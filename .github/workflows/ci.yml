@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  pull-request-policy:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch name
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ ! "$HEAD_REF" =~ ^(docs|feat|fix|refactor|test|chore)/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+            echo "Invalid branch name: $HEAD_REF"
+            echo "Expected: type/<issue-number>-<kebab-case-description>"
+            exit 1
+          fi
+
+      - name: Require exactly one commit
+        env:
+          COMMIT_COUNT: ${{ github.event.pull_request.commits }}
+        run: |
+          if [[ "$COMMIT_COUNT" != "1" ]]; then
+            echo "A pull request must contain exactly one commit; found $COMMIT_COUNT."
+            exit 1
+          fi
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate documentation
+        run: python3 scripts/check_docs.py
+
+  go-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Detect Go module
+        id: module
+        run: |
+          if [[ -f go.mod ]]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Go
+        if: steps.module.outputs.exists == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test
+        if: steps.module.outputs.exists == 'true'
+        run: go test ./...
+
+      - name: Vet
+        if: steps.module.outputs.exists == 'true'
+        run: go vet ./...
