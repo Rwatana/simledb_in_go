@@ -1,0 +1,5 @@
+# Allowed Issue and Pull Request title prefixes.
+prefixes:
+  - Docs
+  - Go
+  - CI/CD
