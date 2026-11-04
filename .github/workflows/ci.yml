@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+      - reopened
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  issue-policy:
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate Issue title prefix
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          valid=false
+          while IFS= read -r prefix; do
+            if [[ "$ISSUE_TITLE" == "[$prefix] "* ]]; then
+              valid=true
+              break
+            fi
+          done < <(sed -n 's/^  - //p' hack/prefix.yml)
+
+          if [[ "$valid" != "true" ]]; then
+            echo "Invalid Issue title: $ISSUE_TITLE"
+            echo "Use one of the prefixes defined in hack/prefix.yml."
+            exit 1
+          fi
+
+  pull-request-policy:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate Pull Request policy
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          valid_prefix=false
+          while IFS= read -r prefix; do
+            if [[ "$PR_TITLE" == "[$prefix] "* ]]; then
+              valid_prefix=true
+              break
+            fi
+          done < <(sed -n 's/^  - //p' hack/prefix.yml)
+
+          if [[ "$valid_prefix" != "true" ]]; then
+            echo "Invalid Pull Request title: $PR_TITLE"
+            echo "Use one of the prefixes defined in hack/prefix.yml."
+            exit 1
+          fi
+
+          if [[ "$HEAD_REF" =~ ^feature/#([0-9]+)_[a-z0-9]+(_[a-z0-9]+)*$ ]]; then
+            issue_number="${BASH_REMATCH[1]}"
+          else
+            echo "Invalid branch name: $HEAD_REF"
+            echo "Expected: feature/#<issue-number>_<snake_case_description>"
+            exit 1
+          fi
+
+          if ! grep -Eq '^## Issue Number[[:space:]]*$' <<< "$PR_BODY"; then
+            echo "Pull Request body must contain: ## Issue Number"
+            exit 1
+          fi
+
+          if ! grep -Eq "^#${issue_number}[[:space:]]*$" <<< "$PR_BODY"; then
+            echo "Issue Number must match the branch: #${issue_number}"
+            exit 1
+          fi
+
+          if ! grep -Eq "(Closes|Fixes|Resolves)[[:space:]]+#${issue_number}([^0-9]|$)" <<< "$PR_BODY"; then
+            echo "Pull Request body must close Issue #${issue_number}."
+            exit 1
+          fi
+
+      - name: Require exactly one commit
+        env:
+          COMMIT_COUNT: ${{ github.event.pull_request.commits }}
+        run: |
+          if [[ "$COMMIT_COUNT" != "1" ]]; then
+            echo "A pull request must contain exactly one commit; found $COMMIT_COUNT."
+            exit 1
+          fi
+
+  docs:
+    if: github.event_name != 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate documentation
+        run: python3 scripts/check_docs.py
+
+  go-quality:
+    if: github.event_name != 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Detect Go module
+        id: module
+        run: |
+          if [[ -f go.mod ]]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Go
+        if: steps.module.outputs.exists == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test
+        if: steps.module.outputs.exists == 'true'
+        run: go test ./...
+
+      - name: Vet
+        if: steps.module.outputs.exists == 'true'
+        run: go vet ./...
