@@ -1,0 +1,28 @@
+<mxfile host="app.diagrams.net" modified="2026-11-05T20:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="chapter-03-block-id" name="Chapter 3 - BlockID">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 3 / Feature 1: BlockID" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=24;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="330" y="25" width="500" height="40" as="geometry"/></mxCell>
+        <mxCell id="blockID" value="BlockID&#xa;&#xa;fileName: student.tbl&#xa;number: 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=16;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="55" y="145" width="240" height="130" as="geometry"/></mxCell>
+        <mxCell id="file" value="database file: student.tbl" style="swimlane;html=1;startSize=38;rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="405" y="115" width="660" height="220" as="geometry"/></mxCell>
+        <mxCell id="b0" value="block 0&#xa;offset 0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="file"><mxGeometry x="30" y="70" width="140" height="90" as="geometry"/></mxCell>
+        <mxCell id="b1" value="block 1&#xa;offset 1 × size" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="file"><mxGeometry x="180" y="70" width="140" height="90" as="geometry"/></mxCell>
+        <mxCell id="b2" value="block 2&#xa;offset 2 × size" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;strokeWidth=3;" vertex="1" parent="file"><mxGeometry x="330" y="70" width="140" height="90" as="geometry"/></mxCell>
+        <mxCell id="b3" value="block 3&#xa;offset 3 × size" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="file"><mxGeometry x="480" y="70" width="140" height="90" as="geometry"/></mxCell>
+        <mxCell id="identifyLabel" value="同じfile名 + block番号" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=13;fontColor=#4b5563;" vertex="1" parent="1"><mxGeometry x="570" y="70" width="220" height="25" as="geometry"/></mxCell>
+        <mxCell id="identifies" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="blockID" target="b2">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="350" y="210"/><mxPoint x="350" y="90"/><mxPoint x="805" y="90"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="comparison" value="Goでの同値性" style="swimlane;html=1;startSize=38;rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="145" y="430" width="870" height="205" as="geometry"/></mxCell>
+        <mxCell id="left" value="BlockID{&#xa; student.tbl, 2&#xa;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=15;" vertex="1" parent="comparison"><mxGeometry x="45" y="65" width="190" height="95" as="geometry"/></mxCell>
+        <mxCell id="equal" value="==&#xa;&#xa;stringとintだけなので&#xa;比較可能 / map key" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;fontStyle=1;" vertex="1" parent="comparison"><mxGeometry x="325" y="65" width="220" height="95" as="geometry"/></mxCell>
+        <mxCell id="right" value="BlockID{&#xa; student.tbl, 2&#xa;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=15;" vertex="1" parent="comparison"><mxGeometry x="635" y="65" width="190" height="95" as="geometry"/></mxCell>
+        <mxCell id="eq1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="comparison" source="left" target="equal"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="eq2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;" edge="1" parent="comparison" source="right" target="equal"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="scope" value="このPRの境界: blockの識別だけ。Pageとfilesystem I/Oは後続Issue。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=15;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="260" y="700" width="640" height="65" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

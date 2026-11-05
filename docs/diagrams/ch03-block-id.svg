@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 3 Feature 1: BlockID</title>
+  <desc id="description">BlockIDがfile名と論理block番号でdatabase file内の1つのblockを識別し、Goでは比較可能な値として扱えることを示す。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#374151"/></marker>
+    <style>.title{font:700 30px system-ui,sans-serif;fill:#1f2937}.heading{font:700 18px system-ui,sans-serif;fill:#1f2937}.text{font:16px system-ui,sans-serif;fill:#1f2937}.small{font:14px system-ui,sans-serif;fill:#4b5563}.box{stroke-width:2}.line{fill:none;stroke:#374151;stroke-width:3;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1400" height="850" fill="#ffffff"/>
+  <text class="title" x="700" y="52" text-anchor="middle">Chapter 3 / Feature 1: BlockID</text>
+
+  <rect class="box" x="55" y="150" width="255" height="140" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="182" y="185" text-anchor="middle">BlockID</text><text class="text" x="182" y="225" text-anchor="middle">fileName: student.tbl</text><text class="text" x="182" y="255" text-anchor="middle">number: 2</text>
+
+  <rect class="box" x="430" y="110" width="900" height="245" rx="12" fill="#f9fafb" stroke="#666666"/>
+  <text class="heading" x="470" y="148">database file: student.tbl</text>
+  <rect class="box" x="470" y="190" width="190" height="105" fill="#dae8fc" stroke="#6c8ebf"/><text class="heading" x="565" y="230" text-anchor="middle">block 0</text><text class="small" x="565" y="262" text-anchor="middle">offset 0</text>
+  <rect class="box" x="670" y="190" width="190" height="105" fill="#dae8fc" stroke="#6c8ebf"/><text class="heading" x="765" y="230" text-anchor="middle">block 1</text><text class="small" x="765" y="262" text-anchor="middle">offset 1 × size</text>
+  <rect x="870" y="190" width="190" height="105" fill="#d5e8d4" stroke="#82b366" stroke-width="4"/><text class="heading" x="965" y="230" text-anchor="middle">block 2</text><text class="small" x="965" y="262" text-anchor="middle">offset 2 × size</text>
+  <rect class="box" x="1070" y="190" width="190" height="105" fill="#dae8fc" stroke="#6c8ebf"/><text class="heading" x="1165" y="230" text-anchor="middle">block 3</text><text class="small" x="1165" y="262" text-anchor="middle">offset 3 × size</text>
+  <path class="line" d="M310 220 H390 V170 H965 V190"/><text class="small" x="820" y="160" text-anchor="middle">同じfile名 + block番号</text>
+
+  <rect class="box" x="145" y="430" width="1110" height="235" rx="12" fill="#f9fafb" stroke="#666666"/>
+  <text class="heading" x="185" y="470">Goでの同値性</text>
+  <rect class="box" x="205" y="515" width="235" height="105" rx="10" fill="#e1d5e7" stroke="#9673a6"/><text class="heading" x="322" y="550" text-anchor="middle">BlockID</text><text class="text" x="322" y="582" text-anchor="middle">student.tbl, 2</text>
+  <rect class="box" x="570" y="505" width="260" height="125" rx="10" fill="#fff2cc" stroke="#d6b656"/><text class="heading" x="700" y="542" text-anchor="middle">==</text><text class="text" x="700" y="575" text-anchor="middle">stringとintだけ</text><text class="small" x="700" y="603" text-anchor="middle">比較可能 / map key</text>
+  <rect class="box" x="960" y="515" width="235" height="105" rx="10" fill="#e1d5e7" stroke="#9673a6"/><text class="heading" x="1077" y="550" text-anchor="middle">BlockID</text><text class="text" x="1077" y="582" text-anchor="middle">student.tbl, 2</text>
+  <path class="line" d="M440 567 H570"/><path class="line" d="M960 567 H830"/>
+
+  <rect class="box" x="290" y="735" width="820" height="70" rx="12" fill="#f8cecc" stroke="#b85450"/>
+  <text class="heading" x="700" y="778" text-anchor="middle">このPRはblockの識別だけ。Pageとfilesystem I/Oは後続Issue。</text>
+</svg>
