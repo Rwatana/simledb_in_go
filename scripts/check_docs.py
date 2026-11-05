@@ -39,7 +39,7 @@ def validate_markdown_links() -> list[str]:
 
 
 def validate_drawio_xml() -> list[str]:
-    """Return errors for Draw.io files that are not well-formed XML."""
+    """Return errors for diagram files that are not well-formed XML."""
     errors: list[str] = []
 
     for diagram in sorted(ROOT.rglob("*.drawio")):
@@ -51,6 +51,16 @@ def validate_drawio_xml() -> list[str]:
 
         if root.tag != "mxfile":
             errors.append(f"{diagram.relative_to(ROOT)}: root element must be mxfile")
+
+    for diagram in sorted(ROOT.rglob("*.svg")):
+        try:
+            root = ET.parse(diagram).getroot()
+        except ET.ParseError as error:
+            errors.append(f"{diagram.relative_to(ROOT)}: invalid XML: {error}")
+            continue
+
+        if root.tag != "{http://www.w3.org/2000/svg}svg":
+            errors.append(f"{diagram.relative_to(ROOT)}: root element must be svg")
 
     return errors
 

@@ -31,7 +31,7 @@ cmd / infrastructure / adapter
 | Chapter | Javaパッケージ | Goで検討する境界 |
 | --- | --- | --- |
 | 1 | 全体像 | DBエンジンとUI、外部I/Oと中核規則 |
-| 2 | `simpleclient`, `jdbc` | クライアントadapterとエンジンAPI |
+| 2 | `simpleclient`, `jdbc` | クライアントadapterとエンジンAPI（概念整理のみ） |
 | 3 | `file` | block/pageの値とファイルI/O |
 | 4 | `log`, `buffer` | ログ永続化とメモリキャッシュ |
 | 5 | `tx` | transaction usecase、recovery、locking |
@@ -44,6 +44,9 @@ cmd / infrastructure / adapter
 | 12-15 | `index`, `materialize`, `multibuffer`, `opt` | 高速化戦略と差し替え可能な実装 |
 
 これは最終構成ではない。実装前のテストが境界を必要としたときにだけ分割する。
+Chapter 2で確認した`Connection`や`ResultSet`の責務も、その名前のGo interfaceを先に
+作る根拠にはしない。接続方式、cursor、metadataのうち、実際の利用側が必要とする操作だけを
+その利用側のpackageに定義する。
 
 ## テスト方針
 

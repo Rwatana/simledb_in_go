@@ -17,11 +17,11 @@
 | Chapter | テーマ | 状態 | 成果物 |
 | --- | --- | --- | --- |
 | 1 | Database Systems | 学習資料作成済み | [章まとめ](docs/chapters/01-database-systems.md) / [概念図](docs/diagrams/ch01-database-system.drawio) |
-| 2 | JDBC | 未着手 | Goにおけるクライアント境界を整理予定 |
+| 2 | JDBC | 学習資料作成済み | [章まとめ](docs/chapters/02-jdbc.md) / [編集用Draw.io](docs/diagrams/ch02-client-boundary.drawio) / [表示用SVG](docs/diagrams/ch02-client-boundary.svg) |
 | 3 | Disk and File Management | 未着手 | 最初のGo実装候補 |
 
-第1章は概念導入の章であり、書籍もSimpleDBのソースコード解説を第3章から
-始めています。そのため、第1章のPRにはGo実装を含めません。
+第1章は概念導入、第2章はJDBCによるクライアント境界の説明であり、書籍もSimpleDBの
+内部実装の解説を第3章から始めています。そのため、第1章と第2章のPRにはGo実装を含めません。
 
 ## 設計方針
 
@@ -66,9 +66,8 @@
 
 ## 次の一歩
 
-Chapter 2はJava固有のJDBCが中心です。Goへ直接移植せず、DBエンジンの利用者側に
-必要な境界を読み解く学習Issueとして扱います。最初の実装はChapter 3の
-`BlockID`相当の値オブジェクトから始める予定です。
+Chapter 3のdisk and file managementへ進みます。最初のGo実装は、file名とblock番号を
+表す`BlockID`相当の値オブジェクトを、利用者から見える振る舞いのテストと一緒に追加します。
 
 ## 参照元
 
