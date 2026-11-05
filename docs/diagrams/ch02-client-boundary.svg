@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 2: JDBCから読み解くDBクライアント境界</title>
+  <desc id="description">共通のJDBC APIからEmbeddedとNetworkのadapterを通ってDBエンジンへ到達する経路と、query結果を閉じるまでのresource lifecycleを示す。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#374151"/></marker>
+    <style>
+      .title{font:700 28px system-ui,sans-serif;fill:#1f2937}.heading{font:700 17px system-ui,sans-serif;fill:#1f2937}.text{font:15px system-ui,sans-serif;fill:#1f2937}.small{font:13px system-ui,sans-serif;fill:#4b5563}.box{stroke-width:2}.line{fill:none;stroke:#374151;stroke-width:2;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1400" height="820" fill="#ffffff"/>
+  <text class="title" x="700" y="45" text-anchor="middle">Chapter 2: JDBCから読み解くDBクライアント境界</text>
+
+  <rect class="box" x="35" y="95" width="190" height="80" rx="10" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="heading" x="130" y="125" text-anchor="middle">Client Application</text><text class="small" x="130" y="150" text-anchor="middle">SimpleIJ / application</text>
+  <rect class="box" x="275" y="85" width="240" height="100" rx="10" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="395" y="115" text-anchor="middle">Client-facing API</text><text class="text" x="395" y="142" text-anchor="middle">Connection · Statement</text><text class="text" x="395" y="164" text-anchor="middle">ResultSet · MetaData</text>
+  <rect class="box" x="575" y="75" width="195" height="75" rx="10" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="heading" x="672" y="105" text-anchor="middle">Embedded Adapter</text><text class="small" x="672" y="130" text-anchor="middle">in-process call</text>
+  <rect class="box" x="575" y="210" width="195" height="80" rx="10" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="heading" x="672" y="240" text-anchor="middle">Network Adapter</text><text class="small" x="672" y="265" text-anchor="middle">Network* wrappers</text>
+  <rect class="box" x="830" y="210" width="180" height="80" rx="10" fill="#ffe6cc" stroke="#d79b00"/>
+  <text class="heading" x="920" y="240" text-anchor="middle">RMI Transport</text><text class="small" x="920" y="265" text-anchor="middle">Remote* interfaces</text>
+  <rect class="box" x="830" y="75" width="180" height="75" rx="10" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="heading" x="920" y="105" text-anchor="middle">Server Adapter</text><text class="small" x="920" y="130" text-anchor="middle">Remote*Impl</text>
+  <rect class="box" x="1080" y="100" width="275" height="125" rx="10" fill="#f8cecc" stroke="#b85450"/>
+  <text class="heading" x="1217" y="132" text-anchor="middle">Database Engine</text><text class="text" x="1217" y="161" text-anchor="middle">Planner · Transaction</text><text class="text" x="1217" y="185" text-anchor="middle">Scan · Schema</text>
+
+  <path class="line" d="M225 135 H275"/><text class="small" x="250" y="125" text-anchor="middle">共通API</text>
+  <path class="line" d="M515 115 H575"/><text class="small" x="545" y="103" text-anchor="middle">embedded</text>
+  <path class="line" d="M515 155 H545 V250 H575"/><text class="small" x="555" y="205" text-anchor="end">network</text>
+  <path class="line" d="M770 112 V65 H1050 V135 H1080"/><text class="small" x="900" y="59" text-anchor="middle">direct in-process call</text>
+  <path class="line" d="M770 250 H830"/><text class="small" x="800" y="238" text-anchor="middle">remote</text>
+  <path class="line" d="M920 210 V150"/><text class="small" x="930" y="185">boundary</text>
+  <path class="line" d="M1010 112 H1080"/><text class="small" x="1045" y="100" text-anchor="middle">usecase</text>
+
+  <rect x="90" y="360" width="1220" height="230" rx="12" fill="#f9fafb" stroke="#666666" stroke-width="2"/>
+  <text class="heading" x="120" y="395">Query resource lifecycle</text>
+  <rect class="box" x="130" y="435" width="220" height="90" rx="10" fill="#dae8fc" stroke="#6c8ebf"/><text class="heading" x="240" y="470" text-anchor="middle">1. executeQuery</text><text class="text" x="240" y="498" text-anchor="middle">SQLを送る</text>
+  <rect class="box" x="435" y="435" width="220" height="90" rx="10" fill="#e1d5e7" stroke="#9673a6"/><text class="heading" x="545" y="470" text-anchor="middle">2. ResultSet</text><text class="text" x="545" y="498" text-anchor="middle">cursorを取得</text>
+  <rect class="box" x="740" y="435" width="220" height="90" rx="10" fill="#fff2cc" stroke="#d6b656"/><text class="heading" x="850" y="470" text-anchor="middle">3. next / get</text><text class="text" x="850" y="498" text-anchor="middle">行を逐次処理</text>
+  <rect class="box" x="1045" y="435" width="220" height="90" rx="10" fill="#d5e8d4" stroke="#82b366"/><text class="heading" x="1155" y="470" text-anchor="middle">4. close</text><text class="text" x="1155" y="498" text-anchor="middle">Scanを解放</text>
+  <path class="line" d="M350 480 H435"/><path class="line" d="M655 480 H740"/><path class="line" d="M960 480 H1045"/><text class="small" x="1002" y="468" text-anchor="middle">必ず</text>
+
+  <rect class="box" x="230" y="655" width="940" height="85" rx="12" fill="#f3f4f6" stroke="#666666"/>
+  <text class="heading" x="700" y="689" text-anchor="middle">Goへの判断</text><text class="text" x="700" y="718" text-anchor="middle">責務と寿命だけを学ぶ。具体的なinterfaceは利用側のテストが必要とするまで作らない。</text>
+</svg>
