@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 4 Feature 1: Log block initialization</title>
+  <desc id="description">missing log fileではblock 0を作りboundaryをblock sizeへ初期化し、existing fileでは末尾blockをloadする分岐。</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.small{font-family:Helvetica,Arial,sans-serif;font-size:14px;fill:#4b5563}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="850" fill="#ffffff"/>
+  <text class="title" x="700" y="58" text-anchor="middle">Chapter 4 / Feature 1: Log block initialization</text>
+  <polygon points="225,165 365,250 225,335 85,250" fill="#fff2cc" stroke="#d6b656" stroke-width="2"/>
+  <text class="heading" x="225" y="245" text-anchor="middle">Length</text><text class="text" x="225" y="273" text-anchor="middle">simpledb.log</text>
+  <rect class="box" x="455" y="130" width="300" height="170" rx="12" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="heading" x="605" y="172" text-anchor="middle">0 blocks</text><text class="text" x="605" y="220" text-anchor="middle">Append block 0</text><text class="text" x="605" y="255" text-anchor="middle">NewPage(blockSize)</text>
+  <rect class="box" x="455" y="340" width="300" height="150" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="605" y="380" text-anchor="middle">N blocks</text><text class="text" x="605" y="425" text-anchor="middle">Read block N-1</text><text class="small" x="605" y="458" text-anchor="middle">do not append</text>
+  <line x1="365" y1="220" x2="455" y2="215" stroke="#475569" stroke-width="3"/><line x1="365" y1="285" x2="455" y2="405" stroke="#475569" stroke-width="3"/>
+  <rect class="box" x="870" y="145" width="450" height="300" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="1095" y="187" text-anchor="middle">log block 0 (32 bytes)</text>
+  <rect class="box" x="895" y="235" width="160" height="130" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="small" x="975" y="270" text-anchor="middle">offset 0..3</text><text class="heading" x="975" y="320" text-anchor="middle">boundary = 32</text>
+  <rect class="box" x="1055" y="235" width="240" height="130" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="small" x="1175" y="270" text-anchor="middle">offset 4..31</text><text class="heading" x="1175" y="307" text-anchor="middle">zero-filled free area</text><text class="small" x="1175" y="340" text-anchor="middle">future records grow right → left</text>
+  <line x1="755" y1="215" x2="870" y2="215" stroke="#475569" stroke-width="3"/>
+  <rect class="box" x="330" y="650" width="740" height="90" rx="12" fill="#f8cecc" stroke="#b85450"/>
+  <text class="heading" x="700" y="705" text-anchor="middle">Empty log invariant: boundary == block size; no record bytes exist.</text>
+</svg>
