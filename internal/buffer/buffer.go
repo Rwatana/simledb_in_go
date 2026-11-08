@@ -161,6 +161,30 @@ func (b *Buffer) assignToBlock(block storage.BlockID) error {
 	return nil
 }
 
+// reassignToBlock replaces a clean, unpinned Buffer's disk block and contents.
+func (b *Buffer) reassignToBlock(block storage.BlockID) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.block == nil {
+		return fmt.Errorf("reassign buffer to %v: buffer is not assigned", block)
+	}
+	if b.modifiedBy != nil {
+		return fmt.Errorf("reassign buffer from %v to %v: buffer is modified by transaction %d", *b.block, block, *b.modifiedBy)
+	}
+	if b.pins != 0 {
+		return fmt.Errorf("reassign buffer from %v to %v: buffer has pin count %d", *b.block, block, b.pins)
+	}
+	page, err := b.files.Read(block)
+	if err != nil {
+		return fmt.Errorf("reassign buffer from %v to %v: %w", *b.block, block, err)
+	}
+	assigned := block
+	b.contents = page
+	b.block = &assigned
+	return nil
+}
+
 // flush persists a dirty Buffer in write-ahead order and marks it clean.
 func (b *Buffer) flush() error {
 	b.mu.Lock()

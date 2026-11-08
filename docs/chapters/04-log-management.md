@@ -22,7 +22,8 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | dirty recovery LSN | dirty Pageに先行するlog record | 実装済み |
 | dirty buffer flush | WAL順序とdata Page保存 | 実装済み |
 | initial block assignment | unassigned frameへのdisk Page load | 実装済み |
-| buffer reassignment | dirty flush後のframe再利用 | 未着手 |
+| clean buffer reassignment | clean frameの安全な再利用 | 実装済み |
+| dirty buffer replacement | WAL flush後のframe再利用 | 未着手 |
 | buffer pool | frame選択と待機 | 未着手 |
 
 ## Feature 1: Log block initialization
@@ -1216,10 +1217,91 @@ WAL orderingはBufferが持つapplication policyで、具体的なdurability mec
 - replacement policy
 - recovery scan/rollback
 
+## Feature 15: Reassign a clean buffer
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-clean-reassignment.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-clean-reassignment.svg)を参照する。図はcurrent assignmentを維持したまま
+target blockをtemporary Pageへreadし、成功後だけBlockIDとContentsを同時に置き換える順序を示す。
+
+### 問い
+
+clean・unpinnedなassigned frameを別blockへ再利用するとき、invalid stateやread failureによってcurrent
+BlockIDとContentsの組み合わせを壊さずにどう切り替えるか。
+
+### 概念
+
+private `reassignToBlock`はBuffer mutex内で、frameがassigned、clean、unpinnedであることを検査する。
+target blockはtemporary Pageへreadし、I/O成功後だけcontents pointerとBlockIDを置き換える。
+
+```text
+validate assigned + clean + unpinned -> read target Page -> commit Page + BlockID
+```
+
+unassigned、dirty、pinnedの各frameはread前にrejectする。target readが失敗した場合も、old BlockID、
+old Contents、dirty metadata、pin countを変更しない。このfeatureはflushを呼ばず、dirty replacementを
+後続PRへ残す。
+
+### 公開API
+
+public APIは増やさない。後続BufferManagerがclean victimへ使うprivate
+`reassignToBlock(block) error`だけを追加する。
+
+### Test-firstの記録
+
+#### Red
+
+successful replacement、unassigned/dirty/pinned rejection、read failureのstate invariantsを先にtestした。
+実装前は`reassignToBlock`が存在せずbuildに失敗した。
+
+```text
+frame.reassignToBlock undefined (type *Buffer has no field or method reassignToBlock)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+precondition validation、temporary Page read、success-only state commitを1つのmutex区間へ追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestReassignToBlockLoadsAnotherBlockIntoACleanUnpinnedFrame` | target BlockID、disk contents、pin count 0 |
+| `TestReassignToBlockRejectsUnassignedDirtyOrPinnedFrames` | precondition failuresと全state維持 |
+| `TestReassignToBlockPreservesCurrentStateWhenTargetReadFails` | I/O failure前後のold assignment invariant |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.Buffer.assignToBlock`の既存frame経路である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `flush()`後にread | clean frameだけを受け入れる | dirty auto-flushを独立behaviorへ分ける |
+| `blk = b`の後に`fm.read` | temporary read後にstate commit | read failureでold assignmentを維持する |
+| `pins = 0` | pin count 0をpreconditionにする | active userがいるframeを置き換えない |
+| 同じmethodでinitial/reassign | private methodを分離 | 各state transitionのpreconditionを明示する |
+
+## Clean Architecture上の判断
+
+Bufferは単一frameの安全なstate transitionだけを担う。どのframeをvictimにするかは後続BufferManagerの
+policyであり、FileManagerはtarget blockのI/Oだけを担う。
+
+## 意図的に含めなかったもの
+
+- dirty Pageのauto-flushとreplacement
+- transaction別FlushAll
+- buffer pool selection/waiting
+- replacement policy
+- recovery scan/rollback
+
 ## 次の機能
 
-次はclean・unpinnedなassigned Bufferを別blockへreassignする。dirty auto-flushを含むreplacementと
-BufferManager poolは、さらに独立したIssue、commit、stacked PRへ分ける。
+次はdirty・unpinnedなassigned BufferをWAL順にflushしてから別blockへreassignする。BufferManager poolは、
+さらに独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 
