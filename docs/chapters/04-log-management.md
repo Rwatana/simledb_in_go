@@ -17,7 +17,8 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | iterator creation flush | disk traversal前のtail durability | 実装済み |
 | unassigned buffer frame | fixed-size cache Pageの初期状態 | 実装済み |
 | buffer pin increment | frame利用開始と0→1遷移 | 実装済み |
-| buffer unpin | frame利用終了とunderflow防止 | 未着手 |
+| buffer unpin | frame利用終了とunderflow防止 | 実装済み |
+| dirty transaction | frameを変更したtransactionの識別 | 未着手 |
 | dirty buffer flush | WAL順序とdata Page保存 | 未着手 |
 | block assignment | frame再利用 | 未着手 |
 | buffer pool | frame選択と待機 | 未着手 |
@@ -805,10 +806,89 @@ pin countはframe自身のlifecycle stateなのでBufferが所有する。pool�
 - WAL付きflush
 - block assignmentとreplacement
 
+## Feature 10: Decrement buffer pin count
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-unpin.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-unpin.svg)を参照する。図はpin count 2から1、1から0への遷移と、
+0からの追加unpinをstate不変のerrorとして拒否する契約を示す。
+
+### 問い
+
+複数clientが共有するframeを解放するとき、まだ利用中の状態とavailableへ戻る瞬間を区別し、誤った
+余分なunpinでcountが負になることをどう防ぐか。
+
+### 概念
+
+private `unpin`はBuffer mutex内でcountを検査する。count > 0なら1減らし、結果が0の場合だけ
+`becameAvailable = true`を返す。すでに0ならerrorを返し、countを変更しない。
+
+```text
+2 --unpin(false)--> 1 --unpin(true)--> 0
+0 --unpin(error)--> 0
+```
+
+後続BufferManagerはtransition booleanを使い、1→0のときだけavailable countを増やしてwaiterへ通知できる。
+
+### 公開API
+
+public APIは増やさない。private `Buffer.unpin() (becameAvailable bool, err error)`を追加し、既存の
+`IsPinned`と`PinCount`で結果を観測する。
+
+### Test-firstの記録
+
+#### Red
+
+2→1、1→0、0でのreject、32 goroutinesのconcurrent decrementを先にtestした。実装前は`unpin`が
+存在せずbuildに失敗した。
+
+```text
+frame.unpin undefined (type *Buffer has no field or method unpin)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+pinと同じmutexを使うdecrement、transition判定、underflow errorを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestUnpinDecrementsCountAndReportsOnlyTheAvailableTransition` | 2→1 false、1→0 true、underflow reject |
+| `TestUnpinIsConcurrencySafe` | 32 concurrent decrements、exactly one 1→0 transition、final zero |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.Buffer.unpin`と`BufferMgr.unpin`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `pins--` | zero検査後の`pins--` | negative countをsilentに作らない |
+| managerが後から`isPinned` | `unpin`がtransition boolを返す | decrementと1→0判定をatomicにする |
+| underflow規定なし | explicit error | duplicate releaseを呼び出し側bugとして報告する |
+| manager method全体をsynchronized | frame mutex | 1 frameのstate transitionを局所化する |
+
+## Clean Architecture上の判断
+
+pinとunpinのcounter invariantはBuffer自身が守る。available poolの集計とcondition notificationはまだ
+BufferManagerへ置かず、今回のPRを1 frameのrelease transitionだけに限定する。
+
+## 意図的に含めなかったもの
+
+- BufferManagerのavailable count更新
+- waiting goroutine notification
+- dirty transaction/LSN metadata
+- WAL付きflush
+- block assignmentとreplacement
+
 ## 次の機能
 
-次はBuffer frameのunpin decrementと0未満を防ぐerrorだけを実装する。dirty metadata、WAL付きflush、
-block assignment、BufferManager poolは、それぞれさらに独立したIssue、commit、stacked PRへ分ける。
+次はBuffer frameを変更したtransaction IDだけを記録する。LSN metadata、WAL付きflush、block assignment、
+BufferManager poolは、それぞれさらに独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 

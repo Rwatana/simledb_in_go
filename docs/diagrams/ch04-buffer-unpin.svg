@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 4 Feature 10: Decrement buffer pin count</title>
+  <desc id="description">pin countが2から1、1から0へ減り、0でのunpinはerrorになる。</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="850" fill="#ffffff"/>
+  <text class="title" x="700" y="60" text-anchor="middle">Chapter 4 / Feature 10: Decrement buffer pin count</text>
+  <rect class="box" x="100" y="185" width="300" height="190" rx="12" fill="#dae8fc" stroke="#6c8ebf"/><text class="heading" x="250" y="230" text-anchor="middle">Shared frame</text><text class="text" x="250" y="285" text-anchor="middle">pin count = 2</text><text class="text" x="250" y="330" text-anchor="middle">IsPinned = true</text>
+  <rect class="box" x="550" y="185" width="300" height="190" rx="12" fill="#fff2cc" stroke="#d6b656"/><text class="heading" x="700" y="230" text-anchor="middle">Pinned frame</text><text class="text" x="700" y="285" text-anchor="middle">pin count = 1</text><text class="text" x="700" y="330" text-anchor="middle">IsPinned = true</text>
+  <rect class="box" x="1000" y="185" width="300" height="190" rx="12" fill="#d5e8d4" stroke="#82b366"/><text class="heading" x="1150" y="230" text-anchor="middle">Available frame</text><text class="text" x="1150" y="285" text-anchor="middle">pin count = 0</text><text class="text" x="1150" y="330" text-anchor="middle">IsPinned = false</text>
+  <line x1="400" y1="280" x2="550" y2="280" stroke="#475569" stroke-width="3"/><polygon points="550,280 537,272 537,288" fill="#475569"/><text class="text" x="475" y="248" text-anchor="middle">unpin() = false</text><text class="text" x="475" y="270" text-anchor="middle">still unavailable</text>
+  <line x1="850" y1="280" x2="1000" y2="280" stroke="#475569" stroke-width="3"/><polygon points="1000,280 987,272 987,288" fill="#475569"/><text class="text" x="925" y="248" text-anchor="middle">unpin() = true</text><text class="text" x="925" y="270" text-anchor="middle">availability changes</text>
+  <rect class="box" x="1000" y="445" width="300" height="110" rx="12" fill="#f8cecc" stroke="#b85450"/><text class="heading" x="1150" y="487" text-anchor="middle">unpin at zero → error</text><text class="text" x="1150" y="530" text-anchor="middle">pin count remains 0</text>
+  <line x1="1150" y1="375" x2="1150" y2="445" stroke="#b85450" stroke-width="3" stroke-dasharray="8 6"/><polygon points="1150,445 1142,432 1158,432" fill="#b85450"/>
+  <rect class="box" x="260" y="650" width="880" height="90" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="700" y="705" text-anchor="middle">Only 1 → 0 returns available. Underflow is rejected without changing state.</text>
+</svg>
