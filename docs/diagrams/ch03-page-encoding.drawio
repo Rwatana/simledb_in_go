@@ -1,0 +1,22 @@
+<mxfile host="app.diagrams.net" modified="2026-11-08T01:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="chapter-03-page-encoding" name="Chapter 3 - Page Encoding">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 3 / Feature 2: Page memory encoding" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=26;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="340" y="30" width="720" height="45" as="geometry"/></mxCell>
+        <mxCell id="page" value="Page (fixed capacity: 24 bytes)" style="swimlane;html=1;startSize=42;rounded=1;fillColor=#f8fafc;strokeColor=#475569;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="70" y="130" width="1260" height="250" as="geometry"/></mxCell>
+        <mxCell id="int0" value="offset 0..3&#xa;int32: 42&#xa;00 00 00 2A" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=1;" vertex="1" parent="page"><mxGeometry x="25" y="80" width="210" height="110" as="geometry"/></mxCell>
+        <mxCell id="gap" value="offset 4..7&#xa;unused" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#9ca3af;fontSize=15;" vertex="1" parent="page"><mxGeometry x="235" y="80" width="180" height="110" as="geometry"/></mxCell>
+        <mxCell id="length" value="offset 8..11&#xa;length: 5&#xa;00 00 00 05" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=15;fontStyle=1;" vertex="1" parent="page"><mxGeometry x="415" y="80" width="230" height="110" as="geometry"/></mxCell>
+        <mxCell id="payload" value="offset 12..16&#xa;payload (5 bytes)&#xa;DE AD 00 BE EF" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontStyle=1;" vertex="1" parent="page"><mxGeometry x="645" y="80" width="300" height="110" as="geometry"/></mxCell>
+        <mxCell id="rest" value="offset 17..23&#xa;remaining capacity" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#9ca3af;fontSize=15;" vertex="1" parent="page"><mxGeometry x="945" y="80" width="270" height="110" as="geometry"/></mxCell>
+        <mxCell id="intContract" value="SetInt(0, 42) / GetInt(0)&#xa;&#xa;4-byte signed integer&#xa;big-endian" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;" vertex="1" parent="1"><mxGeometry x="145" y="485" width="340" height="160" as="geometry"/></mxCell>
+        <mxCell id="bytesContract" value="SetBytes(8, payload) / GetBytes(8)&#xa;&#xa;4-byte length prefix + payload&#xa;read returns a defensive copy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1"><mxGeometry x="760" y="485" width="480" height="160" as="geometry"/></mxCell>
+        <mxCell id="intEdge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1" source="intContract" target="int0"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="bytesEdge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#82b366;" edge="1" parent="1" source="bytesContract" target="payload"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="boundary" value="All reads and writes validate offset + encoded length against the fixed capacity." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="315" y="720" width="770" height="70" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
