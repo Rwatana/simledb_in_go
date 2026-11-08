@@ -19,6 +19,7 @@
 | 1 | Database Systems | 学習資料作成済み | [章まとめ](docs/chapters/01-database-systems.md) / [概念図](docs/diagrams/ch01-database-system.drawio) |
 | 2 | JDBC | 学習資料作成済み | [章まとめ](docs/chapters/02-jdbc.md) / [編集用Draw.io](docs/diagrams/ch02-client-boundary.drawio) / [表示用SVG](docs/diagrams/ch02-client-boundary.svg) |
 | 3 | Disk and File Management | 基礎実装済み | [BlockID、Page、FileManagerの解説・実装記録](docs/chapters/03-disk-and-file-management.md) |
+| 4 | Memory and Log Management | 実装中 | [LogManagerの解説・実装記録](docs/chapters/04-log-management.md) |
 
 第1章は概念導入、第2章はJDBCによるクライアント境界の説明であり、書籍もSimpleDBの
 内部実装の解説を第3章から始めています。そのため、第1章と第2章のPRにはGo実装を含めません。
