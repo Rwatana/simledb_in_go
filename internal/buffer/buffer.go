@@ -15,13 +15,14 @@ type TransactionID int64
 
 // Buffer owns one in-memory Page and its optional disk block assignment.
 type Buffer struct {
-	files      *storagefile.Manager
-	logs       *logmanager.Manager
-	contents   *storage.Page
-	block      *storage.BlockID
-	mu         sync.Mutex
-	pins       int
-	modifiedBy *TransactionID
+	files       *storagefile.Manager
+	logs        *logmanager.Manager
+	contents    *storage.Page
+	block       *storage.BlockID
+	mu          sync.Mutex
+	pins        int
+	modifiedBy  *TransactionID
+	recoveryLSN *logmanager.LSN
 }
 
 // New returns a zero-filled Buffer that is not assigned to a disk block.
@@ -103,4 +104,30 @@ func (b *Buffer) ModifyingTransaction() (TransactionID, bool) {
 		return 0, false
 	}
 	return *b.modifiedBy, true
+}
+
+// RecordRecoveryLSN associates a positive recovery log LSN with a dirty Buffer.
+func (b *Buffer) RecordRecoveryLSN(lsn logmanager.LSN) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if lsn == 0 {
+		return fmt.Errorf("record recovery LSN: zero is not an allocated LSN")
+	}
+	if b.modifiedBy == nil {
+		return fmt.Errorf("record recovery LSN %d: buffer is not marked modified", lsn)
+	}
+	b.recoveryLSN = &lsn
+	return nil
+}
+
+// RecoveryLSN returns the log record that must be durable before this Buffer.
+func (b *Buffer) RecoveryLSN() (logmanager.LSN, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.recoveryLSN == nil {
+		return 0, false
+	}
+	return *b.recoveryLSN, true
 }
