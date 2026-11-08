@@ -15,12 +15,14 @@ type Iterator struct {
 	block    storage.BlockID
 }
 
-// Iterator returns an in-memory snapshot iterator for the current tail block.
-// Creating the iterator does not flush the tail to disk.
+// Iterator flushes the current tail and returns an in-memory snapshot iterator.
 func (m *Manager) Iterator() (*Iterator, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if err := m.flushTailLocked(m.latestLSN); err != nil {
+		return nil, fmt.Errorf("create iterator: flush current log tail: %w", err)
+	}
 	page := storage.NewPageFromBytes(m.page.Snapshot())
 	position, err := blockBoundary(page, m.block)
 	if err != nil {

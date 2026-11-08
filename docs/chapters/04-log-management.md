@@ -14,7 +14,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | block rollover | full tailから次blockへの遷移 | 実装済み |
 | current-block iterator | 1 block内のnewest-to-oldest traversal | 実装済み |
 | previous-block traversal | block境界を越えるreverse traversal | 実装済み |
-| iterator creation flush | disk traversal前のtail durability | 未着手 |
+| iterator creation flush | disk traversal前のtail durability | 実装済み |
 
 ## Feature 1: Log block initialization
 
@@ -399,8 +399,9 @@ recordはright-to-leftにappendされるため、最小offsetのboundaryが最�
 | `Manager.Iterator()` | current in-memory tailのsnapshotから1 block iteratorを作る |
 | `Iterator.Next()` | 次に古いrecordと存在有無を返す |
 
-この段階ではiterator作成時にflushしない。snapshot後にManagerへappendされたrecordも既存iteratorには
-現れない。disk traversalとprevious block移動を次のPRへ分離するためである。
+この機能を導入した段階ではiterator作成時にflushしなかった。snapshot後にManagerへappendされたrecordも
+既存iteratorには現れない。disk traversalとdurability契約を個別にtestするためであり、後述のFeature 7が
+iterator作成前のflushだけを追加する。
 
 ### Test-firstの記録
 
@@ -484,8 +485,9 @@ validationに失敗した場合、Iteratorのcurrent stateを進めずerrorを�
 
 ### 公開API
 
-公開APIは変えない。`Iterator.Next()`のblock末尾経路だけを拡張する。current tailは引き続き
-Managerから取ったmemory snapshot、previous blocksはrollover時に保存済みのdisk Pageをlazy readする。
+公開APIは変えない。`Iterator.Next()`のblock末尾経路だけを拡張する。この機能を導入した段階ではcurrent
+tailをManagerのmemory snapshotから読み、previous blocksはrollover時に保存済みのdisk Pageをlazy read
+した。後述のFeature 7がsnapshot前のtail flushだけを追加する。
 
 ### Test-firstの記録
 
@@ -541,10 +543,96 @@ FileManagerへ委譲する。previous Pageはeager copyせずlazy readし、iter
 - restart後のLSN復元
 - transaction recoveryとの統合
 
+## Feature 7: Flush before iterator creation
+
+編集可能な図は[Draw.io版](../diagrams/ch04-iterator-creation-flush.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-iterator-creation-flush.svg)を参照する。図はunsaved current tailをdiskへwriteし、
+saved LSNを進めた後に同じPageからiterator snapshotを作るdurability boundaryを示す。
+
+### 問い
+
+recovery readerがlog iterationを開始した時点で、current tailを含む全recordがdiskから再読可能であることを
+どう保証するか。
+
+### 概念
+
+`Manager.Iterator`はManager mutexを保持したまま`flushTailLocked(latestLSN)`を呼び、その成功後に
+current Pageをcopyする。
+
+```text
+unsaved latest LSN
+    -> write and sync current Page
+    -> lastSavedLSN = latestLSN
+    -> copy Page into iterator snapshot
+    -> return Iterator
+```
+
+flushが失敗すればsnapshotを返さない。saved LSN以下またはempty logでは既存のprivate flush helperが
+no-opにするため、不要なrewriteを増やさない。
+
+### 公開API
+
+signatureは変えず、`Manager.Iterator() (*Iterator, error)`の作成前conditionを強化する。`error`はPageの
+decodeだけでなく、tail write/sync failureも表す。
+
+### Test-firstの記録
+
+#### Red
+
+2 recordsをmemoryだけへappendし、Iterator作成後のsaved LSNとdisk Page一致を先にtestした。実装前は
+saved LSNが0のままで、disk current blockもinitial boundaryのままだった。
+
+```text
+lastSavedLSN = 0, want latest LSN 2
+disk current block after Iterator() differs from the iterator source Page
+FAIL github.com/Rwatana/simledb_in_go/internal/log
+```
+
+#### Green
+
+Iterator作成のmutex区間冒頭で、既存の`flushTailLocked`を再利用した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/log
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestIteratorFlushesTheCurrentTailBeforeSnapshot` | saved LSN、disk/current Page一致、iterator作成成功 |
+| `TestIteratorTraversesPreviousBlocksNewestToOldest` | current blockもflushされた状態でcross-block orderを維持 |
+
+## Javaソースリーディング
+
+対象は`simpledb.log.LogMgr.iterator`とprivate `flush`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `iterator()`冒頭の`flush()` | `flushTailLocked(latestLSN)` | readerを返す前にtailをdurableにする |
+| `fm.write(currentblk, logpage)` | `files.Write(block, page)` | sync済みFileManager contractを再利用する |
+| `lastSavedLSN = latestLSN` | 同じ | Page単位で保存された最新recordまで進める |
+| unchecked failure | `(*Iterator, error)` | flush failure時にiteratorを返さない |
+| diskからcurrent blockを再read | memory snapshot | 同じmutex区間のPage copyで余分なreadを避ける |
+
+## Clean Architecture上の判断
+
+「readerを公開する前にtailをdurableにする」というpolicyはlog Managerが持ち、実際のwrite/syncは
+FileManagerへ委譲する。public `Flush`を再入可能にせず、同じmutex内でprivate helperを呼ぶことで
+deadlockを避ける。
+
+## 意図的に含めなかったもの
+
+- buffer poolとreplacement policy
+- data Pageのwrite-ahead logging
+- restart後のLSN復元
+- transaction recovery record
+- concurrent file mutationに対するfull snapshot isolation
+
 ## 次の機能
 
-次はiteratorを返す前にcurrent tailをdiskへflushするdurability契約だけを実装する。buffer管理は
-さらに後続の独立Issueとstacked PRへ分ける。
+log Managerの基本機能が揃った。次はChapter 4のbuffer管理を、Buffer frame初期状態、block assignment、
+pin count、BufferManager選択の順に、さらに独立したIssue、commit、stacked PRへ分けて実装する。
 
 ## 参照元
 
