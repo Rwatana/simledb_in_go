@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 4 Feature 11: Track modifying transaction</title>
+  <desc id="description">unmodified Bufferをtransaction 0がdirtyにし、transaction 17がmetadataを置き換える。</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="850" fill="#ffffff"/>
+  <text class="title" x="700" y="60" text-anchor="middle">Chapter 4 / Feature 11: Track modifying transaction</text>
+  <rect class="box" x="100" y="190" width="300" height="180" rx="12" fill="#d5e8d4" stroke="#82b366"/><text class="heading" x="250" y="240" text-anchor="middle">Unmodified frame</text><text class="text" x="250" y="310" text-anchor="middle">modifiedBy = none</text>
+  <rect class="box" x="550" y="190" width="300" height="180" rx="12" fill="#fff2cc" stroke="#d6b656"/><text class="heading" x="700" y="240" text-anchor="middle">Dirty frame</text><text class="text" x="700" y="310" text-anchor="middle">modifiedBy = TransactionID(0)</text>
+  <rect class="box" x="1000" y="190" width="300" height="180" rx="12" fill="#f8cecc" stroke="#b85450"/><text class="heading" x="1150" y="240" text-anchor="middle">Dirty frame</text><text class="text" x="1150" y="310" text-anchor="middle">modifiedBy = TransactionID(17)</text>
+  <line x1="400" y1="280" x2="550" y2="280" stroke="#475569" stroke-width="3"/><polygon points="550,280 537,272 537,288" fill="#475569"/><text class="text" x="475" y="248" text-anchor="middle">MarkModified(0)</text><text class="text" x="475" y="270" text-anchor="middle">no I/O</text>
+  <line x1="850" y1="280" x2="1000" y2="280" stroke="#475569" stroke-width="3"/><polygon points="1000,280 987,272 987,288" fill="#475569"/><text class="text" x="925" y="248" text-anchor="middle">MarkModified(17)</text><text class="text" x="925" y="270" text-anchor="middle">replace metadata</text>
+  <rect class="box" x="235" y="620" width="930" height="105" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="700" y="663" text-anchor="middle">Optional state distinguishes unmodified from valid transaction 0.</text><text class="text" x="700" y="699" text-anchor="middle">Marking only changes metadata; it performs no I/O.</text>
+</svg>

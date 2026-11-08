@@ -18,7 +18,8 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | unassigned buffer frame | fixed-size cache Pageの初期状態 | 実装済み |
 | buffer pin increment | frame利用開始と0→1遷移 | 実装済み |
 | buffer unpin | frame利用終了とunderflow防止 | 実装済み |
-| dirty transaction | frameを変更したtransactionの識別 | 未着手 |
+| dirty transaction | frameを変更したtransactionの識別 | 実装済み |
+| dirty recovery LSN | dirty Pageに先行するlog record | 未着手 |
 | dirty buffer flush | WAL順序とdata Page保存 | 未着手 |
 | block assignment | frame再利用 | 未着手 |
 | buffer pool | frame選択と待機 | 未着手 |
@@ -885,9 +886,94 @@ BufferManagerへ置かず、今回のPRを1 frameのrelease transitionだけに�
 - WAL付きflush
 - block assignmentとreplacement
 
+## Feature 11: Track the modifying transaction
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-modifying-transaction.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-modifying-transaction.svg)を参照する。図はunmodified frameがtransaction
+0でdirtyになり、後のtransaction 17によるmarkでowner metadataが置き換わるが、I/Oは起きないことを示す。
+
+### 問い
+
+transaction単位のflush対象を後から選べるように、どのtransactionがframeをdirtyにしたかを、
+unmodified stateやtransaction 0と混同せずにどう記録するか。
+
+### 概念
+
+Bufferはoptional `TransactionID`を持つ。nilはunmodifiedを表し、値0を含むすべてのTransactionIDはvalidな
+dirty ownerである。`MarkModified`はmutex内でlatest transactionへ置き換える。
+
+```text
+unmodified --MarkModified(0)--> modified by 0
+modified by 0 --MarkModified(17)--> modified by 17
+```
+
+markはmetadataだけを更新し、LogManager flushやFileManager writeを呼ばない。WAL順序とdirty clearは
+後続PRで個別に固定する。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `TransactionID` | modifying transactionを型で識別する |
+| `Buffer.MarkModified(transaction)` | latest modifying transactionを記録する |
+| `Buffer.ModifyingTransaction()` | transactionとmodified flagを返す |
+
+### Test-firstの記録
+
+#### Red
+
+fresh unmodified、transaction 0、overwrite、concurrent mark/queryを先にtestした。実装前はtypeとmethodsが
+存在せずbuildに失敗した。
+
+```text
+undefined: TransactionID
+frame.MarkModified undefined
+frame.ModifyingTransaction undefined
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+optional TransactionIDとmutex-protected mark/queryを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestMarkModifiedTracksAndReplacesTheTransaction` | fresh none、ID 0、latest transaction overwrite |
+| `TestModificationMetadataIsConcurrencySafe` | concurrent mark/queryにdata raceがない |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.Buffer.setModified`のtxnum部分と`modifyingTx`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `int txnum = -1` | optional `*TransactionID` | sentinelを使わずID 0をvalidにする |
+| `this.txnum = txnum` | `MarkModified` | latest modifierで上書きする |
+| `modifyingTx()` | `(TransactionID, bool)` | unmodifiedを型安全に区別する |
+| txnumとlsnを同時更新 | 今回はtransactionだけ | recovery LSNを独立PRでtestする |
+
+## Clean Architecture上の判断
+
+dirty ownershipは1 frameのstateなのでBufferが保持する。transaction-awareな一括flushの選択は
+後続BufferManagerへ残し、今回のPRはmetadataの記録と照会だけを担当する。
+
+## 意図的に含めなかったもの
+
+- recovery log LSN
+- WAL flushとdata Page write
+- flush成功後のdirty clear
+- BufferManager FlushAll
+- block assignmentとreplacement
+
 ## 次の機能
 
-次はBuffer frameを変更したtransaction IDだけを記録する。LSN metadata、WAL付きflush、block assignment、
+次はdirty Pageに先行してdurableにすべきrecovery log LSNだけを記録する。WAL付きflush、block assignment、
 BufferManager poolは、それぞれさらに独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
