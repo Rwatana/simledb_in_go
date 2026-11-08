@@ -42,11 +42,16 @@ func New(files *storagefile.Manager, logs *logmanager.Manager) (*Buffer, error) 
 
 // Contents returns the mutable Page owned by the Buffer.
 func (b *Buffer) Contents() *storage.Page {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	return b.contents
 }
 
 // Block returns the assigned disk block, if one exists.
 func (b *Buffer) Block() (storage.BlockID, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if b.block == nil {
 		return storage.BlockID{}, false
 	}
@@ -130,4 +135,28 @@ func (b *Buffer) RecoveryLSN() (logmanager.LSN, bool) {
 		return 0, false
 	}
 	return *b.recoveryLSN, true
+}
+
+// assignToBlock loads the first disk block into a clean, unpinned Buffer.
+func (b *Buffer) assignToBlock(block storage.BlockID) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.block != nil {
+		return fmt.Errorf("assign buffer to %v: already assigned to %v", block, *b.block)
+	}
+	if b.modifiedBy != nil {
+		return fmt.Errorf("assign buffer to %v: unassigned buffer is marked modified by transaction %d", block, *b.modifiedBy)
+	}
+	if b.pins != 0 {
+		return fmt.Errorf("assign buffer to %v: unassigned buffer has pin count %d", block, b.pins)
+	}
+	page, err := b.files.Read(block)
+	if err != nil {
+		return fmt.Errorf("assign buffer to %v: %w", block, err)
+	}
+	assigned := block
+	b.contents = page
+	b.block = &assigned
+	return nil
 }
