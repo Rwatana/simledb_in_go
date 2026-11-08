@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 4 Feature 3: Flush through an LSN</title>
+  <desc id="description">memory tailにLSN 1と2があり、Flush 1がPage全体をdiskへ保存してlastSavedLSNを2へ進める。</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.small{font-family:Helvetica,Arial,sans-serif;font-size:14px;fill:#4b5563}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="850" fill="#ffffff"/>
+  <text class="title" x="700" y="58" text-anchor="middle">Chapter 4 / Feature 3: Flush through an LSN</text>
+  <rect class="box" x="90" y="145" width="430" height="270" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="305" y="188" text-anchor="middle">Memory tail</text>
+  <rect class="box" x="120" y="230" width="370" height="125" rx="10" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="heading" x="305" y="265" text-anchor="middle">boundary → LSN 2 → LSN 1</text><text class="text" x="305" y="307" text-anchor="middle">latestLSN = 2</text><text class="text" x="305" y="335" text-anchor="middle">lastSavedLSN = 0</text>
+  <rect class="box" x="570" y="165" width="260" height="230" rx="12" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="heading" x="700" y="207" text-anchor="middle">Flush(1)</text><text class="text" x="700" y="252" text-anchor="middle">1 &gt; lastSaved 0</text><text class="text" x="700" y="284" text-anchor="middle">1 ≤ latest 2</text><text class="heading" x="700" y="342" text-anchor="middle">Write current Page</text>
+  <line x1="520" y1="280" x2="570" y2="280" stroke="#475569" stroke-width="3"/>
+  <rect class="box" x="880" y="145" width="430" height="270" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="1095" y="188" text-anchor="middle">Disk tail after success</text>
+  <rect class="box" x="910" y="230" width="370" height="125" rx="10" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="1095" y="270" text-anchor="middle">boundary → LSN 2 → LSN 1</text><text class="text" x="1095" y="320" text-anchor="middle">lastSavedLSN = latestLSN = 2</text>
+  <line x1="830" y1="280" x2="880" y2="280" stroke="#475569" stroke-width="3"/>
+  <rect class="box" x="235" y="650" width="930" height="100" rx="12" fill="#f8cecc" stroke="#b85450"/>
+  <text class="heading" x="700" y="692" text-anchor="middle">A Page write may also save records newer than the requested LSN.</text><text class="text" x="700" y="725" text-anchor="middle">Saved state advances only after the write succeeds.</text>
+</svg>
