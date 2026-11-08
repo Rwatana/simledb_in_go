@@ -9,7 +9,7 @@ logの振る舞いを小さく分け、初期化、1 block内append、flush、bl
 | Feature | 学ぶ概念 | 状態 |
 | --- | --- | --- |
 | log block initialization | tail pageとboundary | 実装済み |
-| record append in one block | right-to-left encodingとLSN | 未着手 |
+| record append in one block | right-to-left encodingとLSN | 実装済み |
 | explicit flush | durability boundary | 未着手 |
 | block rollover | full tailから次blockへの遷移 | 未着手 |
 | reverse iterator | newest-to-oldest traversal | 未着手 |
@@ -106,10 +106,98 @@ existing tailのboundaryが`[4, blockSize]`外なら、破損状態としてcons
 - reverse iterator
 - buffer poolとwrite-ahead logging
 
+## Feature 2: Record append within one block
+
+編集可能な図は[Draw.io版](../diagrams/ch04-log-record-append.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-log-record-append.svg)を参照する。図はpayload 3 bytesのrecordを
+32-byte blockへappendし、boundaryが32から25へ移動する例を示す。
+
+### 問い
+
+最新recordから逆順に読みやすくするため、複数recordを1つのfixed-size blockへどう配置するか。
+
+### 概念
+
+各recordはPageの`SetBytes`と同じ4-byte length prefix + payloadで表す。現在のboundaryからencoded
+lengthを引いた位置へrecordを置き、その位置を新しいboundaryとしてoffset 0へ保存する。
+
+```text
+record position = boundary - (4 + payload length)
+new boundary    = record position
+```
+
+recordが増えるほどboundaryは左へ移動する。iteratorはboundaryから開始してrecordのencoded length分
+右へ進むことで、最新から古い順に同一blockを読める。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Manager.Append(record)` | current tailへrecordをcopyし、新しいLSNを返す |
+| `LSN` | process lifetime内でappend順を表す単調増加番号 |
+
+この段階の`Append`はdiskへwriteしない。current blockに収まらない場合もrolloverせず、Page、boundary、
+LSNを変更しないerrorとして返す。flushとrolloverの契約を別PRで個別にtestするためである。
+
+## Test-firstの記録
+
+### Red
+
+2 recordsのLSNとlayout、capacity error、disk未反映を先にtestした。実装前は`Append` methodがなく
+buildが失敗した。
+
+```text
+manager.Append undefined (type *Manager has no field or method Append)
+FAIL github.com/Rwatana/simledb_in_go/internal/log [build failed]
+```
+
+### Green
+
+Managerへmutexとlatest LSNを追加し、current Pageだけを更新する最小実装を追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/log
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestAppendStoresRecordsRightToLeftAndAllocatesLSN` | layout、boundary、LSN、empty/binary payload、copy |
+| `TestAppendDoesNotChangeStateWhenRecordDoesNotFit` | capacity errorがPageとLSNを変更しない |
+| `TestAppendDoesNotFlushTheTailPage` | appendだけではdisk boundaryを変更しない |
+
+## Javaソースリーディング
+
+対象は`simpledb.log.LogMgr.append`のうち、current blockにrecordが収まる経路だけである。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `int latestLSN` | `LSN uint64` | process lifetime内の単調増加を明示する |
+| `recsize + Integer.BYTES` | `len(record) + 4` | Pageのlength prefix contractを共有する |
+| `boundary - bytesneeded` | 同じright-to-left計算 | reverse traversal用disk layoutを維持する |
+| synchronized `append` | Manager mutex | PageとLSNの更新を1 critical sectionにする |
+| full blockでflush/rollover | error | rolloverを独立PRに分離する |
+
+入力recordは`Page.SetBytes`がcopyするため、append後に呼び出し側がsliceを変更してもtailは変わらない。
+
+## Clean Architecture上の判断
+
+LSN割り当てとrecord layoutはlogの中核規則なので`internal/log`に置く。filesystemへ依存するflushは
+まだ呼ばず、in-memory state transitionだけをunit testで固定する。
+
+## 意図的に含めなかったもの
+
+- explicit flushとlast saved LSN
+- capacity不足時のblock rollover
+- reverse iterator
+- restart後のLSN復元
+- transactionとwrite-ahead logging
+
 ## 次の機能
 
-次は現在のtail blockに収まる1 recordだけをright-to-leftでappendし、boundaryを更新してLSNを返す。
-disk flushと容量不足時のrolloverは、それぞれ別Issueと別PRへ分ける。
+次は指定LSNまでのrecordをdiskへ反映するexplicit flushだけを実装する。rolloverはflushの後に、
+別Issue、別commit、別stacked PRとして扱う。
 
 ## 参照元
 

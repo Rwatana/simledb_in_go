@@ -4,6 +4,7 @@ package log
 import (
 	"fmt"
 	"math"
+	"sync"
 
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
@@ -11,12 +12,17 @@ import (
 
 const boundarySize = 4
 
+// LSN identifies one log record appended during the current process lifetime.
+type LSN uint64
+
 // Manager owns the in-memory tail page of one database log file.
 type Manager struct {
-	files    *storagefile.Manager
-	fileName string
-	page     *storage.Page
-	block    storage.BlockID
+	files     *storagefile.Manager
+	fileName  string
+	page      *storage.Page
+	block     storage.BlockID
+	mu        sync.Mutex
+	latestLSN LSN
 }
 
 // NewManager loads the existing log tail or initializes its first empty block.
@@ -67,4 +73,32 @@ func NewManager(files *storagefile.Manager, fileName string) (*Manager, error) {
 		return nil, fmt.Errorf("create log manager for %q: tail boundary %d outside [%d, %d]", fileName, boundary, boundarySize, blockSize)
 	}
 	return &Manager{files: files, fileName: fileName, page: page, block: block}, nil
+}
+
+// Append stores record in the current tail block and returns its LSN.
+// Append returns an error without changing the tail when the record does not fit.
+func (m *Manager) Append(record []byte) (LSN, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if len(record) > math.MaxInt32-boundarySize {
+		return 0, fmt.Errorf("append log record of %d bytes: encoded length exceeds four-byte boundary capacity", len(record))
+	}
+	boundary, err := m.page.GetInt(0)
+	if err != nil {
+		return 0, fmt.Errorf("append log record to %v: read boundary: %w", m.block, err)
+	}
+	encodedLength := boundarySize + len(record)
+	position := int(boundary) - encodedLength
+	if position < boundarySize {
+		return 0, fmt.Errorf("append log record of %d bytes to %v: encoded length %d does not fit before boundary %d", len(record), m.block, encodedLength, boundary)
+	}
+	if err := m.page.SetBytes(position, record); err != nil {
+		return 0, fmt.Errorf("append log record to %v at offset %d: %w", m.block, position, err)
+	}
+	if err := m.page.SetInt(0, int32(position)); err != nil {
+		return 0, fmt.Errorf("append log record to %v: update boundary to %d: %w", m.block, position, err)
+	}
+	m.latestLSN++
+	return m.latestLSN, nil
 }
