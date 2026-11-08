@@ -3,6 +3,7 @@ package buffer
 
 import (
 	"fmt"
+	"sync"
 
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
@@ -15,6 +16,8 @@ type Buffer struct {
 	logs     *logmanager.Manager
 	contents *storage.Page
 	block    *storage.BlockID
+	mu       sync.Mutex
+	pins     int
 }
 
 // New returns a zero-filled Buffer that is not assigned to a disk block.
@@ -43,4 +46,26 @@ func (b *Buffer) Block() (storage.BlockID, bool) {
 		return storage.BlockID{}, false
 	}
 	return *b.block, true
+}
+
+// IsPinned reports whether at least one client is using the Buffer.
+func (b *Buffer) IsPinned() bool {
+	return b.PinCount() > 0
+}
+
+// PinCount returns the number of active pins on the Buffer.
+func (b *Buffer) PinCount() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.pins
+}
+
+// pin increments the pin count and reports an available-to-pinned transition.
+func (b *Buffer) pin() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	becamePinned := b.pins == 0
+	b.pins++
+	return becamePinned
 }

@@ -16,7 +16,8 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | previous-block traversal | block境界を越えるreverse traversal | 実装済み |
 | iterator creation flush | disk traversal前のtail durability | 実装済み |
 | unassigned buffer frame | fixed-size cache Pageの初期状態 | 実装済み |
-| buffer pin count | frame利用数 | 未着手 |
+| buffer pin increment | frame利用開始と0→1遷移 | 実装済み |
+| buffer unpin | frame利用終了とunderflow防止 | 未着手 |
 | dirty buffer flush | WAL順序とdata Page保存 | 未着手 |
 | block assignment | frame再利用 | 未着手 |
 | buffer pool | frame選択と待機 | 未着手 |
@@ -720,10 +721,94 @@ BufferはPageとBlockIDというstorage valueを所有し、外側のFileManager
 - BlockID assignmentとdisk read
 - BufferManager poolとreplacement policy
 
+## Feature 9: Increment buffer pin count
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-pin.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-pin.svg)を参照する。図はpin count 0、1、2の遷移と、BufferManagerが
+availabilityを減らすべき0→1だけが`true`になる契約を示す。
+
+### 問い
+
+同じframeを複数clientが共有するとき、frameが利用中かどうかと、available poolから外れる瞬間を
+1つのcounterでどう表すか。
+
+### 概念
+
+Bufferはmutexで保護したnon-negative pin countを持つ。private `pin`はcountを1増やし、増加前が0だった
+場合だけ`true`を返す。
+
+```text
+0 --pin(true)--> 1 --pin(false)--> 2 --pin(false)--> ...
+```
+
+`IsPinned`はcount > 0、`PinCount`は現在値を返す。availability accountingを担当する後続BufferManagerは
+`pin`のbooleanを使い、同じframeの2回目以降のpinでavailable countを重複して減らさない。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Buffer.IsPinned()` | pin countが1以上か返す |
+| `Buffer.PinCount()` | mutexで保護したcurrent countを返す |
+| private `Buffer.pin()` | countを増やし、0→1遷移だけを返す |
+
+### Test-firstの記録
+
+#### Red
+
+fresh count、1回目と2回目のtransition、32 goroutinesのconcurrent pinを先にtestした。実装前は
+`IsPinned`、`PinCount`、`pin`が存在せずbuildに失敗した。
+
+```text
+frame.IsPinned undefined
+frame.PinCount undefined
+frame.pin undefined
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+Bufferへmutexとpin countを追加し、read/incrementを同じlockで保護した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestPinIncrementsCountAndReportsOnlyTheFirstTransition` | fresh zero、0→1 true、1→2 false |
+| `TestPinIsConcurrencySafe` | 32 concurrent increments、exactly one availability transition |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.Buffer.pin`と`isPinned`、`BufferMgr.tryToPin`のavailability分岐である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `pins++` | mutex内の`pins++` | 将来のconcurrent manager accessにもraceを残さない |
+| `pins > 0` | `IsPinned()` | 同じpinned predicateを維持する |
+| managerがincrement前に`isPinned` | `pin()`がtransition boolを返す | check-then-actを1 critical sectionにする |
+| count getterなし | `PinCount()` | invariantをtestし診断できるread-only query |
+
+## Clean Architecture上の判断
+
+pin countはframe自身のlifecycle stateなのでBufferが所有する。pool全体のavailable countとframe選択は
+後続BufferManagerへ残し、今回のPRは1 frame内のatomic transitionだけを扱う。
+
+## 意図的に含めなかったもの
+
+- unpin/decrementとunderflow error
+- BufferManagerのavailable count
+- dirty transaction/LSN metadata
+- WAL付きflush
+- block assignmentとreplacement
+
 ## 次の機能
 
-次はBuffer frameのpin countだけを実装する。dirty metadata、WAL付きflush、block assignment、
-BufferManager poolは、それぞれさらに独立したIssue、commit、stacked PRへ分ける。
+次はBuffer frameのunpin decrementと0未満を防ぐerrorだけを実装する。dirty metadata、WAL付きflush、
+block assignment、BufferManager poolは、それぞれさらに独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 
