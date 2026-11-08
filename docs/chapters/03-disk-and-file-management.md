@@ -10,7 +10,7 @@ Chapter 3からSimpleDBの内部実装を始める。章全体を1つのPull Req
 | `BlockID` | file内の論理blockを識別する値 | 実装済み |
 | `Page` | blockと同じ大きさのmemory領域と値のencoding | 実装済み |
 | `FileManager` read/write | block番号をbyte offsetへ変換するfile I/O | 実装済み |
-| `FileManager` append/length | fileをblock単位で拡張・計測する操作 | 未着手 |
+| `FileManager` append/length | fileをblock単位で拡張・計測する操作 | 実装済み |
 
 参考実装のstep-by-step documentationと同様に、概念、使い方、実行結果、図を実装順に残す。
 このプロジェクトではさらに、各featureのtest、JavaからGoへの設計判断、意図的に含めなかった
@@ -370,11 +370,101 @@ Java版はread時にも`rws`でfileを開くためmissing fileが作られ得る
 - filesystemのmock interface
 - buffer pool、log、transaction、lock
 
-## 次の機能
+## Feature 4: FileManager append / length
 
-次は`FileManager`のappend/lengthを独立したIssueとして扱う。file sizeをblock sizeで割って
-logical block数を取得し、末尾へzero-filled blockを追加して新しい`BlockID`を返す振る舞いを
-一時ディレクトリのintegration testで説明する。
+編集可能な図は[Draw.io版](../diagrams/ch03-file-append-length.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch03-file-append-length.svg)を参照する。図は2 blocksのfileへblock 2を追加し、
+logical lengthが3へ変化する流れを示す。
+
+### 問い
+
+file末尾のbyte位置を新しいlogical block番号へ変換し、既存blockを変えずに拡張するにはどうするか。
+
+### 概念
+
+file byte sizeがblock sizeの整数倍なら、現在のlogical block数と次にappendするblock番号は同じになる。
+
+```text
+current blocks   = file byte size ÷ block size
+new block number = current blocks
+new file size    = old file size + block size
+```
+
+新しいblockはzero-filledにする。後続のlogやrecord codeが初期化前のdisk bytesを観測せず、
+`Page`のzero valueと同じ状態から書き始められる。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Length(fileName)` | complete logical blockの数を返す。missing fileは0 |
+| `Append(fileName)` | zero-filled blockを末尾へ追加し、その`BlockID`を返す |
+
+file sizeがblock sizeで割り切れない場合、端数を無視せず破損状態としてerrorにする。appendも
+同じ検査を行い、partial fileへ新しいblockを重ねて状態を分かりにくくしない。
+
+## Test-firstの記録
+
+### Red
+
+missing fileのlength、3回の連続append、zero-filled block、partial fileをintegration testへ追加した。
+実装前は期待するmethodが存在せずbuildが失敗した。
+
+```text
+manager.Length undefined (type *file.Manager has no field or method Length)
+manager.Append undefined (type *file.Manager has no field or method Append)
+FAIL github.com/Rwatana/simledb_in_go/internal/infrastructure/file [build failed]
+```
+
+### Green
+
+file sizeの検査と`WriteAt`によるzero block追加をManagerのmutex内へ実装した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/infrastructure/file
+ok github.com/Rwatana/simledb_in_go/internal/storage
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestManagerAppendsZeroFilledBlocksAndReportsLength` | missing file、連続番号、zero fill、既存block保持、length |
+| `TestManagerRejectsPartialBlockFiles` | partial blockとpath traversalを拒否しfile sizeを変えない |
+
+## Javaソースリーディング
+
+対象は`simpledb.file.FileMgr`の`length`と`append`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `f.length() / blocksize` | `Length` | exact divisionを要求しpartial blockをerrorにする |
+| `new BlockId(filename, length)` | 同じ0始まり番号 | append前のlengthを新block番号にする |
+| zeroed `byte[]`のwrite | zeroed `[]byte`の`WriteAt` | fixed-size blockを明示的に初期化する |
+| `RuntimeException` | 文脈付き`error` | file名、block番号、I/O操作を呼び出し側へ返す |
+| methodごとの非統一同期 | 同じManager mutex | size観測とappendの番号決定を直列化する |
+
+Java版はpartial blockを整数除算で切り捨てる。Go版はsilentなdata lossを避けるため、lengthとappendの
+両方で`file size % block size == 0`を要求する。
+
+## Clean Architecture上の判断
+
+appendとlengthもOS file sizeへ依存するため、read/writeと同じfilesystem adapterへ置く。
+返り値は内側の`storage.BlockID`だが、`storage`側からManagerへの依存は増やさない。
+
+## 意図的に含めなかったもの
+
+- temporary table cleanupとdatabaseのnew/existing判定
+- block truncateとdelete
+- open file cache
+- concurrent process間のfile lock
+- buffer pool、log、transaction、recovery
+
+## Chapter 3の到達点
+
+`BlockID`、`Page`、fixed-size block read/write、append/lengthが揃い、memory上の値をlogical blockへ
+対応させて永続化する最小file layerが完成した。次はChapter 4で、このfile layerを利用する
+`LogManager`のrecord appendとblock rolloverを独立したIssueとして実装する。
 
 ## 参照元
 

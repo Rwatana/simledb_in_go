@@ -152,6 +152,125 @@ func TestManagerRejectsInvalidBlockAccess(t *testing.T) {
 	}
 }
 
+func TestManagerAppendsZeroFilledBlocksAndReportsLength(t *testing.T) {
+	t.Parallel()
+
+	const blockSize = 16
+	directory := filepath.Join(t.TempDir(), "database")
+	manager := newManager(t, directory, blockSize)
+	const fileName = "student.tbl"
+
+	length, err := manager.Length(fileName)
+	if err != nil {
+		t.Fatalf("Length() missing file error = %v", err)
+	}
+	if length != 0 {
+		t.Fatalf("Length() missing file = %d, want 0", length)
+	}
+
+	block0, err := manager.Append(fileName)
+	if err != nil {
+		t.Fatalf("Append() first block error = %v", err)
+	}
+	if got, want := block0, storage.NewBlockID(fileName, 0); got != want {
+		t.Fatalf("Append() first block = %v, want %v", got, want)
+	}
+	assertZeroBlock(t, manager, block0)
+
+	page0 := newStoragePage(t, blockSize)
+	if err := page0.SetInt(0, 42); err != nil {
+		t.Fatalf("page0.SetInt() error = %v", err)
+	}
+	if err := manager.Write(block0, page0); err != nil {
+		t.Fatalf("Write(%v) error = %v", block0, err)
+	}
+
+	for wantNumber := 1; wantNumber <= 2; wantNumber++ {
+		block, err := manager.Append(fileName)
+		if err != nil {
+			t.Fatalf("Append() block %d error = %v", wantNumber, err)
+		}
+		if got, want := block, storage.NewBlockID(fileName, wantNumber); got != want {
+			t.Errorf("Append() block = %v, want %v", got, want)
+		}
+		assertZeroBlock(t, manager, block)
+
+		length, err := manager.Length(fileName)
+		if err != nil {
+			t.Fatalf("Length() after append %d error = %v", wantNumber, err)
+		}
+		if got, want := length, wantNumber+1; got != want {
+			t.Errorf("Length() after append %d = %d, want %d", wantNumber, got, want)
+		}
+	}
+
+	read0, err := manager.Read(block0)
+	if err != nil {
+		t.Fatalf("Read(%v) error = %v", block0, err)
+	}
+	value, err := read0.GetInt(0)
+	if err != nil {
+		t.Fatalf("read0.GetInt() error = %v", err)
+	}
+	if value != 42 {
+		t.Errorf("block 0 value after later appends = %d, want 42", value)
+	}
+
+	info, err := os.Stat(filepath.Join(directory, fileName))
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if got, want := info.Size(), int64(3*blockSize); got != want {
+		t.Errorf("file size = %d, want %d", got, want)
+	}
+}
+
+func TestManagerRejectsPartialBlockFiles(t *testing.T) {
+	t.Parallel()
+
+	const blockSize = 16
+	directory := filepath.Join(t.TempDir(), "database")
+	manager := newManager(t, directory, blockSize)
+	path := filepath.Join(directory, "partial.tbl")
+	if err := os.WriteFile(path, make([]byte, blockSize+1), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if _, err := manager.Length("partial.tbl"); err == nil {
+		t.Error("Length() partial block error = nil, want a corruption error")
+	}
+	if _, err := manager.Append("partial.tbl"); err == nil {
+		t.Error("Append() partial block error = nil, want a corruption error")
+	}
+	if _, err := manager.Length("../escape.tbl"); err == nil {
+		t.Error("Length() path traversal error = nil, want an invalid file name error")
+	}
+	if _, err := manager.Append("../escape.tbl"); err == nil {
+		t.Error("Append() path traversal error = nil, want an invalid file name error")
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if got, want := info.Size(), int64(blockSize+1); got != want {
+		t.Errorf("partial file size after rejected append = %d, want %d", got, want)
+	}
+}
+
+func assertZeroBlock(t *testing.T, manager *storagefile.Manager, block storage.BlockID) {
+	t.Helper()
+
+	page, err := manager.Read(block)
+	if err != nil {
+		t.Fatalf("Read(%v) error = %v", block, err)
+	}
+	want := make([]byte, manager.BlockSize())
+	if got := page.Snapshot(); !bytes.Equal(got, want) {
+		t.Errorf("Read(%v) = %v, want a zero-filled block", block, got)
+	}
+}
+
 func newManager(t *testing.T, directory string, blockSize int) *storagefile.Manager {
 	t.Helper()
 

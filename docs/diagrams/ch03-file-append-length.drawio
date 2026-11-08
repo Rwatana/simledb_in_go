@@ -1,0 +1,23 @@
+<mxfile host="app.diagrams.net" modified="2026-11-08T03:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="chapter-03-file-append-length" name="Chapter 3 - File Append Length">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 3 / Feature 4: FileManager append / length" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=26;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="330" y="30" width="740" height="45" as="geometry"/></mxCell>
+        <mxCell id="before" value="Before append: Length = 2 blocks" style="swimlane;html=1;startSize=42;rounded=1;fillColor=#f8fafc;strokeColor=#475569;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="80" y="155" width="470" height="250" as="geometry"/></mxCell>
+        <mxCell id="before0" value="block 0&#xa;existing data" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;" vertex="1" parent="before"><mxGeometry x="25" y="90" width="200" height="90" as="geometry"/></mxCell>
+        <mxCell id="before1" value="block 1&#xa;existing data" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;" vertex="1" parent="before"><mxGeometry x="225" y="90" width="200" height="90" as="geometry"/></mxCell>
+        <mxCell id="append" value="Append(&amp;quot;student.tbl&amp;quot;)&#xa;&#xa;new block number = current length = 2&#xa;WriteAt(offset 2 × block size)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=16;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="590" y="165" width="300" height="220" as="geometry"/></mxCell>
+        <mxCell id="after" value="After append: Length = 3 blocks" style="swimlane;html=1;startSize=42;rounded=1;fillColor=#f8fafc;strokeColor=#475569;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="930" y="125" width="400" height="310" as="geometry"/></mxCell>
+        <mxCell id="after0" value="block 0&#xa;unchanged" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;" vertex="1" parent="after"><mxGeometry x="25" y="65" width="350" height="60" as="geometry"/></mxCell>
+        <mxCell id="after1" value="block 1&#xa;unchanged" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;" vertex="1" parent="after"><mxGeometry x="25" y="125" width="350" height="60" as="geometry"/></mxCell>
+        <mxCell id="after2" value="block 2&#xa;zero-filled" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontStyle=1;strokeWidth=3;" vertex="1" parent="after"><mxGeometry x="25" y="185" width="350" height="60" as="geometry"/></mxCell>
+        <mxCell id="beforeEdge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;" edge="1" parent="1" source="before" target="append"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="afterEdge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;" edge="1" parent="1" source="append" target="after"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="formula" value="Length(file) = file byte size ÷ block size&#xa;&#xa;partial block → error (no silent truncation)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="355" y="555" width="690" height="130" as="geometry"/></mxCell>
+        <mxCell id="boundary" value="Append and Length run under the same Manager mutex, so the observed size and new block number stay consistent." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="220" y="745" width="960" height="65" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
