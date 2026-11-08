@@ -68,8 +68,9 @@
 ## 次の一歩
 
 Chapter 3の基礎file layerと、Chapter 4のlog manager基本機能が揃いました。buffer管理は未割当frame、
-pin increment、unpin、modifying transaction、recovery LSN、最初のBlockID割当、WAL順flushまで
-進んでいます。次はclean・unpinnedなassigned frameの再割当だけを、独立したIssueとPRで追加します。
+pin increment、unpin、modifying transaction、recovery LSN、最初のBlockID割当、WAL順flush、clean frameの
+再割当まで進んでいます。次はdirty・unpinnedなassigned frameのWAL順flushと再割当だけを、独立したIssueと
+PRで追加します。
 
 ## 参照元
 
