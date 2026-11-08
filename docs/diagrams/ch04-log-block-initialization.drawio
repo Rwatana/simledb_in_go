@@ -1,0 +1,21 @@
+<mxfile host="app.diagrams.net" modified="2026-11-09T00:30:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="chapter-04-log-block-initialization" name="Chapter 4 - Log Block Initialization">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 4 / Feature 1: Log block initialization" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=26;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="340" y="35" width="720" height="45" as="geometry"/></mxCell>
+        <mxCell id="decision" value="Length(&amp;quot;simpledb.log&amp;quot;)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="90" y="175" width="270" height="170" as="geometry"/></mxCell>
+        <mxCell id="missing" value="0 blocks&#xa;&#xa;Append block 0&#xa;NewPage(blockSize)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="455" y="135" width="300" height="170" as="geometry"/></mxCell>
+        <mxCell id="existing" value="N blocks&#xa;&#xa;Read block N-1&#xa;do not append" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=16;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="455" y="340" width="300" height="150" as="geometry"/></mxCell>
+        <mxCell id="missingEdge" value="missing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;" edge="1" parent="1" source="decision" target="missing"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="existingEdge" value="existing" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;" edge="1" parent="1" source="decision" target="existing"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="page" value="log block 0 (32 bytes)" style="swimlane;html=1;startSize=42;rounded=1;fillColor=#f8fafc;strokeColor=#475569;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="870" y="145" width="450" height="300" as="geometry"/></mxCell>
+        <mxCell id="boundary" value="offset 0..3&#xa;&#xa;boundary = 32" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;fontStyle=1;" vertex="1" parent="page"><mxGeometry x="25" y="90" width="160" height="130" as="geometry"/></mxCell>
+        <mxCell id="free" value="offset 4..31&#xa;&#xa;zero-filled free area&#xa;future records grow right → left" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;" vertex="1" parent="page"><mxGeometry x="185" y="90" width="240" height="130" as="geometry"/></mxCell>
+        <mxCell id="pageEdge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;" edge="1" parent="1" source="missing" target="page"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="invariant" value="Empty log invariant: boundary == block size; no record bytes exist." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="330" y="650" width="740" height="90" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
