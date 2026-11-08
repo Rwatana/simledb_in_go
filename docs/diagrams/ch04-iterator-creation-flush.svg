@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 4 Feature 7: Flush before iterator creation</title>
+  <desc id="description">unsaved memory tailをdiskへflushしてsaved LSNを進めた後、iterator snapshotを作る。</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="850" fill="#ffffff"/>
+  <text class="title" x="700" y="60" text-anchor="middle">Chapter 4 / Feature 7: Flush before iterator creation</text>
+  <rect class="box" x="60" y="145" width="340" height="260" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="230" y="187" text-anchor="middle">Unsaved memory tail</text>
+  <rect class="box" x="85" y="223" width="290" height="135" rx="10" fill="#f8cecc" stroke="#b85450"/>
+  <text class="text" x="230" y="258" text-anchor="middle">latestLSN = 2 · lastSavedLSN = 0</text><text class="text" x="230" y="315" text-anchor="middle">boundary → LSN 2 → LSN 1</text>
+  <rect class="box" x="465" y="175" width="260" height="200" rx="12" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="heading" x="595" y="215" text-anchor="middle">Iterator() holds mutex</text><text class="text" x="595" y="275" text-anchor="middle">flushTailLocked(2)</text><text class="text" x="595" y="325" text-anchor="middle">write + sync Page</text>
+  <rect class="box" x="790" y="145" width="300" height="260" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="940" y="187" text-anchor="middle">Durable disk tail</text>
+  <rect class="box" x="815" y="223" width="250" height="135" rx="10" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="text" x="940" y="265" text-anchor="middle">lastSavedLSN = 2</text><text class="text" x="940" y="315" text-anchor="middle">boundary → LSN 2 → LSN 1</text>
+  <rect class="box" x="1155" y="145" width="190" height="260" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="1250" y="187" text-anchor="middle">Iterator snapshot</text>
+  <rect class="box" x="1175" y="235" width="150" height="110" rx="10" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="text" x="1250" y="275" text-anchor="middle">copy the same</text><text class="text" x="1250" y="310" text-anchor="middle">current Page</text>
+  <line x1="400" y1="275" x2="465" y2="275" stroke="#475569" stroke-width="3"/><polygon points="465,275 452,267 452,283" fill="#475569"/>
+  <line x1="725" y1="275" x2="790" y2="275" stroke="#475569" stroke-width="3"/><polygon points="790,275 777,267 777,283" fill="#475569"/>
+  <line x1="1090" y1="275" x2="1155" y2="275" stroke="#475569" stroke-width="3"/><polygon points="1155,275 1142,267 1142,283" fill="#475569"/>
+  <text class="text" x="1122" y="255" text-anchor="middle">success</text>
+  <rect class="box" x="235" y="620" width="930" height="105" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="700" y="663" text-anchor="middle">No Iterator escapes before the current tail is durable.</text>
+  <text class="text" x="700" y="699" text-anchor="middle">A flush error returns no snapshot.</text>
+</svg>

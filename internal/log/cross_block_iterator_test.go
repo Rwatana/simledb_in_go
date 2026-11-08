@@ -60,8 +60,8 @@ func TestIteratorTraversesPreviousBlocksNewestToOldest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("diskCurrent.GetInt(0) error = %v", err)
 	}
-	if diskBoundary != 20 {
-		t.Errorf("current disk boundary after traversal = %d, want unchanged boundary 20", diskBoundary)
+	if diskBoundary != 12 {
+		t.Errorf("current disk boundary after traversal = %d, want flushed boundary 12", diskBoundary)
 	}
 }
 

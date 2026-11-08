@@ -3,14 +3,12 @@ package log
 import (
 	"bytes"
 	"testing"
-
-	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 func TestIteratorReadsCurrentBlockNewestToOldest(t *testing.T) {
 	t.Parallel()
 
-	manager, files := newLogManager(t, 64)
+	manager, _ := newLogManager(t, 64)
 	records := [][]byte{
 		[]byte("oldest"),
 		{},
@@ -47,17 +45,6 @@ func TestIteratorReadsCurrentBlockNewestToOldest(t *testing.T) {
 		t.Errorf("Next() after exhaustion = (%v, %t, %v), want (nil, false, nil)", got, ok, err)
 	}
 
-	diskTail, err := files.Read(storage.NewBlockID("simpledb.log", 0))
-	if err != nil {
-		t.Fatalf("Read(disk tail) error = %v", err)
-	}
-	diskBoundary, err := diskTail.GetInt(0)
-	if err != nil {
-		t.Fatalf("diskTail.GetInt(0) error = %v", err)
-	}
-	if diskBoundary != 64 {
-		t.Errorf("disk boundary after Iterator() = %d, want unchanged boundary 64", diskBoundary)
-	}
 }
 
 func TestIteratorSnapshotsReturnedRecordsAndEmptyTail(t *testing.T) {
