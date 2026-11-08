@@ -66,8 +66,8 @@
 
 ## 次の一歩
 
-Chapter 3の次の機能単位は`FileManager`のread/writeです。`BlockID`の論理block番号を
-byte offsetへ変換し、`Page`と一時ディレクトリ上のdatabase fileを往復するI/Oを実装します。
+Chapter 3の次の機能単位は`FileManager`のappend/lengthです。固定長のzero-filled blockを
+file末尾へ追加し、file sizeからlogical block数を取得する操作を実装します。
 
 ## 参照元
 

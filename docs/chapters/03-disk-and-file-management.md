@@ -9,7 +9,7 @@ Chapter 3からSimpleDBの内部実装を始める。章全体を1つのPull Req
 | --- | --- | --- |
 | `BlockID` | file内の論理blockを識別する値 | 実装済み |
 | `Page` | blockと同じ大きさのmemory領域と値のencoding | 実装済み |
-| `FileManager` read/write | block番号をbyte offsetへ変換するfile I/O | 未着手 |
+| `FileManager` read/write | block番号をbyte offsetへ変換するfile I/O | 実装済み |
 | `FileManager` append/length | fileをblock単位で拡張・計測する操作 | 未着手 |
 
 参考実装のstep-by-step documentationと同様に、概念、使い方、実行結果、図を実装順に残す。
@@ -273,15 +273,113 @@ Java版のAPI名は参考にするが、`ByteBuffer`のmutable positionやexcept
 - record layoutとfield type
 - concurrent accessの同期
 
+## Feature 3: FileManager block read / write
+
+編集可能な図は[Draw.io版](../diagrams/ch03-file-read-write.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch03-file-read-write.svg)を参照する。図は論理block番号からfile内の
+byte offsetを求め、Page全体をfixed-size blockとして往復する流れを示す。
+
+### 問い
+
+OSのfile APIへstorageの論理blockをどのように対応させ、1 blockを欠けずに読み書きするか。
+
+### 概念
+
+`FileManager`はdatabase directoryとblock sizeを持つfilesystem adapterである。`BlockID`の
+block番号を次の式でbyte offsetへ変換する。
+
+```text
+byte offset = block number × block size
+```
+
+block sizeが32 bytesなら、block 2はfileの64..95 bytesに対応する。writeはPage全体のsnapshotを
+`WriteAt`し、readは同じ長さを`ReadAt`して新しいPageへcopyする。blockの途中までしか読めない
+short readは成功として扱わない。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `file.NewManager(directory, blockSize)` | database directoryを用意してfilesystem adapterを作る |
+| `BlockSize()` | fixed block sizeを返す |
+| `Write(block, page)` | Page全体を指定blockのoffsetへ永続化する |
+| `Read(block)` | 指定block全体を新しいPageとして読み出す |
+| `storage.NewPageFromBytes` | diskから読んだbytesをcopyしてPageを作る |
+
+file名はdatabase directory直下のbase nameだけを受け入れる。空文字、separatorを含むpath、
+`..`によるdirectory traversalはI/O前に拒否する。block番号の負数とoffset計算のoverflowも
+同様にerrorにする。
+
+## Test-firstの記録
+
+### Red
+
+一時ディレクトリを使い、directory作成、block 0とblock 2のround-trip、invalid accessを
+外部test packageから記述した。実装前はfilesystem packageに非test Go fileがなく失敗した。
+
+```text
+github.com/Rwatana/simledb_in_go/internal/infrastructure/file: no non-test Go files
+FAIL github.com/Rwatana/simledb_in_go/internal/infrastructure/file [build failed]
+```
+
+### Green
+
+`os.File.ReadAt` / `WriteAt`を使い、各操作でfileを開閉する最小実装を追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/infrastructure/file
+ok github.com/Rwatana/simledb_in_go/internal/storage
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestNewManagerCreatesDatabaseDirectory` | directory作成とblock size contract |
+| `TestManagerWritesAndReadsBlocks` | 複数blockのoffset、round-trip、Page間の非aliasing |
+| `TestManagerRejectsInvalidBlockAccess` | 負数、overflow、size不一致、short read、path traversalのerror |
+| `TestNewPageFromBytesCopiesContents` | diskから渡されたsliceをPage内部と共有しない |
+
+## Javaソースリーディング
+
+対象は`simpledb.file.FileMgr`のconstructor、`read`、`write`、`getFile`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `RandomAccessFile.seek` | `ReadAt` / `WriteAt` | mutable file positionを共有せずoffsetを引数にする |
+| `Page.contents()` | `Snapshot()` / `NewPageFromBytes` | filesystem層とPage内部でsliceを共有しない |
+| `RuntimeException` | 文脈付き`error` | 呼び出し側が失敗を明示的に扱えるようにする |
+| `openFiles` cache | 操作ごとのopen/close | cacheの必要性を計測する前にlifecycleを複雑化しない |
+| `synchronized` | Manager内のmutex | 同一Managerのblock I/Oを直列化する |
+| 任意のchild path | database直下のbase name | directory外へのpath traversalを拒否する |
+
+Java版はread時にも`rws`でfileを開くためmissing fileが作られ得る。Go版はread-only openを使い、
+存在しないfileや未書き込みblockをerrorとして報告する。write後は`Sync`して成功の時点を明確にする。
+
+## Clean Architecture上の判断
+
+`Manager`は`os`とfilesystem pathへ依存するため、`internal/infrastructure/file`へ置く。
+依存方向は外側のfilesystem adapterから内側の`storage.BlockID`と`storage.Page`へ向かう。
+`storage` packageは`Manager`や`os.File`をimportしない。
+
+## 意図的に含めなかったもの
+
+- block appendとfile length
+- temporary table cleanup
+- open file cacheとclose lifecycle
+- filesystemのmock interface
+- buffer pool、log、transaction、lock
+
 ## 次の機能
 
-次は`FileManager`のread/writeを独立したIssueとして扱う。`BlockID.Number()`とblock sizeから
-file offsetを計算し、一時ディレクトリのfileと固定capacityの`Page`を往復できる振る舞いを
-integration testで説明する。appendとfile lengthはさらに後続Issueへ分ける。
+次は`FileManager`のappend/lengthを独立したIssueとして扱う。file sizeをblock sizeで割って
+logical block数を取得し、末尾へzero-filled blockを追加して新しい`BlockID`を返す振る舞いを
+一時ディレクトリのintegration testで説明する。
 
 ## 参照元
 
 - Edward Sciore, *Database Design and Implementation*, 2nd ed., Section 3.5 and Fig. 3.13
-- SimpleDB 3.4 Java source: `simpledb.file.BlockId`, `simpledb.file.Page`
+- SimpleDB 3.4 Java source: `simpledb.file.BlockId`, `simpledb.file.Page`, `simpledb.file.FileMgr`
 - Go standard library: `encoding/binary`
+- Go standard library: `os.File.ReadAt`, `os.File.WriteAt`
 - [nakamasato/database-design-and-implementation](https://github.com/nakamasato/database-design-and-implementation)
