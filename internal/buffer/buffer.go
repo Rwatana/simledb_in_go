@@ -69,3 +69,15 @@ func (b *Buffer) pin() bool {
 	b.pins++
 	return becamePinned
 }
+
+// unpin decrements the pin count and reports a pinned-to-available transition.
+func (b *Buffer) unpin() (bool, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.pins == 0 {
+		return false, fmt.Errorf("unpin buffer: pin count is already zero")
+	}
+	b.pins--
+	return b.pins == 0, nil
+}
