@@ -1,17 +1,15 @@
-package storage_test
+package storage
 
 import (
 	"bytes"
 	"math"
 	"testing"
-
-	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 func TestNewPageHasFixedCapacity(t *testing.T) {
 	t.Parallel()
 
-	page, err := storage.NewPage(32)
+	page, err := NewPage(32)
 	if err != nil {
 		t.Fatalf("NewPage() error = %v", err)
 	}
@@ -19,7 +17,7 @@ func TestNewPageHasFixedCapacity(t *testing.T) {
 	if got, want := page.Capacity(), 32; got != want {
 		t.Errorf("Capacity() = %d, want %d", got, want)
 	}
-	if _, err := storage.NewPage(-1); err == nil {
+	if _, err := NewPage(-1); err == nil {
 		t.Error("NewPage(-1) error = nil, want an invalid size error")
 	}
 }
@@ -156,7 +154,7 @@ func TestNewPageFromBytesCopiesContents(t *testing.T) {
 	t.Parallel()
 
 	contents := []byte{0x00, 0x00, 0x00, 0x2a}
-	page := storage.NewPageFromBytes(contents)
+	page := NewPageFromBytes(contents)
 	contents[3] = 0
 
 	got, err := page.GetInt(0)
@@ -168,12 +166,31 @@ func TestNewPageFromBytesCopiesContents(t *testing.T) {
 	}
 }
 
-func newPage(t *testing.T, size int) *storage.Page {
+func newPage(t *testing.T, size int) *Page {
 	t.Helper()
 
-	page, err := storage.NewPage(size)
+	page, err := NewPage(size)
 	if err != nil {
 		t.Fatalf("NewPage(%d) error = %v", size, err)
 	}
 	return page
+}
+
+func TestPageCoversByteEncodingLimits(t *testing.T) {
+	page, err := NewPage(8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := page.SetInt(0, -1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := page.GetBytes(0); err == nil {
+		t.Fatal("GetBytes() error = nil, want negative-length error")
+	}
+	if _, err := page.GetBytes(-1); err == nil {
+		t.Fatal("GetBytes(-1) error = nil, want offset error")
+	}
+	if err := page.setBytesWithLimit(0, []byte{1, 2, 3}, 2); err == nil {
+		t.Fatal("setBytesWithLimit() error = nil, want length-limit error")
+	}
 }
