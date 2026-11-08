@@ -10,7 +10,7 @@ logの振る舞いを小さく分け、初期化、1 block内append、flush、bl
 | --- | --- | --- |
 | log block initialization | tail pageとboundary | 実装済み |
 | record append in one block | right-to-left encodingとLSN | 実装済み |
-| explicit flush | durability boundary | 未着手 |
+| explicit flush | durability boundary | 実装済み |
 | block rollover | full tailから次blockへの遷移 | 未着手 |
 | reverse iterator | newest-to-oldest traversal | 未着手 |
 
@@ -194,10 +194,93 @@ LSN割り当てとrecord layoutはlogの中核規則なので`internal/log`に�
 - restart後のLSN復元
 - transactionとwrite-ahead logging
 
+## Feature 3: Explicit flush through an LSN
+
+編集可能な図は[Draw.io版](../diagrams/ch04-log-flush.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-log-flush.svg)を参照する。図はmemory tailにLSN 1と2があり、disk tailが
+まだemptyな状態から`Flush(1)`でPage全体が保存されるdurability boundaryを示す。
+
+### 問い
+
+呼び出し側が指定したlog recordと、それより前のrecordがdiskへ到達したことをどう保証するか。
+
+### 概念
+
+Managerは`latestLSN`に加えて`lastSavedLSN`を持つ。requested LSNがまだ保存されていなければ、
+current tail Page全体をFileManagerでwriteする。
+
+```text
+requested LSN <= lastSavedLSN  -> no-op
+lastSavedLSN < requested LSN <= latestLSN -> write tail Page
+requested LSN > latestLSN      -> error
+```
+
+Page単位でwriteするため、LSN 1を要求した時点ですでにLSN 2も同じtailにあれば、両方がdiskへ保存され、
+`lastSavedLSN`は2へ進む。saved stateはFileManagerのwriteとsyncが成功した後にだけ更新する。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Manager.Flush(lsn)` | requested LSNを含むcurrent tailをdiskへ保存する |
+
+### Test-firstの記録
+
+#### Red
+
+memory/disk boundaryの差、saved LSN、future LSNを先にtestした。実装前は`Flush`と
+`lastSavedLSN`が存在せずbuildが失敗した。
+
+```text
+manager.Flush undefined (type *Manager has no field or method Flush)
+manager.lastSavedLSN undefined
+FAIL github.com/Rwatana/simledb_in_go/internal/log [build failed]
+```
+
+#### Green
+
+Manager mutex内でLSNを検査し、必要な場合だけFileManagerへtail Pageをwriteする実装を追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/log
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestFlushPersistsTheTailThroughRequestedLSN` | requested LSNを含むPage全体を保存しlatestまでsavedにする |
+| `TestFlushRejectsFutureLSNAndSkipsSavedLSN` | future LSNのerrorとsaved以下のno-op |
+| `TestFlushZeroOnEmptyLogIsNoOp` | empty logのLSN 0はPageを変えない |
+
+## Javaソースリーディング
+
+対象は`simpledb.log.LogMgr.flush(int)`とprivate `flush()`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `lsn >= lastSavedLSN` | `lsn > lastSavedLSN` | 同じsaved LSNの不要なrewriteを避ける |
+| `fm.write(currentblk, logpage)` | `files.Write(block, page)` | FileManagerのsync済みblock writeを再利用する |
+| `lastSavedLSN = latestLSN` | 同じ | Page writeで同時に保存された最新recordまで進める |
+| 未割当future LSN | error | 呼び出し側のLSN誤りをsilentに受け入れない |
+
+## Clean Architecture上の判断
+
+flushの「どのLSNまで保存済みか」という規則はlog Managerが持ち、実際のsyncはfilesystem adapterへ
+委譲する。ManagerはOS file handleを直接扱わない。
+
+## 意図的に含めなかったもの
+
+- capacity不足時のautomatic flushとblock rollover
+- iterator開始時のautomatic flush
+- data Pageとのwrite-ahead logging連携
+- crash後のLSN復元
+
 ## 次の機能
 
-次は指定LSNまでのrecordをdiskへ反映するexplicit flushだけを実装する。rolloverはflushの後に、
-別Issue、別commit、別stacked PRとして扱う。
+次はcurrent tailにrecordが収まらない場合のblock rolloverだけを実装する。old tailのflush、新しい
+zero-filled block、initial boundary、record再試行を1つのstate transitionとしてtestするが、
+reverse iteratorはさらに別Issueと別PRへ分ける。
 
 ## 参照元
 
