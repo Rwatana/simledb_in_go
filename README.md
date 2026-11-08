@@ -68,8 +68,8 @@
 ## 次の一歩
 
 Chapter 3の基礎file layerが揃い、Chapter 4のlog block初期化、1 block内append、明示flush、
-block rolloverまで進みました。次はcurrent block内のreverse iterationだけを、独立したIssueとPRで
-実装します。
+block rollover、current block内のreverse iterationまで進みました。次はiteratorがprevious blockへ
+移動する振る舞いだけを、独立したIssueとPRで実装します。
 
 ## 参照元
 

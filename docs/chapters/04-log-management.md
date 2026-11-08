@@ -3,8 +3,8 @@
 ## この章の進め方
 
 Chapter 4ではChapter 3のfixed-size file layerを使い、recovery logとbuffer管理を段階的に実装する。
-logの振る舞いを小さく分け、初期化、1 block内append、flush、block rollover、reverse iterationを
-それぞれ独立したIssue、test、1 commit、stacked Pull Requestとして扱う。
+logの振る舞いを小さく分け、初期化、1 block内append、flush、block rollover、1 block iteration、
+previous block traversalをそれぞれ独立したIssue、test、1 commit、stacked Pull Requestとして扱う。
 
 | Feature | 学ぶ概念 | 状態 |
 | --- | --- | --- |
@@ -12,7 +12,8 @@ logの振る舞いを小さく分け、初期化、1 block内append、flush、bl
 | record append in one block | right-to-left encodingとLSN | 実装済み |
 | explicit flush | durability boundary | 実装済み |
 | block rollover | full tailから次blockへの遷移 | 実装済み |
-| reverse iterator | newest-to-oldest traversal | 未着手 |
+| current-block iterator | 1 block内のnewest-to-oldest traversal | 実装済み |
+| previous-block traversal | block境界を越えるreverse traversal | 未着手 |
 
 ## Feature 1: Log block initialization
 
@@ -364,10 +365,98 @@ atomicなmutex区間に限定した。
 - restart後のLSN復元
 - transactionとwrite-ahead logging
 
+## Feature 5: Current-block reverse iterator
+
+編集可能な図は[Draw.io版](../diagrams/ch04-current-block-iterator.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-current-block-iterator.svg)を参照する。図はiterator作成時のPage snapshotと、
+boundaryからblock末尾へ進むことでLSN 3、2、1の順にpayloadを返す流れを示す。
+
+### 問い
+
+right-to-leftで格納した可変長recordを、writerや後続appendの影響を受けずにnewest-to-oldestで読むには
+どの位置から、どれだけ進めばよいか。
+
+### 概念
+
+`Manager.Iterator`はmutex内でcurrent Pageをcopyし、snapshotのboundaryを最初のpositionにする。
+`Iterator.Next`はpositionのlength-prefixed bytesを読み、次の式でoldest側へ進む。
+
+```text
+record = page.GetBytes(position)
+position = position + 4 + len(record)
+position == block size ならexhausted
+```
+
+recordはright-to-leftにappendされるため、最小offsetのboundaryが最新recordであり、offsetを増やすほど
+古くなる。Pageの`GetBytes`はpayloadをcopyするので、callerが返り値を変更しても別iteratorのsnapshotを
+壊さない。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Manager.Iterator()` | current in-memory tailのsnapshotから1 block iteratorを作る |
+| `Iterator.Next()` | 次に古いrecordと存在有無を返す |
+
+この段階ではiterator作成時にflushしない。snapshot後にManagerへappendされたrecordも既存iteratorには
+現れない。disk traversalとprevious block移動を次のPRへ分離するためである。
+
+### Test-firstの記録
+
+#### Red
+
+binary payload、empty payload、snapshot後append、exhaustion、copy isolationを先にtestした。実装前は
+`Manager.Iterator`が存在せずbuildが失敗した。
+
+```text
+manager.Iterator undefined (type *Manager has no field or method Iterator)
+FAIL github.com/Rwatana/simledb_in_go/internal/log [build failed]
+```
+
+#### Green
+
+current Page snapshotとpositionだけを持つone-block Iteratorを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/log
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestIteratorReadsCurrentBlockNewestToOldest` | reverse order、binary/empty payload、snapshot、exhaustion、no flush |
+| `TestIteratorSnapshotsReturnedRecordsAndEmptyTail` | empty blockと独立したpayload copy |
+
+## Javaソースリーディング
+
+対象は`simpledb.log.LogIterator`のconstructor、`moveToBlock`、`next`の1 block内経路である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| FileManagerからcurrent blockをread | memory Pageのsnapshot | flushとdisk traversalを後続PRに分離する |
+| `currentpos = boundary` | `position = boundary` | 最新recordから開始する |
+| `currentpos += 4 + rec.length` | 同じ | length prefixを含めて古いrecordへ進む |
+| `Iterator<byte[]>` | `Next() ([]byte, bool, error)` | exhaustionとdecode errorをGoの戻り値で表す |
+| block末尾でprevious blockへ移動 | 今回はexhausted | cross-block traversalを独立した振る舞いにする |
+
+## Clean Architecture上の判断
+
+iteratorはlogのdisk layoutを解釈するため`internal/log`に置く。current featureはimmutable Page snapshotだけを
+所有し、FileManagerへ依存しない。readerとwriterのlock共有時間をPage copyの間だけに制限する。
+
+## 意図的に含めなかったもの
+
+- previous blockへの移動
+- iterator作成時のautomatic flush
+- disk Pageのread failure
+- concurrent live view
+- transaction recoveryとの統合
+
 ## 次の機能
 
-次はcurrent tail 1 block内だけをnewest-to-oldestで読むiteratorを実装する。previous blockへの移動と
-iterator開始時flushは、さらに別Issue、別commit、別stacked PRへ分ける。
+次はcurrent blockを読み終えたiteratorがprevious blockへ移動する振る舞いだけを実装する。
+iterator作成時のautomatic flushは、さらに別Issue、別commit、別stacked PRへ分ける。
 
 ## 参照元
 
