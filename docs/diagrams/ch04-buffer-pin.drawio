@@ -1,0 +1,17 @@
+<mxfile host="app.diagrams.net" modified="2026-11-09T05:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="chapter-04-buffer-pin" name="Chapter 4 - Buffer Pin">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 4 / Feature 9: Increment buffer pin count" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=26;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="300" y="30" width="800" height="50" as="geometry"/></mxCell>
+        <mxCell id="zero" value="Available frame&#xa;&#xa;pin count = 0&#xa;IsPinned = false" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="100" y="185" width="300" height="190" as="geometry"/></mxCell>
+        <mxCell id="one" value="Pinned frame&#xa;&#xa;pin count = 1&#xa;IsPinned = true" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="550" y="185" width="300" height="190" as="geometry"/></mxCell>
+        <mxCell id="many" value="Shared frame&#xa;&#xa;pin count = 2&#xa;IsPinned = true" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1000" y="185" width="300" height="190" as="geometry"/></mxCell>
+        <mxCell id="edge1" value="pin() returns true&#xa;availability changes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;fontSize=16;" edge="1" parent="1" source="zero" target="one"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge2" value="pin() returns false&#xa;still unavailable" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;fontSize=16;" edge="1" parent="1" source="one" target="many"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rule" value="Only the atomic 0 → 1 transition removes a frame from the available pool." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="260" y="620" width="880" height="105" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
