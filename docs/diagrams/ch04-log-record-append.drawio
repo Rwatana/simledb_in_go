@@ -1,0 +1,22 @@
+<mxfile host="app.diagrams.net" modified="2026-11-09T01:10:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="chapter-04-log-record-append" name="Chapter 4 - Log Record Append">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 4 / Feature 2: Append within one log block" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=26;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="330" y="35" width="740" height="45" as="geometry"/></mxCell>
+        <mxCell id="before" value="Before: boundary = 32" style="swimlane;html=1;startSize=42;rounded=1;fillColor=#f8fafc;strokeColor=#475569;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="70" y="155" width="470" height="250" as="geometry"/></mxCell>
+        <mxCell id="beforeBoundary" value="0..3&#xa;32" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;fontStyle=1;" vertex="1" parent="before"><mxGeometry x="25" y="90" width="100" height="90" as="geometry"/></mxCell>
+        <mxCell id="beforeFree" value="4..31&#xa;free" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="before"><mxGeometry x="125" y="90" width="300" height="90" as="geometry"/></mxCell>
+        <mxCell id="calculation" value="Append(DE AD 00)&#xa;&#xa;encoded length = 4 + 3 = 7&#xa;record position = 32 - 7 = 25&#xa;LSN = 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=16;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="575" y="165" width="300" height="220" as="geometry"/></mxCell>
+        <mxCell id="after" value="After: boundary = 25" style="swimlane;html=1;startSize=42;rounded=1;fillColor=#f8fafc;strokeColor=#475569;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="910" y="145" width="420" height="270" as="geometry"/></mxCell>
+        <mxCell id="afterBoundary" value="0..3&#xa;25" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=16;fontStyle=1;" vertex="1" parent="after"><mxGeometry x="20" y="90" width="80" height="100" as="geometry"/></mxCell>
+        <mxCell id="afterFree" value="4..24&#xa;free" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=16;" vertex="1" parent="after"><mxGeometry x="100" y="90" width="170" height="100" as="geometry"/></mxCell>
+        <mxCell id="record" value="25..31&#xa;length 3 + payload&#xa;00 00 00 03 DE AD 00" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;fontStyle=1;strokeWidth=3;" vertex="1" parent="after"><mxGeometry x="270" y="90" width="130" height="100" as="geometry"/></mxCell>
+        <mxCell id="leftEdge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;" edge="1" parent="1" source="before" target="calculation"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rightEdge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;" edge="1" parent="1" source="calculation" target="after"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="direction" value="New records grow from the right edge toward offset 4. The newest record always starts at boundary." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=17;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="250" y="650" width="900" height="90" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
