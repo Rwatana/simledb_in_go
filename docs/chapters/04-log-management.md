@@ -19,7 +19,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | buffer pin increment | frame利用開始と0→1遷移 | 実装済み |
 | buffer unpin | frame利用終了とunderflow防止 | 実装済み |
 | dirty transaction | frameを変更したtransactionの識別 | 実装済み |
-| dirty recovery LSN | dirty Pageに先行するlog record | 未着手 |
+| dirty recovery LSN | dirty Pageに先行するlog record | 実装済み |
 | dirty buffer flush | WAL順序とdata Page保存 | 未着手 |
 | block assignment | frame再利用 | 未着手 |
 | buffer pool | frame選択と待機 | 未着手 |
@@ -971,10 +971,94 @@ dirty ownershipは1 frameのstateなのでBufferが保持する。transaction-aw
 - BufferManager FlushAll
 - block assignmentとreplacement
 
+## Feature 12: Associate a recovery LSN
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-recovery-lsn.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-recovery-lsn.svg)を参照する。図はdirty transactionだけを持つframeへ
+LSN 1を関連付け、後のLSN 9で置き換えるmetadata遷移と、clean/zero rejectionを示す。
+
+### 問い
+
+dirty data Pageをdiskへ書く前に、どのrecovery log recordまでdurableにすべきかを、実際のI/Oをまだ
+行わずにどう記録するか。
+
+### 概念
+
+Bufferはoptional `log.LSN`を持つ。LSNはすでに`MarkModified`されたframeにだけ記録でき、log Managerが
+割り当てるLSNは1から始まるため0をrejectする。later LSNはprevious LSNを置き換える。
+
+```text
+dirty by tx 7, no LSN
+    --RecordRecoveryLSN(1)--> recovery LSN 1
+    --RecordRecoveryLSN(9)--> recovery LSN 9
+```
+
+記録はmetadataだけで、LogManagerの`Flush`やFileManagerの`Write`は呼ばない。WAL orderingは後続の
+Buffer flush PRでこの値を利用して固定する。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Buffer.RecordRecoveryLSN(lsn)` | dirty frameへpositive LSNを関連付ける |
+| `Buffer.RecoveryLSN()` | associated LSNと存在有無を返す |
+
+### Test-firstの記録
+
+#### Red
+
+fresh none、clean rejection、transaction-only mark、LSN 0 rejection、replacement、concurrent accessを先に
+testした。実装前はmethodsが存在せずbuildに失敗した。
+
+```text
+frame.RecordRecoveryLSN undefined
+frame.RecoveryLSN undefined
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+optional LSNとdirty/positive validationを、既存Buffer mutex内へ追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestRecordRecoveryLSNRequiresADirtyBufferAndPositiveLSN` | clean/zero reject、LSN association、replacement |
+| `TestRecoveryLSNMetadataIsConcurrencySafe` | concurrent record/queryにdata raceがない |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.Buffer.setModified`のlsn部分と`flush`のWAL callである。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `int lsn = -1` | optional `*log.LSN` | sentinelを使わずmissingを表す |
+| `if (lsn >= 0) this.lsn = lsn` | positive LSNだけ記録 | Go logのallocated LSN 1始まりに合わせる |
+| txnumと同時にset | dirty precondition後に別method | metadataの2責務を別PRでtestする |
+| `lm.flush(lsn)` | 今回は呼ばない | WAL I/Oを次のflush featureへ残す |
+
+## Clean Architecture上の判断
+
+WAL prerequisiteの値はBufferがdirty Pageと一緒に保持するが、durability actionはまだ実行しない。
+log packageのtyped LSNを再利用し、buffer側で別のsequence number表現を増やさない。
+
+## 意図的に含めなかったもの
+
+- LogManager flush
+- data Page write
+- flush成功後のtransaction/LSN clear
+- block assignmentとreplacement
+- BufferManager FlushAll
+
 ## 次の機能
 
-次はdirty Pageに先行してdurableにすべきrecovery log LSNだけを記録する。WAL付きflush、block assignment、
-BufferManager poolは、それぞれさらに独立したIssue、commit、stacked PRへ分ける。
+次は未割当でcleanなBuffer frameへ最初のBlockIDを割り当て、disk Pageを読む振る舞いだけを実装する。
+reassignment、WAL付きflush、BufferManager poolはさらに独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 
