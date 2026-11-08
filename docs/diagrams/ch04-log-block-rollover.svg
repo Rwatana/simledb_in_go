@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 4 Feature 4: Full log block rollover</title>
+  <desc id="description">fullなblock 0をflushし、初期化済みblock 1へ切り替えてnew recordをmemoryへappendする。</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="850" fill="#ffffff"/>
+  <text class="title" x="700" y="60" text-anchor="middle">Chapter 4 / Feature 4: Full log block rollover</text>
+  <rect class="box" x="55" y="145" width="350" height="260" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="230" y="187" text-anchor="middle">1. Full memory tail</text>
+  <rect class="box" x="85" y="225" width="290" height="125" rx="10" fill="#f8cecc" stroke="#b85450"/>
+  <text class="heading" x="230" y="260" text-anchor="middle">block 0 · boundary = 4</text><text class="text" x="230" y="310" text-anchor="middle">LSN 1 pending</text>
+  <rect class="box" x="470" y="180" width="260" height="190" rx="12" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="heading" x="600" y="225" text-anchor="middle">2. flush old tail</text><text class="text" x="600" y="275" text-anchor="middle">3. append block 1</text><text class="text" x="600" y="325" text-anchor="middle">4. write boundary = 20</text>
+  <line x1="405" y1="275" x2="470" y2="275" stroke="#475569" stroke-width="3"/><polygon points="470,275 457,267 457,283" fill="#475569"/>
+  <rect class="box" x="795" y="145" width="550" height="260" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="1070" y="187" text-anchor="middle">5. New memory tail</text>
+  <rect class="box" x="820" y="225" width="225" height="120" rx="10" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="heading" x="932" y="262" text-anchor="middle">disk block 0</text><text class="text" x="932" y="310" text-anchor="middle">LSN 1 durable</text>
+  <rect class="box" x="1095" y="225" width="225" height="120" rx="10" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="heading" x="1207" y="258" text-anchor="middle">memory block 1</text><text class="text" x="1207" y="288" text-anchor="middle">boundary = 12</text><text class="text" x="1207" y="318" text-anchor="middle">LSN 2 pending</text>
+  <line x1="730" y1="275" x2="795" y2="275" stroke="#475569" stroke-width="3"/><polygon points="795,275 782,267 782,283" fill="#475569"/>
+  <rect class="box" x="180" y="620" width="1040" height="105" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="700" y="663" text-anchor="middle">Invariant: block 1 is durable as a valid empty page before LSN 2 is memory-only.</text>
+  <text class="text" x="700" y="699" text-anchor="middle">The new record reaches disk only on explicit flush or the next rollover.</text>
+</svg>
