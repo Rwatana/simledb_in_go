@@ -11,7 +11,7 @@ logの振る舞いを小さく分け、初期化、1 block内append、flush、bl
 | log block initialization | tail pageとboundary | 実装済み |
 | record append in one block | right-to-left encodingとLSN | 実装済み |
 | explicit flush | durability boundary | 実装済み |
-| block rollover | full tailから次blockへの遷移 | 未着手 |
+| block rollover | full tailから次blockへの遷移 | 実装済み |
 | reverse iterator | newest-to-oldest traversal | 未着手 |
 
 ## Feature 1: Log block initialization
@@ -136,8 +136,9 @@ recordが増えるほどboundaryは左へ移動する。iteratorはboundaryか�
 | `Manager.Append(record)` | current tailへrecordをcopyし、新しいLSNを返す |
 | `LSN` | process lifetime内でappend順を表す単調増加番号 |
 
-この段階の`Append`はdiskへwriteしない。current blockに収まらない場合もrolloverせず、Page、boundary、
-LSNを変更しないerrorとして返す。flushとrolloverの契約を別PRで個別にtestするためである。
+この機能を導入した段階の`Append`はdiskへwriteしない。current blockに収まらない場合もrolloverせず、
+Page、boundary、LSNを変更しないerrorとして返した。後述のFeature 4がこのcapacity不足経路だけを
+拡張し、flushとrolloverの契約を独立してtestする。
 
 ## Test-firstの記録
 
@@ -276,11 +277,97 @@ flushの「どのLSNまで保存済みか」という規則はlog Managerが持�
 - data Pageとのwrite-ahead logging連携
 - crash後のLSN復元
 
+## Feature 4: Full block rollover
+
+編集可能な図は[Draw.io版](../diagrams/ch04-log-block-rollover.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-log-block-rollover.svg)を参照する。図はfull memory tailから、durableなold
+blockと初期化済みnew blockを経て、new recordをmemoryだけに持つtailへ切り替わる順序を示す。
+
+### 問い
+
+current tailにrecordが入らないとき、old recordsを失わず、new blockも再open可能なdisk stateにしてから
+appendを続けるには、どの順でstateを変えるべきか。
+
+### 概念
+
+recordのencoded lengthがempty blockのrecord領域を超える場合は、I/Oの前にrejectする。収まるrecordが
+current tailにだけ入らない場合は、次の順でrolloverする。
+
+```text
+1. old tail Pageをwriteし、old latest LSNまでsavedにする
+2. zero-filled blockをfile末尾へappendする
+3. new Pageのboundaryをblock sizeにし、その初期状態をwriteする
+4. Managerのcurrent PageとBlockIDをnew tailへ切り替える
+5. recordをnew tailのmemory Pageへappendし、新しいLSNを割り当てる
+```
+
+手順3でempty stateをdiskへ保存するため、new blockが存在するのにboundary 0という無効な中間状態を
+残さない。手順5のrecordは通常appendと同じくmemory-onlyであり、明示`Flush`または次回rolloverまで
+durableではない。
+
+### 公開API
+
+公開APIは増やさない。`Manager.Append(record)`のcapacity不足経路だけを拡張する。privateな
+`rollOverLocked`と`flushTailLocked`は、1つのmutex critical section内でstate transitionを組み立てる。
+
+### Test-firstの記録
+
+#### Red
+
+20-byte blockを最初のencoded recordで満たし、2件目がblock 1へ移ることを先にtestした。実装前は
+従来どおりcapacity errorで停止した。
+
+```text
+Append(second) rollover error = append log record of 4 bytes to
+[file simpledb.log, block 0]: encoded length 8 does not fit before boundary 4
+FAIL github.com/Rwatana/simledb_in_go/internal/log
+```
+
+#### Green
+
+empty block容量の事前検査と、old-tail flush、initialized block append、tail切替を追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/log
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestAppendRollsOverAFullTailBlock` | old tail durability、new block initialization、連続LSN、memory-only new record |
+| `TestAppendRejectsARecordThatCannotFitAnEmptyBlockBeforeRollover` | oversized recordをI/O前にrejectしPage、BlockID、LSN、lengthを維持 |
+
+## Javaソースリーディング
+
+対象は`simpledb.log.LogMgr.append`のfull-block分岐と`appendNewBlock`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `flush()` | `flushTailLocked(latestLSN)` | old tailをnew block作成前にdurableにする |
+| `fm.append(logfile)` | `files.Append(fileName)` | zero-filled blockをfile末尾へ追加する |
+| `setInt(0, fm.blockSize())` | 同じinitial boundary | iteratorとreopenが解釈できるempty layoutを維持する |
+| `fm.write(currentblk, logpage)` | `files.Write(block, page)` | record追加前のvalid empty blockをdiskへ保存する |
+| oversized recordの明示検査なし | I/O前のcapacity error | 無駄なflushやempty block追加を防ぐ |
+
+## Clean Architecture上の判断
+
+rolloverの順序とdurability boundaryはlog policyとして`internal/log`が持つ。block追加、Page write、syncの
+仕組みは引き続きfilesystem adapterへ委譲する。public helperを増やさず、appendという1 use caseの
+atomicなmutex区間に限定した。
+
+## 意図的に含めなかったもの
+
+- log recordを読むiterator API
+- previous blockへのreverse traversal
+- iterator開始時のautomatic flush
+- restart後のLSN復元
+- transactionとwrite-ahead logging
+
 ## 次の機能
 
-次はcurrent tailにrecordが収まらない場合のblock rolloverだけを実装する。old tailのflush、新しい
-zero-filled block、initial boundary、record再試行を1つのstate transitionとしてtestするが、
-reverse iteratorはさらに別Issueと別PRへ分ける。
+次はcurrent tail 1 block内だけをnewest-to-oldestで読むiteratorを実装する。previous blockへの移動と
+iterator開始時flushは、さらに別Issue、別commit、別stacked PRへ分ける。
 
 ## 参照元
 
