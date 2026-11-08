@@ -18,7 +18,7 @@
 | --- | --- | --- | --- |
 | 1 | Database Systems | 学習資料作成済み | [章まとめ](docs/chapters/01-database-systems.md) / [概念図](docs/diagrams/ch01-database-system.drawio) |
 | 2 | JDBC | 学習資料作成済み | [章まとめ](docs/chapters/02-jdbc.md) / [編集用Draw.io](docs/diagrams/ch02-client-boundary.drawio) / [表示用SVG](docs/diagrams/ch02-client-boundary.svg) |
-| 3 | Disk and File Management | 実装中 | [BlockIDとPageの解説・実装記録](docs/chapters/03-disk-and-file-management.md) |
+| 3 | Disk and File Management | 基礎実装済み | [BlockID、Page、FileManagerの解説・実装記録](docs/chapters/03-disk-and-file-management.md) |
 
 第1章は概念導入、第2章はJDBCによるクライアント境界の説明であり、書籍もSimpleDBの
 内部実装の解説を第3章から始めています。そのため、第1章と第2章のPRにはGo実装を含めません。
@@ -33,6 +33,22 @@
 - 正常系だけでなく、境界値・永続化・障害時の振る舞いをテスト名で説明する
 
 詳細は[アーキテクチャ方針](docs/architecture.md)を参照してください。
+
+## ローカルでCIを実行
+
+GitHub Actionsと同じGoテスト、statement coverage、vet、ドキュメント検査をMakefileから実行できます。
+
+```sh
+make test
+make coverage-check
+make vet
+make docs
+make ci
+```
+
+`make coverage`は`coverage.out`を作成し、`make coverage-report`は関数ごとの結果を表示します。
+`make coverage-html`はブラウザーで確認できる`coverage.html`を作成します。coverageの出力ファイルはGit管理対象外です。
+coverage用Go build cacheは既定で`/tmp/simpledb-coverage-cache`を使い、`COVERAGE_CACHE`で変更できます。
 
 ## リポジトリ構成（予定）
 
@@ -66,8 +82,8 @@
 
 ## 次の一歩
 
-Chapter 3の次の機能単位は`FileManager`のappend/lengthです。固定長のzero-filled blockを
-file末尾へ追加し、file sizeからlogical block数を取得する操作を実装します。
+Chapter 3の基礎file layerが揃いました。次はChapter 4の`LogManager`を小さなIssueへ分け、
+log recordのappendとblock rolloverから実装します。
 
 ## 参照元
 
