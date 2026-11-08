@@ -152,6 +152,22 @@ func TestPageSnapshotDoesNotExposeMutableMemory(t *testing.T) {
 	}
 }
 
+func TestNewPageFromBytesCopiesContents(t *testing.T) {
+	t.Parallel()
+
+	contents := []byte{0x00, 0x00, 0x00, 0x2a}
+	page := storage.NewPageFromBytes(contents)
+	contents[3] = 0
+
+	got, err := page.GetInt(0)
+	if err != nil {
+		t.Fatalf("GetInt() error = %v", err)
+	}
+	if got != 42 {
+		t.Errorf("GetInt() = %d after source mutation, want 42", got)
+	}
+}
+
 func newPage(t *testing.T, size int) *storage.Page {
 	t.Helper()
 
