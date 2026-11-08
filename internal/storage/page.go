@@ -22,6 +22,13 @@ func NewPage(capacity int) (*Page, error) {
 	return &Page{contents: make([]byte, capacity)}, nil
 }
 
+// NewPageFromBytes returns a Page containing a copy of contents.
+func NewPageFromBytes(contents []byte) *Page {
+	pageContents := make([]byte, len(contents))
+	copy(pageContents, contents)
+	return &Page{contents: pageContents}
+}
+
 // Capacity returns the number of bytes available in the page.
 func (p *Page) Capacity() int {
 	return len(p.contents)
