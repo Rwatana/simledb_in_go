@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 4 Feature 8: Unassigned buffer frame</title>
+  <desc id="description">FileManagerとLogManagerからzero-filled Pageを持つ未割当Bufferを作る。</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="850" fill="#ffffff"/>
+  <text class="title" x="700" y="60" text-anchor="middle">Chapter 4 / Feature 8: Unassigned buffer frame</text>
+  <rect class="box" x="100" y="150" width="350" height="250" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="275" y="190" text-anchor="middle">Constructor dependencies</text>
+  <rect class="box" x="125" y="228" width="140" height="115" rx="10" fill="#dae8fc" stroke="#6c8ebf"/><text class="heading" x="195" y="270" text-anchor="middle">FileManager</text><text class="text" x="195" y="312" text-anchor="middle">BlockSize() = N</text>
+  <rect class="box" x="285" y="228" width="140" height="115" rx="10" fill="#fff2cc" stroke="#d6b656"/><text class="heading" x="355" y="270" text-anchor="middle">LogManager</text><text class="text" x="355" y="312" text-anchor="middle">for later WAL</text>
+  <rect class="box" x="545" y="175" width="270" height="200" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="680" y="215" text-anchor="middle">buffer.New</text><text class="text" x="680" y="275" text-anchor="middle">validate dependencies</text><text class="text" x="680" y="325" text-anchor="middle">allocate Page(N)</text>
+  <rect class="box" x="910" y="150" width="390" height="250" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="1105" y="190" text-anchor="middle">Fresh Buffer</text>
+  <rect class="box" x="935" y="228" width="175" height="115" rx="10" fill="#d5e8d4" stroke="#82b366"/><text class="heading" x="1022" y="265" text-anchor="middle">Contents Page</text><text class="text" x="1022" y="300" text-anchor="middle">capacity = N</text><text class="text" x="1022" y="327" text-anchor="middle">all bytes = 0</text>
+  <rect class="box" x="1135" y="228" width="140" height="115" rx="10" fill="#f8cecc" stroke="#b85450"/><text class="heading" x="1205" y="270" text-anchor="middle">BlockID</text><text class="text" x="1205" y="312" text-anchor="middle">unassigned</text>
+  <line x1="450" y1="275" x2="545" y2="275" stroke="#475569" stroke-width="3"/><polygon points="545,275 532,267 532,283" fill="#475569"/>
+  <line x1="815" y1="275" x2="910" y2="275" stroke="#475569" stroke-width="3"/><polygon points="910,275 897,267 897,283" fill="#475569"/>
+  <rect class="box" x="260" y="620" width="880" height="105" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="700" y="680" text-anchor="middle">Fresh means: valid fixed-size Page, no disk block, and no I/O yet.</text>
+</svg>
