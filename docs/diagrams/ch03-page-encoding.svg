@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 3 Feature 2: Page memory encoding</title>
+  <desc id="description">固定長Pageにbig-endianの4-byte整数と、4-byte length prefix付きのbinary payloadをoffset指定で格納する構造。</desc>
+  <defs>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#6c8ebf"/></marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#82b366"/></marker>
+    <style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.small{font-family:Helvetica,Arial,sans-serif;font-size:14px;fill:#4b5563}.box{stroke-width:2}.blue-line{fill:none;stroke:#6c8ebf;stroke-width:3;marker-end:url(#arrow-blue)}.green-line{fill:none;stroke:#82b366;stroke-width:3;marker-end:url(#arrow-green)}</style>
+  </defs>
+  <rect width="1400" height="850" fill="#ffffff"/>
+  <text class="title" x="700" y="55" text-anchor="middle">Chapter 3 / Feature 2: Page memory encoding</text>
+
+  <rect class="box" x="70" y="130" width="1260" height="250" rx="14" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="105" y="172">Page (fixed capacity: 24 bytes)</text>
+  <rect class="box" x="95" y="210" width="210" height="110" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="small" x="200" y="238" text-anchor="middle">offset 0..3</text><text class="heading" x="200" y="270" text-anchor="middle">int32: 42</text><text class="text" x="200" y="300" text-anchor="middle">00 00 00 2A</text>
+  <rect class="box" x="305" y="210" width="180" height="110" fill="#f5f5f5" stroke="#9ca3af"/>
+  <text class="small" x="395" y="252" text-anchor="middle">offset 4..7</text><text class="text" x="395" y="285" text-anchor="middle">unused</text>
+  <rect class="box" x="485" y="210" width="230" height="110" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="small" x="600" y="238" text-anchor="middle">offset 8..11</text><text class="heading" x="600" y="270" text-anchor="middle">length: 5</text><text class="text" x="600" y="300" text-anchor="middle">00 00 00 05</text>
+  <rect class="box" x="715" y="210" width="300" height="110" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="small" x="865" y="238" text-anchor="middle">offset 12..16</text><text class="heading" x="865" y="270" text-anchor="middle">payload (5 bytes)</text><text class="text" x="865" y="300" text-anchor="middle">DE AD 00 BE EF</text>
+  <rect class="box" x="1015" y="210" width="270" height="110" fill="#f5f5f5" stroke="#9ca3af"/>
+  <text class="small" x="1150" y="252" text-anchor="middle">offset 17..23</text><text class="text" x="1150" y="285" text-anchor="middle">remaining capacity</text>
+
+  <rect class="box" x="145" y="485" width="340" height="160" rx="12" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="heading" x="315" y="525" text-anchor="middle">SetInt(0, 42) / GetInt(0)</text><text class="text" x="315" y="570" text-anchor="middle">4-byte signed integer</text><text class="text" x="315" y="602" text-anchor="middle">big-endian</text>
+  <path class="blue-line" d="M315 485 V430 H200 V320"/>
+
+  <rect class="box" x="760" y="485" width="480" height="160" rx="12" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="heading" x="1000" y="525" text-anchor="middle">SetBytes(8, payload) / GetBytes(8)</text><text class="text" x="1000" y="570" text-anchor="middle">4-byte length prefix + payload</text><text class="text" x="1000" y="602" text-anchor="middle">read returns a defensive copy</text>
+  <path class="green-line" d="M1000 485 V430 H865 V320"/>
+
+  <rect class="box" x="315" y="720" width="770" height="70" rx="12" fill="#f8cecc" stroke="#b85450"/>
+  <text class="heading" x="700" y="762" text-anchor="middle">Every access validates offset + encoded length against capacity.</text>
+</svg>

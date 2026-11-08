@@ -8,7 +8,7 @@ Chapter 3からSimpleDBの内部実装を始める。章全体を1つのPull Req
 | Feature | 学ぶ概念 | 状態 |
 | --- | --- | --- |
 | `BlockID` | file内の論理blockを識別する値 | 実装済み |
-| `Page` | blockと同じ大きさのmemory領域と値のencoding | 未着手 |
+| `Page` | blockと同じ大きさのmemory領域と値のencoding | 実装済み |
 | `FileManager` read/write | block番号をbyte offsetへ変換するfile I/O | 未着手 |
 | `FileManager` append/length | fileをblock単位で拡張・計測する操作 | 未着手 |
 
@@ -157,13 +157,131 @@ interfaceも追加していない。値の生成、比較、表示に外部依�
 書籍とJava版の`BlockId`もconstructorでvalidationを行わない。最初のPRでは教材の契約を越えて
 規則を追加せず、filesystem境界で実害のある失敗をtestするときにvalidation場所を決める。
 
+## Feature 2: Page memory encoding
+
+編集可能な図は[Draw.io版](../diagrams/ch03-page-encoding.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch03-page-encoding.svg)を参照する。図は固定長Pageの中で4-byte整数と
+length-prefixedなbyte列がどのoffsetを占めるかを示す。
+
+### 問い
+
+disk blockへ書き出す前の値を、固定長memory領域のどこに、何byte使って保存するか。
+
+### 概念
+
+`Page`は固定capacityのbyte列を持ち、値の先頭位置をoffsetで指定する。整数は必ず4 bytes、
+任意のbinary payloadは4-byteのlength prefixとpayload本体として格納する。
+
+```text
+integer = 4-byte signed value
+bytes   = 4-byte payload length + payload
+```
+
+複数の値を同じPageへ置く場合、呼び出し側が前の値のencoded lengthを使って次のoffsetを決める。
+`Page`自身はrecord layoutやfield typeを知らず、指定された位置のencodingだけを担当する。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `NewPage(capacity)` | 固定capacityの空Pageを作る |
+| `Capacity()` | 利用可能な総byte数を返す |
+| `SetInt` / `GetInt` | offset指定で4-byte整数を書き読みする |
+| `SetBytes` / `GetBytes` | offset指定でlength-prefixed bytesを書き読みする |
+| `Snapshot()` | file I/Oへ渡せる全Page内容のcopyを返す |
+
+`GetBytes`と`Snapshot`は内部sliceを直接返さずcopyを返す。呼び出し側が返却値を変更しても、
+Page内部のencoded valueは変わらない。
+
+### Encoding contract
+
+整数とlength prefixはJavaの`ByteBuffer` defaultと同じbig-endianに固定した。Goの`int`は
+platform依存の幅を持つため、公開APIでは幅が明確な`int32`を使う。
+
+```go
+page, err := storage.NewPage(32)
+if err != nil {
+    // handle invalid capacity
+}
+
+_ = page.SetInt(0, 42)
+_ = page.SetBytes(8, []byte{0xde, 0xad, 0xbe, 0xef})
+```
+
+すべてのread/writeで`offset + encoded length`がcapacity内かを確認する。範囲外accessや、
+Page内に収まらないlength prefixはpanicさせず、操作とoffsetを含むerrorとして返す。
+
+## Test-firstの記録
+
+### Red
+
+`Page`型を追加する前に、固定capacity、整数とbyte列のround-trip、境界error、防御的copyを
+外部test packageから記述した。実装前は期待するAPIが存在しないためbuildが失敗した。
+
+```text
+internal/storage/page_test.go: undefined: storage.NewPage
+internal/storage/page_test.go: undefined: storage.Page
+FAIL github.com/Rwatana/simledb_in_go/internal/storage [build failed]
+```
+
+### Green
+
+固定長sliceと`encoding/binary.BigEndian`を使う最小実装を追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/storage
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestNewPageHasFixedCapacity` | capacityが固定され、負数を拒否する |
+| `TestPageStoresFourByteIntegers` | 符号付きint32をbig-endianでround-tripする |
+| `TestPageStoresLengthPrefixedBytes` | 空やNULを含むpayloadをlength prefix付きで保存する |
+| `TestPageRejectsOutOfBoundsAccess` | encoded rangeがcapacityを越える操作をerrorにする |
+| `TestPageSnapshotDoesNotExposeMutableMemory` | snapshotから内部memoryを書き換えられない |
+
+## Javaソースリーディング
+
+対象は`simpledb.file.Page`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `ByteBuffer.allocateDirect` | 固定長`[]byte` | off-heap最適化は計測理由がないため持ち込まない |
+| `getInt` / `putInt` | `GetInt` / `SetInt` | `int32`とbig-endianで4-byte contractを明示する |
+| `getBytes` / `setBytes` | `GetBytes` / `SetBytes` | 同じlength prefix形式を使い、copyを返す |
+| `getString` / `setString` | 未実装 | string encodingはrecord実装が要求した時点で追加する |
+| `contents()` | `Snapshot()` | package外のfile I/Oへmutable sliceを公開しない |
+| `BufferOverflowException`等 | `error` | 境界失敗を呼び出し側が明示的に扱えるようにする |
+
+Java版のAPI名は参考にするが、`ByteBuffer`のmutable positionやexceptionを再現しない。
+各操作はabsolute offsetを受け取り、成功時にもPage全体のcursor状態を変化させない。
+
+## Clean Architecture上の判断
+
+`Page`はmemory上のencoding規則だけを持ち、`os.File`やpathをimportしないため
+`internal/storage`へ置く。次の`FileManager`は外側のfilesystem実装として`BlockID`と`Page`を
+利用する。`Snapshot`がcopyを返すため、I/O層がPageの内部表現を保持して後から変更することもない。
+
+## 意図的に含めなかったもの
+
+- string専用APIと文字encoding
+- `BlockID`との関連付け
+- filesystemへのread/write/append
+- block sizeの設定管理
+- record layoutとfield type
+- concurrent accessの同期
+
 ## 次の機能
 
-次は`Page`を独立したIssueとして扱う。固定長byte列へ整数とblobを書き、同じoffsetから読める
-振る舞いをtable-driven testで説明する。file I/Oはまだ追加せず、memory上のencodingだけに絞る。
+次は`FileManager`のread/writeを独立したIssueとして扱う。`BlockID.Number()`とblock sizeから
+file offsetを計算し、一時ディレクトリのfileと固定capacityの`Page`を往復できる振る舞いを
+integration testで説明する。appendとfile lengthはさらに後続Issueへ分ける。
 
 ## 参照元
 
 - Edward Sciore, *Database Design and Implementation*, 2nd ed., Section 3.5 and Fig. 3.13
-- SimpleDB 3.4 Java source: `simpledb.file.BlockId`
+- SimpleDB 3.4 Java source: `simpledb.file.BlockId`, `simpledb.file.Page`
+- Go standard library: `encoding/binary`
 - [nakamasato/database-design-and-implementation](https://github.com/nakamasato/database-design-and-implementation)
