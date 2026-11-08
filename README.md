@@ -67,8 +67,9 @@
 
 ## 次の一歩
 
-Chapter 3の基礎file layerが揃い、Chapter 4のlog block初期化、1 block内append、明示flushまで
-進みました。次はcapacity不足時のblock rolloverだけを、独立したIssueとPRで実装します。
+Chapter 3の基礎file layerが揃い、Chapter 4のlog block初期化、1 block内append、明示flush、
+block rolloverまで進みました。次はcurrent block内のreverse iterationだけを、独立したIssueとPRで
+実装します。
 
 ## 参照元
 

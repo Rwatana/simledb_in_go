@@ -77,7 +77,7 @@ func NewManager(files *storagefile.Manager, fileName string) (*Manager, error) {
 }
 
 // Append stores record in the current tail block and returns its LSN.
-// Append returns an error without changing the tail when the record does not fit.
+// A full tail is flushed before Append starts a newly initialized block.
 func (m *Manager) Append(record []byte) (LSN, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -85,14 +85,20 @@ func (m *Manager) Append(record []byte) (LSN, error) {
 	if len(record) > math.MaxInt32-boundarySize {
 		return 0, fmt.Errorf("append log record of %d bytes: encoded length exceeds four-byte boundary capacity", len(record))
 	}
+	encodedLength := boundarySize + len(record)
+	if encodedLength > m.files.BlockSize()-boundarySize {
+		return 0, fmt.Errorf("append log record of %d bytes: encoded length %d cannot fit in an empty %d-byte block", len(record), encodedLength, m.files.BlockSize())
+	}
 	boundary, err := m.page.GetInt(0)
 	if err != nil {
 		return 0, fmt.Errorf("append log record to %v: read boundary: %w", m.block, err)
 	}
-	encodedLength := boundarySize + len(record)
 	position := int(boundary) - encodedLength
 	if position < boundarySize {
-		return 0, fmt.Errorf("append log record of %d bytes to %v: encoded length %d does not fit before boundary %d", len(record), m.block, encodedLength, boundary)
+		if err := m.rollOverLocked(); err != nil {
+			return 0, fmt.Errorf("append log record of %d bytes: roll over full tail %v: %w", len(record), m.block, err)
+		}
+		position = m.files.BlockSize() - encodedLength
 	}
 	if err := m.page.SetBytes(position, record); err != nil {
 		return 0, fmt.Errorf("append log record to %v at offset %d: %w", m.block, position, err)
@@ -112,6 +118,37 @@ func (m *Manager) Flush(lsn LSN) error {
 	if lsn > m.latestLSN {
 		return fmt.Errorf("flush LSN %d: latest allocated LSN is %d", lsn, m.latestLSN)
 	}
+	if lsn <= m.lastSavedLSN {
+		return nil
+	}
+	return m.flushTailLocked(lsn)
+}
+
+func (m *Manager) rollOverLocked() error {
+	if err := m.flushTailLocked(m.latestLSN); err != nil {
+		return err
+	}
+
+	page, err := storage.NewPage(m.files.BlockSize())
+	if err != nil {
+		return fmt.Errorf("create new tail page: %w", err)
+	}
+	if err := page.SetInt(0, int32(m.files.BlockSize())); err != nil {
+		return fmt.Errorf("initialize new tail boundary: %w", err)
+	}
+	block, err := m.files.Append(m.fileName)
+	if err != nil {
+		return fmt.Errorf("append new tail block: %w", err)
+	}
+	if err := m.files.Write(block, page); err != nil {
+		return fmt.Errorf("write initialized tail block %v: %w", block, err)
+	}
+	m.page = page
+	m.block = block
+	return nil
+}
+
+func (m *Manager) flushTailLocked(lsn LSN) error {
 	if lsn <= m.lastSavedLSN {
 		return nil
 	}
