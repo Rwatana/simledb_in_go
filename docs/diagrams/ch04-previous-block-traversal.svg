@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 4 Feature 6: Previous-block traversal</title>
+  <desc id="description">memory block 2からdisk block 1、block 0へ移動し、record 4から1を逆順に読む。</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="850" fill="#ffffff"/>
+  <text class="title" x="700" y="60" text-anchor="middle">Chapter 4 / Feature 6: Previous-block traversal</text>
+  <rect class="box" x="70" y="150" width="330" height="240" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="235" y="185" text-anchor="middle">Memory snapshot · block 2</text>
+  <rect class="box" x="100" y="235" width="270" height="110" rx="10" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="heading" x="235" y="275" text-anchor="middle">boundary → record 4</text><text class="text" x="235" y="320" text-anchor="middle">then position = capacity</text>
+  <rect class="box" x="535" y="150" width="330" height="240" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="700" y="185" text-anchor="middle">Lazy disk read · block 1</text>
+  <rect class="box" x="565" y="235" width="270" height="110" rx="10" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="text" x="700" y="275" text-anchor="middle">boundary → record 3 → record 2</text><text class="text" x="700" y="320" text-anchor="middle">then position = capacity</text>
+  <rect class="box" x="1000" y="150" width="330" height="240" rx="12" fill="#f8fafc" stroke="#475569"/>
+  <text class="heading" x="1165" y="185" text-anchor="middle">Lazy disk read · block 0</text>
+  <rect class="box" x="1030" y="235" width="270" height="110" rx="10" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="heading" x="1165" y="275" text-anchor="middle">boundary → record 1</text><text class="text" x="1165" y="320" text-anchor="middle">block 0 end = exhausted</text>
+  <line x1="400" y1="275" x2="535" y2="275" stroke="#475569" stroke-width="3"/><polygon points="535,275 522,267 522,283" fill="#475569"/><text class="text" x="467" y="255" text-anchor="middle">block − 1</text>
+  <line x1="865" y1="275" x2="1000" y2="275" stroke="#475569" stroke-width="3"/><polygon points="1000,275 987,267 987,283" fill="#475569"/><text class="text" x="932" y="255" text-anchor="middle">block − 1</text>
+  <rect class="box" x="190" y="620" width="1020" height="105" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="heading" x="700" y="663" text-anchor="middle">Global order: record 4 → record 3 → record 2 → record 1</text>
+  <text class="text" x="700" y="699" text-anchor="middle">Each loaded Page restarts at its validated boundary.</text>
+</svg>
