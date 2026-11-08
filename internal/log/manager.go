@@ -17,12 +17,13 @@ type LSN uint64
 
 // Manager owns the in-memory tail page of one database log file.
 type Manager struct {
-	files     *storagefile.Manager
-	fileName  string
-	page      *storage.Page
-	block     storage.BlockID
-	mu        sync.Mutex
-	latestLSN LSN
+	files        *storagefile.Manager
+	fileName     string
+	page         *storage.Page
+	block        storage.BlockID
+	mu           sync.Mutex
+	latestLSN    LSN
+	lastSavedLSN LSN
 }
 
 // NewManager loads the existing log tail or initializes its first empty block.
@@ -101,4 +102,22 @@ func (m *Manager) Append(record []byte) (LSN, error) {
 	}
 	m.latestLSN++
 	return m.latestLSN, nil
+}
+
+// Flush ensures that the current tail, including lsn, is stored on disk.
+func (m *Manager) Flush(lsn LSN) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if lsn > m.latestLSN {
+		return fmt.Errorf("flush LSN %d: latest allocated LSN is %d", lsn, m.latestLSN)
+	}
+	if lsn <= m.lastSavedLSN {
+		return nil
+	}
+	if err := m.files.Write(m.block, m.page); err != nil {
+		return fmt.Errorf("flush log tail %v through LSN %d: %w", m.block, lsn, err)
+	}
+	m.lastSavedLSN = m.latestLSN
+	return nil
 }
