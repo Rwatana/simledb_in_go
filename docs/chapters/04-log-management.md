@@ -20,7 +20,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | buffer unpin | frame利用終了とunderflow防止 | 実装済み |
 | dirty transaction | frameを変更したtransactionの識別 | 実装済み |
 | dirty recovery LSN | dirty Pageに先行するlog record | 実装済み |
-| dirty buffer flush | WAL順序とdata Page保存 | 未着手 |
+| dirty buffer flush | WAL順序とdata Page保存 | 実装済み |
 | initial block assignment | unassigned frameへのdisk Page load | 実装済み |
 | buffer reassignment | dirty flush後のframe再利用 | 未着手 |
 | buffer pool | frame選択と待機 | 未着手 |
@@ -1135,10 +1135,91 @@ in-memory commitを分離し、replacement policyをBufferManagerへ持ち込ま
 - pin count reset
 - BufferManager selection/replacement
 
+## Feature 14: Flush a dirty buffer in WAL order
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-wal-flush.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-wal-flush.svg)を参照する。図はoptional recovery LSN、data Page、dirty
+metadata clearの順序と、failure時に後続stateへ進まない境界を示す。
+
+### 問い
+
+dirty data Pageが、その変更を説明するrecovery logより先にdiskへ到達しないようにし、I/O失敗後も
+retry可能なdirty stateをどう維持するか。
+
+### 概念
+
+private `flush`はBuffer mutex内でdirty stateを検査する。recovery LSNがあればLogManagerへflushを要求し、
+成功後にFileManagerでassigned blockへcontentsを書き、最後にtransactionとLSN metadataをclearする。
+
+```text
+optional log Flush(lsn) -> data Page Write(block) -> clear dirty metadata
+```
+
+clean frameはno-opである。unassigned dirty frame、log flush failure、data write failureはerrorを返し、
+dirty metadataを維持する。log failureではdata Page writeへ進まない。
+
+### 公開API
+
+public APIは増やさない。後続assignment/BufferManagerが使うprivate `Buffer.flush() error`だけを追加する。
+
+### Test-firstの記録
+
+#### Red
+
+WALあり/なしのwrite、log failure、clean no-op、unassigned dirty rejectionを先にtestした。実装前は
+`flush`が存在せずbuildに失敗した。
+
+```text
+frame.flush undefined (type *Buffer has no field or method flush)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+log flush、data write、success-only metadata clearを同じBuffer mutex区間へ追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestFlushWritesRecoveryLogBeforeDirtyPageAndClearsMetadata` | log/data durabilityとsuccess clear |
+| `TestFlushWritesDirtyPageWithoutARecoveryLSN` | non-logged modificationのdata-only write |
+| `TestFlushFailurePreservesDirtyStateAndDiskPage` | future LSN failureでdata unchanged、metadata維持 |
+| `TestFlushNoOpsForCleanBufferAndRejectsUnassignedDirtyBuffer` | no-opとassignment precondition |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.Buffer.flush`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `if (txnum >= 0)` | optional modifiedBy | sentinelなしでdirtyを判定する |
+| `lm.flush(lsn)` | LSNがある場合だけ`logs.Flush` | no-log modificationでzero LSNを渡さない |
+| `fm.write(blk, contents)` | 同じ | log成功後にdata Pageをsyncする |
+| `txnum = -1` | transactionとLSNをnil | write成功後だけ全dirty metadataをclearする |
+| unchecked failure | error | retry可能なstateを呼び出し側へ返す |
+
+## Clean Architecture上の判断
+
+WAL orderingはBufferが持つapplication policyで、具体的なdurability mechanismはLogManagerとFileManagerへ
+委譲する。BufferManagerは個々のI/O順序を再実装せず、このprimitiveを呼ぶだけにする。
+
+## 意図的に含めなかったもの
+
+- assigned frameのreassignment
+- transaction別FlushAll
+- buffer pool selection/waiting
+- replacement policy
+- recovery scan/rollback
+
 ## 次の機能
 
-次はassigned dirty frameを、recovery LSN、data Pageの順でflushし、成功後にdirty metadataをclearする。
-reassignmentとBufferManager poolはさらに独立したIssue、commit、stacked PRへ分ける。
+次はclean・unpinnedなassigned Bufferを別blockへreassignする。dirty auto-flushを含むreplacementと
+BufferManager poolは、さらに独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 

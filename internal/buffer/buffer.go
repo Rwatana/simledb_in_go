@@ -160,3 +160,27 @@ func (b *Buffer) assignToBlock(block storage.BlockID) error {
 	b.block = &assigned
 	return nil
 }
+
+// flush persists a dirty Buffer in write-ahead order and marks it clean.
+func (b *Buffer) flush() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.modifiedBy == nil {
+		return nil
+	}
+	if b.block == nil {
+		return fmt.Errorf("flush buffer modified by transaction %d: buffer is not assigned to a block", *b.modifiedBy)
+	}
+	if b.recoveryLSN != nil {
+		if err := b.logs.Flush(*b.recoveryLSN); err != nil {
+			return fmt.Errorf("flush buffer %v recovery LSN %d: %w", *b.block, *b.recoveryLSN, err)
+		}
+	}
+	if err := b.files.Write(*b.block, b.contents); err != nil {
+		return fmt.Errorf("flush buffer %v: %w", *b.block, err)
+	}
+	b.modifiedBy = nil
+	b.recoveryLSN = nil
+	return nil
+}
