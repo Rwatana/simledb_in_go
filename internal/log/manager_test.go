@@ -356,3 +356,23 @@ func newFileManager(t *testing.T, blockSize int) *storagefile.Manager {
 	}
 	return files
 }
+
+func TestAppendRejectsSyntheticOversizedRecordBeforeStateChanges(t *testing.T) {
+	t.Parallel()
+
+	manager, _ := newLogManager(t, 32)
+	before := manager.page.Snapshot()
+	lsn, err := manager.appendWithMaxInt32([]byte("12345"), 8)
+	if lsn != 0 {
+		t.Errorf("appendWithMaxInt32() LSN = %d, want 0", lsn)
+	}
+	if err == nil || !strings.Contains(err.Error(), "append log record of 5 bytes: encoded length exceeds four-byte boundary capacity") {
+		t.Errorf("appendWithMaxInt32() error = %v, want the four-byte boundary capacity error", err)
+	}
+	if got := manager.page.Snapshot(); !bytes.Equal(got, before) {
+		t.Errorf("tail Page changed after rejected append: got %v, want %v", got, before)
+	}
+	if manager.latestLSN != 0 {
+		t.Errorf("latest LSN = %d, want unchanged value 0", manager.latestLSN)
+	}
+}

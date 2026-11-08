@@ -67,8 +67,8 @@
 
 ## 次の一歩
 
-Chapter 3の基礎file layerが揃いました。次はChapter 4の`LogManager`を小さなIssueへ分け、
-log recordのappendとblock rolloverから実装します。
+Chapter 3の基礎file layerが揃い、Chapter 4のlog block初期化と1 block内appendまで進みました。
+次はappend済みtailをLSN指定でdiskへ反映する明示flushを、独立したIssueとPRで実装します。
 
 ## 参照元
 
