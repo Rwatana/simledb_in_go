@@ -13,7 +13,8 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | explicit flush | durability boundary | 実装済み |
 | block rollover | full tailから次blockへの遷移 | 実装済み |
 | current-block iterator | 1 block内のnewest-to-oldest traversal | 実装済み |
-| previous-block traversal | block境界を越えるreverse traversal | 未着手 |
+| previous-block traversal | block境界を越えるreverse traversal | 実装済み |
+| iterator creation flush | disk traversal前のtail durability | 未着手 |
 
 ## Feature 1: Log block initialization
 
@@ -453,10 +454,97 @@ iteratorはlogのdisk layoutを解釈するため`internal/log`に置く。curre
 - concurrent live view
 - transaction recoveryとの統合
 
+## Feature 6: Previous-block traversal
+
+編集可能な図は[Draw.io版](../diagrams/ch04-previous-block-traversal.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-previous-block-traversal.svg)を参照する。図はmemory snapshotのblock 2を読み
+終えた後、disk block 1、block 0をlazy loadしてglobal reverse orderを維持する流れを示す。
+
+### 問い
+
+1 block iteratorのpositionがblock末尾に達したとき、log全体のnewest-to-oldest orderを壊さずに
+どのblockとoffsetへ移動すべきか。
+
+### 概念
+
+IteratorはPageとpositionに加えてcurrent BlockIDとFileManager参照を持つ。positionがPage capacityと
+一致し、block numberが0より大きければ、numberを1減らしたblockをreadし、そのPageのboundaryを
+新しいpositionにする。
+
+```text
+while position == page capacity:
+    if block number == 0: exhausted
+    block = block number - 1
+    page = read(block)
+    position = page boundary
+```
+
+`while`にすることで、validだがemptyなblockが途中にあってもさらに前へ進める。readまたはboundary
+validationに失敗した場合、Iteratorのcurrent stateを進めずerrorを返す。
+
+### 公開API
+
+公開APIは変えない。`Iterator.Next()`のblock末尾経路だけを拡張する。current tailは引き続き
+Managerから取ったmemory snapshot、previous blocksはrollover時に保存済みのdisk Pageをlazy readする。
+
+### Test-firstの記録
+
+#### Red
+
+3 blocksへ4 recordsを配置し、global reverse orderとinvalid previous boundaryを先にtestした。実装前は
+current blockの1 recordを返した直後にexhaustedとなった。
+
+```text
+Next() record 1 ok = false, want true
+Next(corrupt previous block) = ([], false, <nil>), want boundary error
+FAIL github.com/Rwatana/simledb_in_go/internal/log
+```
+
+#### Green
+
+IteratorへFileManagerとBlockIDを追加し、block末尾でprevious Pageをloadするprivate transitionを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/log
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestIteratorTraversesPreviousBlocksNewestToOldest` | 3 blocksのglobal reverse order、block 0 exhaustion、no flush |
+| `TestIteratorReportsAnInvalidPreviousBlockBoundary` | previous Pageをcommitする前のboundary validationとerror |
+
+## Javaソースリーディング
+
+対象は`simpledb.log.LogIterator.hasNext`、`next`のblock切替、`moveToBlock`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `currentpos < blockSize || blk.number() > 0` | `Next`内のposition/block判定 | separate HasNextによるI/O error隠蔽を避ける |
+| `blk.number()-1` | 同じprevious BlockID | file内の物理reverse orderを維持する |
+| `fm.read(blk, p)` | `files.Read(block)` | previous blockだけを必要時にloadする |
+| `currentpos = boundary` | `position = blockBoundary(...)` | 各blockの最新recordから再開する |
+| boundary検査なし | `[4, capacity]`検査 | corrupt Pageをrecordとしてdecodeしない |
+
+## Clean Architecture上の判断
+
+cross-block iteratorはlog layoutとblock sequenceを解釈する`internal/log`の責務であり、raw filesystem操作は
+FileManagerへ委譲する。previous Pageはeager copyせずlazy readし、iterator 1つのmemory使用量を1 Pageに
+保つ。
+
+## 意図的に含めなかったもの
+
+- iterator作成時のautomatic flush
+- 全previous Pageのeager snapshot
+- iteration中の外部file mutationに対するsnapshot isolation
+- restart後のLSN復元
+- transaction recoveryとの統合
+
 ## 次の機能
 
-次はcurrent blockを読み終えたiteratorがprevious blockへ移動する振る舞いだけを実装する。
-iterator作成時のautomatic flushは、さらに別Issue、別commit、別stacked PRへ分ける。
+次はiteratorを返す前にcurrent tailをdiskへflushするdurability契約だけを実装する。buffer管理は
+さらに後続の独立Issueとstacked PRへ分ける。
 
 ## 参照元
 
