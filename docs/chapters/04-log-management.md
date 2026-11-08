@@ -15,6 +15,11 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | current-block iterator | 1 block内のnewest-to-oldest traversal | 実装済み |
 | previous-block traversal | block境界を越えるreverse traversal | 実装済み |
 | iterator creation flush | disk traversal前のtail durability | 実装済み |
+| unassigned buffer frame | fixed-size cache Pageの初期状態 | 実装済み |
+| buffer pin count | frame利用数 | 未着手 |
+| dirty buffer flush | WAL順序とdata Page保存 | 未着手 |
+| block assignment | frame再利用 | 未着手 |
+| buffer pool | frame選択と待機 | 未着手 |
 
 ## Feature 1: Log block initialization
 
@@ -629,10 +634,96 @@ deadlockを避ける。
 - transaction recovery record
 - concurrent file mutationに対するfull snapshot isolation
 
+## Feature 8: Unassigned buffer frame
+
+編集可能な図は[Draw.io版](../diagrams/ch04-unassigned-buffer.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-unassigned-buffer.svg)を参照する。図はFileManagerのblock sizeを使って
+zero-filled Pageを所有し、まだBlockIDを持たないfresh Bufferの境界を示す。
+
+### 問い
+
+buffer poolへframeを並べる前に、disk I/Oやpin policyを混ぜず、各frameが必ず有効なfixed-size Pageを
+所有する初期状態をどう作るか。
+
+### 概念
+
+`Buffer`はFileManager、LogManager、mutable Page、optional BlockIDを保持する。constructorはdependencyを
+検査し、FileManagerのblock sizeと同じcapacityのzero-filled Pageを1つ作る。fresh frameのBlockIDは
+未割当である。
+
+```text
+New(files, logs)
+    -> Page(capacity = files.BlockSize())
+    -> block = unassigned
+```
+
+`Contents`はowned Pageを返す。上位のrecord/transaction layerがPageを更新する必要があるため、ここでは
+copyではなくmutable referenceを公開する。dirty trackingは後続PRで追加する。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `buffer.New(files, logs)` | zero-filled unassigned frameを作る |
+| `Buffer.Contents()` | frameが所有するmutable Pageを返す |
+| `Buffer.Block()` | assigned BlockIDと存在有無を返す |
+
+### Test-firstの記録
+
+#### Red
+
+external test packageからcapacity、zero-fill、unassigned state、mutable contents、nil dependenciesを先に
+記述した。実装前はbuffer packageにnon-test Go fileがなくbuildに失敗した。
+
+```text
+github.com/Rwatana/simledb_in_go/internal/buffer: no non-test Go files
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+Page ownershipとoptional BlockIDだけを持つ最小Bufferを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestNewCreatesAnUnassignedZeroFilledFrame` | capacity、zero-fill、unassigned Block、contents access |
+| `TestNewRejectsNilDependencies` | FileManager/LogManager dependency validation |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.Buffer`のfieldとconstructor、`contents`、`block`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `new Page(fm.blockSize())` | `storage.NewPage(files.BlockSize())` | file blockと同じfixed capacityを使う |
+| `BlockId blk = null` | optional `*storage.BlockID` | unassigned stateをzero-value BlockIDと混同しない |
+| `contents()` | `Contents()` | 上位layerがPageを更新できるmutable reference |
+| `block()`がnullable | `(BlockID, bool)` | nilをpublic APIへ漏らさない |
+| constructor dependency無検査 | nil error | setup failureを早く明示する |
+
+## Clean Architecture上の判断
+
+BufferはPageとBlockIDというstorage valueを所有し、外側のFileManager/LogManagerを後続のI/O use case用に
+参照する。初期化PRでは依存を保存するだけでI/Oを行わず、frame stateとallocation policyを分離する。
+
+## 意図的に含めなかったもの
+
+- pin/unpin count
+- modifying transactionとLSN
+- dirty Page flush
+- BlockID assignmentとdisk read
+- BufferManager poolとreplacement policy
+
 ## 次の機能
 
-log Managerの基本機能が揃った。次はChapter 4のbuffer管理を、Buffer frame初期状態、block assignment、
-pin count、BufferManager選択の順に、さらに独立したIssue、commit、stacked PRへ分けて実装する。
+次はBuffer frameのpin countだけを実装する。dirty metadata、WAL付きflush、block assignment、
+BufferManager poolは、それぞれさらに独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 
