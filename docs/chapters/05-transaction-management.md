@@ -104,9 +104,47 @@ build because `TransactionID`, `OperationStart`, `EncodeStartRecord`, and `Decod
 | `writeToLog(lm, txnum)` | codec only | Append is the next independent behavior |
 | empty `undo` | no undo method yet | Avoid an interface before update records require it |
 
+## Feature 3: Append a START record
+
+`AppendStartRecord` composes Feature 2's exact codec with the existing log append contract. Its `LogAppender` port contains
+only `Append([]byte) (log.LSN, error)`, so `log.Manager` satisfies it directly and recovery tests can use an in-memory
+recorder without filesystem I/O.
+
+```text
+TransactionID
+    -> EncodeStartRecord                 (exact 8 bytes)
+    -> LogAppender.Append                (exactly once)
+    -> return the same LSN or wrapped error
+```
+
+The function does not flush the LSN. A START record only establishes rollback history; the later commit and rollback
+behaviors are responsible for their own durability boundaries. On append failure, the error includes the transaction ID
+and preserves the underlying error for `errors.Is`; it does not retry because the caller cannot know whether a failed I/O
+partially entered an external implementation.
+
+### Test-first record
+
+The exact appended bytes, unchanged LSN, single-call failure path, and concrete `log.Manager` conformance were tested
+first. The initial build failed because `AppendStartRecord` and `LogAppender` were undefined.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestAppendStartRecordAppendsExactEncodingAndReturnsLSN` | One exact append and unchanged LSN |
+| `TestAppendStartRecordReturnsAppendFailureWithContext` | Wrapped transaction context and no retry |
+| `TestLogManagerSatisfiesStartRecordAppender` | Existing concrete manager satisfies the consumer-owned port |
+
+### Java source map and Go decision
+
+| Java `StartRecord.writeToLog` | Go | Decision |
+| --- | --- | --- |
+| accepts concrete `LogMgr` | consumes `LogAppender` | Declare the minimum port at the recovery consumer |
+| builds two integers inline | reuses `EncodeStartRecord` | Keep byte layout independently testable |
+| returns `lm.append(rec)` | returns the same `log.LSN` | Preserve the log manager's ordering token |
+| unchecked append failure | wrapped Go error | Expose failure and transaction context explicitly |
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 by appending a START record through the log manager as a separate issue and stacked PR.
+Continue Sect. 5.3.9.1 with the COMMIT record codec as a separate issue and stacked PR.
 
 ## Sources
 
