@@ -33,7 +33,8 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | non-waiting pin attempt | cache hit/missのatomic composition | 実装済み |
 | final-release notification | condition variableとavailable predicate | 実装済み |
 | waiting buffer pin | condition wait、wake、retry | 実装済み |
-| buffer pin timeout | bounded waitingとabort | 未着手 |
+| buffer pin timeout | bounded waitingとabort | 実装済み |
+| transaction buffer flush | transaction別dirty frame保存 | 未着手 |
 
 ## Feature 1: Log block initialization
 
@@ -2169,10 +2170,102 @@ waiting policyはpool coordinationのuse caseなのでManagerに閉じ込め、B
 - transaction別FlushAll
 - replacement policyの変更
 
+## Feature 26: Abort a buffer pin after its wait deadline
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-pin-timeout.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-pin-timeout.svg)を参照する。図はunavailable後に1本のdeadline timerを開始し、
+期限前のreleaseなら成功、期限到達後もunavailableなら専用errorへ分岐する流れを示す。
+
+### 問い
+
+利用可能frameが戻らないとき、永久にgoroutineを止めず、同時にreleaseとdeadlineのraceでもpool stateを
+壊さないbounded waitをどう実装するか。
+
+### 概念
+
+Managerは書籍と同じ10秒をdefault `pinWaitTimeout`として持つ。`Pin`は最初のunavailable resultでdeadlineを
+計算し、1本だけ`time.AfterFunc`を開始する。timer callbackはManager mutexを取得し、既存conditionを
+Broadcastするだけである。
+
+```text
+unavailable -> start deadline timer -> Cond.Wait()
+release first -> Broadcast -> retry succeeds -> return frame
+deadline first -> Broadcast -> retry unavailable -> remaining <= 0 -> ErrPinTimeout
+```
+
+timeout判定とretryはManager mutex内の同じloopで行うため、timer自身はframeやavailableを変更しない。
+releaseがdeadline付近で競合しても、retryでframeを取得できればsuccessを優先し、まだunavailableならabortする。
+method終了時はtimerをstopし、遅れたBroadcastがあってもwaiterのloop predicateで安全に扱う。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `ErrPinTimeout` | `errors.Is`で判定できるpin wait期限超過 |
+| `Manager.Pin(block)` | default 10秒以内にframeをpinし、期限超過ならwrapped `ErrPinTimeout`を返す |
+
+timeout durationはpackage-private fieldとし、production constructorは常に10秒を設定する。testだけが短いdurationへ
+差し替え、suiteを遅くせずdeadline behaviorを検証する。
+
+### Test-firstの記録
+
+#### Red
+
+default duration、timeout state、release-before-deadline、concurrent timeoutを先にtestした。実装前は
+`pinWaitTimeout`と`ErrPinTimeout`が存在せずbuildに失敗した。
+
+```text
+manager.pinWaitTimeout undefined (type *Manager has no field or method pinWaitTimeout)
+undefined: ErrPinTimeout
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+10秒default、sentinel error、最初のunavailableで開始するtimer、deadline後のabort判定だけを既存loopへ追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestNewManagerUsesBookPinWaitTimeout` | production defaultが10秒 |
+| `TestManagerPinTimesOutWithoutMutationAndCanRecover` | timeout error、state保持、後続release後の再利用 |
+| `TestManagerPinReleaseBeforeDeadlineStillSucceeds` | deadline前releaseのsuccess |
+| `TestManagerConcurrentPinWaitersCanIndependentlyTimeOut` | 複数timer wakeupと独立abort |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr.pin`、`waitingTooLong`、`BufferAbortException`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `MAX_TIME = 10000` | `defaultPinWaitTimeout = 10 * time.Second` | 書籍の待機上限を維持する |
+| start timestamp | `deadline := time.Now().Add(timeout)` | monotonic componentを持つGo timeで期限を表す |
+| `wait(MAX_TIME)` | timer callback + `Cond.Broadcast` | `sync.Cond`にないtimed waitを補う |
+| `waitingTooLong` | `time.Until(deadline) <= 0` | retry後に期限を評価する |
+| `BufferAbortException` | wrapped `ErrPinTimeout` | `errors.Is`可能な明示的error contract |
+| catch `InterruptedException` | context cancellationなし | cancellationをこのPRへ混ぜない |
+
+## Clean Architecture上の判断
+
+deadline policyはManager内部に置き、Buffer、storage、filesystemへclockやtimerを渡さない。timer callbackは
+condition wakeupだけを行い、domain state mutationは既存Manager critical sectionに限定する。
+
+## 意図的に含めなかったもの
+
+- context cancellation
+- caller別timeout option
+- transaction別FlushAll
+- replacement policyの変更
+
 ## 次の機能
 
-次は`Pin`の待機に上限を設け、期限までframeを取得できなければ専用abort errorを返す振る舞いを追加する。
-transaction別FlushAllは、その後の独立したIssue、commit、stacked PRへ分ける。
+次は指定transactionがdirtyにしたpool内frameだけをWAL順にflushする`FlushAll`を追加する。複数frameの途中で
+failureが起きた場合の継続/停止policyも、そのobservable behaviorとしてtestで固定する。
 
 ## 参照元
 
