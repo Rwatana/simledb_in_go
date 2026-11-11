@@ -142,9 +142,47 @@ first. The initial build failed because `AppendStartRecord` and `LogAppender` we
 | returns `lm.append(rec)` | returns the same `log.LSN` | Preserve the log manager's ordering token |
 | unchecked append failure | wrapped Go error | Expose failure and transaction context explicitly |
 
+## Feature 4: Transaction COMMIT log record codec
+
+COMMIT uses the same fixed-width shape as START, but its durable operation code is `2`. `EncodeCommitRecord` writes the
+operation followed by the signed four-byte transaction bit pattern; `DecodeCommitRecord` requires exactly eight bytes and
+checks the operation before returning a `CommitRecord`.
+
+```text
+offset 0                offset 4                 offset 8
++-----------------------+------------------------+
+| COMMIT operation = 2  | transaction ID (int32) |
++-----------------------+------------------------+
+```
+
+This PR factors the already-tested START representation into private `encodeTransactionRecord` and
+`decodeTransactionRecord` helpers. The public START API and its error text remain unchanged. The shared code expresses only
+the common two-integer layout; it does not introduce a generic public record abstraction before record dispatch is needed.
+
+### Test-first record
+
+Exact positive, zero, and negative-bit-pattern encodings plus malformed inputs were tested first. The initial build failed
+because `OperationCommit`, `EncodeCommitRecord`, and `DecodeCommitRecord` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestCommitRecordRoundTrip` | Exact COMMIT bytes and signed transaction ID round-trip |
+| `TestDecodeCommitRecordRejectsInvalidEncoding` | Truncation, trailing bytes, and a START operation are rejected |
+
+### Java source map and Go decision
+
+| Java `CommitRecord` | Go | Decision |
+| --- | --- | --- |
+| `COMMIT = 2` | `OperationCommit Operation = 2` | Preserve the durable operator value |
+| two `Integer.BYTES` values | shared private fixed-width codec | Reuse the representation without merging record types |
+| constructor extracts `txnum` | strict `DecodeCommitRecord` | Validate boundary and operation first |
+| `writeToLog` | excluded | Append and flush are later observable behaviors |
+| empty `undo` | no undo method yet | Do not add orchestration to a value codec |
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 with the COMMIT record codec as a separate issue and stacked PR.
+Continue Sect. 5.3.9.1 by appending the COMMIT record as a separate issue, then flush it in another PR because append and
+durability are distinct observable behaviors.
 
 ## Sources
 
