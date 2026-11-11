@@ -179,10 +179,39 @@ because `OperationCommit`, `EncodeCommitRecord`, and `DecodeCommitRecord` did no
 | `writeToLog` | excluded | Append and flush are later observable behaviors |
 | empty `undo` | no undo method yet | Do not add orchestration to a value codec |
 
+## Feature 5: Append a COMMIT record
+
+`AppendCommitRecord` sends Feature 4's exact bytes through the same recovery-owned `LogAppender` port as START. It returns
+the append LSN unchanged. Failure is wrapped with the COMMIT transaction ID, preserves the underlying error, and is not
+retried.
+
+The shared private append helper contains only the one-call/error-context sequence. START still selects its own codec and
+name, while COMMIT selects its own; this avoids a public generic record writer and keeps each operation independently
+reviewable.
+
+### Test-first record
+
+Exact bytes, unchanged LSN, and the no-retry error path were tested before implementation. The first run failed because
+`AppendCommitRecord` was undefined.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestAppendCommitRecordAppendsExactEncodingAndReturnsLSN` | One exact COMMIT append and unchanged LSN |
+| `TestAppendCommitRecordReturnsAppendFailureWithContext` | Wrapped COMMIT transaction context and no retry |
+
+### Java source map and Go decision
+
+| Java `CommitRecord.writeToLog` | Go | Decision |
+| --- | --- | --- |
+| concrete `LogMgr` parameter | existing `LogAppender` port | Reuse the consumer-owned append boundary |
+| builds bytes and appends together | codec then append | Keep layout tests separate from I/O composition |
+| returns append LSN | unchanged `log.LSN` | Preserve ordering identity for the next flush behavior |
+| append has no checked error | wrapped Go error | Make partial I/O uncertainty explicit and avoid retry |
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 by appending the COMMIT record as a separate issue, then flush it in another PR because append and
-durability are distinct observable behaviors.
+Continue Sect. 5.3.9.1 by flushing an appended COMMIT LSN in a separate PR because append and durability are distinct
+observable behaviors.
 
 ## Sources
 
