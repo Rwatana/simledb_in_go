@@ -32,7 +32,8 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | cache miss buffer pin | lifecycle dispatchと成功後pin | 実装済み |
 | non-waiting pin attempt | cache hit/missのatomic composition | 実装済み |
 | final-release notification | condition variableとavailable predicate | 実装済み |
-| buffer selection and waiting | frame検索、割当、待機 | 未着手 |
+| waiting buffer pin | condition wait、wake、retry | 実装済み |
+| buffer pin timeout | bounded waitingとabort | 未着手 |
 
 ## Feature 1: Log block initialization
 
@@ -2077,10 +2078,101 @@ condition variableはBufferやstorageへ漏らさず、pool coordinationを持�
 - transaction別FlushAll
 - replacement policyの変更
 
+## Feature 25: Wait for an available buffer when pinning
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-pin-wait.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-pin-wait.svg)を参照する。図はpublic `Pin`がatomic attemptを行い、pool exhausted
+ならcondition variableでsleepし、final unpinの通知後にmutexを再取得してloopする流れを示す。
+
+### 問い
+
+all-pinned状態でCPUをspinさせず、lost wakeupや同時起床したclient同士のraceを避けながら、利用可能frameが
+生じるまでpin要求をどう待たせるか。
+
+### 概念
+
+`Manager.Pin`はManager mutexを取得し、`tryToPinLocked`をloopで呼ぶ。結果がsuccessならframeを返し、I/O/WAL
+failureならerrorを返す。unavailableだけは`availableChanged.Wait`を呼び、mutexをatomicに解放してsleepする。
+
+```text
+for {
+    frame, pinned, err := tryToPinLocked(target)
+    error     -> return error
+    pinned    -> return frame
+    otherwise -> Cond.Wait(); then retry
+}
+```
+
+final unpinがBroadcastするとwaiterはManager mutexを再取得する。複数waiterが同時に起きても、先にmutexを取った
+clientだけがavailable frameをclaimし、後続clientはloopで再検査して必要なら再び待つ。targetがすでにcacheされ、
+そのframeがpinned中なら、追加pinは新しいframeを必要としないため即時成功する。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Manager.Pin(block)` | blockのcache hit/missを処理し、必要ならavailable frameを待ってpinned Bufferを返す |
+
+この段階の`Pin`にはtimeoutとcancellationがない。待機上限とabort errorは次の独立機能で追加する。
+
+### Test-firstの記録
+
+#### Red
+
+cache hit、intermediate/final release、複数waiterのrecheck、assignment failureを先にtestした。実装前は
+`Manager.Pin`が存在せずbuildに失敗した。
+
+```text
+manager.Pin undefined (type *Manager has no field or method Pin)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+`tryToPin`をlock wrapperと`tryToPinLocked`へ分け、public `Pin`にattempt/Wait loopだけを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestManagerPinReturnsCachedFrameImmediately` | pool available 0でもcache hitは同一frameを追加pinする |
+| `TestManagerPinWaitsForFinalReleaseAndRetries` | intermediate release待機、final release起床、target再割当 |
+| `TestManagerPinWaitersRecheckAfterBroadcast` | 複数waiterのmutex直列化とpredicate再検査 |
+| `TestManagerPinReturnsAssignmentErrorsWithoutWaiting` | I/O errorの即時伝播とavailable保持 |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr.pin`のwait/retry loopである。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| synchronized `pin` | Manager mutexをmethod全体で保持 | attemptとwait predicateを同じlockで扱う |
+| `tryToPin(blk)` | `tryToPinLocked(block)` | mutexの二重取得を避けて既存primitiveを再利用する |
+| `while (buff == null)` | `for` loopと`pinned` result | spurious/multiple wakeup後に必ずretryする |
+| `wait(MAX_TIME)` | `availableChanged.Wait()` | このPRは通知待ちだけに限定する |
+| assignment exceptionなし | explicit `error` return | I/O/WAL failureでは待たない |
+| fixed timeout abort | 未実装 | bounded waitingを次PRへ分離する |
+
+## Clean Architecture上の判断
+
+waiting policyはpool coordinationのuse caseなのでManagerに閉じ込め、Bufferやfilesystemへcondition variableを
+渡さない。`Pin`は既存atomic attemptを繰り返すだけで、Page I/Oやreplacement ruleを重複実装しない。
+
+## 意図的に含めなかったもの
+
+- timeoutとabort error
+- context cancellation
+- transaction別FlushAll
+- replacement policyの変更
+
 ## 次の機能
 
-次はpublic `Pin`がall-pinned状態でcondition variableを待ち、final unpin後にretryして成功する振る舞いを
-追加する。timeoutとabortは、さらに別のIssue、commit、stacked PRへ分ける。
+次は`Pin`の待機に上限を設け、期限までframeを取得できなければ専用abort errorを返す振る舞いを追加する。
+transaction別FlushAllは、その後の独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 
