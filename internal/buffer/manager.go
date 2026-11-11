@@ -63,3 +63,15 @@ func (m *Manager) findExistingBuffer(block storage.BlockID) (*Buffer, bool) {
 	}
 	return nil, false
 }
+
+func (m *Manager) chooseUnpinnedBuffer() (*Buffer, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, frame := range m.frames {
+		if !frame.IsPinned() {
+			return frame, true
+		}
+	}
+	return nil, false
+}
