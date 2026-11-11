@@ -185,11 +185,43 @@ func (b *Buffer) reassignToBlock(block storage.BlockID) error {
 	return nil
 }
 
+// replaceDirtyWithBlock flushes a dirty, unpinned Buffer before loading another block.
+func (b *Buffer) replaceDirtyWithBlock(block storage.BlockID) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.block == nil {
+		return fmt.Errorf("replace dirty buffer with %v: buffer is not assigned", block)
+	}
+	if b.modifiedBy == nil {
+		return fmt.Errorf("replace dirty buffer %v with %v: buffer is clean", *b.block, block)
+	}
+	if b.pins != 0 {
+		return fmt.Errorf("replace dirty buffer %v with %v: buffer has pin count %d", *b.block, block, b.pins)
+	}
+	oldBlock := *b.block
+	if err := b.flushLocked(); err != nil {
+		return fmt.Errorf("replace dirty buffer %v with %v: %w", oldBlock, block, err)
+	}
+	page, err := b.files.Read(block)
+	if err != nil {
+		return fmt.Errorf("replace flushed buffer %v with %v: %w", oldBlock, block, err)
+	}
+	assigned := block
+	b.contents = page
+	b.block = &assigned
+	return nil
+}
+
 // flush persists a dirty Buffer in write-ahead order and marks it clean.
 func (b *Buffer) flush() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	return b.flushLocked()
+}
+
+func (b *Buffer) flushLocked() error {
 	if b.modifiedBy == nil {
 		return nil
 	}
