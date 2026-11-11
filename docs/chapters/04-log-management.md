@@ -25,6 +25,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | clean buffer reassignment | clean frameの安全な再利用 | 実装済み |
 | dirty buffer replacement | WAL flush後のframe再利用 | 実装済み |
 | buffer pool initialization | fixed-size frame ownership | 実装済み |
+| existing buffer lookup | assigned BlockID検索 | 実装済み |
 | buffer selection and waiting | frame検索、割当、待機 | 未着手 |
 
 ## Feature 1: Log block initialization
@@ -1471,11 +1472,88 @@ Managerは複数Bufferのlifecycleを調整するuse-case寄りの責務を同�
 - waiting、timeout、notification
 - transaction別FlushAll
 
+## Feature 18: Find an existing buffer assignment
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-existing-lookup.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-existing-lookup.svg)を参照する。図はtarget BlockIDでpoolをscanし、exact match
+またはmissingをstate変更なしで返す経路を示す。
+
+### 問い
+
+同じdisk blockへ複数frameを割り当てないために、pool内ですでにcacheされているBlockIDをどう識別するか。
+
+### 概念
+
+private `findExistingBuffer`はManager mutexを保持してframeを順に調べる。各frameの`Block()`がunassignedなら
+skipし、assigned BlockIDのfile nameとblock numberがtargetと完全一致した場合だけ、そのframeを返す。
+
+```text
+target BlockID -> scan assigned frames -> exact match: frame / no match: nil, false
+```
+
+lookupはframeのpin count、assignment、contents、dirty metadataとManager available countを変更しない。
+matching frameがpinnedかunpinnedかの判断も後続pin coordinationへ残す。
+
+### 公開API
+
+public APIは増やさない。後続Manager pin flowがmutex内で使うprivate
+`findExistingBuffer(block) (*Buffer, bool)`だけを追加する。
+
+### Test-firstの記録
+
+#### Red
+
+same file/block match、different file、unassigned/missing、no-mutationを先にtestした。実装前は
+`findExistingBuffer`が存在せずbuildに失敗した。
+
+```text
+manager.findExistingBuffer undefined (type *Manager has no field or method findExistingBuffer)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+Manager mutex内で既存`Buffer.Block`を比較するlinear scanだけを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestFindExistingBufferReturnsTheExactAssignedFrameWithoutMutation` | exact match、missing、full BlockID比較、no mutation |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr.findExistingBuffer`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `for (Buffer buff : bufferpool)` | `for _, frame := range m.frames` | pool orderのlinear scan |
+| nullable `buff.block()` | `(BlockID, bool)` | unassignedをsentinelなしで表す |
+| `b.equals(blk)` | comparable valueの`assigned == block` | file nameとnumberを同時比較する |
+| callerのsynchronized内 | methodがManager mutexを取得 | 単体behaviorでもraceを防ぐ |
+
+## Clean Architecture上の判断
+
+cache identity lookupはpool coordinationの責務なのでManagerに置く。BlockID equalityはstorage value objectの
+comparable representationを使い、新しいindexやmapは小さいfixed-size poolへ必要になるまで導入しない。
+
+## 意図的に含めなかったもの
+
+- unpinned victim selection
+- missing blockのassignment
+- Buffer pin increment
+- Manager available count更新
+- waiting、timeout、notification
+- transaction別FlushAll
+
 ## 次の機能
 
-次はpool内からtarget BlockIDへすでにassignedされたframeを検索する振る舞いだけを実装する。unpinned victim
-selection、assignment、pin countとavailable countの更新、waitingは、さらに独立したIssue、commit、stacked
-PRへ分ける。
+次はpoolから最初のunpinned frameをvictim候補として選ぶ振る舞いだけを実装する。assignment、dirty replacement、
+pin countとavailable countの更新、waitingは、さらに独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 
