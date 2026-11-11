@@ -26,6 +26,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | dirty buffer replacement | WAL flush後のframe再利用 | 実装済み |
 | buffer pool initialization | fixed-size frame ownership | 実装済み |
 | existing buffer lookup | assigned BlockID検索 | 実装済み |
+| unpinned candidate selection | pool-order victim候補 | 実装済み |
 | buffer selection and waiting | frame検索、割当、待機 | 未着手 |
 
 ## Feature 1: Log block initialization
@@ -1550,10 +1551,91 @@ comparable representationを使い、新しいindexやmapは小さいfixed-size 
 - waiting、timeout、notification
 - transaction別FlushAll
 
+## Feature 19: Choose the first unpinned buffer candidate
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-unpinned-selection.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-unpinned-selection.svg)を参照する。図はpool orderでpinned frameをskipし、
+最初のunpinned frameまたは候補なしをstate変更なしで返す経路を示す。
+
+### 問い
+
+target blockがまだcacheされていないとき、利用中のframeを壊さず、replacement可能な候補をどう選ぶか。
+
+### 概念
+
+private `chooseUnpinnedBuffer`はManager mutexを保持し、poolの先頭から`Buffer.IsPinned()`を調べる。
+pin count 0の最初のframeを返し、全frameがpinnedなら`nil, false`を返す。
+
+```text
+Frame 0 -> pinned: skip -> ... -> first pin count 0: return
+all pinned -> nil, false
+```
+
+assigned、dirtyなframeもunpinnedなら候補である。flush、assignment、replacementは後続のdispatchが行うため、
+selection自体はpin count、BlockID、contents、dirty metadata、available countを変更しない。
+
+### 公開API
+
+public APIは増やさない。後続Manager pin flowが使うprivate
+`chooseUnpinnedBuffer() (*Buffer, bool)`だけを追加する。
+
+### Test-firstの記録
+
+#### Red
+
+first candidate、pinned skip、dirty assigned candidate、all pinned、no-mutationを先にtestした。実装前は
+`chooseUnpinnedBuffer`が存在せずbuildに失敗した。
+
+```text
+manager.chooseUnpinnedBuffer undefined (type *Manager has no field or method chooseUnpinnedBuffer)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+Manager mutex内で既存`Buffer.IsPinned`を調べるlinear scanだけを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestChooseUnpinnedBufferReturnsTheFirstCandidateWithoutMutation` | first candidate、skip、dirty eligibility、exhaustion、no mutation |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr.chooseUnpinnedBuffer`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| pool先頭からloop | 同じ | deterministicなfirst-fitを維持する |
+| `!buff.isPinned()` | `!frame.IsPinned()` | frame自身のatomic queryを再利用する |
+| nullable return | `(*Buffer, bool)` | candidateなしを明示する |
+| assigned/dirtyを区別しない | 同じ | replacement actionを後続behaviorへ分ける |
+| callerのsynchronized内 | methodがManager mutexを取得 | 単体behaviorでもraceを防ぐ |
+
+## Clean Architecture上の判断
+
+first-fitは現時点の最小replacement policyでありManagerに置く。LRUなどの追加metadataは、書籍の後続章や
+計測可能な要求が生じるまで導入しない。選択とI/Oを分離し、このPRはpure coordination queryに限定する。
+
+## 意図的に含めなかったもの
+
+- selected frameのassignmentまたはreplacement
+- Buffer pin increment
+- Manager available count更新
+- existing assignment lookupの変更
+- waiting、timeout、notification
+- transaction別FlushAll
+
 ## 次の機能
 
-次はpoolから最初のunpinned frameをvictim候補として選ぶ振る舞いだけを実装する。assignment、dirty replacement、
-pin countとavailable countの更新、waitingは、さらに独立したIssue、commit、stacked PRへ分ける。
+次はtarget blockがすでにcacheされている場合だけ、そのexisting frameをpinし、0→1遷移時だけManager available
+countを減らす振る舞いを実装する。missing blockのassignment、victim replacement、waitingは、さらに独立した
+Issue、commit、stacked PRへ分ける。
 
 ## 参照元
 
