@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 4 Feature 27: Flush one transaction's buffers</title><desc id="description">pool orderでmatching dirty frameだけをWAL順flushし、最初のfailureで停止する。</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:19px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="850" fill="#ffffff"/><text class="title" x="700" y="58" text-anchor="middle">Chapter 4 / Feature 27: Flush one transaction's buffers</text>
+  <rect class="box" x="55" y="255" width="250" height="155" rx="12" fill="#e1d5e7" stroke="#9673a6"/><text class="heading" x="180" y="300" text-anchor="middle">FlushAll(tx)</text><text class="text" x="180" y="360" text-anchor="middle">lock Manager mutex</text>
+  <rect class="box" x="390" y="255" width="235" height="155" rx="12" fill="#fff2cc" stroke="#d6b656"/><text class="heading" x="507" y="300" text-anchor="middle">Scan frames</text><text class="text" x="507" y="360" text-anchor="middle">in pool order</text>
+  <rect class="box" x="730" y="105" width="250" height="150" rx="12" fill="#f5f5f5" stroke="#666666"/><text class="heading" x="855" y="150" text-anchor="middle">Clean or other tx</text><text class="text" x="855" y="210" text-anchor="middle">skip without write</text>
+  <rect class="box" x="730" y="325" width="250" height="175" rx="12" fill="#dae8fc" stroke="#6c8ebf"/><text class="heading" x="855" y="370" text-anchor="middle">Matching dirty frame</text><text class="text" x="855" y="420" text-anchor="middle">Buffer.flush()</text><text class="text" x="855" y="460" text-anchor="middle">WAL → data page</text>
+  <rect class="box" x="1090" y="105" width="250" height="165" rx="12" fill="#d5e8d4" stroke="#82b366"/><text class="heading" x="1215" y="150" text-anchor="middle">Success</text><text class="text" x="1215" y="205" text-anchor="middle">frame becomes clean</text><text class="text" x="1215" y="240" text-anchor="middle">continue scan</text>
+  <rect class="box" x="1090" y="390" width="250" height="165" rx="12" fill="#f8cecc" stroke="#b85450"/><text class="heading" x="1215" y="435" text-anchor="middle">First failure</text><text class="text" x="1215" y="490" text-anchor="middle">return frame context</text><text class="text" x="1215" y="525" text-anchor="middle">stop scan</text>
+  <rect class="box" x="390" y="585" width="235" height="145" rx="12" fill="#d5e8d4" stroke="#82b366"/><text class="heading" x="507" y="630" text-anchor="middle">End of pool</text><text class="text" x="507" y="685" text-anchor="middle">return nil</text>
+  <line x1="305" y1="332" x2="390" y2="332" stroke="#475569" stroke-width="3"/><polygon points="390,332 376,324 376,340" fill="#475569"/>
+  <line x1="625" y1="285" x2="730" y2="180" stroke="#475569" stroke-width="3"/><polygon points="730,180 715,183 727,195" fill="#475569"/>
+  <line x1="625" y1="370" x2="730" y2="412" stroke="#475569" stroke-width="3"/><polygon points="730,412 718,401 712,416" fill="#475569"/>
+  <line x1="980" y1="375" x2="1090" y2="210" stroke="#475569" stroke-width="3"/><polygon points="1090,210 1076,216 1089,225" fill="#475569"/>
+  <line x1="980" y1="450" x2="1090" y2="472" stroke="#475569" stroke-width="3"/><polygon points="1090,472 1078,462 1075,478" fill="#475569"/>
+  <line x1="507" y1="410" x2="507" y2="585" stroke="#475569" stroke-width="3"/><polygon points="507,585 499,571 515,571" fill="#475569"/>
+  <path d="M1090 155 H1025 V75 H507 V255" fill="none" stroke="#475569" stroke-width="3"/><polygon points="507,255 499,241 515,241" fill="#475569"/>
+  <rect class="box" x="220" y="765" width="960" height="55" rx="12" fill="#f5f5f5" stroke="#666666"/><text class="heading" x="700" y="800" text-anchor="middle">Earlier successes remain durable; first failure stops the pool scan.</text>
+</svg>
