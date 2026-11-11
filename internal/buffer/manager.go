@@ -54,7 +54,10 @@ func (m *Manager) Available() int {
 func (m *Manager) findExistingBuffer(block storage.BlockID) (*Buffer, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.findExistingBufferLocked(block)
+}
 
+func (m *Manager) findExistingBufferLocked(block storage.BlockID) (*Buffer, bool) {
 	for _, frame := range m.frames {
 		assigned, exists := frame.Block()
 		if exists && assigned == block {
@@ -62,6 +65,20 @@ func (m *Manager) findExistingBuffer(block storage.BlockID) (*Buffer, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (m *Manager) pinExistingBuffer(block storage.BlockID) (*Buffer, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	frame, found := m.findExistingBufferLocked(block)
+	if !found {
+		return nil, false
+	}
+	if frame.pin() {
+		m.available--
+	}
+	return frame, true
 }
 
 func (m *Manager) chooseUnpinnedBuffer() (*Buffer, bool) {
