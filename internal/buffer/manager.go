@@ -112,11 +112,44 @@ func (m *Manager) Unpin(frame *Buffer) error {
 func (m *Manager) chooseUnpinnedBuffer() (*Buffer, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.chooseUnpinnedBufferLocked()
+}
 
+func (m *Manager) chooseUnpinnedBufferLocked() (*Buffer, bool) {
 	for _, frame := range m.frames {
 		if !frame.IsPinned() {
 			return frame, true
 		}
 	}
 	return nil, false
+}
+
+func (m *Manager) pinCacheMiss(block storage.BlockID) (*Buffer, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.findExistingBufferLocked(block); exists {
+		return nil, false, fmt.Errorf("pin cache miss %v: block is already cached", block)
+	}
+	frame, found := m.chooseUnpinnedBufferLocked()
+	if !found {
+		return nil, false, nil
+	}
+	assigned, hasAssignment := frame.Block()
+	_, dirty := frame.ModifyingTransaction()
+	var err error
+	switch {
+	case !hasAssignment:
+		err = frame.assignToBlock(block)
+	case dirty:
+		err = frame.replaceDirtyWithBlock(block)
+	default:
+		err = frame.reassignToBlock(block)
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("pin cache miss %v using frame assigned to %v: %w", block, assigned, err)
+	}
+	frame.pin()
+	m.available--
+	return frame, true, nil
 }
