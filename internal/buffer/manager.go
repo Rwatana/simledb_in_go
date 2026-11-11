@@ -6,6 +6,7 @@ import (
 
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 // Manager owns a fixed-size pool of Buffer frames.
@@ -48,4 +49,17 @@ func (m *Manager) Available() int {
 	defer m.mu.Unlock()
 
 	return m.available
+}
+
+func (m *Manager) findExistingBuffer(block storage.BlockID) (*Buffer, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, frame := range m.frames {
+		assigned, exists := frame.Block()
+		if exists && assigned == block {
+			return frame, true
+		}
+	}
+	return nil, false
 }
