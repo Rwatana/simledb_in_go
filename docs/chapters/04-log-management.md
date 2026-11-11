@@ -31,6 +31,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | managed buffer unpin | final releaseとavailable回復 | 実装済み |
 | cache miss buffer pin | lifecycle dispatchと成功後pin | 実装済み |
 | non-waiting pin attempt | cache hit/missのatomic composition | 実装済み |
+| final-release notification | condition variableとavailable predicate | 実装済み |
 | buffer selection and waiting | frame検索、割当、待機 | 未着手 |
 
 ## Feature 1: Log block initialization
@@ -1991,10 +1992,95 @@ waiting policyをまだ混ぜないことで、即時attemptの結果を`pinned`
 - transaction別FlushAll
 - replacement policyの変更
 
+## Feature 24: Notify waiters after a final buffer release
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-release-notification.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-release-notification.svg)を参照する。図はfuture waiterがManager mutexを
+解放してcondition variableで待ち、final unpinがavailableを増やしてから通知するprotocolを示す。
+
+### 問い
+
+全frameがpinnedで待っているclientへ、利用可能frameが本当に生じた瞬間だけをlost wakeupなしでどう伝えるか。
+
+### 概念
+
+Managerは自身のmutexをlockerにした`sync.Cond`を持つ。waiterは同じmutex内で`available == 0`をloop条件として
+検査し、`Wait`でmutexを一時解放する。`Manager.Unpin`はpin countが1から0へ変わったときだけ、同じmutex内で
+availableを増やしてから`Broadcast`する。
+
+```text
+waiter: lock -> while available == 0 { Cond.Wait() } -> recheck
+unpin : lock -> pin count 1 to 0 -> available++ -> Cond.Broadcast() -> unlock
+```
+
+複数pinの途中releaseではavailableが増えないため通知しない。nil、foreign、underflowのerror経路もpredicateを
+変更せず通知しない。waiterはspurious wakeupや別clientによるframe取得に備え、起床後に必ずpredicateを再検査する。
+
+### 公開API
+
+public APIは増やさない。`NewManager`がprivate `availableChanged *sync.Cond`をManager mutexへ結び付け、既存
+`Manager.Unpin`のfinal-release分岐だけが`Broadcast`する。待機loop自体は次の独立機能へ残す。
+
+### Test-firstの記録
+
+#### Red
+
+condition initialization、intermediate/final release、invalid unpinを先にtestした。実装前は
+`availableChanged`が存在せずbuildに失敗した。
+
+```text
+manager.availableChanged undefined (type *Manager has no field or method availableChanged)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+Manager constructorで`sync.NewCond(&manager.mu)`を作り、final releaseでavailable increment後に
+`Broadcast`する最小実装を追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestNewManagerBindsAvailabilityConditionToItsMutex` | condition初期化とManager mutex共有 |
+| `TestManagerUnpinWakesAvailabilityWaiterOnlyOnFinalRelease` | intermediate no-opとfinal release wakeup |
+| `TestManagerInvalidUnpinDoesNotPublishAvailability` | invalid inputでpredicateを公開しない |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr.unpin`の`notifyAll`と`pin`の`wait` protocolである。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| synchronized monitor | Manager `sync.Mutex` | available predicateを1つのlockで保護する |
+| `wait(MAX_TIME)` | 後続の`sync.Cond.Wait` | timeout policyをまだ含めない |
+| `notifyAll()` | `availableChanged.Broadcast()` | 複数waiterへpredicate変更を通知する |
+| final unpin後に通知 | available increment後にBroadcast | 起床clientが更新済みstateを観測する |
+| intermediate unpinは通知なし | `becameAvailable`分岐内だけBroadcast | false availability signalを避ける |
+
+Goの`sync.Cond`自体はtimeout APIを持たない。bounded waitingは後続機能でcontext/timerを含むpublic API設計と
+合わせて扱い、このPRではlost wakeupを防ぐpredicate/notification protocolだけを固定する。
+
+## Clean Architecture上の判断
+
+condition variableはBufferやstorageへ漏らさず、pool coordinationを持つManagerの内部実装に限定する。
+`available`を唯一のpredicateとして共有し、channelをframe数だけ管理する追加構造は導入しない。
+
+## 意図的に含めなかったもの
+
+- public `Pin` APIとwaiting loop
+- timeoutとabort error
+- transaction別FlushAll
+- replacement policyの変更
+
 ## 次の機能
 
-次はfinal unpinで待機clientへ通知するためのManager synchronizationを追加する。public `Pin`のwaiting loopと
-timeoutは、それぞれさらに別のIssue、commit、stacked PRへ分ける。
+次はpublic `Pin`がall-pinned状態でcondition variableを待ち、final unpin後にretryして成功する振る舞いを
+追加する。timeoutとabortは、さらに別のIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 
