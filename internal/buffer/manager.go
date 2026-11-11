@@ -11,9 +11,10 @@ import (
 
 // Manager owns a fixed-size pool of Buffer frames.
 type Manager struct {
-	frames    []*Buffer
-	mu        sync.Mutex
-	available int
+	frames           []*Buffer
+	mu               sync.Mutex
+	available        int
+	availableChanged *sync.Cond
 }
 
 // NewManager creates capacity fresh, unassigned Buffer frames.
@@ -35,7 +36,9 @@ func NewManager(files *storagefile.Manager, logs *logmanager.Manager, capacity i
 		}
 		frames[index] = frame
 	}
-	return &Manager{frames: frames, available: capacity}, nil
+	manager := &Manager{frames: frames, available: capacity}
+	manager.availableChanged = sync.NewCond(&manager.mu)
+	return manager, nil
 }
 
 // Capacity returns the immutable number of frames in the pool.
@@ -105,6 +108,7 @@ func (m *Manager) Unpin(frame *Buffer) error {
 	}
 	if becameAvailable {
 		m.available++
+		m.availableChanged.Broadcast()
 	}
 	return nil
 }
