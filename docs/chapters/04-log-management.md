@@ -27,6 +27,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | buffer pool initialization | fixed-size frame ownership | 実装済み |
 | existing buffer lookup | assigned BlockID検索 | 実装済み |
 | unpinned candidate selection | pool-order victim候補 | 実装済み |
+| existing buffer pin | cache済みframeのpinとavailable遷移 | 実装済み |
 | buffer selection and waiting | frame検索、割当、待機 | 未着手 |
 
 ## Feature 1: Log block initialization
@@ -1631,11 +1632,94 @@ first-fitは現時点の最小replacement policyでありManagerに置く。LRU�
 - waiting、timeout、notification
 - transaction別FlushAll
 
+## Feature 20: Pin an existing cached buffer
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-pin-existing.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-pin-existing.svg)を参照する。図はtarget BlockIDをすでに保持するframeを
+Manager mutex内で見つけ、pin countとavailable countを一貫して更新する経路を示す。
+
+### 問い
+
+複数の呼び出しが同じcache済みframeを利用するとき、すべてのpinを保持しながら、利用可能frame数を
+重複して減らさないためにはどう調整するか。
+
+### 概念
+
+private `pinExistingBuffer`はManager mutexを取得し、同じcritical sectionでexisting frameを検索して
+`Buffer.pin`を呼ぶ。`Buffer.pin`はpin countが0から1へ変わった場合だけ`true`を返すため、そのときだけ
+Managerの`available`を1減らす。
+
+```text
+existing frame, pin count 0 -> pin count 1, available - 1
+existing frame, pin count n -> pin count n + 1, available unchanged  (n > 0)
+missing frame               -> no mutation
+```
+
+lookupとpin/accountingを1つのManager mutexで直列化することで、並行呼び出しでもすべてのpin incrementを
+保持し、0→1遷移を1回だけ数える。
+
+### 公開API
+
+public APIは増やさない。後続のpublic pin flowがcache hit経路で使うprivate
+`pinExistingBuffer(block) (*Buffer, bool)`だけを追加する。既存lookupはlock済みの呼び出し元から再利用できる
+`findExistingBufferLocked`へ分け、外からの単独lookupは従来どおりwrapperでManager mutexを取得する。
+
+### Test-firstの記録
+
+#### Red
+
+初回pin、反復pin、missing、並行pinを先にtestした。実装前は`pinExistingBuffer`が存在せずbuildに失敗した。
+
+```text
+manager.pinExistingBuffer undefined (type *Manager has no field or method pinExistingBuffer)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+Manager mutex内でexisting lookup、frame pin、0→1時のavailable decrementだけを行う最小実装を追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestPinExistingBufferUpdatesAvailabilityOnlyOnFirstPin` | 初回0→1、反復pin、missingのno mutation |
+| `TestPinExistingBufferConcurrentCallsKeepEveryPinAndOneTransition` | 並行pin countとavailableの単一遷移 |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr.tryToPin`のcache hit経路と`findExistingBuffer`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `findExistingBuffer(blk)` | `findExistingBufferLocked(block)` | Manager mutexを二重取得せずlookupを再利用する |
+| `if (!buff.isPinned()) numAvailable--` | `if frame.pin() { m.available-- }` | 0→1遷移をBufferの返り値で直接表す |
+| `buff.pin()` | 同じpin count increment | 同じframeへの複数利用者を数える |
+| synchronized `tryToPin` | `pinExistingBuffer`全体をManager mutexで保護 | lookup、pin、accountingをatomicにする |
+| missing時はvictim選択へ進む | `(nil, false)` | cache miss経路を別PRへ分離する |
+
+## Clean Architecture上の判断
+
+pool全体の利用可能数はManagerの状態、個別利用数はBufferの状態として責務を分ける。ManagerはBufferが返す
+transitionだけを集計し、pin countの内部表現を重複して判定しない。public APIは完全なcache miss経路まで
+揃ってから追加し、このPRは既存assignmentへのcoordinationに限定する。
+
+## 意図的に含めなかったもの
+
+- missing blockへのframe assignmentまたはreplacement
+- Manager-level unpinとavailable increment
+- public `Pin` API
+- all-pinned時のwaiting、timeout、notification
+- transaction別FlushAll
+
 ## 次の機能
 
-次はtarget blockがすでにcacheされている場合だけ、そのexisting frameをpinし、0→1遷移時だけManager available
-countを減らす振る舞いを実装する。missing blockのassignment、victim replacement、waitingは、さらに独立した
-Issue、commit、stacked PRへ分ける。
+次はManager経由でpin済みframeをunpinし、1→0遷移時だけavailable countを増やす振る舞いを実装する。
+missing blockのassignment、victim replacement、waitingは、さらに独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 
