@@ -62,6 +62,23 @@ func (m *Manager) Available() int {
 	return m.available
 }
 
+// FlushAll persists every dirty Buffer last modified by transaction.
+func (m *Manager) FlushAll(transaction TransactionID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for index, frame := range m.frames {
+		modifiedBy, dirty := frame.ModifyingTransaction()
+		if !dirty || modifiedBy != transaction {
+			continue
+		}
+		if err := frame.flush(); err != nil {
+			return fmt.Errorf("flush transaction %d buffer frame %d: %w", transaction, index, err)
+		}
+	}
+	return nil
+}
+
 func (m *Manager) findExistingBuffer(block storage.BlockID) (*Buffer, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

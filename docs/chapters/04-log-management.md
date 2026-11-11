@@ -34,7 +34,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | final-release notification | condition variableとavailable predicate | 実装済み |
 | waiting buffer pin | condition wait、wake、retry | 実装済み |
 | buffer pin timeout | bounded waitingとabort | 実装済み |
-| transaction buffer flush | transaction別dirty frame保存 | 未着手 |
+| transaction buffer flush | transaction別dirty frame保存 | 実装済み |
 
 ## Feature 1: Log block initialization
 
@@ -2262,10 +2262,102 @@ condition wakeupだけを行い、domain state mutationは既存Manager critical
 - transaction別FlushAll
 - replacement policyの変更
 
+## Feature 27: Flush all buffers modified by one transaction
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-flush-all.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-flush-all.svg)を参照する。図はManagerがpool orderでframeを走査し、指定transaction
+に一致するdirty frameだけをWAL順にflushし、最初のfailureで停止する流れを示す。
+
+### 問い
+
+transactionのcommitやrecovery準備で、そのtransactionが変更したPageだけを選び、各PageのWAL contractを
+守りながらpool全体をどう保存するか。
+
+### 概念
+
+`Manager.FlushAll`はManager mutexを保持してpool先頭からframeを調べる。`ModifyingTransaction`が指定値と
+一致するdirty frameだけに既存`Buffer.flush`を呼び、clean frameと別transactionのdirty frameはskipする。
+
+```text
+for frame in pool order:
+    clean or modified by another tx -> skip
+    modified by requested tx        -> Buffer.flush()  // log before data
+    first flush error                -> stop and return frame context
+```
+
+matching frameはpinnedでもflushでき、pin countとManager availableは変えない。failure前に成功したframeはすでに
+durableかつcleanでありrollbackしない。failed frameは`Buffer.flush`が定めたfailure stateを保持し、後続frameは
+未処理のまま残す。このstop-on-first-error policyにより、どこまで成功したかをpool indexから追跡できる。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Manager.FlushAll(transaction)` | 指定transactionのdirty frameだけをpool orderでWAL順flushする |
+
+matching frameがなければsuccessful no-opとする。複数errorの集約やretryは呼び出し側へ自動化せず、最初の
+failureをcontext付きで返す。
+
+### Test-firstの記録
+
+#### Red
+
+matching/other/clean/pinned frame、no match、途中WAL failureを先にtestした。実装前は`Manager.FlushAll`が
+存在せずbuildに失敗した。
+
+```text
+manager.FlushAll undefined (type *Manager has no field or method FlushAll)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+Manager mutex内のpool-order scan、transaction filter、既存`Buffer.flush`呼び出し、最初のerror returnだけを
+追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestManagerFlushAllFlushesOnlyMatchingTransactionFrames` | matching dirtyのみ保存、WAL、pinned許可、他frame保持 |
+| `TestManagerFlushAllStopsAtFirstFailure` | earlier success、failed state、later untouched、frame context |
+| `TestManagerFlushAllWithoutMatchingFramesIsNoOp` | non-matching transactionのno-op |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr.flushAll`と`simpledb.buffer.Buffer.flush`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| synchronized `flushAll` | Manager mutex | pool scanと対象判定を直列化する |
+| `buff.modifyingTx() == txnum` | `ModifyingTransaction()`のvalue/exists | cleanとtransaction 0を区別する |
+| matching frameで`buff.flush()` | 既存`frame.flush()` | WALとdata writeのcontractを再利用する |
+| pinned状態を区別しない | 同じ | durability要求は利用中frameにも適用する |
+| unchecked I/O failure | contextual `error` | partial completion位置を呼び出し側へ返す |
+| loop継続の暗黙動作 | first errorで停止 | 後続frameの未処理stateを決定的にする |
+
+## Clean Architecture上の判断
+
+transaction filterとpool traversalはManagerのcoordination責務、WAL/data persistenceはBufferの既存責務として
+分離する。transaction commit/rollback use caseはまだ導入せず、将来のtransaction layerが呼べるdurability
+primitiveだけを提供する。
+
+## 意図的に含めなかったもの
+
+- failed frameの自動retry
+- 複数flush errorの集約
+- transaction commit、rollback、recovery
+- context cancellation
+- replacement policyの変更
+
 ## 次の機能
 
-次は指定transactionがdirtyにしたpool内frameだけをWAL順にflushする`FlushAll`を追加する。複数frameの途中で
-failureが起きた場合の継続/停止policyも、そのobservable behaviorとしてtestで固定する。
+Chapter 4のlog managerとbuffer managerの基本機能はここまでで揃う。次はChapter 5へ進み、transactionと
+concurrency controlの最小value/lock behaviorから、書籍順に1 observable behaviorずつ実装する。
 
 ## 参照元
 
