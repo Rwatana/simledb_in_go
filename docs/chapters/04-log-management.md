@@ -24,7 +24,8 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | initial block assignment | unassigned frameへのdisk Page load | 実装済み |
 | clean buffer reassignment | clean frameの安全な再利用 | 実装済み |
 | dirty buffer replacement | WAL flush後のframe再利用 | 実装済み |
-| buffer pool | frame選択と待機 | 未着手 |
+| buffer pool initialization | fixed-size frame ownership | 実装済み |
+| buffer selection and waiting | frame検索、割当、待機 | 未着手 |
 
 ## Feature 1: Log block initialization
 
@@ -1385,10 +1386,96 @@ WALと単一frameのstate transitionはBufferに閉じ込め、durability mechan
 - transaction別FlushAll
 - recovery scan/rollback
 
+## Feature 17: Initialize a fixed-size buffer pool
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-pool-initialization.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-pool-initialization.svg)を参照する。図はBuffer Managerが指定数のdistinctな
+fresh frameを所有し、capacityとavailable countを同じ値から開始する関係を示す。
+
+### 問い
+
+block検索やreplacement policyを先取りせず、有限なmemory resourceとしてのbuffer poolをどう初期化するか。
+
+### 概念
+
+`NewManager(files, logs, capacity)`はpositive capacityを検査し、既存`Buffer.New`を使って指定数のframeを
+生成する。各frameは同じFileManagerとLogManagerを参照するが、distinctなBufferとPageを所有する。
+
+```text
+capacity N -> create N fresh Buffer frames -> available = N
+```
+
+fresh frameはすべてunassigned、clean、pin count 0で、Page capacityはFileManager block sizeと一致する。
+pool生成時にはblock lookup、disk Page assignment、pin、flush、replacementを行わない。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `buffer.NewManager(files, logs, capacity)` | fixed-size poolを生成する |
+| `Manager.Capacity()` | immutableなframe数を返す |
+| `Manager.Available()` | 現在unpinnedなframe数を返す |
+
+`Available`は後続pin/unpinで更新されるmutable stateなので、初期実装からManager mutexで保護する。
+
+### Test-firstの記録
+
+#### Red
+
+pool size、frame uniqueness、全frameのfresh state、invalid capacity/dependencyを先にtestした。実装前は
+`NewManager`が存在せずbuildに失敗した。
+
+```text
+undefined: NewManager
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+frame slice、available count、mutexと3つのpublic APIだけを持つ最小Managerを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestNewManagerCreatesAFixedSizePoolOfFreshFrames` | capacity、available、distinct frame、fresh state |
+| `TestNewManagerRejectsInvalidCapacityOrDependencies` | positive capacityとnon-nil dependency |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr` constructorと`available`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `new Buffer[numbuffs]` | `make([]*Buffer, capacity)` | fixed-size ownershipを明示する |
+| loopで`new Buffer(fm, lm)` | loopで既存`New(files, logs)` | frame invariantを1か所で再利用する |
+| `numAvailable = numbuffs` | `available = capacity` | 初期frameはすべてunpinned |
+| unchecked zero/negative | contextual error | 無意味またはpanicするpoolをrejectする |
+| synchronized `available()` | mutex-protected `Available()` | 後続mutationとのraceを防ぐ |
+
+## Clean Architecture上の判断
+
+Managerは複数Bufferのlifecycleを調整するuse-case寄りの責務を同じbuffer packageに置く。新しいinterfaceやpackageを
+作らず、現在必要なFileManager/LogManager concrete dependencyをcomposition時に受け取る。
+
+## 意図的に含めなかったもの
+
+- existing assignment lookup
+- unpinned victim selection
+- block assignmentとreplacementのdispatch
+- Manager-level pin/unpin
+- waiting、timeout、notification
+- transaction別FlushAll
+
 ## 次の機能
 
-次は指定数のunassigned Bufferを持つfixed-size BufferManager poolの初期化だけを実装する。existing assignment
-lookup、victim selection、pin/unpin、waitingは、さらに独立したIssue、commit、stacked PRへ分ける。
+次はpool内からtarget BlockIDへすでにassignedされたframeを検索する振る舞いだけを実装する。unpinned victim
+selection、assignment、pin countとavailable countの更新、waitingは、さらに独立したIssue、commit、stacked
+PRへ分ける。
 
 ## 参照元
 
