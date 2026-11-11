@@ -28,6 +28,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | existing buffer lookup | assigned BlockID検索 | 実装済み |
 | unpinned candidate selection | pool-order victim候補 | 実装済み |
 | existing buffer pin | cache済みframeのpinとavailable遷移 | 実装済み |
+| managed buffer unpin | final releaseとavailable回復 | 実装済み |
 | buffer selection and waiting | frame検索、割当、待機 | 未着手 |
 
 ## Feature 1: Log block initialization
@@ -1716,10 +1717,100 @@ transitionだけを集計し、pin countの内部表現を重複して判定し�
 - all-pinned時のwaiting、timeout、notification
 - transaction別FlushAll
 
+## Feature 21: Unpin a managed buffer
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-manager-unpin.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-manager-unpin.svg)を参照する。図はManager所有frameのpinを1つ解放し、
+最後のpinが外れたときだけavailable countを回復する経路と、invalid inputのno-mutationを示す。
+
+### 問い
+
+同じframeを複数の利用者がpinしているとき、各releaseを失わず、利用可能frame数を早すぎる時点や
+複数回にわたって増やさないためにはどう調整するか。
+
+### 概念
+
+public `Manager.Unpin`はManager mutexを取得し、引数が自身のpoolに属することをpointer identityで検証してから
+`Buffer.unpin`を呼ぶ。`Buffer.unpin`はpin countが1から0へ変わった場合だけ`true`を返すため、そのときだけ
+Managerの`available`を1増やす。
+
+```text
+managed frame, pin count n -> pin count n - 1, available unchanged  (n > 1)
+managed frame, pin count 1 -> pin count 0,     available + 1
+nil / foreign / count 0    -> error, no mutation
+```
+
+ownership check、pin decrement、available accountingを同じManager mutex内で行うため、並行releaseでも
+すべてのdecrementを保持し、1→0遷移を1回だけ集計できる。
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Manager.Unpin(frame)` | 所有frameのpinを1つ解放し、final releaseをavailableへ反映する |
+
+nil、他のManagerまたは単独生成されたforeign frame、すでにunpinnedなframeはerrorにし、ManagerとBufferの
+状態を変更しない。ownershipを検証せずforeign frameを受け入れると、このManagerのavailable countだけが
+増えてpool invariantが壊れるためである。
+
+### Test-firstの記録
+
+#### Red
+
+反復release、invalid input、並行releaseを先にtestした。実装前は`Manager.Unpin`が存在せずbuildに失敗した。
+
+```text
+manager.Unpin undefined (type *Manager has no field or method Unpin)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+Manager mutex内のownership scan、既存`Buffer.unpin`、1→0時のavailable incrementだけを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestManagerUnpinRestoresAvailabilityOnlyOnFinalRelease` | 複数pinの中間releaseとfinal release |
+| `TestManagerUnpinRejectsInvalidFramesWithoutMutation` | nil、foreign、underflowのerrorとno mutation |
+| `TestManagerUnpinConcurrentCallsKeepEveryReleaseAndOneTransition` | 並行decrementとavailableの単一遷移 |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr.unpin`と`simpledb.buffer.Buffer.unpin`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `buff.unpin()` | `frame.unpin()` | frame自身がpin countを保護して減らす |
+| `if (!buff.isPinned()) numAvailable++` | `if becameAvailable { m.available++ }` | 1→0遷移を返り値で直接表す |
+| synchronized `unpin` | `Manager.Unpin`全体をManager mutexで保護 | decrementとaccountingをatomicにする |
+| pool membershipを暗黙に仮定 | pointer identityでownershipを検証 | exported Go APIでavailable invariantを守る |
+| pin count 0でもdecrement可能 | underflow error | invalid releaseでnegative countを作らない |
+| final releaseで`notifyAll()` | 通知なし | waiting導入を独立PRへ分離する |
+
+## Clean Architecture上の判断
+
+Bufferは個別pin countの遷移、Managerはpool ownershipとavailable集計を担当する。ManagerはBufferの内部countを
+読み直して推測せず、既存transition resultだけを利用する。waiting primitiveをまだ導入しないことで、
+このPRはrelease/accountingという1つのobservable behaviorに限定する。
+
+## 意図的に含めなかったもの
+
+- missing blockへのframe assignmentまたはreplacement
+- public `Pin` API
+- waiting、timeout、final release時のnotification
+- transaction別FlushAll
+- replacement policyの変更
+
 ## 次の機能
 
-次はManager経由でpin済みframeをunpinし、1→0遷移時だけavailable countを増やす振る舞いを実装する。
-missing blockのassignment、victim replacement、waitingは、さらに独立したIssue、commit、stacked PRへ分ける。
+次はtarget blockがcacheされていない場合にunpinned candidateを選び、そのframeへdisk Pageを割り当てる
+cache miss経路を実装する。waitingとtimeoutは、全frameがpinnedな場合の別Issue、commit、stacked PRへ分ける。
 
 ## 参照元
 
