@@ -66,9 +66,47 @@ behaviors, not part of the checkpoint value itself.
 - Generic record dispatch
 - Rollback and restart-recovery scans
 
+## Feature 2: Transaction START log record
+
+The same [editable diagram](../diagrams/ch05-checkpoint-record.drawio) and
+[rendered SVG](../diagrams/ch05-checkpoint-record.svg) now compare the two record prefixes. START extends the four-byte
+operation with one four-byte transaction ID:
+
+```text
+offset 0               offset 4                 offset 8
++----------------------+------------------------+
+| START operation = 1  | transaction ID (int32) |
++----------------------+------------------------+
+```
+
+`EncodeStartRecord` preserves the complete signed int32 bit pattern. `DecodeStartRecord` requires exactly eight bytes,
+checks the operation before exposing the ID, and reports malformed length or a different operation as contextual errors.
+The codec deliberately does not decide whether a transaction ID is valid; allocation and lifecycle policy belong to the
+future transaction use case.
+
+### Test-first record
+
+Positive, zero, negative-bit-pattern, and malformed encodings were tested before implementation. The first run failed to
+build because `TransactionID`, `OperationStart`, `EncodeStartRecord`, and `DecodeStartRecord` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestStartRecordRoundTrip` | Exact eight-byte encoding and signed int32 round-trip |
+| `TestDecodeStartRecordRejectsInvalidEncoding` | Truncation, trailing bytes, and another operation are rejected |
+
+### Java source map and Go decision
+
+| Java `StartRecord` | Go | Decision |
+| --- | --- | --- |
+| `START = 1` | `OperationStart Operation = 1` | Preserve the durable operator value |
+| two `Integer.BYTES` fields | exact eight-byte slice | Make the record boundary explicit |
+| constructor extracts `txnum` | strict decoder returns `StartRecord` | Validate size and operation before the ID |
+| `writeToLog(lm, txnum)` | codec only | Append is the next independent behavior |
+| empty `undo` | no undo method yet | Avoid an interface before update records require it |
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 with the START record's transaction ID encoding and decoding as a separate issue and stacked PR.
+Continue Sect. 5.3.9.1 by appending a START record through the log manager as a separate issue and stacked PR.
 
 ## Sources
 
