@@ -69,8 +69,8 @@
 
 Chapter 3の基礎file layerと、Chapter 4のlog manager基本機能が揃いました。buffer管理は未割当frame、
 pin increment、unpin、modifying transaction、recovery LSN、最初のBlockID割当、WAL順flush、clean frameの
-再割当、dirty frameのWAL順replacementまで進んでいます。次は指定数のunassigned frameを作るBufferManager
-pool初期化だけを、独立したIssueとPRで追加します。
+再割当、dirty frameのWAL順replacement、fixed-size BufferManager pool初期化まで進んでいます。次はpool内の
+existing assignment lookupだけを、独立したIssueとPRで追加します。
 
 ## 参照元
 
