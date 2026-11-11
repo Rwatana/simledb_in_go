@@ -30,6 +30,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | existing buffer pin | cache済みframeのpinとavailable遷移 | 実装済み |
 | managed buffer unpin | final releaseとavailable回復 | 実装済み |
 | cache miss buffer pin | lifecycle dispatchと成功後pin | 実装済み |
+| non-waiting pin attempt | cache hit/missのatomic composition | 実装済み |
 | buffer selection and waiting | frame検索、割当、待機 | 未着手 |
 
 ## Feature 1: Log block initialization
@@ -1901,10 +1902,99 @@ first-fitだけを保つ。
 - transaction別FlushAll
 - LRUなどのreplacement policy
 
+## Feature 23: Compose a non-waiting buffer pin attempt
+
+cache hit側の状態遷移は[Feature 20のDraw.io](../diagrams/ch04-buffer-pin-existing.drawio)と
+[SVG](../diagrams/ch04-buffer-pin-existing.svg)、cache miss側は
+[Feature 22のDraw.io](../diagrams/ch04-buffer-cache-miss-pin.drawio)と
+[SVG](../diagrams/ch04-buffer-cache-miss-pin.svg)を参照する。この機能は2つの既存分岐を1つのatomic decisionへ
+合成するだけなので、同じ内容を繰り返す新しい図は追加しない。
+
+### 問い
+
+並行clientが同じtarget blockを要求したとき、cache missと判断した複数clientが別々のframeへ同じblockを
+割り当てるraceを防ぎながら、cache hitとmissをどう1回の試行として扱うか。
+
+### 概念
+
+private `tryToPin`はManager mutexを1回取得し、そのcritical sectionを維持したままcache identityを調べる。
+hitならexisting frameをpinし、missなら既存`pinCacheMissLocked`へ進む。
+
+```text
+findExistingBufferLocked(target)
+  found   -> pin existing frame; return immediately
+  missing -> select/assign/pin available frame
+  no available frame -> return nil, false, nil without waiting
+```
+
+lookupからassignment完了までManager mutexを解放しないため、最初のclientがtargetを割り当てた後のclientは
+必ずcache hitとして同じframeを使う。すべてのframeがpinnedなら待たずにunavailableを返し、I/O/WAL errorは
+そのまま呼び出し側へ伝える。
+
+### 公開API
+
+public APIは増やさない。後続のwaiting `Pin`が各attemptで使うprivate
+`tryToPin(block) (*Buffer, bool, error)`を追加する。cache miss helperはManager mutex取得wrapperと
+`pinCacheMissLocked`へ分け、単独testの契約を保ったままatomic compositionから再利用する。
+
+### Test-firstの記録
+
+#### Red
+
+missからhit、exhaustion、I/O/WAL failure、同一blockへの並行試行を先にtestした。実装前は`tryToPin`が
+存在せずbuildに失敗した。
+
+```text
+manager.tryToPin undefined (type *Manager has no field or method tryToPin)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+Manager mutex内でexisting lookupと既存cache miss helperを選ぶ最小compositionを追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestTryToPinComposesCacheMissAndCacheHit` | first miss assignmentとsubsequent hitの同一frame利用 |
+| `TestTryToPinReturnsImmediatelyWhenEveryFrameIsPinned` | non-waiting exhaustionとno mutation |
+| `TestTryToPinPropagatesCacheMissFailuresWithoutConsumingAFrame` | read/WAL failureの伝播とavailable保持 |
+| `TestTryToPinConcurrentSameBlockUsesOneFrameAndKeepsEveryPin` | duplicate assignment防止、全pin保持、単一0→1遷移 |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr.tryToPin`全体である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `findExistingBuffer(blk)` | `findExistingBufferLocked(block)` | cache identityをcritical section内で判定する |
+| miss時`chooseUnpinnedBuffer` | `pinCacheMissLocked` | 分割済みselection/lifecycleを再利用する |
+| `null`でexhaustion | `(nil, false, nil)` | errorとunavailableを区別する |
+| unchecked assignment failure | explicit `error` | I/O/WAL failureを失わない |
+| synchronized `tryToPin` | `tryToPin`全体をManager mutexで保護 | hit/miss decisionをatomicにする |
+
+## Clean Architecture上の判断
+
+`tryToPin`は新しいPage I/Oやreplacement ruleを持たず、Manager内の既存coordination operationを合成する。
+waiting policyをまだ混ぜないことで、即時attemptの結果を`pinned`、`unavailable`、`error`の3種類として明確に
+保ち、後続の待機loopがこのprimitiveだけを繰り返せるようにする。
+
+## 意図的に含めなかったもの
+
+- public `Pin` API
+- all-pinned時のwaiting、timeout、notification
+- transaction別FlushAll
+- replacement policyの変更
+
 ## 次の機能
 
-次はcache hitとcache missを1つのnon-waiting try-to-pin operationへ合成する。all-pinned時のwaitingとtimeoutは、
-さらに別のIssue、commit、stacked PRへ分ける。
+次はfinal unpinで待機clientへ通知するためのManager synchronizationを追加する。public `Pin`のwaiting loopと
+timeoutは、それぞれさらに別のIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 

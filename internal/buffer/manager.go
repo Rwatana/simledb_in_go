@@ -127,7 +127,10 @@ func (m *Manager) chooseUnpinnedBufferLocked() (*Buffer, bool) {
 func (m *Manager) pinCacheMiss(block storage.BlockID) (*Buffer, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.pinCacheMissLocked(block)
+}
 
+func (m *Manager) pinCacheMissLocked(block storage.BlockID) (*Buffer, bool, error) {
 	if _, exists := m.findExistingBufferLocked(block); exists {
 		return nil, false, fmt.Errorf("pin cache miss %v: block is already cached", block)
 	}
@@ -152,4 +155,17 @@ func (m *Manager) pinCacheMiss(block storage.BlockID) (*Buffer, bool, error) {
 	frame.pin()
 	m.available--
 	return frame, true, nil
+}
+
+func (m *Manager) tryToPin(block storage.BlockID) (*Buffer, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if frame, found := m.findExistingBufferLocked(block); found {
+		if frame.pin() {
+			m.available--
+		}
+		return frame, true, nil
+	}
+	return m.pinCacheMissLocked(block)
 }
