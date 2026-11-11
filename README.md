@@ -74,8 +74,8 @@ pin increment、unpin、modifying transaction、recovery LSN、最初のBlockID�
 Manager経由のunpinも1→0遷移だけをavailable countへ反映し、cache missでは既存のinitial assignment、clean
 reassignment、dirty WAL replacementへdispatchして成功後にpinできます。cache hitとmissは1つのatomicな
 non-waiting attemptへ合成済みで、public `Pin`はall-pinned時にcondition variableで待ち、final unpin後に
-再試行します。待機は10秒でboundedされ、期限超過は`ErrPinTimeout`になります。次はtransaction別
-`FlushAll`を追加します。
+再試行します。待機は10秒でboundedされ、期限超過は`ErrPinTimeout`になります。transaction別`FlushAll`も
+指定transactionのdirty frameだけをWAL順に保存できます。次はChapter 5へ進みます。
 
 ## 参照元
 
