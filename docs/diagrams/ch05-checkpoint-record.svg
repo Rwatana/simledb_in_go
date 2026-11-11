@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 5 Feature 1: Quiescent checkpoint record</title>
+  <desc id="description">A checkpoint recovery record is exactly four zero bytes representing the big-endian checkpoint operation code.</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.label{font-family:Helvetica,Arial,sans-serif;font-size:18px;fill:#475569}.heading{font-family:Helvetica,Arial,sans-serif;font-size:24px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:20px;fill:#1f2937}.byte{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:24px;font-weight:700;fill:#1f2937}</style></defs>
+  <rect width="1200" height="700" fill="#ffffff"/>
+  <text class="title" x="600" y="70" text-anchor="middle">Chapter 5 / Feature 1: Quiescent checkpoint record</text>
+  <text class="label" x="275" y="195">offset 0</text><text class="label" x="925" y="195" text-anchor="end">offset 4</text>
+  <rect x="275" y="215" width="650" height="205" rx="14" fill="#dae8fc" stroke="#6c8ebf" stroke-width="3"/>
+  <text class="heading" x="600" y="275" text-anchor="middle">CHECKPOINT operation code</text>
+  <text class="text" x="600" y="335" text-anchor="middle">int32 = 0</text><text class="text" x="600" y="375" text-anchor="middle">big-endian</text>
+  <g fill="#e1d5e7" stroke="#9673a6" stroke-width="2"><rect x="275" y="470" width="162.5" height="80"/><rect x="437.5" y="470" width="162.5" height="80"/><rect x="600" y="470" width="162.5" height="80"/><rect x="762.5" y="470" width="162.5" height="80"/></g>
+  <text class="byte" x="356" y="520" text-anchor="middle">00</text><text class="byte" x="519" y="520" text-anchor="middle">00</text><text class="byte" x="681" y="520" text-anchor="middle">00</text><text class="byte" x="844" y="520" text-anchor="middle">00</text>
+  <rect x="275" y="600" width="650" height="65" rx="12" fill="#d5e8d4" stroke="#82b366" stroke-width="2"/>
+  <text class="heading" x="600" y="641" text-anchor="middle">Exactly 4 bytes · no transaction ID · no undo payload</text>
+</svg>
