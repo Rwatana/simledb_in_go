@@ -1,0 +1,17 @@
+<mxfile host="app.diagrams.net" modified="2026-11-12T08:58:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="chapter-05-commit-durability" name="Chapter 5 - Commit Durability"><mxGraphModel dx="1300" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="700" math="0" shadow="0"><root>
+    <mxCell id="0"/><mxCell id="1" parent="0"/>
+    <mxCell id="title" value="Chapter 5 / Feature 6: COMMIT durability boundary" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=26;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="220" y="35" width="860" height="50" as="geometry"/></mxCell>
+    <mxCell id="encode" value="Encode COMMIT(tx)&#xa;8 bytes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=19;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="245" width="230" height="130" as="geometry"/></mxCell>
+    <mxCell id="append" value="Append(record)&#xa;&#xa;returns LSN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=19;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="385" y="245" width="230" height="130" as="geometry"/></mxCell>
+    <mxCell id="flush" value="Flush(LSN)&#xa;&#xa;same LSN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=19;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="710" y="245" width="230" height="130" as="geometry"/></mxCell>
+    <mxCell id="durable" value="Durable COMMIT&#xa;&#xa;return LSN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=19;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1035" y="245" width="230" height="130" as="geometry"/></mxCell>
+    <mxCell id="append-failure" value="Append error&#xa;no Flush call" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="385" y="485" width="230" height="110" as="geometry"/></mxCell>
+    <mxCell id="flush-failure" value="Flush error&#xa;no retry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="710" y="485" width="230" height="110" as="geometry"/></mxCell>
+    <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;" edge="1" parent="1" source="encode" target="append"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;" edge="1" parent="1" source="append" target="flush"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;" edge="1" parent="1" source="flush" target="durable"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="e4" value="error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;fontSize=16;" edge="1" parent="1" source="append" target="append-failure"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="e5" value="error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=3;fontSize=16;" edge="1" parent="1" source="flush" target="flush-failure"><mxGeometry relative="1" as="geometry"/></mxCell>
+  </root></mxGraphModel></diagram>
+</mxfile>
