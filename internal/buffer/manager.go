@@ -1,13 +1,20 @@
 package buffer
 
 import (
+	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
+
+// ErrPinTimeout reports that no Buffer became available before the pin deadline.
+var ErrPinTimeout = errors.New("buffer pin wait timed out")
+
+const defaultPinWaitTimeout = 10 * time.Second
 
 // Manager owns a fixed-size pool of Buffer frames.
 type Manager struct {
@@ -15,6 +22,7 @@ type Manager struct {
 	mu               sync.Mutex
 	available        int
 	availableChanged *sync.Cond
+	pinWaitTimeout   time.Duration
 }
 
 // NewManager creates capacity fresh, unassigned Buffer frames.
@@ -36,7 +44,7 @@ func NewManager(files *storagefile.Manager, logs *logmanager.Manager, capacity i
 		}
 		frames[index] = frame
 	}
-	manager := &Manager{frames: frames, available: capacity}
+	manager := &Manager{frames: frames, available: capacity, pinWaitTimeout: defaultPinWaitTimeout}
 	manager.availableChanged = sync.NewCond(&manager.mu)
 	return manager, nil
 }
@@ -182,6 +190,13 @@ func (m *Manager) Pin(block storage.BlockID) (*Buffer, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	deadline := time.Now().Add(m.pinWaitTimeout)
+	var deadlineWakeup *time.Timer
+	defer func() {
+		if deadlineWakeup != nil {
+			deadlineWakeup.Stop()
+		}
+	}()
 	for {
 		frame, pinned, err := m.tryToPinLocked(block)
 		if err != nil {
@@ -189,6 +204,17 @@ func (m *Manager) Pin(block storage.BlockID) (*Buffer, error) {
 		}
 		if pinned {
 			return frame, nil
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return nil, fmt.Errorf("pin buffer %v: %w", block, ErrPinTimeout)
+		}
+		if deadlineWakeup == nil {
+			deadlineWakeup = time.AfterFunc(remaining, func() {
+				m.mu.Lock()
+				m.availableChanged.Broadcast()
+				m.mu.Unlock()
+			})
 		}
 		m.availableChanged.Wait()
 	}
