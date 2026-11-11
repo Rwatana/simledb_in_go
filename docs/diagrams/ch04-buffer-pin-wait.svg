@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 4 Feature 25: Wait for an available buffer</title><desc id="description">public Pinがnon-waiting attemptを行い、unavailableならcondition variableで待ち、final unpin後に再試行する。</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:19px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="850" fill="#ffffff"/><text class="title" x="700" y="58" text-anchor="middle">Chapter 4 / Feature 25: Wait for an available buffer</text>
+  <rect class="box" x="70" y="255" width="260" height="155" rx="12" fill="#e1d5e7" stroke="#9673a6"/><text class="heading" x="200" y="300" text-anchor="middle">Manager.Pin(target)</text><text class="text" x="200" y="360" text-anchor="middle">lock Manager mutex</text>
+  <rect class="box" x="430" y="255" width="260" height="155" rx="12" fill="#fff2cc" stroke="#d6b656"/><text class="heading" x="560" y="300" text-anchor="middle">tryToPinLocked</text><text class="text" x="560" y="360" text-anchor="middle">cache hit or miss</text>
+  <rect class="box" x="1080" y="120" width="250" height="145" rx="12" fill="#d5e8d4" stroke="#82b366"/><text class="heading" x="1205" y="165" text-anchor="middle">Pinned</text><text class="text" x="1205" y="220" text-anchor="middle">return frame</text>
+  <rect class="box" x="1080" y="315" width="250" height="155" rx="12" fill="#f8cecc" stroke="#b85450"/><text class="heading" x="1205" y="360" text-anchor="middle">I/O or WAL error</text><text class="text" x="1205" y="420" text-anchor="middle">return error immediately</text>
+  <rect class="box" x="770" y="525" width="270" height="175" rx="12" fill="#dae8fc" stroke="#6c8ebf"/><text class="heading" x="905" y="570" text-anchor="middle">No available frame</text><text class="text" x="905" y="620" text-anchor="middle">Cond.Wait()</text><text class="text" x="905" y="660" text-anchor="middle">mutex released</text>
+  <rect class="box" x="430" y="525" width="260" height="175" rx="12" fill="#dae8fc" stroke="#6c8ebf"/><text class="heading" x="560" y="570" text-anchor="middle">Final unpin Broadcast</text><text class="text" x="560" y="620" text-anchor="middle">reacquire mutex</text><text class="text" x="560" y="660" text-anchor="middle">loop and retry</text>
+  <line x1="330" y1="332" x2="430" y2="332" stroke="#475569" stroke-width="3"/><polygon points="430,332 416,324 416,340" fill="#475569"/>
+  <line x1="690" y1="285" x2="1080" y2="192" stroke="#475569" stroke-width="3"/><polygon points="1080,192 1065,188 1069,203" fill="#475569"/>
+  <line x1="690" y1="350" x2="1080" y2="392" stroke="#475569" stroke-width="3"/><polygon points="1080,392 1067,383 1065,399" fill="#475569"/>
+  <line x1="640" y1="410" x2="770" y2="555" stroke="#475569" stroke-width="3"/><polygon points="770,555 766,540 754,551" fill="#475569"/>
+  <line x1="770" y1="620" x2="690" y2="620" stroke="#475569" stroke-width="3"/><polygon points="690,620 704,612 704,628" fill="#475569"/>
+  <line x1="560" y1="525" x2="560" y2="410" stroke="#475569" stroke-width="3"/><polygon points="560,410 552,424 568,424" fill="#475569"/>
+  <rect class="box" x="220" y="755" width="960" height="65" rx="12" fill="#f5f5f5" stroke="#666666"/><text class="heading" x="700" y="795" text-anchor="middle">Unavailable attempts sleep; every wakeup rechecks and retries.</text>
+</svg>
