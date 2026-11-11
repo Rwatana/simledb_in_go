@@ -29,6 +29,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | unpinned candidate selection | pool-order victim候補 | 実装済み |
 | existing buffer pin | cache済みframeのpinとavailable遷移 | 実装済み |
 | managed buffer unpin | final releaseとavailable回復 | 実装済み |
+| cache miss buffer pin | lifecycle dispatchと成功後pin | 実装済み |
 | buffer selection and waiting | frame検索、割当、待機 | 未着手 |
 
 ## Feature 1: Log block initialization
@@ -1807,10 +1808,103 @@ Bufferは個別pin countの遷移、Managerはpool ownershipとavailable集計�
 - transaction別FlushAll
 - replacement policyの変更
 
+## Feature 22: Assign and pin an available buffer on a cache miss
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-cache-miss-pin.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-cache-miss-pin.svg)を参照する。図はcache missでfirst unpinned frameを選び、
+frameの状態に応じた既存lifecycleを通してtarget Pageをloadし、成功後にだけpinする経路を示す。
+
+### 問い
+
+target blockがpoolにないとき、利用中のframeを壊さず、clean/dirtyの永続化規則を再利用しながら、
+1つのavailable frameをどうtargetへ割り当てるか。
+
+### 概念
+
+private `pinCacheMiss`はManager mutexを保持し、targetが本当にcache missであることを確認してから
+pool orderで最初のunpinned frameを選ぶ。選択されたframeの状態に応じ、すでに単体test済みのlifecycleへ
+dispatchする。
+
+```text
+unassigned frame     -> assignToBlock(target)
+clean assigned frame -> reassignToBlock(target)
+dirty assigned frame -> replaceDirtyWithBlock(target)  // WAL, old data write, target read
+```
+
+assignmentが成功した後にだけpin countを0から1へ変え、`available`を1減らす。候補なしは`nil, false, nil`、
+I/OやWAL failureはerrorとし、どちらもpinとavailableを変更しない。selection、dispatch、accountingを同じ
+Manager critical sectionに置くため、並行cache missが同じframeをclaimすることもない。
+
+### 公開API
+
+public APIは増やさない。後続のtry-to-pin flowがcache miss経路で使うprivate
+`pinCacheMiss(block) (*Buffer, bool, error)`だけを追加する。既存のcandidate selectionはlock済み呼び出し元から
+使える`chooseUnpinnedBufferLocked`へ分け、単独selection wrapperの契約は維持する。
+
+### Test-firstの記録
+
+#### Red
+
+unassigned/clean/dirty dispatch、exhaustion、existing target、failure、並行claimを先にtestした。実装前は
+`pinCacheMiss`が存在せずbuildに失敗した。
+
+```text
+manager.pinCacheMiss undefined (type *Manager has no field or method pinCacheMiss)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+Manager mutex内のcache miss確認、locked candidate selection、既存lifecycle dispatch、成功後pin/accountingだけを
+追加した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestPinCacheMissAssignsTheFirstUnpinnedFrame` | unassigned、clean、dirty candidateのdispatchとpin |
+| `TestPinCacheMissReportsExhaustionOrExistingTargetWithoutMutation` | all-pinnedと非miss入力のno mutation |
+| `TestPinCacheMissFailureDoesNotPinOrConsumeAvailability` | target read/WAL failure時のpin・available保持 |
+| `TestPinCacheMissConcurrentCallsClaimDifferentFrames` | Manager mutexによるcandidate claimの直列化 |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.BufferMgr.tryToPin`のcache miss経路と`Buffer.assignToBlock`である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| `chooseUnpinnedBuffer()` | `chooseUnpinnedBufferLocked()` | 同じManager critical sectionでfirst-fit selection |
+| `buff == null` | `(nil, false, nil)` | exhaustionとI/O errorを区別する |
+| `buff.assignToBlock(blk)` | frame状態別の3 lifecycleへdispatch | 分割済みWAL/error契約を再利用する |
+| `if (!buff.isPinned()) numAvailable--` | assignment成功後の`frame.pin(); m.available--` | failed I/Oでavailabilityを消費しない |
+| unchecked I/O | contextual error | 呼び出し側がfailureとexhaustionを区別できる |
+| synchronized `tryToPin` | `pinCacheMiss`全体をManager mutexで保護 | duplicate claimを防ぐ |
+
+Java版の`assignToBlock`は内部で旧frameをflushする。Go版はその複合処理をすでにinitial assignment、clean
+reassignment、dirty replacementへ分けているため、Managerはstateに応じて明示的にdispatchする。
+
+## Clean Architecture上の判断
+
+Managerはpool policyとlifecycle orchestrationだけを担当し、Page I/O、WAL順序、failure後stateはBufferの既存
+operationへ委譲する。新しいreplacement interfaceやpolicy metadataを追加せず、現在のsmall fixed poolに必要な
+first-fitだけを保つ。
+
+## 意図的に含めなかったもの
+
+- cache hit経路との合成
+- public `Pin` API
+- all-pinned時のwaiting、timeout、notification
+- transaction別FlushAll
+- LRUなどのreplacement policy
+
 ## 次の機能
 
-次はtarget blockがcacheされていない場合にunpinned candidateを選び、そのframeへdisk Pageを割り当てる
-cache miss経路を実装する。waitingとtimeoutは、全frameがpinnedな場合の別Issue、commit、stacked PRへ分ける。
+次はcache hitとcache missを1つのnon-waiting try-to-pin operationへ合成する。all-pinned時のwaitingとtimeoutは、
+さらに別のIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 
