@@ -23,7 +23,7 @@ previous block traversalをそれぞれ独立したIssue、test、1 commit、sta
 | dirty buffer flush | WAL順序とdata Page保存 | 実装済み |
 | initial block assignment | unassigned frameへのdisk Page load | 実装済み |
 | clean buffer reassignment | clean frameの安全な再利用 | 実装済み |
-| dirty buffer replacement | WAL flush後のframe再利用 | 未着手 |
+| dirty buffer replacement | WAL flush後のframe再利用 | 実装済み |
 | buffer pool | frame選択と待機 | 未着手 |
 
 ## Feature 1: Log block initialization
@@ -1298,10 +1298,97 @@ policyであり、FileManagerはtarget blockのI/Oだけを担う。
 - replacement policy
 - recovery scan/rollback
 
+## Feature 16: Replace a dirty buffer after WAL flush
+
+編集可能な図は[Draw.io版](../diagrams/ch04-buffer-dirty-replacement.drawio)、ブラウザで表示できる図は
+[SVG版](../diagrams/ch04-buffer-dirty-replacement.svg)を参照する。図はdirty old frameをWAL順にdurableにし、
+target Pageをtemporaryにreadしてからreplacementを公開するまでと、各failure boundaryを示す。
+
+### 問い
+
+dirty・unpinnedなassigned frameを別blockへ再利用するとき、old Pageを失わずWALを守り、途中のI/O failure後も
+retry可能なstateをどう残すか。
+
+### 概念
+
+private `replaceDirtyWithBlock`はBuffer mutex内でassigned、dirty、unpinnedを検査する。既存`flush`と同じ
+`flushLocked` policyを使ってoptional recovery log、old data Pageの順に保存し、成功後だけdirty metadataを
+clearする。その後target blockをtemporary Pageへreadし、成功後だけBlockIDとContentsを同時に置き換える。
+
+```text
+validate -> optional log Flush -> old Page Write -> clear dirty
+         -> read target Page -> commit target Page + BlockID
+```
+
+log flushまたはold Page writeが失敗した場合はold assignment、memory contents、transaction、LSNをdirtyのまま
+維持し、dirty replacementをretryできる。old Page write成功後にtarget readが失敗した場合は、old assignmentと
+contentsをclean・durableなframeとして維持し、clean reassignmentとしてretryできる。
+
+### 公開API
+
+public APIは増やさない。後続BufferManagerがdirty victimへ使うprivate
+`replaceDirtyWithBlock(block) error`と、mutex取得済み経路で共有する`flushLocked`だけを追加する。
+
+### Test-firstの記録
+
+#### Red
+
+WAL成功、invalid state rejection、log/data failure、target read failureを先にtestした。実装前は
+`replaceDirtyWithBlock`が存在せずbuildに失敗した。
+
+```text
+frame.replaceDirtyWithBlock undefined (type *Buffer has no field or method replaceDirtyWithBlock)
+FAIL github.com/Rwatana/simledb_in_go/internal/buffer [build failed]
+```
+
+#### Green
+
+既存flush sequenceを`flushLocked`へ抽出し、同じBuffer mutex区間でflush、temporary read、success-only commitを
+実装した。
+
+```text
+ok github.com/Rwatana/simledb_in_go/internal/buffer
+```
+
+### Test cases
+
+| Test | 説明する振る舞い |
+| --- | --- |
+| `TestReplaceDirtyWithBlockFlushesOldPageThenLoadsTarget` | WAL、old Page durability、target commit、metadata clear |
+| `TestReplaceDirtyWithBlockRejectsUnassignedCleanOrPinnedFrames` | replacement preconditionとstate維持 |
+| `TestReplaceDirtyWithBlockLogFailurePreservesDirtyOldFrame` | log failureでdata write/replacementを行わない |
+| `TestReplaceDirtyWithBlockDataWriteFailurePreservesDirtyOldFrame` | data failureでdirty metadataとold frameを維持 |
+| `TestReplaceDirtyWithBlockTargetReadFailureKeepsFlushedOldFrame` | target failureでold frameをclean・durableに維持 |
+
+## Javaソースリーディング
+
+対象は`simpledb.buffer.Buffer.assignToBlock`のflushを含むreplacement経路である。
+
+| Java | Go | 判断 |
+| --- | --- | --- |
+| method先頭で`flush()` | dirty専用private methodで`flushLocked` | clean replacementとのbehavior境界を維持する |
+| `blk = b`後に`fm.read` | temporary read後にBlockIDとPageをcommit | target failureでold assignmentを維持する |
+| `pins = 0`へreset | pin count 0をpreconditionにする | active userがいるframeを置き換えない |
+| unchecked I/O | contextual errorとretry state | failureをBufferManagerへ伝播する |
+
+## Clean Architecture上の判断
+
+WALと単一frameのstate transitionはBufferに閉じ込め、durability mechanismはLogManagerとFileManagerへ委譲する。
+どのframeをvictimにするか、何件のframeを持つか、待機するかは後続BufferManagerのpolicyとして分離する。
+
+## 意図的に含めなかったもの
+
+- clean frame reassignmentの変更
+- fixed-size buffer pool生成
+- existing assignment lookup
+- victim selectionとwaiting
+- transaction別FlushAll
+- recovery scan/rollback
+
 ## 次の機能
 
-次はdirty・unpinnedなassigned BufferをWAL順にflushしてから別blockへreassignする。BufferManager poolは、
-さらに独立したIssue、commit、stacked PRへ分ける。
+次は指定数のunassigned Bufferを持つfixed-size BufferManager poolの初期化だけを実装する。existing assignment
+lookup、victim selection、pin/unpin、waitingは、さらに独立したIssue、commit、stacked PRへ分ける。
 
 ## 参照元
 
