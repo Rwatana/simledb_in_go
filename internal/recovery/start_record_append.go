@@ -13,9 +13,13 @@ type LogAppender interface {
 
 // AppendStartRecord appends one encoded transaction start record.
 func AppendStartRecord(appender LogAppender, transaction TransactionID) (logmanager.LSN, error) {
-	lsn, err := appender.Append(EncodeStartRecord(transaction))
+	return appendTransactionRecord(appender, transaction, "start", EncodeStartRecord(transaction))
+}
+
+func appendTransactionRecord(appender LogAppender, transaction TransactionID, name string, encoded []byte) (logmanager.LSN, error) {
+	lsn, err := appender.Append(encoded)
 	if err != nil {
-		return 0, fmt.Errorf("append start record for transaction %d: %w", transaction, err)
+		return 0, fmt.Errorf("append %s record for transaction %d: %w", name, transaction, err)
 	}
 	return lsn, nil
 }
