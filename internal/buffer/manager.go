@@ -81,6 +81,34 @@ func (m *Manager) pinExistingBuffer(block storage.BlockID) (*Buffer, bool) {
 	return frame, true
 }
 
+// Unpin releases one pin from a Buffer owned by the Manager.
+func (m *Manager) Unpin(frame *Buffer) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if frame == nil {
+		return fmt.Errorf("unpin managed buffer: frame must not be nil")
+	}
+	owned := false
+	for _, candidate := range m.frames {
+		if candidate == frame {
+			owned = true
+			break
+		}
+	}
+	if !owned {
+		return fmt.Errorf("unpin managed buffer: frame is not owned by this manager")
+	}
+	becameAvailable, err := frame.unpin()
+	if err != nil {
+		return fmt.Errorf("unpin managed buffer: %w", err)
+	}
+	if becameAvailable {
+		m.available++
+	}
+	return nil
+}
+
 func (m *Manager) chooseUnpinnedBuffer() (*Buffer, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
