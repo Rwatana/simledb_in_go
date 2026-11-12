@@ -359,3 +359,72 @@ func TestLockTableWaitsForExclusiveReleaseBeforeAcquiringShared(t *testing.T) {
 		t.Fatalf("shared holders after wait = %d, want 1", got)
 	}
 }
+
+func TestLockTableTimesOutBlockedSharedRequest(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	other := storage.NewBlockID("tbl", 2)
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(other); err != nil {
+		t.Fatal(err)
+	}
+
+	err := table.WaitSharedFor(block, 20*time.Millisecond)
+	if !errors.Is(err, ErrLockTimeout) {
+		t.Fatalf("WaitSharedFor() error = %v, want ErrLockTimeout", err)
+	}
+	if got := table.locks[block]; got != -1 {
+		t.Fatalf("exclusive state after timeout = %d, want -1", got)
+	}
+	if got := table.locks[other]; got != 1 {
+		t.Fatalf("other shared holders = %d, want 1", got)
+	}
+}
+
+func TestLockTableBoundedSharedRequestAcquiresBeforeDeadline(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- table.WaitSharedFor(block, time.Second)
+	}()
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		table.mu.Lock()
+		waiting := table.changed != nil
+		table.mu.Unlock()
+		if waiting {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("bounded shared request did not begin waiting")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	table.Unlock(block)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("WaitSharedFor() error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("bounded shared request did not acquire before deadline")
+	}
+	if got := table.locks[block]; got != 1 {
+		t.Fatalf("shared holders after bounded wait = %d, want 1", got)
+	}
+}

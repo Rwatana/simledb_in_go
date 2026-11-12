@@ -1028,10 +1028,30 @@ initial build failed because `WaitShared` did not exist.
 This is the unbounded wait/recheck portion of Java `LockTable.sLock`. The ten-second abort policy is intentionally a
 separate behavior.
 
+## Feature 46: Time out a blocked shared request
+
+`WaitSharedFor` applies a caller-provided deadline to the same shared wait/recheck loop. A timer reacquires the table
+mutex, marks the wait expired, and broadcasts the condition; the request then rechecks the exclusive predicate before
+returning `ErrLockTimeout`. If final release wins before the deadline, the timer is stopped and one shared hold is
+granted. Timeout changes no lock state.
+
+### Test-first record
+
+Deadline abort/state preservation and successful acquisition before the deadline were tested first. The initial build
+failed because `WaitSharedFor` and `ErrLockTimeout` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableTimesOutBlockedSharedRequest` | A persistent exclusive holder causes a distinguishable timeout without state mutation |
+| `TestLockTableBoundedSharedRequestAcquiresBeforeDeadline` | Final release before the deadline grants one shared hold |
+
+This maps to Java `LockTable.sLock`'s elapsed-time check and `LockAbortException`. Go accepts the duration explicitly so
+tests and future transaction policy do not depend on a package-global ten-second delay.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by applying a bounded timeout to shared-lock waiting, then add exclusive
-waiting and transaction-local lock tracking separately.
+Continue with Chapter 5 concurrency control by waiting for competing shared holders before granting an exclusive lock,
+then add exclusive timeout and transaction-local lock tracking separately.
 
 ## Sources
 
