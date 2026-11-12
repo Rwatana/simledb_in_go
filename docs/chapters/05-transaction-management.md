@@ -358,9 +358,30 @@ Exact append bytes/LSN, encoding cutoff, and append failure were tested first. T
 Java `SetIntRecord.writeToLog` calculates the layout and appends in one method. Go composes the separately tested codec
 with the existing append port while keeping old-value capture and undo out of this boundary.
 
+## Feature 12: SETSTRING update record codec
+
+The [editable Draw.io](../diagrams/ch05-setstring-record.drawio) and [SVG](../diagrams/ch05-setstring-record.svg) show the
+two variable regions. SETSTRING stores operation `5`, transaction, length-prefixed filename, block, offset, and a separately
+length-prefixed old string. Exact size is `24 + filename bytes + old-value bytes`.
+
+The decoder validates both signed lengths before slicing, then requires the exact final boundary. The encoder rejects
+block-number narrowing and combined-size overflow. UTF-8 content and signed fixed fields round-trip without coercion.
+
+### Test-first record
+
+Exact bytes, UTF-8/signed fields, block overflow, and corruption of either length were tested first. The initial build
+failed because the SETSTRING operation, encoder, and decoder did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSetStringRecordRoundTrip` | Exact two-string layout and decoded fields |
+| `TestSetStringRecordRoundTripsUTF8AndSignedFields` | Both strings and signed fields round-trip |
+| `TestEncodeSetStringRecordRejectsBlockOutsideInt32` | Block number cannot truncate |
+| `TestDecodeSetStringRecordRejectsInvalidEncoding` | Both lengths and exact boundary are strict |
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 with the SETSTRING update record codec as a separate issue and stacked PR.
+Continue Sect. 5.3.9.1 by appending a SETSTRING record as a separate issue and stacked PR.
 
 ## Sources
 

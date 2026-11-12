@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="650" viewBox="0 0 1400 650" role="img" aria-labelledby="title desc">
+  <title id="title">SETSTRING undo record layout</title>
+  <desc id="desc">SETSTRING contains two length-prefixed strings.</desc>
+  <style>.t{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.h{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.x{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}</style>
+  <rect width="1400" height="650" fill="#fff"/>
+  <text class="t" x="700" y="70" text-anchor="middle">Chapter 5 / Feature 12: SETSTRING undo record layout</text>
+  <g stroke-width="2">
+    <rect x="35" y="230" width="165" height="120" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+    <rect x="200" y="230" width="175" height="120" rx="12" fill="#dae8fc" stroke="#6c8ebf"/>
+    <rect x="375" y="230" width="240" height="120" rx="12" fill="#fff2cc" stroke="#d6b656"/>
+    <rect x="615" y="230" width="190" height="120" rx="12" fill="#d5e8d4" stroke="#82b366"/>
+    <rect x="805" y="230" width="190" height="120" rx="12" fill="#f8cecc" stroke="#b85450"/>
+    <rect x="995" y="230" width="370" height="120" rx="12" fill="#fff2cc" stroke="#d6b656"/>
+  </g>
+  <text class="h" x="117" y="278" text-anchor="middle">SETSTRING</text>
+  <text class="x" x="117" y="318" text-anchor="middle">int32 = 5</text>
+  <text class="h" x="287" y="278" text-anchor="middle">Transaction</text>
+  <text class="x" x="287" y="318" text-anchor="middle">int32</text>
+  <text class="h" x="495" y="278" text-anchor="middle">Filename</text>
+  <text class="x" x="495" y="318" text-anchor="middle">length + bytes</text>
+  <text class="h" x="710" y="278" text-anchor="middle">Block</text>
+  <text class="x" x="710" y="318" text-anchor="middle">int32</text>
+  <text class="h" x="900" y="278" text-anchor="middle">Offset</text>
+  <text class="x" x="900" y="318" text-anchor="middle">int32</text>
+  <text class="h" x="1180" y="278" text-anchor="middle">Old string</text>
+  <text class="x" x="1180" y="318" text-anchor="middle">length + bytes</text>
+  <rect x="250" y="465" width="900" height="70" rx="12" fill="#d5e8d4" stroke="#82b366" stroke-width="2"/>
+  <text class="h" x="700" y="507" text-anchor="middle">Exact size = 24 fixed bytes + filename bytes + old-value bytes</text>
+</svg>
