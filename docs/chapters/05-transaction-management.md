@@ -557,10 +557,31 @@ build failed because `NewRollbackRecordIterator` did not exist.
 
 This maps to the START branch and return in Java `RecoveryMgr.doRollback`. The iterator still does not invoke undo.
 
+## Feature 22: Undo rollback updates in reverse order
+
+`UndoRollbackRecords` consumes decoded records from the START-bounded source and a `RollbackUndoTarget` supporting both
+value types. It invokes SETINT or SETSTRING undo in source order, ignores marker records whose undo is a no-op, and stops
+at the first source or restore failure. Because the source is newest-to-oldest, repeated updates to the same location are
+restored in the required reverse history order.
+
+### Test-first record
+
+Mixed update types, a no-op marker, source failure, and first-undo failure cutoff were tested first. The initial build
+failed because `UndoRollbackRecords` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestUndoRollbackRecordsRestoresUpdatesInSourceOrder` | SETSTRING then SETINT restore in reverse-log order without logging |
+| `TestUndoRollbackRecordsReturnsSourceFailure` | Bounded traversal failure stops rollback |
+| `TestUndoRollbackRecordsStopsAfterUndoFailure` | Failed newest undo prevents older mutations |
+
+This maps to `rec.undo(tx)` in Java `RecoveryMgr.doRollback`, while iterator construction and rollback durability remain
+outside this behavior.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.2 by dispatching SETINT and SETSTRING undo over this bounded stream, then add rollback flush and
-marker durability as separate behaviors.
+Continue with Sect. 5.3.9.2 by composing log iterator creation with bounded undo, then add rollback buffer flush, marker
+append, and marker LSN flush as separate behaviors.
 
 ## Sources
 
