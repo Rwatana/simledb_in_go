@@ -818,10 +818,31 @@ initial build failed because `RecoverRestartAndAppend` did not exist.
 This maps to `CheckpointRecord.writeToLog` after `bm.flushAll(txnum)` in Java `RecoveryMgr.recover`. Checkpoint durability
 is the next behavior.
 
+## Feature 35: Make restart CHECKPOINT durable
+
+`RecoverRestart` completes history undo, recovered-buffer flush, and CHECKPOINT append before flushing exactly the
+returned checkpoint LSN. It returns that LSN unchanged on success. Any earlier failure prevents checkpoint flush;
+durability failure includes the recovery transaction and LSN while preserving its cause.
+
+### Test-first record
+
+Successful LSN identity, early failure cutoff, append failure cutoff, and checkpoint flush failure were tested first. The
+initial build failed because `RecoverRestart` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecoverRestartFlushesReturnedCheckpointLSN` | Flush exactly the appended checkpoint and return its LSN |
+| `TestRecoverRestartDoesNotFlushCheckpointAfterEarlierFailure` | Failed recovery performs no checkpoint I/O |
+| `TestRecoverRestartDoesNotFlushCheckpointAfterAppendFailure` | Failed checkpoint append cannot be flushed |
+| `TestRecoverRestartReturnsCheckpointFlushFailure` | Durability failure identifies recovery transaction and LSN |
+
+This completes Java `RecoveryMgr.recover`'s recovery/durability responsibility. Lock release and buffer unpin belong to
+the later public transaction layer.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.3 by flushing the returned CHECKPOINT LSN as a separate behavior, then proceed to transaction
-concurrency control in book order.
+Continue with Chapter 5 concurrency control in book order, beginning with the lock table's uncontended shared-lock
+acquisition as its own observable behavior.
 
 ## Sources
 
