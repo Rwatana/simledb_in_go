@@ -272,9 +272,27 @@ because `OperationRollback`, `EncodeRollbackRecord`, and `DecodeRollbackRecord` 
 | `writeToLog` | excluded | Append and flush remain separate behaviors |
 | empty `undo` | no undo method yet | Rollback scanning belongs to later orchestration |
 
+## Feature 8: Append a ROLLBACK record
+
+`AppendRollbackRecord` sends the exact Feature 7 encoding through the existing recovery-owned `LogAppender`, once. It
+returns the append LSN unchanged; failure carries the ROLLBACK transaction ID, preserves the cause, and is not retried.
+
+### Test-first record
+
+Exact bytes, unchanged LSN, and the no-retry failure path were tested first. The initial build failed because
+`AppendRollbackRecord` was undefined.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestAppendRollbackRecordAppendsExactEncodingAndReturnsLSN` | One exact ROLLBACK append and unchanged LSN |
+| `TestAppendRollbackRecordReturnsAppendFailureWithContext` | Wrapped ROLLBACK context and no retry |
+
+Java `RollbackRecord.writeToLog` combines encoding and append. Go reuses the separately tested codec and the private
+one-call append helper, keeping rollback scanning and durability out of this behavior.
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 by appending the ROLLBACK record as a separate issue and stacked PR.
+Continue Sect. 5.3.9.1 by flushing an appended ROLLBACK LSN as a separate issue and stacked PR.
 
 ## Sources
 
