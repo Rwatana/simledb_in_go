@@ -201,3 +201,30 @@ func TestLockTableRemovesExclusiveLock(t *testing.T) {
 		t.Fatalf("other shared holders = %d, want 1", got)
 	}
 }
+
+func TestLockTableRejectsSharedAcquisitionWhileExclusiveLockExists(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	other := storage.NewBlockID("tbl", 2)
+
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(other); err != nil {
+		t.Fatal(err)
+	}
+
+	err := table.LockShared(block)
+	if !errors.Is(err, ErrLockConflict) {
+		t.Fatalf("LockShared() error = %v, want ErrLockConflict", err)
+	}
+	if got := table.locks[block]; got != -1 {
+		t.Fatalf("exclusive state after conflict = %d, want -1", got)
+	}
+	if got := table.locks[other]; got != 1 {
+		t.Fatalf("other shared holders = %d, want 1", got)
+	}
+}

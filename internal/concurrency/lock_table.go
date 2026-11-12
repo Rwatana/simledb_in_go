@@ -25,6 +25,9 @@ func (t *LockTable) LockShared(block storage.BlockID) error {
 	if t.locks == nil {
 		t.locks = make(map[storage.BlockID]int)
 	}
+	if t.locks[block] < 0 {
+		return ErrLockConflict
+	}
 	t.locks[block]++
 	return nil
 }
