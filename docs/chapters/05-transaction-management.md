@@ -619,10 +619,31 @@ because `RollbackTransactionChanges` did not exist.
 This maps to `bm.flushAll(txnum)` immediately after `doRollback()` in Java `RecoveryMgr.rollback`. Marker append and LSN
 flush remain separate.
 
+## Feature 25: Append ROLLBACK after restored-buffer flush
+
+`RollbackTransactionAndAppend` completes history undo and restored-buffer persistence before composing the existing
+`AppendRollbackRecord` behavior. It appends exactly one marker and returns its LSN unchanged. Any earlier failure prevents
+append, while append failure retains the existing transaction context. The marker is not flushed here.
+
+### Test-first record
+
+Successful phase order/LSN, history cutoff, buffer-flush cutoff, and append failure were tested first. The initial build
+failed because `RollbackTransactionAndAppend` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRollbackTransactionAndAppendWritesMarkerAfterBufferFlush` | Append once after restored pages persist and return LSN |
+| `TestRollbackTransactionAndAppendDoesNotAppendAfterHistoryFailure` | Incomplete undo cannot claim rollback completion |
+| `TestRollbackTransactionAndAppendDoesNotAppendAfterBufferFlushFailure` | Unpersisted undo cannot claim rollback completion |
+| `TestRollbackTransactionAndAppendReturnsAppendFailure` | Marker write failure remains explicit |
+
+This maps to `RollbackRecord.writeToLog` after `bm.flushAll(txnum)` in Java `RecoveryMgr.rollback`. Marker durability is
+the next behavior.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.2 public rollback orchestration by appending the ROLLBACK marker after restored-buffer flush,
-then making that marker LSN durable as a separate behavior.
+Continue with Sect. 5.3.9.2 by flushing the returned ROLLBACK marker LSN as a separate behavior, then begin restart
+recovery's finished-transaction tracking.
 
 ## Sources
 
