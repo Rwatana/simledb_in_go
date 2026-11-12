@@ -599,10 +599,30 @@ initial build failed because `RollbackTransactionHistory` did not exist.
 This composes Java `RecoveryMgr.doRollback` without reproducing its class structure. Public rollback durability remains
 the next set of behaviors.
 
+## Feature 24: Flush restored rollback buffers
+
+`RollbackTransactionChanges` first completes `RollbackTransactionHistory`, then invokes the minimal
+`TransactionBufferFlusher` exactly once for the same transaction. A history failure prevents flush; a flush failure keeps
+its cause and transaction context. No ROLLBACK record is appended at this boundary.
+
+### Test-first record
+
+Successful ordering and identity, history-failure cutoff, and flush failure were tested first. The initial build failed
+because `RollbackTransactionChanges` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRollbackTransactionChangesFlushesAfterHistoryUndo` | Flush the same transaction only after all undo operations |
+| `TestRollbackTransactionChangesDoesNotFlushAfterHistoryFailure` | Incomplete rollback never persists a partial phase here |
+| `TestRollbackTransactionChangesReturnsFlushFailure` | Buffer persistence failure remains explicit |
+
+This maps to `bm.flushAll(txnum)` immediately after `doRollback()` in Java `RecoveryMgr.rollback`. Marker append and LSN
+flush remain separate.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.2 public rollback orchestration, adding buffer flush, ROLLBACK append, and marker LSN flush as
-separate behaviors.
+Continue with Sect. 5.3.9.2 public rollback orchestration by appending the ROLLBACK marker after restored-buffer flush,
+then making that marker LSN durable as a separate behavior.
 
 ## Sources
 
