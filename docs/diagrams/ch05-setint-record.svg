@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="650" viewBox="0 0 1400 650" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 5 Feature 10: SETINT undo record layout</title><desc id="description">SETINT stores operation, transaction, length-prefixed filename, block, offset, and old integer in big-endian order.</desc>
+  <defs><style>.title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}.heading{font-family:Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;fill:#1f2937}.text{font-family:Helvetica,Arial,sans-serif;font-size:16px;fill:#1f2937}.box{stroke-width:2}</style></defs>
+  <rect width="1400" height="650" fill="#fff"/><text class="title" x="700" y="70" text-anchor="middle">Chapter 5 / Feature 10: SETINT undo record layout</text>
+  <g class="box"><rect x="40" y="230" width="170" height="120" rx="12" fill="#e1d5e7" stroke="#9673a6"/><rect x="210" y="230" width="180" height="120" rx="12" fill="#dae8fc" stroke="#6c8ebf"/><rect x="390" y="230" width="260" height="120" rx="12" fill="#fff2cc" stroke="#d6b656"/><rect x="650" y="230" width="220" height="120" rx="12" fill="#d5e8d4" stroke="#82b366"/><rect x="870" y="230" width="220" height="120" rx="12" fill="#f8cecc" stroke="#b85450"/><rect x="1090" y="230" width="260" height="120" rx="12" fill="#f5f5f5" stroke="#666"/></g>
+  <text class="heading" x="125" y="275" text-anchor="middle">SETINT</text><text class="text" x="125" y="315" text-anchor="middle">int32 = 4</text>
+  <text class="heading" x="300" y="275" text-anchor="middle">Transaction ID</text><text class="text" x="300" y="315" text-anchor="middle">int32</text>
+  <text class="heading" x="520" y="265" text-anchor="middle">Filename</text><text class="text" x="520" y="302" text-anchor="middle">int32 byte length</text><text class="text" x="520" y="330" text-anchor="middle">+ UTF-8 bytes</text>
+  <text class="heading" x="760" y="275" text-anchor="middle">Block number</text><text class="text" x="760" y="315" text-anchor="middle">int32</text>
+  <text class="heading" x="980" y="275" text-anchor="middle">Page offset</text><text class="text" x="980" y="315" text-anchor="middle">int32</text>
+  <text class="heading" x="1220" y="275" text-anchor="middle">Old integer</text><text class="text" x="1220" y="315" text-anchor="middle">int32</text>
+  <rect x="250" y="465" width="900" height="70" rx="12" fill="#d5e8d4" stroke="#82b366" stroke-width="2"/><text class="heading" x="700" y="507" text-anchor="middle">Exact size = 24 fixed bytes + filename byte length · all integers big-endian</text>
+</svg>
