@@ -497,9 +497,29 @@ build failed because `SetStringRecord.Undo` did not exist.
 
 This maps to Java `SetStringRecord.undo` and deliberately remains a separate observable behavior from SETINT undo.
 
+## Feature 19: Identify transaction-owned records
+
+`RecordTransaction` uses the typed records' existing `TransactionID` methods to distinguish transaction history from
+global records. START, COMMIT, ROLLBACK, SETINT, and SETSTRING return their owner; CHECKPOINT and a nil record report no
+owner. The minimal `Record` dispatch interface remains unchanged.
+
+### Test-first record
+
+All transaction record kinds, CHECKPOINT, and nil were tested first. The initial build failed because
+`RecordTransaction` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordTransactionReturnsEveryOwnedRecordTransaction` | All five transaction record kinds expose their owner |
+| `TestRecordTransactionReportsUnownedCheckpointAndNil` | Global and absent records have no transaction owner |
+
+This supplies Java `LogRecord.txNumber`'s selection role without assigning a sentinel transaction to CHECKPOINT. It does
+not iterate, filter, stop, or undo records yet.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.2 backward rollback scanning, split into record selection, stopping, and durability behaviors.
+Continue with Sect. 5.3.9.2 backward rollback scanning, next selecting only the requested transaction before adding the
+matching START stopping rule and update undo.
 
 ## Sources
 
