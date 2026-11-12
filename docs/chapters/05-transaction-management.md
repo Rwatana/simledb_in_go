@@ -965,10 +965,28 @@ Exclusive removal and independent block state were tested first. The initial tes
 This completes the state-removal cases in Java `LockTable.unlock`. Notification remains separate so its observable
 wakeup behavior can be tested independently.
 
+## Feature 43: Reject shared acquisition while exclusive
+
+`LockShared` checks for the negative exclusive sentinel while holding the table mutex. It returns `ErrLockConflict`
+without changing the exclusive state or any other block. Waiting and timeout remain outside this non-waiting conflict
+path.
+
+### Test-first record
+
+Shared acquisition against an exclusive holder and state preservation were tested first. The initial test failed
+because `LockShared` incremented `-1` and returned success.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableRejectsSharedAcquisitionWhileExclusiveLockExists` | An exclusive holder rejects a shared request without changing lock state |
+
+The negative-state predicate maps to Java `LockTable.hasXlock`. The sentinel result gives the later waiting wrapper a
+precise contention signal.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by notifying blocked lock requests after final release, then separately add
-conflict waiting, timeout, and transaction-local lock tracking.
+Continue with Chapter 5 concurrency control by waiting for an exclusive holder to release before granting a shared
+lock, then add release notification, timeout, exclusive waiting, and transaction-local lock tracking separately.
 
 ## Sources
 
