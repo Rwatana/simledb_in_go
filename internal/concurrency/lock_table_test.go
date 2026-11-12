@@ -130,3 +130,27 @@ func TestLockTableRejectsExclusiveUpgradeWithCompetingSharedHolder(t *testing.T)
 		t.Fatalf("other shared holders = %d, want 1", got)
 	}
 }
+
+func TestLockTableReleasesOneOfMultipleSharedHolders(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	other := storage.NewBlockID("tbl", 2)
+
+	for range 3 {
+		if err := table.LockShared(block); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := table.LockShared(other); err != nil {
+		t.Fatal(err)
+	}
+
+	table.Unlock(block)
+
+	if got := table.locks[block]; got != 2 {
+		t.Fatalf("shared holders after unlock = %d, want 2", got)
+	}
+	if got := table.locks[other]; got != 1 {
+		t.Fatalf("other shared holders = %d, want 1", got)
+	}
+}
