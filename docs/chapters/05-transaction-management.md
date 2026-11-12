@@ -395,9 +395,28 @@ Exact bytes/LSN, encoding cutoff, and contextual append failure were tested firs
 | `TestAppendSetStringRecordDoesNotAppendAfterEncodingFailure` | Invalid block width prevents I/O |
 | `TestAppendSetStringRecordReturnsAppendFailureWithContext` | Wrapped transaction/block context and no retry |
 
+## Feature 14: Decode records by operation
+
+The [editable Draw.io](../diagrams/ch05-record-dispatch.drawio) and [SVG](../diagrams/ch05-record-dispatch.svg) show the
+single common dispatch point. `DecodeRecord` reads the four-byte operation prefix, selects one of the six strict decoders,
+and returns the minimal `Record` interface exposing `Operation`.
+
+Short prefixes and unknown operations fail before dispatch. Once selected, each existing decoder retains authority over
+its exact layout, so its boundary and corruption errors pass through unchanged.
+
+### Test-first record
+
+All six dispatch paths, short prefix, unknown operation, and selected-decoder error propagation were tested first. The
+initial build failed because `DecodeRecord` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestDecodeRecordDispatchesEveryOperation` | Each operation returns its concrete typed record |
+| `TestDecodeRecordRejectsShortAndUnknownOperation` | Prefix/operation errors and strict decoder errors remain explicit |
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 with generic operation-based record decoding as a separate issue and stacked PR.
+Continue Sect. 5.3.9.2 with backward rollback scanning as separate observable behaviors.
 
 ## Sources
 
