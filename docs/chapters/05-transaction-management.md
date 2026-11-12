@@ -379,9 +379,25 @@ failed because the SETSTRING operation, encoder, and decoder did not exist.
 | `TestEncodeSetStringRecordRejectsBlockOutsideInt32` | Block number cannot truncate |
 | `TestDecodeSetStringRecordRejectsInvalidEncoding` | Both lengths and exact boundary are strict |
 
+## Feature 13: Append a SETSTRING record
+
+`AppendSetStringRecord` encodes before I/O, appends exactly once, and returns the LSN unchanged. Encoding failure prevents
+append; append failure carries transaction/block context, preserves the cause, and is not retried.
+
+### Test-first record
+
+Exact bytes/LSN, encoding cutoff, and contextual append failure were tested first. The initial build failed because
+`AppendSetStringRecord` was undefined.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestAppendSetStringRecordAppendsExactEncodingAndReturnsLSN` | One exact append and unchanged LSN |
+| `TestAppendSetStringRecordDoesNotAppendAfterEncodingFailure` | Invalid block width prevents I/O |
+| `TestAppendSetStringRecordReturnsAppendFailureWithContext` | Wrapped transaction/block context and no retry |
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 by appending a SETSTRING record as a separate issue and stacked PR.
+Continue Sect. 5.3.9.1 with generic operation-based record decoding as a separate issue and stacked PR.
 
 ## Sources
 
