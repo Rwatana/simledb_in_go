@@ -661,10 +661,28 @@ initial build failed because `RollbackTransaction` did not exist.
 This completes Java `RecoveryMgr.rollback`'s recovery/durability responsibility. Lock release and buffer unpin ownership
 belong to the later public transaction layer.
 
+## Feature 27: Track finished restart transactions
+
+`FinishedTransactions` is a zero-value-ready set updated only by COMMIT and ROLLBACK records. START, update records, and
+CHECKPOINT do not change it. Repeated completion markers are idempotent, and unseen transactions remain unfinished.
+
+### Test-first record
+
+Both completion kinds, duplicate observation, all non-completion kinds, and unseen lookup were tested first. The initial
+build failed because `FinishedTransactions` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestFinishedTransactionsTracksCommitAndRollbackIdempotently` | Both terminal markers finish their transaction once |
+| `TestFinishedTransactionsIgnoresNonCompletionRecords` | START, updates, and CHECKPOINT do not finish transactions |
+| `TestFinishedTransactionsReportsUnseenTransactionUnfinished` | Missing completion history stays eligible for undo |
+
+This maps to Java `RecoveryMgr.doRecover`'s `finishedTxs` collection without exposing its mutable representation.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.3 restart recovery, beginning with newest-to-oldest finished-transaction tracking before adding
-unfinished update undo and checkpoint termination as separate behaviors.
+Continue with Sect. 5.3.9.3 restart recovery by selecting updates whose transaction is not finished, then add CHECKPOINT
+termination and undo dispatch as separate behaviors.
 
 ## Sources
 
