@@ -6,14 +6,14 @@ import (
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
-// IntegerUpdateView exposes the assigned page needed to log an integer update.
-type IntegerUpdateView interface {
+// UpdateView exposes the assigned page needed to log an update.
+type UpdateView interface {
 	Block() (storage.BlockID, bool)
 	Contents() *storage.Page
 }
 
 // LogPreviousInteger appends the current integer as undo information before update.
-func LogPreviousInteger(appender LogAppender, transaction TransactionID, view IntegerUpdateView, offset int32) (logmanager.LSN, error) {
+func LogPreviousInteger(appender LogAppender, transaction TransactionID, view UpdateView, offset int32) (logmanager.LSN, error) {
 	block, assigned := view.Block()
 	if !assigned {
 		return 0, fmt.Errorf("log previous integer for transaction %d: buffer is not assigned", transaction)
