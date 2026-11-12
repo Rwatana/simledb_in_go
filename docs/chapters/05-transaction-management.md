@@ -578,10 +578,31 @@ failed because `UndoRollbackRecords` did not exist.
 This maps to `rec.undo(tx)` in Java `RecoveryMgr.doRollback`, while iterator construction and rollback durability remain
 outside this behavior.
 
+## Feature 23: Compose transaction history rollback
+
+`RollbackTransactionHistory` creates one newest-to-oldest encoded iterator, bounds it with `RollbackRecordIterator`, and
+passes that decoded stream to `UndoRollbackRecords`. This is the complete internal history-restoration phase: iterator
+creation, transaction selection, START termination, and reverse update undo. It deliberately performs no buffer flush or
+ROLLBACK marker I/O.
+
+### Test-first record
+
+End-to-end mixed-transaction history, iterator creation failure, and undo failure propagation were tested first. The
+initial build failed because `RollbackTransactionHistory` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRollbackTransactionHistoryCreatesBoundedIteratorAndUndoesUpdates` | One iterator restores only the target history to START |
+| `TestRollbackTransactionHistoryStopsAfterIteratorCreationFailure` | Iterator failure prevents every undo operation |
+| `TestRollbackTransactionHistoryReturnsBoundedUndoFailure` | Restore failure retains transaction and underlying context |
+
+This composes Java `RecoveryMgr.doRollback` without reproducing its class structure. Public rollback durability remains
+the next set of behaviors.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.2 by composing log iterator creation with bounded undo, then add rollback buffer flush, marker
-append, and marker LSN flush as separate behaviors.
+Continue with Sect. 5.3.9.2 public rollback orchestration, adding buffer flush, ROLLBACK append, and marker LSN flush as
+separate behaviors.
 
 ## Sources
 
