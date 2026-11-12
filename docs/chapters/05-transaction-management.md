@@ -339,9 +339,28 @@ Java `SetIntRecord` uses `Page` offsets to write the same six values. Go owns th
 big-endian primitives and returns errors for format violations; append, old-value capture from Buffer, and undo remain
 separate observable behaviors.
 
+## Feature 11: Append a SETINT record
+
+`AppendSetIntRecord` encodes first, then performs exactly one append and returns its LSN unchanged. Encoding failure makes
+no I/O call. Append failure includes transaction and block context, preserves the cause, and is not retried.
+
+### Test-first record
+
+Exact append bytes/LSN, encoding cutoff, and append failure were tested first. The initial build failed because
+`AppendSetIntRecord` was undefined.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestAppendSetIntRecordAppendsExactEncodingAndReturnsLSN` | One exact append and unchanged LSN |
+| `TestAppendSetIntRecordDoesNotAppendAfterEncodingFailure` | Invalid block width prevents I/O |
+| `TestAppendSetIntRecordReturnsAppendFailureWithContext` | Transaction/block context, wrapped cause, no retry |
+
+Java `SetIntRecord.writeToLog` calculates the layout and appends in one method. Go composes the separately tested codec
+with the existing append port while keeping old-value capture and undo out of this boundary.
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 by appending a SETINT record as a separate issue and stacked PR.
+Continue Sect. 5.3.9.1 with the SETSTRING update record codec as a separate issue and stacked PR.
 
 ## Sources
 
