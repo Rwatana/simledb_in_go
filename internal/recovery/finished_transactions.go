@@ -28,3 +28,18 @@ func (f *FinishedTransactions) Contains(transaction TransactionID) bool {
 	_, exists := f.transactions[transaction]
 	return exists
 }
+
+// ShouldUndo observes record and reports whether it is an unfinished update.
+func (f *FinishedTransactions) ShouldUndo(record Record) bool {
+	f.Observe(record)
+	var transaction TransactionID
+	switch update := record.(type) {
+	case SetIntRecord:
+		transaction = update.TransactionID()
+	case SetStringRecord:
+		transaction = update.TransactionID()
+	default:
+		return false
+	}
+	return !f.Contains(transaction)
+}

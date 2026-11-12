@@ -679,10 +679,29 @@ build failed because `FinishedTransactions` did not exist.
 
 This maps to Java `RecoveryMgr.doRecover`'s `finishedTxs` collection without exposing its mutable representation.
 
+## Feature 28: Select unfinished restart updates
+
+`FinishedTransactions.ShouldUndo` observes each record in newest-to-oldest scan order, records COMMIT/ROLLBACK completion,
+and selects only SETINT or SETSTRING from transactions not yet finished. Thus a terminal marker suppresses every older
+update for that transaction, while updates from unfinished transactions remain candidates. START, CHECKPOINT, and nil are
+never selected.
+
+### Test-first record
+
+Interleaved completion markers, older finished updates, both unfinished update types, boundaries, and nil were tested
+first. The initial build failed because `FinishedTransactions.ShouldUndo` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestFinishedTransactionsSelectsOnlyUnfinishedUpdatesInScanOrder` | Scan order filters completed histories and selects unfinished updates |
+
+This maps to the completion-marker and `!finishedTxs.contains(rec.txNumber())` branches in Java
+`RecoveryMgr.doRecover`, without adding iteration or undo yet.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.3 restart recovery by selecting updates whose transaction is not finished, then add CHECKPOINT
-termination and undo dispatch as separate behaviors.
+Continue with Sect. 5.3.9.3 restart recovery by stopping the reverse scan at CHECKPOINT, then add unfinished-update undo
+dispatch as a separate behavior.
 
 ## Sources
 
