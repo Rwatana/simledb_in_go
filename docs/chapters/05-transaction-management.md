@@ -414,9 +414,31 @@ initial build failed because `DecodeRecord` did not exist.
 | `TestDecodeRecordDispatchesEveryOperation` | Each operation returns its concrete typed record |
 | `TestDecodeRecordRejectsShortAndUnknownOperation` | Prefix/operation errors and strict decoder errors remain explicit |
 
+## Feature 15: Log the previous integer before update
+
+`LogPreviousInteger` consumes a minimal `IntegerUpdateView`: assigned block plus Page contents. It reads the current int32
+at the requested offset and composes the existing SETINT append behavior before any caller mutation occurs. Missing block,
+nil contents, or page range error prevents append.
+
+### Test-first record
+
+Old-value capture, missing assignment, range failure, and concrete Buffer conformance were tested first. The initial build
+failed because `IntegerUpdateView` and `LogPreviousInteger` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLogPreviousIntegerAppendsValueBeforeUpdate` | Captures block/offset/old value and returns append LSN |
+| `TestLogPreviousIntegerRejectsMissingAssignmentBeforeAppend` | Unassigned Buffer causes no log write |
+| `TestLogPreviousIntegerRejectsPageReadFailureBeforeAppend` | Invalid page range causes no log write |
+| `TestBufferSatisfiesIntegerUpdateView` | Existing Buffer directly satisfies the consumer port |
+
+This maps to Java `RecoveryMgr.setInt`'s old-value read and `SetIntRecord.writeToLog` call only. Applying the new value and
+marking the buffer dirty remain transaction-layer behavior.
+
 ## Next behavior
 
-Continue Sect. 5.3.9.2 with backward rollback scanning as separate observable behaviors.
+Continue with `RecoveryMgr.setString` old-value capture, then Sect. 5.3.9.2 backward rollback scanning as separate
+observable behaviors.
 
 ## Sources
 
