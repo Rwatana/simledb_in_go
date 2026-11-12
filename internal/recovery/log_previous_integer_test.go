@@ -63,6 +63,6 @@ func TestLogPreviousIntegerRejectsPageReadFailureBeforeAppend(t *testing.T) {
 	}
 }
 
-func TestBufferSatisfiesIntegerUpdateView(t *testing.T) {
-	var _ IntegerUpdateView = (*buffer.Buffer)(nil)
+func TestBufferSatisfiesUpdateView(t *testing.T) {
+	var _ UpdateView = (*buffer.Buffer)(nil)
 }

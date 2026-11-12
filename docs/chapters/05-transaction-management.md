@@ -416,29 +416,50 @@ initial build failed because `DecodeRecord` did not exist.
 
 ## Feature 15: Log the previous integer before update
 
-`LogPreviousInteger` consumes a minimal `IntegerUpdateView`: assigned block plus Page contents. It reads the current int32
+`LogPreviousInteger` consumes a minimal `UpdateView`: assigned block plus Page contents. It reads the current int32
 at the requested offset and composes the existing SETINT append behavior before any caller mutation occurs. Missing block,
 nil contents, or page range error prevents append.
 
 ### Test-first record
 
 Old-value capture, missing assignment, range failure, and concrete Buffer conformance were tested first. The initial build
-failed because `IntegerUpdateView` and `LogPreviousInteger` did not exist.
+failed because `UpdateView` and `LogPreviousInteger` did not exist.
 
 | Test | Observable behavior |
 | --- | --- |
 | `TestLogPreviousIntegerAppendsValueBeforeUpdate` | Captures block/offset/old value and returns append LSN |
 | `TestLogPreviousIntegerRejectsMissingAssignmentBeforeAppend` | Unassigned Buffer causes no log write |
 | `TestLogPreviousIntegerRejectsPageReadFailureBeforeAppend` | Invalid page range causes no log write |
-| `TestBufferSatisfiesIntegerUpdateView` | Existing Buffer directly satisfies the consumer port |
+| `TestBufferSatisfiesUpdateView` | Existing Buffer directly satisfies the consumer port |
 
 This maps to Java `RecoveryMgr.setInt`'s old-value read and `SetIntRecord.writeToLog` call only. Applying the new value and
 marking the buffer dirty remain transaction-layer behavior.
 
+## Feature 16: Log the previous string before update
+
+`LogPreviousString` reuses `UpdateView`, reads the Page's length-prefixed bytes at the requested offset, converts those
+bytes to their string value, and composes the existing SETSTRING append behavior. Missing assignment, nil contents, or an
+invalid byte region fails before append, so the log cannot describe a value that was not actually observed.
+
+### Test-first record
+
+UTF-8 old-value capture, missing assignment, range failure, and shared Buffer conformance were tested first. The initial
+build failed because `UpdateView` and `LogPreviousString` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLogPreviousStringAppendsValueBeforeUpdate` | Captures block/offset/UTF-8 old value and returns append LSN |
+| `TestLogPreviousStringRejectsMissingAssignmentBeforeAppend` | Unassigned Buffer causes no log write |
+| `TestLogPreviousStringRejectsPageReadFailureBeforeAppend` | Invalid length-prefixed region causes no log write |
+| `TestBufferSatisfiesUpdateView` | Integer and string logging share the same minimal Buffer port |
+
+This maps to Java `RecoveryMgr.setString`'s old-value read and `SetStringRecord.writeToLog` call only. Applying the new
+value, dirty metadata, and undo remain outside this behavior.
+
 ## Next behavior
 
-Continue with `RecoveryMgr.setString` old-value capture, then Sect. 5.3.9.2 backward rollback scanning as separate
-observable behaviors.
+Continue with SETINT undo, then SETSTRING undo and Sect. 5.3.9.2 backward rollback scanning as separate observable
+behaviors.
 
 ## Sources
 
