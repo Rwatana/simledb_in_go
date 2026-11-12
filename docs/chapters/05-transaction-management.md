@@ -290,9 +290,31 @@ Exact bytes, unchanged LSN, and the no-retry failure path were tested first. The
 Java `RollbackRecord.writeToLog` combines encoding and append. Go reuses the separately tested codec and the private
 one-call append helper, keeping rollback scanning and durability out of this behavior.
 
+## Feature 9: Flush the appended ROLLBACK LSN
+
+`AppendAndFlushRollbackRecord` appends first, then flushes exactly the returned LSN. Append failure prevents flush; flush
+failure carries transaction and LSN context and is not retried. Success returns the same now-durable LSN.
+
+The private append-and-flush sequence is shared with COMMIT, while each operation supplies its own append behavior and
+error name. This preserves distinct public recovery meanings without duplicating the durability cut points.
+
+### Test-first record
+
+Success, append failure, and flush failure were fixed before implementation. The initial build failed because
+`AppendAndFlushRollbackRecord` was undefined.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestAppendAndFlushRollbackRecordFlushesReturnedLSN` | Flush and return exactly the appended LSN |
+| `TestAppendAndFlushRollbackRecordDoesNotFlushAfterAppendFailure` | Append failure cuts off flush |
+| `TestAppendAndFlushRollbackRecordReturnsFlushFailureWithContext` | Flush failure has transaction/LSN context and no retry |
+
+Java `RecoveryMgr.rollback` flushes the rollback marker after undo and buffer flush. This feature implements only the final
+log durability primitive; undo and buffer coordination remain later transaction behavior.
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 by flushing an appended ROLLBACK LSN as a separate issue and stacked PR.
+Continue Sect. 5.3.9.1 with the SETINT update record codec as a separate issue and stacked PR.
 
 ## Sources
 
