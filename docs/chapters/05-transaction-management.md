@@ -948,10 +948,27 @@ count-one entry unchanged.
 This implements the shared-lock case of Java `LockTable.unlock`'s removal branch. Java's accompanying `notifyAll` and
 the exclusive-lock case remain later behaviors.
 
+## Feature 42: Remove an exclusive block lock
+
+`Unlock` removes a block whose state is the exclusive sentinel `-1`. The removal is serialized by the table mutex,
+preserves other blocks, and deliberately performs no waiter notification.
+
+### Test-first record
+
+Exclusive removal and independent block state were tested first. The initial test failed because `Unlock` retained the
+`-1` entry.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableRemovesExclusiveLock` | Releasing an exclusive lock removes only that block's entry |
+
+This completes the state-removal cases in Java `LockTable.unlock`. Notification remains separate so its observable
+wakeup behavior can be tested independently.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by removing an exclusive block lock without notification, then separately
-add waiter notification, conflict waiting, timeout, and transaction-local lock tracking.
+Continue with Chapter 5 concurrency control by notifying blocked lock requests after final release, then separately add
+conflict waiting, timeout, and transaction-local lock tracking.
 
 ## Sources
 
