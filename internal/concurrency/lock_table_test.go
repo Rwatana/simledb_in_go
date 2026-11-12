@@ -154,3 +154,25 @@ func TestLockTableReleasesOneOfMultipleSharedHolders(t *testing.T) {
 		t.Fatalf("other shared holders = %d, want 1", got)
 	}
 }
+
+func TestLockTableRemovesFinalSharedLock(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	other := storage.NewBlockID("tbl", 2)
+
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(other); err != nil {
+		t.Fatal(err)
+	}
+
+	table.Unlock(block)
+
+	if _, exists := table.locks[block]; exists {
+		t.Fatalf("final shared lock remains in table: %v", table.locks)
+	}
+	if got := table.locks[other]; got != 1 {
+		t.Fatalf("other shared holders = %d, want 1", got)
+	}
+}

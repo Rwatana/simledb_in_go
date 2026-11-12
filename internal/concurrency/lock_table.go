@@ -46,5 +46,7 @@ func (t *LockTable) Unlock(block storage.BlockID) {
 	defer t.mu.Unlock()
 	if t.locks[block] > 1 {
 		t.locks[block]--
+	} else if t.locks[block] == 1 {
+		delete(t.locks, block)
 	}
 }
