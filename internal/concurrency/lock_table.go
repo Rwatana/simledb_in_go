@@ -39,3 +39,12 @@ func (t *LockTable) LockExclusive(block storage.BlockID) error {
 	t.locks[block] = -1
 	return nil
 }
+
+// Unlock releases one of multiple shared holders on block.
+func (t *LockTable) Unlock(block storage.BlockID) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.locks[block] > 1 {
+		t.locks[block]--
+	}
+}
