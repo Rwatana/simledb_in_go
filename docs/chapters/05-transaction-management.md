@@ -719,10 +719,31 @@ first. The initial build failed because `NewRestartRecordIterator` did not exist
 This maps to the CHECKPOINT return and iterator exhaustion in Java `RecoveryMgr.doRecover`. Completion filtering and undo
 remain consumers of this bounded stream.
 
+## Feature 30: Undo unfinished restart updates
+
+`UndoRestartRecords` consumes decoded records from the checkpoint-bounded source, maintains `FinishedTransactions`, and
+invokes SETINT or SETSTRING undo only for unfinished transactions. The source's newest-to-oldest order is preserved;
+COMMIT/ROLLBACK suppress older updates, while START and completed updates cause no mutation. Source or undo failure stops
+before processing an older record.
+
+### Test-first record
+
+Interleaved finished/unfinished histories, both update types, source failure, and first-undo failure cutoff were tested
+first. The initial build failed because `UndoRestartRecords` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestUndoRestartRecordsRestoresOnlyUnfinishedUpdatesInSourceOrder` | Restore only unfinished SETSTRING/SETINT in reverse-log order |
+| `TestUndoRestartRecordsReturnsSourceFailure` | Checkpoint-bounded traversal failure stops restart recovery |
+| `TestUndoRestartRecordsStopsAfterUnfinishedUndoFailure` | Failed newest undo prevents older mutations |
+
+This maps to the completion tracking and `rec.undo(tx)` branch in Java `RecoveryMgr.doRecover`. Iterator construction and
+post-undo durability remain separate.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.3 restart recovery by applying finished-transaction filtering and undo dispatch to this bounded
-stream, then add recovery buffer flush and checkpoint durability as separate behaviors.
+Continue with Sect. 5.3.9.3 restart recovery by composing encoded iterator creation with bounded undo, then add recovery
+buffer flush, CHECKPOINT append, and checkpoint LSN flush as separate behaviors.
 
 ## Sources
 
