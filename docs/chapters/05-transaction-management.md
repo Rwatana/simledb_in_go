@@ -516,10 +516,30 @@ All transaction record kinds, CHECKPOINT, and nil were tested first. The initial
 This supplies Java `LogRecord.txNumber`'s selection role without assigning a sentinel transaction to CHECKPOINT. It does
 not iterate, filter, stop, or undo records yet.
 
+## Feature 20: Select one transaction's records
+
+`NextTransactionRecord` consumes the minimal `EncodedRecordIterator`, decodes newest-to-oldest candidates, and returns
+only the next record whose owner matches the requested transaction. CHECKPOINT and other transactions are skipped;
+iterator exhaustion remains an explicit no-record result. Iterator and decoding failures stop selection with transaction
+context.
+
+### Test-first record
+
+Mixed ownership, CHECKPOINT, repeated calls through exhaustion, and both failure sources were tested first. The initial
+build failed because `NextTransactionRecord` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNextTransactionRecordSkipsUnownedAndOtherTransactions` | Preserve reverse order while filtering one transaction |
+| `TestNextTransactionRecordReturnsIteratorFailure` | Storage traversal failure stops selection with context |
+| `TestNextTransactionRecordReturnsDecodeFailure` | Malformed candidate is not silently skipped |
+
+This maps to the `rec.txNumber() == txnum` predicate in Java `RecoveryMgr.doRollback`. Matching START termination and
+undo dispatch remain separate behaviors.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.2 backward rollback scanning, next selecting only the requested transaction before adding the
-matching START stopping rule and update undo.
+Continue with Sect. 5.3.9.2 by adding matching START termination, then update undo dispatch as separate behaviors.
 
 ## Sources
 
