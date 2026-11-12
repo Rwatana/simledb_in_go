@@ -797,10 +797,31 @@ Exact bytes/LSN and contextual append failure were tested first. The initial bui
 
 This maps to Java `CheckpointRecord.writeToLog`; restart-recovery ordering and durability remain separate.
 
+## Feature 34: Append CHECKPOINT after restart flush
+
+`RecoverRestartAndAppend` completes restart history undo and recovered-buffer persistence before composing
+`AppendCheckpointRecord`. It appends exactly one checkpoint and returns its LSN unchanged. History or buffer-flush failure
+prevents append; append failure retains checkpoint context. The checkpoint LSN is not flushed here.
+
+### Test-first record
+
+Successful phase order/LSN, history cutoff, buffer-flush cutoff, and checkpoint append failure were tested first. The
+initial build failed because `RecoverRestartAndAppend` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecoverRestartAndAppendWritesCheckpointAfterBufferFlush` | Append once after restored pages persist and return LSN |
+| `TestRecoverRestartAndAppendDoesNotAppendAfterHistoryFailure` | Incomplete recovery cannot establish a new boundary |
+| `TestRecoverRestartAndAppendDoesNotAppendAfterBufferFlushFailure` | Unpersisted recovery cannot establish a new boundary |
+| `TestRecoverRestartAndAppendReturnsCheckpointFailure` | Checkpoint write failure remains explicit |
+
+This maps to `CheckpointRecord.writeToLog` after `bm.flushAll(txnum)` in Java `RecoveryMgr.recover`. Checkpoint durability
+is the next behavior.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.3 restart recovery by composing CHECKPOINT append after recovered-buffer flush, then flush its
-LSN as a separate behavior.
+Continue with Sect. 5.3.9.3 by flushing the returned CHECKPOINT LSN as a separate behavior, then proceed to transaction
+concurrency control in book order.
 
 ## Sources
 
