@@ -4,9 +4,32 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
+
+func startLockTableWaiter(table *LockTable) (<-chan struct{}, <-chan struct{}) {
+	ready := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		table.mu.Lock()
+		close(ready)
+		table.waitForChangeLocked()
+		table.mu.Unlock()
+		close(done)
+	}()
+	return ready, done
+}
+
+func requireLockWaiterWake(t *testing.T, done <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("lock waiter was not notified")
+	}
+}
 
 func TestZeroValueLockTableAcquiresFirstSharedLock(t *testing.T) {
 	var table LockTable
@@ -227,4 +250,58 @@ func TestLockTableRejectsSharedAcquisitionWhileExclusiveLockExists(t *testing.T)
 	if got := table.locks[other]; got != 1 {
 		t.Fatalf("other shared holders = %d, want 1", got)
 	}
+}
+
+func TestLockTableNotifiesWaitersAfterFinalRelease(t *testing.T) {
+	t.Run("shared", func(t *testing.T) {
+		var table LockTable
+		block := storage.NewBlockID("tbl", 1)
+		if err := table.LockShared(block); err != nil {
+			t.Fatal(err)
+		}
+
+		ready, done := startLockTableWaiter(&table)
+		<-ready
+		table.Unlock(block)
+		requireLockWaiterWake(t, done)
+	})
+
+	t.Run("exclusive", func(t *testing.T) {
+		var table LockTable
+		block := storage.NewBlockID("tbl", 1)
+		if err := table.LockShared(block); err != nil {
+			t.Fatal(err)
+		}
+		if err := table.LockExclusive(block); err != nil {
+			t.Fatal(err)
+		}
+
+		ready, done := startLockTableWaiter(&table)
+		<-ready
+		table.Unlock(block)
+		requireLockWaiterWake(t, done)
+	})
+}
+
+func TestLockTableDoesNotNotifyWaitersAfterPartialSharedRelease(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+
+	ready, done := startLockTableWaiter(&table)
+	<-ready
+	table.Unlock(block)
+	select {
+	case <-done:
+		t.Fatal("partial shared release notified lock waiter")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	table.Unlock(block)
+	requireLockWaiterWake(t, done)
 }
