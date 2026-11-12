@@ -698,10 +698,31 @@ first. The initial build failed because `FinishedTransactions.ShouldUndo` did no
 This maps to the completion-marker and `!finishedTxs.contains(rec.txNumber())` branches in Java
 `RecoveryMgr.doRecover`, without adding iteration or undo yet.
 
+## Feature 29: Stop restart scan at CHECKPOINT
+
+`RestartRecordIterator` decodes the newest-to-oldest source and yields records until the first quiescent CHECKPOINT. It
+consumes but does not expose that boundary, then remains exhausted without reading older history. Reaching the physical
+beginning of the log without a checkpoint is also successful exhaustion. Iterator and decoder failures retain restart
+context.
+
+### Test-first record
+
+Permanent checkpoint stopping, older-history protection, end-of-log exhaustion, and both failure sources were tested
+first. The initial build failed because `NewRestartRecordIterator` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRestartRecordIteratorStopsPermanentlyAtCheckpoint` | CHECKPOINT protects all older history from restart undo |
+| `TestRestartRecordIteratorAllowsEndOfLogBeforeCheckpoint` | A database without an earlier checkpoint can scan to origin |
+| `TestRestartRecordIteratorReturnsIteratorAndDecodeFailures` | Traversal and corruption failures remain explicit |
+
+This maps to the CHECKPOINT return and iterator exhaustion in Java `RecoveryMgr.doRecover`. Completion filtering and undo
+remain consumers of this bounded stream.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.3 restart recovery by stopping the reverse scan at CHECKPOINT, then add unfinished-update undo
-dispatch as a separate behavior.
+Continue with Sect. 5.3.9.3 restart recovery by applying finished-transaction filtering and undo dispatch to this bounded
+stream, then add recovery buffer flush and checkpoint durability as separate behaviors.
 
 ## Sources
 
