@@ -312,9 +312,36 @@ Success, append failure, and flush failure were fixed before implementation. The
 Java `RecoveryMgr.rollback` flushes the rollback marker after undo and buffer flush. This feature implements only the final
 log durability primitive; undo and buffer coordination remain later transaction behavior.
 
+## Feature 10: SETINT update record codec
+
+The [editable Draw.io diagram](../diagrams/ch05-setint-record.drawio) and
+[rendered SVG](../diagrams/ch05-setint-record.svg) show the variable-length undo record. SETINT stores operation `4`, the
+transaction, a byte-length-prefixed filename, block number, page offset, and the integer value that existed before update.
+Its exact size is `24 + len(filename bytes)`.
+
+`EncodeSetIntRecord` rejects a block number that cannot fit the four-byte durable format. `DecodeSetIntRecord` checks the
+operation, signed filename length, complete filename/fixed suffix, and exact final boundary, so truncated or concatenated
+records are not accepted accidentally. UTF-8 filenames and signed int32 field bit patterns round-trip unchanged.
+
+### Test-first record
+
+Exact bytes, UTF-8 and signed fields, block overflow, and malformed record boundaries were tested first. The initial build
+failed because the SETINT operation, encoder, and decoder did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSetIntRecordRoundTrip` | Exact complete layout and decoded fields |
+| `TestSetIntRecordRoundTripsUTF8FilenameAndSignedFields` | Filename bytes and signed values survive round-trip |
+| `TestEncodeSetIntRecordRejectsBlockOutsideInt32` | Host-width block cannot silently truncate on disk |
+| `TestDecodeSetIntRecordRejectsInvalidEncoding` | Wrong op, length corruption, truncation, and trailing bytes fail |
+
+Java `SetIntRecord` uses `Page` offsets to write the same six values. Go owns the recovery wire layout directly with
+big-endian primitives and returns errors for format violations; append, old-value capture from Buffer, and undo remain
+separate observable behaviors.
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 with the SETINT update record codec as a separate issue and stacked PR.
+Continue Sect. 5.3.9.1 by appending a SETINT record as a separate issue and stacked PR.
 
 ## Sources
 
