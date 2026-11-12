@@ -537,9 +537,30 @@ build failed because `NextTransactionRecord` did not exist.
 This maps to the `rec.txNumber() == txnum` predicate in Java `RecoveryMgr.doRollback`. Matching START termination and
 undo dispatch remain separate behaviors.
 
+## Feature 21: Stop rollback traversal at START
+
+`RollbackRecordIterator` wraps transaction selection with the history boundary required by rollback. It yields matching
+records in reverse-log order, consumes but does not expose the matching START, and then remains exhausted without reading
+older history. Reaching the beginning of the log before START is a corruption/incomplete-history error rather than a
+successful rollback.
+
+### Test-first record
+
+Permanent stopping, protection of older history, missing START, and selection failure were tested first. The initial
+build failed because `NewRollbackRecordIterator` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRollbackRecordIteratorStopsPermanentlyAtMatchingStart` | START terminates this transaction without reading older records |
+| `TestRollbackRecordIteratorRejectsExhaustionBeforeStart` | Missing history boundary is explicit failure |
+| `TestRollbackRecordIteratorReturnsSelectionFailure` | Iterator/decode failures keep rollback context |
+
+This maps to the START branch and return in Java `RecoveryMgr.doRollback`. The iterator still does not invoke undo.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.2 by adding matching START termination, then update undo dispatch as separate behaviors.
+Continue with Sect. 5.3.9.2 by dispatching SETINT and SETSTRING undo over this bounded stream, then add rollback flush and
+marker durability as separate behaviors.
 
 ## Sources
 
