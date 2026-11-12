@@ -14,12 +14,16 @@ type DurableLog interface {
 
 // AppendAndFlushCommitRecord appends a COMMIT record and makes its LSN durable.
 func AppendAndFlushCommitRecord(logs DurableLog, transaction TransactionID) (logmanager.LSN, error) {
-	lsn, err := AppendCommitRecord(logs, transaction)
+	return appendAndFlushTransactionRecord(logs, transaction, "commit", AppendCommitRecord)
+}
+
+func appendAndFlushTransactionRecord(logs DurableLog, transaction TransactionID, name string, appendRecord func(LogAppender, TransactionID) (logmanager.LSN, error)) (logmanager.LSN, error) {
+	lsn, err := appendRecord(logs, transaction)
 	if err != nil {
 		return 0, err
 	}
 	if err := logs.Flush(lsn); err != nil {
-		return 0, fmt.Errorf("flush commit record for transaction %d through LSN %d: %w", transaction, lsn, err)
+		return 0, fmt.Errorf("flush %s record for transaction %d through LSN %d: %w", name, transaction, lsn, err)
 	}
 	return lsn, nil
 }
