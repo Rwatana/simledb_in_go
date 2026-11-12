@@ -477,9 +477,29 @@ because `SetIntRecord.Undo` did not exist.
 This maps to Java `SetIntRecord.undo`. Go makes failure and cleanup explicit while retaining the book's rule that undo
 must not generate another SETINT record.
 
+## Feature 18: Undo a SETSTRING record
+
+`SetStringRecord.Undo` follows the same recovery boundary through a string-specific `StringUndoTarget`: pin the recorded
+block, restore the saved UTF-8 value with logging disabled, and release the pin after every restore attempt. Each failure
+keeps its cause and identifies the failed phase.
+
+### Test-first record
+
+The exact pin/restore/unpin sequence, UTF-8 value, no-log flag, and each failure boundary were tested first. The initial
+build failed because `SetStringRecord.Undo` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSetStringRecordUndoRestoresOldValueWithoutLogging` | Pin, restore UTF-8 with `false`, then unpin |
+| `TestSetStringRecordUndoStopsAfterPinFailure` | Failed pin prevents restore and unpin |
+| `TestSetStringRecordUndoUnpinsAfterRestoreFailure` | Failed restore still releases the pin |
+| `TestSetStringRecordUndoReturnsUnpinFailure` | Release failure remains visible to the caller |
+
+This maps to Java `SetStringRecord.undo` and deliberately remains a separate observable behavior from SETINT undo.
+
 ## Next behavior
 
-Continue with SETSTRING undo, then Sect. 5.3.9.2 backward rollback scanning as separate observable behaviors.
+Continue with Sect. 5.3.9.2 backward rollback scanning, split into record selection, stopping, and durability behaviors.
 
 ## Sources
 
