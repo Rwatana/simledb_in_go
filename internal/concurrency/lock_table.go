@@ -14,8 +14,9 @@ var ErrLockConflict = errors.New("lock conflict")
 // LockTable stores the shared lock state for database blocks.
 // Its zero value is ready for use.
 type LockTable struct {
-	mu    sync.Mutex
-	locks map[storage.BlockID]int
+	mu      sync.Mutex
+	locks   map[storage.BlockID]int
+	changed *sync.Cond
 }
 
 // LockShared acquires a compatible shared lock on block.
@@ -51,5 +52,15 @@ func (t *LockTable) Unlock(block storage.BlockID) {
 		t.locks[block]--
 	} else if t.locks[block] == 1 || t.locks[block] == -1 {
 		delete(t.locks, block)
+		if t.changed != nil {
+			t.changed.Broadcast()
+		}
 	}
+}
+
+func (t *LockTable) waitForChangeLocked() {
+	if t.changed == nil {
+		t.changed = sync.NewCond(&t.mu)
+	}
+	t.changed.Wait()
 }
