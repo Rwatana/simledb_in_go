@@ -839,10 +839,29 @@ initial build failed because `RecoverRestart` did not exist.
 This completes Java `RecoveryMgr.recover`'s recovery/durability responsibility. Lock release and buffer unpin belong to
 the later public transaction layer.
 
+## Feature 36: Acquire the first shared block lock
+
+The zero-value-ready `concurrency.LockTable` owns synchronized lock state keyed by `BlockID`. `LockShared` records one
+shared holder for an unlocked block, and distinct blocks remain independent. This first behavior has no conflict path;
+additional holders, exclusive state, release, and waiting remain separate.
+
+### Test-first record
+
+Zero-value first acquisition and independent block state were tested first. The initial build failed because `LockTable`
+did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestZeroValueLockTableAcquiresFirstSharedLock` | An unlocked block becomes shared by one holder |
+| `TestLockTableKeepsUncontendedBlocksIndependent` | Locks on different blocks do not share state |
+
+This maps to the non-waiting path of Java `LockTable.sLock`. Go uses a zero-value-ready synchronized table and postpones
+conflict policy until the corresponding observable behaviors require it.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control in book order, beginning with the lock table's uncontended shared-lock
-acquisition as its own observable behavior.
+Continue with Chapter 5 concurrency control by allowing an additional compatible shared holder, then add uncontended
+exclusive acquisition, upgrade, unlock, waiting, and timeout as separate behaviors.
 
 ## Sources
 
