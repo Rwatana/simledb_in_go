@@ -740,10 +740,30 @@ first. The initial build failed because `UndoRestartRecords` did not exist.
 This maps to the completion tracking and `rec.undo(tx)` branch in Java `RecoveryMgr.doRecover`. Iterator construction and
 post-undo durability remain separate.
 
+## Feature 31: Compose restart history recovery
+
+`RecoverRestartHistory` creates one newest-to-oldest encoded iterator, bounds it with `RestartRecordIterator`, and passes
+the decoded stream to `UndoRestartRecords`. This composes iterator creation, CHECKPOINT termination, completion tracking,
+and unfinished update undo without performing any post-recovery flush or checkpoint I/O.
+
+### Test-first record
+
+End-to-end mixed finished/unfinished history, protected pre-checkpoint history, iterator creation failure, and undo
+failure propagation were tested first. The initial build failed because `RecoverRestartHistory` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecoverRestartHistoryCreatesBoundedIteratorAndUndoesUnfinishedUpdates` | One iterator restores only unfinished post-checkpoint history |
+| `TestRecoverRestartHistoryStopsAfterIteratorCreationFailure` | Iterator failure prevents every undo operation |
+| `TestRecoverRestartHistoryReturnsUndoFailure` | Restore failure retains restart and underlying context |
+
+This composes Java `RecoveryMgr.doRecover` without reproducing its class structure. Buffer flush and checkpoint
+durability remain separate.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.3 restart recovery by composing encoded iterator creation with bounded undo, then add recovery
-buffer flush, CHECKPOINT append, and checkpoint LSN flush as separate behaviors.
+Continue with Sect. 5.3.9.3 restart recovery by flushing recovered buffers, then append CHECKPOINT and flush its LSN as
+separate behaviors.
 
 ## Sources
 
