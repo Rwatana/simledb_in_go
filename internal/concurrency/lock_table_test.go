@@ -305,3 +305,57 @@ func TestLockTableDoesNotNotifyWaitersAfterPartialSharedRelease(t *testing.T) {
 	table.Unlock(block)
 	requireLockWaiterWake(t, done)
 }
+
+func TestLockTableWaitsForExclusiveReleaseBeforeAcquiringShared(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- table.WaitShared(block)
+	}()
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		table.mu.Lock()
+		waiting := table.changed != nil
+		state := table.locks[block]
+		table.mu.Unlock()
+		if waiting {
+			if state != -1 {
+				t.Fatalf("state while waiting = %d, want -1", state)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("shared request did not begin waiting")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	select {
+	case err := <-done:
+		t.Fatalf("WaitShared() completed before release with error %v", err)
+	default:
+	}
+
+	table.Unlock(block)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("WaitShared() error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("shared request did not acquire after release")
+	}
+
+	if got := table.locks[block]; got != 1 {
+		t.Fatalf("shared holders after wait = %d, want 1", got)
+	}
+}

@@ -33,6 +33,20 @@ func (t *LockTable) LockShared(block storage.BlockID) error {
 	return nil
 }
 
+// WaitShared waits for an exclusive holder to release block, then acquires one shared hold.
+func (t *LockTable) WaitShared(block storage.BlockID) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for t.locks[block] < 0 {
+		t.waitForChangeLocked()
+	}
+	if t.locks == nil {
+		t.locks = make(map[storage.BlockID]int)
+	}
+	t.locks[block]++
+	return nil
+}
+
 // LockExclusive upgrades the sole shared holder on block to exclusive.
 func (t *LockTable) LockExclusive(block storage.BlockID) error {
 	t.mu.Lock()
