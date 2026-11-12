@@ -18,9 +18,10 @@ var ErrLockTimeout = errors.New("lock wait timed out")
 // LockTable stores the shared lock state for database blocks.
 // Its zero value is ready for use.
 type LockTable struct {
-	mu      sync.Mutex
-	locks   map[storage.BlockID]int
-	changed *sync.Cond
+	mu               sync.Mutex
+	locks            map[storage.BlockID]int
+	changed          *sync.Cond
+	exclusiveWaiters int
 }
 
 // LockShared acquires a compatible shared lock on block.
@@ -88,6 +89,19 @@ func (t *LockTable) WaitSharedFor(block storage.BlockID, timeout time.Duration) 
 	return nil
 }
 
+// WaitExclusive waits for competing shared holders to release block, then upgrades the caller's shared hold.
+func (t *LockTable) WaitExclusive(block storage.BlockID) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for t.locks[block] > 1 {
+		t.exclusiveWaiters++
+		t.waitForChangeLocked()
+		t.exclusiveWaiters--
+	}
+	t.locks[block] = -1
+	return nil
+}
+
 // LockExclusive upgrades the sole shared holder on block to exclusive.
 func (t *LockTable) LockExclusive(block storage.BlockID) error {
 	t.mu.Lock()
@@ -105,6 +119,9 @@ func (t *LockTable) Unlock(block storage.BlockID) {
 	defer t.mu.Unlock()
 	if t.locks[block] > 1 {
 		t.locks[block]--
+		if t.locks[block] == 1 && t.exclusiveWaiters > 0 && t.changed != nil {
+			t.changed.Broadcast()
+		}
 	} else if t.locks[block] == 1 || t.locks[block] == -1 {
 		delete(t.locks, block)
 		if t.changed != nil {

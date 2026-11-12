@@ -987,7 +987,8 @@ precise contention signal.
 
 `LockTable` lazily creates a condition variable bound to the same mutex that protects lock state. Removing a final
 shared or exclusive entry broadcasts after the state mutation, allowing every registered waiter to reacquire the mutex
-and recheck its predicate. Decrementing a shared count that remains positive does not broadcast.
+and recheck its predicate. An ordinary partial shared release does not broadcast; a later exclusive-wait behavior adds
+a targeted exception when the count reaches the requester's sole shared hold.
 
 The [editable Draw.io diagram](../diagrams/ch05-lock-release-notification.drawio) and
 [rendered SVG](../diagrams/ch05-lock-release-notification.svg) show why state mutation and notification share one mutex,
@@ -1048,10 +1049,32 @@ failed because `WaitSharedFor` and `ErrLockTimeout` did not exist.
 This maps to Java `LockTable.sLock`'s elapsed-time check and `LockAbortException`. Go accepts the duration explicitly so
 tests and future transaction policy do not depend on a package-global ten-second delay.
 
+## Feature 47: Wait for competing shared holders before exclusive acquisition
+
+`WaitExclusive` assumes the requester already owns one shared hold. While the count is greater than one it registers an
+exclusive waiter and sleeps on the table condition. Releasing a competing holder from count two to one broadcasts only
+when such a waiter is registered. The awakened request rechecks the predicate and changes the sole shared state to the
+exclusive sentinel `-1`. Ordinary partial release still does not notify unrelated waiters.
+
+The [editable Draw.io diagram](../diagrams/ch05-lock-release-notification.drawio) and
+[rendered SVG](../diagrams/ch05-lock-release-notification.svg) now include the count-two to count-one exclusive-upgrade
+wakeup path.
+
+### Test-first record
+
+Blocked state and upgrade after the competing holder releases were tested first. The initial build failed because
+`WaitExclusive` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableWaitsForCompetingSharedHolderBeforeAcquiringExclusive` | Other shared holders block upgrade; their final competing release wakes and grants exclusive state |
+
+This implements the unbounded wait/recheck portion of Java `LockTable.xLock`. Bounded abort remains separate.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by waiting for competing shared holders before granting an exclusive lock,
-then add exclusive timeout and transaction-local lock tracking separately.
+Continue with Chapter 5 concurrency control by applying a bounded timeout to exclusive-lock waiting, then add
+transaction-local lock tracking separately.
 
 ## Sources
 
