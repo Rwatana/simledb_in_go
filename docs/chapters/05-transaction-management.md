@@ -456,10 +456,30 @@ build failed because `UpdateView` and `LogPreviousString` did not exist.
 This maps to Java `RecoveryMgr.setString`'s old-value read and `SetStringRecord.writeToLog` call only. Applying the new
 value, dirty metadata, and undo remain outside this behavior.
 
+## Feature 17: Undo a SETINT record
+
+`SetIntRecord.Undo` consumes an `IntegerUndoTarget` rather than a concrete transaction. It pins the recorded block,
+restores the saved integer with logging explicitly disabled, and always unpins after a restore attempt. A pin failure
+stops before mutation; restore and unpin failures retain their causes and operation context.
+
+### Test-first record
+
+The exact pin/restore/unpin sequence, no-log flag, and each failure boundary were tested first. The initial build failed
+because `SetIntRecord.Undo` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSetIntRecordUndoRestoresOldValueWithoutLogging` | Pin, restore with `false`, then unpin |
+| `TestSetIntRecordUndoStopsAfterPinFailure` | Failed pin prevents restore and unpin |
+| `TestSetIntRecordUndoUnpinsAfterRestoreFailure` | Failed restore still releases the pin |
+| `TestSetIntRecordUndoReturnsUnpinFailure` | Release failure remains visible to the caller |
+
+This maps to Java `SetIntRecord.undo`. Go makes failure and cleanup explicit while retaining the book's rule that undo
+must not generate another SETINT record.
+
 ## Next behavior
 
-Continue with SETINT undo, then SETSTRING undo and Sect. 5.3.9.2 backward rollback scanning as separate observable
-behaviors.
+Continue with SETSTRING undo, then Sect. 5.3.9.2 backward rollback scanning as separate observable behaviors.
 
 ## Sources
 
