@@ -1,6 +1,7 @@
 package concurrency
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
@@ -97,6 +98,33 @@ func TestLockTableUpgradesSoleSharedHolderToExclusive(t *testing.T) {
 
 	if got := table.locks[block]; got != -1 {
 		t.Fatalf("exclusive state = %d, want -1", got)
+	}
+	if got := table.locks[other]; got != 1 {
+		t.Fatalf("other shared holders = %d, want 1", got)
+	}
+}
+
+func TestLockTableRejectsExclusiveUpgradeWithCompetingSharedHolder(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	other := storage.NewBlockID("tbl", 2)
+
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(other); err != nil {
+		t.Fatal(err)
+	}
+
+	err := table.LockExclusive(block)
+	if !errors.Is(err, ErrLockConflict) {
+		t.Fatalf("LockExclusive() error = %v, want ErrLockConflict", err)
+	}
+	if got := table.locks[block]; got != 2 {
+		t.Fatalf("shared holders after conflict = %d, want 2", got)
 	}
 	if got := table.locks[other]; got != 1 {
 		t.Fatalf("other shared holders = %d, want 1", got)
