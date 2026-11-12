@@ -14,13 +14,13 @@ type LockTable struct {
 	locks map[storage.BlockID]int
 }
 
-// LockShared acquires the first uncontended shared lock on block.
+// LockShared acquires a compatible shared lock on block.
 func (t *LockTable) LockShared(block storage.BlockID) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.locks == nil {
 		t.locks = make(map[storage.BlockID]int)
 	}
-	t.locks[block] = 1
+	t.locks[block]++
 	return nil
 }
