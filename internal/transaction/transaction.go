@@ -23,10 +23,19 @@ type Transaction struct {
 	buffers       *BufferList
 	bufferManager BufferManager
 	logs          recovery.DurableLog
+	iterator      recovery.EncodedRecordIteratorFactory
 }
 
 // New allocates an identity, appends its START record, and creates isolated local ownership backed by shared managers.
-func New(allocator *IDAllocator, lockTable *concurrency.LockTable, bufferManager BufferManager, logs recovery.DurableLog) (*Transaction, error) {
+// An optional iterator factory enables transaction rollback.
+func New(allocator *IDAllocator, lockTable *concurrency.LockTable, bufferManager BufferManager, logs recovery.DurableLog, iterator ...recovery.EncodedRecordIteratorFactory) (*Transaction, error) {
+	if len(iterator) > 1 {
+		return nil, fmt.Errorf("create transaction: expected at most one recovery iterator factory, got %d", len(iterator))
+	}
+	var iteratorFactory recovery.EncodedRecordIteratorFactory
+	if len(iterator) == 1 {
+		iteratorFactory = iterator[0]
+	}
 	id := allocator.Next()
 	if _, err := recovery.AppendStartRecord(logs, id); err != nil {
 		return nil, fmt.Errorf("start transaction %d: %w", id, err)
@@ -37,6 +46,7 @@ func New(allocator *IDAllocator, lockTable *concurrency.LockTable, bufferManager
 		buffers:       NewBufferList(bufferManager),
 		bufferManager: bufferManager,
 		logs:          logs,
+		iterator:      iteratorFactory,
 	}, nil
 }
 
@@ -143,6 +153,17 @@ func (t *Transaction) SetString(block storage.BlockID, offset int32, value strin
 		}
 	}
 	return nil
+}
+
+// Rollback restores this transaction's logged updates and makes its ROLLBACK marker durable.
+func (t *Transaction) Rollback() (logmanager.LSN, error) {
+	if t.iterator == nil {
+		return 0, fmt.Errorf("rollback transaction %d: recovery iterator factory is not configured", t.id)
+	}
+	flush := func(transaction recovery.TransactionID) error {
+		return t.bufferManager.FlushAll(buffer.TransactionID(transaction))
+	}
+	return recovery.RollbackTransaction(t.iterator, t.id, t, flush, t.logs)
 }
 
 // Commit flushes this transaction's modified buffers and makes its COMMIT marker durable.

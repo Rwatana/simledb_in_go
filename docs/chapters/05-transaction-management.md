@@ -1548,9 +1548,31 @@ logged-update guard.
 
 This maps to Java `Transaction.setString(..., true)` and its `RecoveryMgr.setString` old-value append.
 
+## Feature 71: Invoke durable rollback from a transaction
+
+`Transaction.Rollback` passes its injected newest-to-oldest iterator factory, own ID, and itself as the undo target to
+`recovery.RollbackTransaction`. Existing recovery composition restores SETINT/SETSTRING values without logging, flushes
+the restored buffers, appends ROLLBACK, and flushes that marker's LSN. The transaction returns the durable LSN unchanged.
+
+The iterator factory is an optional constructor dependency so transactions that only commit keep their existing setup;
+calling rollback without it returns an explicit configuration error. This feature intentionally leaves locks and the
+original buffer pins owned after both success and failure. Their post-durability cleanup order remains separately tested.
+
+### Test-first record
+
+Own-ID undo, restored value, durable ROLLBACK identity, retained locks/pins, and iterator failure propagation were tested
+first. The initial build failed because the constructor did not accept the factory and `Transaction.Rollback` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRollbackInvokesDurabilityForOwnID` | Logged updates are restored and a durable own-ID ROLLBACK is returned while resources remain owned |
+| `TestTransactionRollbackFailureKeepsLocksAndPins` | Iterator failure prevents durability and preserves transaction locks and pins |
+
+This implements the recovery portion of Java `Transaction.rollback`; cleanup follows in independent features.
+
 ## Next behavior
 
-Continue with Chapter 5 by composing transaction rollback from recovery undo, durability, lock release, and buffer unpin.
+Continue with Chapter 5 by releasing transaction locks only after durable rollback, then unpinning buffers separately.
 
 ## Sources
 
