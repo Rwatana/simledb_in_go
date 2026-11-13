@@ -655,6 +655,77 @@ func TestTransactionSetIntLogFailurePreservesPageAndMetadata(t *testing.T) {
 	}
 }
 
+func TestTransactionSetStringWithoutLoggingUpdatesPinnedPageExclusively(t *testing.T) {
+	bufferManager, _, block := newTransactionStringBlock(t, 8, "old")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	logs := &recordingTransactionLog{}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.SetString(block, 8, "新しい値", false); err != nil {
+		t.Fatal(err)
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("SetString removed transaction buffer ownership")
+	}
+	got, err := frame.Contents().GetBytes(8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "新しい値" {
+		t.Fatalf("stored string = %q, want %q", got, "新しい値")
+	}
+	if modifiedBy, dirty := frame.ModifyingTransaction(); !dirty || modifiedBy != buffer.TransactionID(tx.ID()) {
+		t.Fatalf("modifying transaction = (%d, %v), want (%d, true)", modifiedBy, dirty, tx.ID())
+	}
+	if lsn, ok := frame.RecoveryLSN(); ok {
+		t.Fatalf("no-log SetString recovery LSN = %d, want absent", lsn)
+	}
+	if len(logs.records) != 1 {
+		t.Fatalf("log records = %d, want START only", len(logs.records))
+	}
+	if err := table.LockShared(block); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("shared acquisition after SetString error = %v, want ErrLockConflict", err)
+	}
+}
+
+func TestTransactionSetStringWithoutLoggingReturnsPreconditionAndPageFailures(t *testing.T) {
+	bufferManager, _, block := newTransactionStringBlock(t, 8, "old")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.SetString(block, 8, "new", false); !errors.Is(err, ErrBufferNotPinned) {
+		t.Fatalf("SetString() without pin error = %v, want ErrBufferNotPinned", err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.SetString(block, 60, "too long", false); err == nil {
+		t.Fatal("SetString() outside page returned nil error")
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("failed SetString removed transaction buffer ownership")
+	}
+	if _, dirty := frame.ModifyingTransaction(); dirty {
+		t.Fatal("failed SetString marked buffer modified")
+	}
+	if err := tx.SetString(block, 8, "new", true); err == nil {
+		t.Fatal("logged SetString silently used the no-log path")
+	}
+}
+
 func newTransactionDataBlock(t *testing.T, offset int, value int32) (*buffer.Manager, *logmanager.Manager, storage.BlockID) {
 	t.Helper()
 	files, err := storagefile.NewManager(filepath.Join(t.TempDir(), "database"), 64)

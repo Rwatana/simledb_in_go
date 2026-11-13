@@ -1501,9 +1501,33 @@ Feature 67.
 
 This maps to Java `Transaction.setInt(..., true)` and its `RecoveryMgr.setInt` old-value append.
 
+## Feature 69: Write a string without a recovery record
+
+The `logUpdate == false` path of `Transaction.SetString` requires the block's transaction-local buffer, retains an
+exclusive lock, writes the UTF-8 bytes with the page's four-byte length prefix, and marks the frame dirty for the current
+transaction. It appends no SETSTRING record and associates no recovery LSN, so recovery can restore an old string without
+logging the restoration itself.
+
+Missing ownership is rejected before locking. Insufficient page capacity is returned before dirty metadata changes. The
+logged branch remains an explicit error at this stack point, preventing a caller from silently receiving an unlogged
+string update before the next feature adds old-value capture.
+
+### Test-first record
+
+Length-prefixed UTF-8 mutation, exclusive ownership, dirty attribution, absent recovery metadata, missing-pin failure,
+capacity failure, and logged-path rejection were tested first. The initial build failed because
+`Transaction.SetString` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionSetStringWithoutLoggingUpdatesPinnedPageExclusively` | The no-log path writes the string, marks the transaction dirty, retains exclusive ownership, and appends nothing |
+| `TestTransactionSetStringWithoutLoggingReturnsPreconditionAndPageFailures` | Missing ownership and insufficient capacity fail without dirtying the frame, while logged writes cannot bypass WAL |
+
+This maps to Java `Transaction.setString(..., false)` and supplies the `StringUndoTarget` signature used by SETSTRING undo.
+
 ## Next behavior
 
-Continue with Chapter 5 by implementing the no-log string write path, then its logged old-value capture.
+Continue with Chapter 5 by capturing and recording the old string before a logged write.
 
 ## Sources
 
