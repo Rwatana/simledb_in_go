@@ -7,6 +7,7 @@ import (
 	"github.com/Rwatana/simledb_in_go/internal/concurrency"
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
 	"github.com/Rwatana/simledb_in_go/internal/recovery"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 // BufferManager provides the transaction-scoped buffer operations needed by its lifecycle.
@@ -42,6 +43,11 @@ func New(allocator *IDAllocator, lockTable *concurrency.LockTable, bufferManager
 // ID returns the transaction's canonical recovery identifier.
 func (t *Transaction) ID() recovery.TransactionID {
 	return t.id
+}
+
+// Pin acquires a buffer for block and records it as transaction-local ownership.
+func (t *Transaction) Pin(block storage.BlockID) error {
+	return t.buffers.Pin(block)
 }
 
 // Commit flushes this transaction's modified buffers and makes its COMMIT marker durable.
