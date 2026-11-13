@@ -102,6 +102,9 @@ func (t *Transaction) GetInt(block storage.BlockID, offset int) (int32, error) {
 
 // GetString reads a length-prefixed string from a pinned block while retaining a shared lock.
 func (t *Transaction) GetString(block storage.BlockID, offset int) (string, error) {
+	if t.state != transactionActive {
+		return "", fmt.Errorf("get string from block %v at offset %d for transaction %d: %w", block, offset, t.id, ErrTransactionCompleted)
+	}
 	frame, ok := t.buffers.Buffer(block)
 	if !ok {
 		return "", fmt.Errorf("get string from transaction buffer %v at offset %d: %w", block, offset, ErrBufferNotPinned)
