@@ -168,3 +168,50 @@ func TestTransactionCommitFailureKeepsPinnedBuffers(t *testing.T) {
 		t.Fatalf("log flushes after failed commit = %v, want none", logs.flushed)
 	}
 }
+
+func TestTransactionCommitReleasesLocksAfterDurability(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	bufferManager := &recordingBufferPinner{}
+	logs := &recordingTransactionLog{}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := storage.NewBlockID("tbl", 1)
+	if err := tx.locks.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(block); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("shared acquisition before commit error = %v, want ErrLockConflict", err)
+	}
+
+	if _, err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(block); err != nil {
+		t.Fatalf("shared acquisition after commit: %v", err)
+	}
+}
+
+func TestTransactionCommitFailureKeepsLocksHeld(t *testing.T) {
+	wantErr := errors.New("flush failed")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	bufferManager := &recordingBufferPinner{flushErr: wantErr}
+	tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := storage.NewBlockID("tbl", 1)
+	if err := tx.locks.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tx.Commit(); !errors.Is(err, wantErr) {
+		t.Fatalf("Commit() error = %v, want %v", err, wantErr)
+	}
+	if err := table.LockShared(block); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("shared acquisition after failed commit error = %v, want ErrLockConflict", err)
+	}
+}

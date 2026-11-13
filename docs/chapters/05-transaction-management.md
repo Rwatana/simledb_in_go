@@ -1330,9 +1330,29 @@ were tested first. The initial build failed because `Transaction.Commit` did not
 This implements the recovery portion of Java `Transaction.commit` while preserving explicit Go errors. Lock release and
 buffer unpin are deliberately still absent so each cleanup transition can be observed and tested independently.
 
+## Feature 61: Release locks after durable COMMIT
+
+After `recovery.CommitTransaction` returns a durable COMMIT LSN, `Transaction.Commit` calls its local concurrency
+manager's `Release`. Shared and exclusive ownership are therefore removed only after the transaction's updates and COMMIT
+marker are durable. Any durability error returns before release, leaving the transaction's locks intact for retry or
+failure handling. The successful method still returns the COMMIT LSN.
+
+### Test-first record
+
+Exclusive conflict before commit, shared availability after durable commit, and lock retention after durability failure
+were tested first. The initial success test failed because the exclusive lock remained after commit.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionCommitReleasesLocksAfterDurability` | Durable commit releases exclusive ownership so another shared acquisition can proceed |
+| `TestTransactionCommitFailureKeepsLocksHeld` | A failed durability step returns before lock release and preserves the exclusive conflict |
+
+This adds the `concurMgr.release()` portion of Java `Transaction.commit` after recovery commit. Buffer pin cleanup remains
+separate so its ordering and failure behavior can be tested independently.
+
 ## Next behavior
 
-Continue with Chapter 5 by releasing transaction locks after durable commit, then add buffer unpin as a separate lifecycle
+Continue with Chapter 5 by unpinning all transaction buffers after durable commit and lock release as a separate lifecycle
 behavior without mixing rollback.
 
 ## Sources
