@@ -798,6 +798,91 @@ func TestTransactionSetStringLogFailurePreservesPageAndMetadata(t *testing.T) {
 	}
 }
 
+func TestTransactionRollbackInvokesDurabilityForOwnID(t *testing.T) {
+	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	factory := func() (recovery.EncodedRecordIterator, error) {
+		return logs.Iterator()
+	}
+	tx, err := New(&allocator, &table, bufferManager, logs, factory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.SetInt(block, 8, 77, true); err != nil {
+		t.Fatal(err)
+	}
+
+	lsn, err := tx.Rollback()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lsn != 3 {
+		t.Fatalf("Rollback() LSN = %d, want 3", lsn)
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("rollback released transaction buffer ownership")
+	}
+	got, err := frame.Contents().GetInt(8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 42 {
+		t.Fatalf("integer after rollback = %d, want old value 42", got)
+	}
+	iterator, err := logs.Iterator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, ok, err := iterator.Next()
+	if err != nil || !ok {
+		t.Fatalf("latest log record = (%v, %v), want ROLLBACK", ok, err)
+	}
+	record, err := recovery.DecodeRecord(encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recordTransaction, owned := recovery.RecordTransaction(record)
+	if record.Operation() != recovery.OperationRollback || !owned || recordTransaction != tx.ID() {
+		t.Fatalf("latest record = operation %d transaction (%d, %v), want ROLLBACK for %d", record.Operation(), recordTransaction, owned, tx.ID())
+	}
+	if err := table.LockShared(block); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("shared acquisition after rollback error = %v, want retained exclusive lock", err)
+	}
+}
+
+func TestTransactionRollbackFailureKeepsLocksAndPins(t *testing.T) {
+	wantErr := errors.New("iterator failed")
+	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	factory := func() (recovery.EncodedRecordIterator, error) { return nil, wantErr }
+	tx, err := New(&allocator, &table, bufferManager, logs, factory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.locks.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tx.Rollback(); !errors.Is(err, wantErr) {
+		t.Fatalf("Rollback() error = %v, want %v", err, wantErr)
+	}
+	if _, ok := tx.buffers.Buffer(block); !ok {
+		t.Fatal("failed rollback released transaction buffer ownership")
+	}
+	if err := table.LockShared(block); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("shared acquisition after failed rollback error = %v, want retained exclusive lock", err)
+	}
+}
+
 func newTransactionDataBlock(t *testing.T, offset int, value int32) (*buffer.Manager, *logmanager.Manager, storage.BlockID) {
 	t.Helper()
 	files, err := storagefile.NewManager(filepath.Join(t.TempDir(), "database"), 64)
