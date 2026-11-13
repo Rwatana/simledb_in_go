@@ -1454,9 +1454,33 @@ page-boundary failure were tested first. The initial build failed because `Trans
 
 This maps to Java `Transaction.getString`; mutation remains in later, independently tested behaviors.
 
+## Feature 67: Write an integer without a recovery record
+
+The `logUpdate == false` path of `Transaction.SetInt` requires transaction-local buffer ownership, upgrades the block to
+an exclusive transaction lock, stores the four-byte integer, and marks the frame dirty with the transaction ID. It does
+not append a SETINT record or associate a recovery LSN, which is the write mode recovery undo needs to avoid logging its
+own restoration.
+
+Missing ownership is rejected before locking. A page-boundary failure occurs after exclusive acquisition but before the
+dirty marker, so no invalid page mutation can be flushed. Until the next independently tested feature adds old-value
+logging, `logUpdate == true` returns an explicit error instead of silently performing an unlogged update.
+
+### Test-first record
+
+Exclusive ownership, page mutation, dirty attribution, absent recovery LSN, absent SETINT append, missing-pin failure,
+page-boundary failure, and rejection of the not-yet-implemented logged path were tested first. The initial build failed
+because `Transaction.SetInt` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionSetIntWithoutLoggingUpdatesPinnedPageExclusively` | The no-log path updates the page, marks the transaction dirty, retains exclusive ownership, and writes no recovery record |
+| `TestTransactionSetIntWithoutLoggingReturnsPreconditionAndPageFailures` | Missing ownership and invalid offsets fail without dirtying the frame, while logged writes cannot silently bypass WAL |
+
+This maps to Java `Transaction.setInt(..., false)` and supplies the `IntegerUndoTarget` signature used by SETINT undo.
+
 ## Next behavior
 
-Continue with Chapter 5 by implementing the no-log integer write path, then its logged old-value capture.
+Continue with Chapter 5 by capturing and recording the old integer before a logged write.
 
 ## Sources
 
