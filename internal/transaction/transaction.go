@@ -163,7 +163,12 @@ func (t *Transaction) Rollback() (logmanager.LSN, error) {
 	flush := func(transaction recovery.TransactionID) error {
 		return t.bufferManager.FlushAll(buffer.TransactionID(transaction))
 	}
-	return recovery.RollbackTransaction(t.iterator, t.id, t, flush, t.logs)
+	lsn, err := recovery.RollbackTransaction(t.iterator, t.id, t, flush, t.logs)
+	if err != nil {
+		return 0, err
+	}
+	t.locks.Release()
+	return lsn, nil
 }
 
 // Commit flushes this transaction's modified buffers and makes its COMMIT marker durable.

@@ -1570,9 +1570,27 @@ first. The initial build failed because the constructor did not accept the facto
 
 This implements the recovery portion of Java `Transaction.rollback`; cleanup follows in independent features.
 
+## Feature 72: Release locks after durable ROLLBACK
+
+After `recovery.RollbackTransaction` returns a durable marker LSN, `Transaction.Rollback` releases every lock tracked by
+its local concurrency manager and returns that LSN unchanged. Any iterator, undo, buffer flush, marker append, or marker
+flush error returns before release, preserving lock ownership. Buffer pins deliberately remain owned in both cases.
+
+### Test-first record
+
+Shared availability after success, pin retention, LSN preservation, and lock retention after rollback failure were tested
+first. The success test initially failed because the exclusive lock remained after durability.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRollbackInvokesDurabilityForOwnID` | Durable rollback restores the value, preserves its LSN and pin, then releases the exclusive lock |
+| `TestTransactionRollbackFailureKeepsLocksAndPins` | A failed rollback leaves both lock and buffer ownership intact |
+
+This adds the `concurMgr.release()` portion of Java `Transaction.rollback` after recovery durability.
+
 ## Next behavior
 
-Continue with Chapter 5 by releasing transaction locks only after durable rollback, then unpinning buffers separately.
+Continue with Chapter 5 by unpinning every transaction buffer only after durable rollback and lock release.
 
 ## Sources
 
