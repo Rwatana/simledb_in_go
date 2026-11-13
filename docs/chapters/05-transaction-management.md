@@ -1310,10 +1310,30 @@ were tested first. The initial build failed because `CommitTransaction` did not 
 This maps to Java `RecoveryMgr.commit`: `BufferMgr.flushAll(txnum)` precedes `CommitRecord.writeToLog` and log flush.
 Transaction lock release and buffer unpin remain outer lifecycle behaviors and are intentionally not included here.
 
+## Feature 60: Invoke durable commit from a transaction
+
+`Transaction` now retains the durable log and a `BufferManager` port that combines pin ownership with transaction-scoped
+flush. `Commit` adapts its canonical recovery ID to the buffer package's transaction ID and delegates to
+`recovery.CommitTransaction`. It therefore returns only after its dirty buffers are flushed, COMMIT is appended, and the
+COMMIT LSN is durable. START remains append-only during construction.
+
+### Test-first record
+
+The transaction's own ID, buffer-before-log ordering, START/COMMIT record sequence, returned COMMIT LSN, and COMMIT flush
+were tested first. The initial build failed because `Transaction.Commit` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionCommitInvokesDurabilityForOwnID` | A transaction commits its own ID through buffer flush, COMMIT append, and COMMIT LSN flush in order |
+| `TestTransactionCommitFailureKeepsPinnedBuffers` | A durability failure leaves transaction-local buffer ownership intact and writes no COMMIT |
+
+This implements the recovery portion of Java `Transaction.commit` while preserving explicit Go errors. Lock release and
+buffer unpin are deliberately still absent so each cleanup transition can be observed and tested independently.
+
 ## Next behavior
 
-Continue with Chapter 5 by having the transaction object invoke durable commit, then add lock release and buffer unpin as
-separate lifecycle behaviors without mixing rollback.
+Continue with Chapter 5 by releasing transaction locks after durable commit, then add buffer unpin as a separate lifecycle
+behavior without mixing rollback.
 
 ## Sources
 
