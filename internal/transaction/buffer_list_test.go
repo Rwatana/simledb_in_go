@@ -9,10 +9,11 @@ import (
 )
 
 type recordingBufferPinner struct {
-	frame  *buffer.Buffer
-	err    error
-	blocks []storage.BlockID
-	unpins []*buffer.Buffer
+	frame    *buffer.Buffer
+	err      error
+	unpinErr error
+	blocks   []storage.BlockID
+	unpins   []*buffer.Buffer
 }
 
 func (p *recordingBufferPinner) Pin(block storage.BlockID) (*buffer.Buffer, error) {
@@ -22,7 +23,7 @@ func (p *recordingBufferPinner) Pin(block storage.BlockID) (*buffer.Buffer, erro
 
 func (p *recordingBufferPinner) Unpin(frame *buffer.Buffer) error {
 	p.unpins = append(p.unpins, frame)
-	return nil
+	return p.unpinErr
 }
 
 func TestBufferListPinsAndTracksBlock(t *testing.T) {
@@ -104,5 +105,47 @@ func TestBufferListRejectsUnpinForMissingBlock(t *testing.T) {
 	}
 	if len(pinner.unpins) != 0 {
 		t.Fatalf("unpin requests = %v, want none", pinner.unpins)
+	}
+}
+
+func TestBufferListRemovesBufferAfterFinalUnpin(t *testing.T) {
+	frame := &buffer.Buffer{}
+	pinner := &recordingBufferPinner{frame: frame}
+	list := NewBufferList(pinner)
+	block := storage.NewBlockID("tbl", 1)
+
+	if err := list.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Unpin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := list.Buffer(block); ok {
+		t.Fatal("buffer lookup remains after final unpin")
+	}
+	if len(list.pins) != 0 {
+		t.Fatalf("pin occurrences after final unpin = %v, want none", list.pins)
+	}
+}
+
+func TestBufferListPreservesOwnershipWhenUnpinFails(t *testing.T) {
+	wantErr := errors.New("unpin failed")
+	frame := &buffer.Buffer{}
+	pinner := &recordingBufferPinner{frame: frame, unpinErr: wantErr}
+	list := NewBufferList(pinner)
+	block := storage.NewBlockID("tbl", 1)
+
+	if err := list.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Unpin(block); !errors.Is(err, wantErr) {
+		t.Fatalf("Unpin() error = %v, want %v", err, wantErr)
+	}
+	if got, ok := list.Buffer(block); !ok || got != frame {
+		t.Fatalf("Buffer(%v) after failed unpin = (%p, %v), want (%p, true)", block, got, ok, frame)
+	}
+	if len(list.pins) != 1 || list.pins[0] != block {
+		t.Fatalf("pin occurrences after failed unpin = %v, want [%v]", list.pins, block)
 	}
 }
