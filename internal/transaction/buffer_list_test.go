@@ -12,11 +12,17 @@ type recordingBufferPinner struct {
 	frame  *buffer.Buffer
 	err    error
 	blocks []storage.BlockID
+	unpins []*buffer.Buffer
 }
 
 func (p *recordingBufferPinner) Pin(block storage.BlockID) (*buffer.Buffer, error) {
 	p.blocks = append(p.blocks, block)
 	return p.frame, p.err
+}
+
+func (p *recordingBufferPinner) Unpin(frame *buffer.Buffer) error {
+	p.unpins = append(p.unpins, frame)
+	return nil
 }
 
 func TestBufferListPinsAndTracksBlock(t *testing.T) {
@@ -58,5 +64,45 @@ func TestBufferListDoesNotTrackFailedPin(t *testing.T) {
 	}
 	if len(list.pins) != 0 {
 		t.Fatalf("pin occurrences after failure = %v, want none", list.pins)
+	}
+}
+
+func TestBufferListReleasesOneOfRepeatedPins(t *testing.T) {
+	frame := &buffer.Buffer{}
+	pinner := &recordingBufferPinner{frame: frame}
+	list := NewBufferList(pinner)
+	block := storage.NewBlockID("tbl", 1)
+
+	if err := list.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Unpin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(pinner.unpins) != 1 || pinner.unpins[0] != frame {
+		t.Fatalf("unpin requests = %v, want [%p]", pinner.unpins, frame)
+	}
+	if got, ok := list.Buffer(block); !ok || got != frame {
+		t.Fatalf("Buffer(%v) after partial unpin = (%p, %v), want (%p, true)", block, got, ok, frame)
+	}
+	if len(list.pins) != 1 || list.pins[0] != block {
+		t.Fatalf("pin occurrences after partial unpin = %v, want [%v]", list.pins, block)
+	}
+}
+
+func TestBufferListRejectsUnpinForMissingBlock(t *testing.T) {
+	pinner := &recordingBufferPinner{}
+	list := NewBufferList(pinner)
+	block := storage.NewBlockID("tbl", 1)
+
+	if err := list.Unpin(block); !errors.Is(err, ErrBufferNotPinned) {
+		t.Fatalf("Unpin() error = %v, want ErrBufferNotPinned", err)
+	}
+	if len(pinner.unpins) != 0 {
+		t.Fatalf("unpin requests = %v, want none", pinner.unpins)
 	}
 }
