@@ -1508,9 +1508,9 @@ exclusive lock, writes the UTF-8 bytes with the page's four-byte length prefix, 
 transaction. It appends no SETSTRING record and associates no recovery LSN, so recovery can restore an old string without
 logging the restoration itself.
 
-Missing ownership is rejected before locking. Insufficient page capacity is returned before dirty metadata changes. The
-logged branch remains an explicit error at this stack point, preventing a caller from silently receiving an unlogged
-string update before the next feature adds old-value capture.
+Missing ownership is rejected before locking. Insufficient page capacity is returned before dirty metadata changes. At
+this stack point the logged branch remained an explicit error, preventing a caller from silently receiving an unlogged
+string update before the next feature added old-value capture.
 
 ### Test-first record
 
@@ -1525,9 +1525,32 @@ capacity failure, and logged-path rejection were tested first. The initial build
 
 This maps to Java `Transaction.setString(..., false)` and supplies the `StringUndoTarget` signature used by SETSTRING undo.
 
+## Feature 70: Log the previous string before a transaction write
+
+The `logUpdate == true` path acquires the transaction's exclusive block lock and calls `recovery.LogPreviousString`
+before changing the length-prefixed page bytes. The SETSTRING record carries the current transaction ID, assigned block,
+offset, and old string. After append succeeds, the new bytes are stored, the frame is marked dirty, and the returned LSN
+is attached for WAL-ordered persistence.
+
+Append failure returns before mutation, leaving the old string and clean frame metadata intact. The existing no-log path
+continues to append nothing and carries no recovery LSN.
+
+### Test-first record
+
+Old-string capture, append-before-mutate ordering, SETSTRING identity, UTF-8 replacement, dirty attribution, recovery
+LSN propagation, and append-failure atomicity were tested first. The initial tests failed against Feature 69's explicit
+logged-update guard.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionSetStringLogsPreviousValueBeforeMutation` | SETSTRING records the old string before replacement, then the frame carries the returned LSN |
+| `TestTransactionSetStringLogFailurePreservesPageAndMetadata` | Append failure preserves the old string and clean metadata |
+
+This maps to Java `Transaction.setString(..., true)` and its `RecoveryMgr.setString` old-value append.
+
 ## Next behavior
 
-Continue with Chapter 5 by capturing and recording the old string before a logged write.
+Continue with Chapter 5 by composing transaction rollback from recovery undo, durability, lock release, and buffer unpin.
 
 ## Sources
 
