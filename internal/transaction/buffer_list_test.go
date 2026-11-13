@@ -10,6 +10,7 @@ import (
 
 type recordingBufferPinner struct {
 	frame    *buffer.Buffer
+	frames   map[storage.BlockID]*buffer.Buffer
 	err      error
 	unpinErr error
 	blocks   []storage.BlockID
@@ -18,6 +19,9 @@ type recordingBufferPinner struct {
 
 func (p *recordingBufferPinner) Pin(block storage.BlockID) (*buffer.Buffer, error) {
 	p.blocks = append(p.blocks, block)
+	if p.frames != nil {
+		return p.frames[block], p.err
+	}
 	return p.frame, p.err
 }
 
@@ -147,5 +151,52 @@ func TestBufferListPreservesOwnershipWhenUnpinFails(t *testing.T) {
 	}
 	if len(list.pins) != 1 || list.pins[0] != block {
 		t.Fatalf("pin occurrences after failed unpin = %v, want [%v]", list.pins, block)
+	}
+}
+
+func TestBufferListReleasesAllPinOccurrences(t *testing.T) {
+	firstFrame := &buffer.Buffer{}
+	secondFrame := &buffer.Buffer{}
+	firstBlock := storage.NewBlockID("tbl", 1)
+	secondBlock := storage.NewBlockID("tbl", 2)
+	pinner := &recordingBufferPinner{frames: map[storage.BlockID]*buffer.Buffer{
+		firstBlock:  firstFrame,
+		secondBlock: secondFrame,
+	}}
+	list := NewBufferList(pinner)
+
+	if err := list.Pin(firstBlock); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Pin(firstBlock); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Pin(secondBlock); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.UnpinAll(); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.UnpinAll(); err != nil {
+		t.Fatal(err)
+	}
+
+	wantUnpins := []*buffer.Buffer{firstFrame, firstFrame, secondFrame}
+	if len(pinner.unpins) != len(wantUnpins) {
+		t.Fatalf("unpin count = %d, want %d", len(pinner.unpins), len(wantUnpins))
+	}
+	for index, want := range wantUnpins {
+		if pinner.unpins[index] != want {
+			t.Fatalf("unpin[%d] = %p, want %p", index, pinner.unpins[index], want)
+		}
+	}
+	if len(list.pins) != 0 {
+		t.Fatalf("pin occurrences after unpin all = %v, want none", list.pins)
+	}
+	if _, ok := list.Buffer(firstBlock); ok {
+		t.Fatal("first buffer lookup remains after unpin all")
+	}
+	if _, ok := list.Buffer(secondBlock); ok {
+		t.Fatal("second buffer lookup remains after unpin all")
 	}
 }
