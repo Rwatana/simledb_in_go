@@ -49,3 +49,11 @@ func (m *Manager) LockExclusive(block storage.BlockID) error {
 	m.locks[block] = exclusiveLock
 	return nil
 }
+
+// Release releases every block lock tracked by this manager and clears its local ownership.
+func (m *Manager) Release() {
+	for block := range m.locks {
+		m.table.Unlock(block)
+	}
+	clear(m.locks)
+}
