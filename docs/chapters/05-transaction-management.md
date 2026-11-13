@@ -1232,10 +1232,30 @@ tested first. The initial build failed because `UnpinAll` did not exist.
 This maps to Java `BufferList.unpinAll`. Go returns an error so a shared-manager failure is visible; defining an explicit
 partial-failure retry contract remains separate from the successful bulk-release behavior.
 
+## Feature 56: Allocate transaction identifiers
+
+The zero value of `transaction.IDAllocator` starts at zero internally and atomically increments before returning an ID,
+so a fresh allocator yields positive identifiers `1, 2, 3, ...`. `Next` returns `recovery.TransactionID` directly,
+making the four-byte recovery-record identifier the canonical transaction lifecycle type. Atomic increment prevents
+duplicate IDs when transaction construction is concurrent.
+
+### Test-first record
+
+Sequential allocation, canonical return type, concurrent uniqueness, positivity, and a gap-free completed allocation set
+were tested first. The initial build failed because `IDAllocator` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestIDAllocatorReturnsSequentialRecoveryTransactionIDs` | A fresh allocator returns canonical recovery transaction IDs starting at one in sequence |
+| `TestIDAllocatorReturnsUniqueConcurrentIDs` | Concurrent calls produce one unique ID for every completed allocation without gaps |
+
+This maps to Java `Transaction.nextTxNumber`, replacing its synchronized static integer with an injectable, zero-value-ready
+atomic allocator. Persisting or restoring the sequence across process restarts is not part of the Java behavior here.
+
 ## Next behavior
 
-Continue with Chapter 5 by composing transaction construction and lifecycle around recovery, concurrency, and buffer
-ownership as separate behaviors.
+Continue with Chapter 5 by constructing a transaction from its allocated ID and collaborators, then append its START
+record as a separate behavior before composing commit and rollback.
 
 ## Sources
 
