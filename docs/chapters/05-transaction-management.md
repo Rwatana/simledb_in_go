@@ -1174,10 +1174,30 @@ The initial build failed because `NewBufferList` did not exist.
 This maps to Java `BufferList.pin` and `getBuffer`. Go introduces a small port so transaction-local ownership depends only
 on the shared manager operation it currently needs. Repeated pins and both unpin paths remain separate behaviors.
 
+## Feature 53: Release one of repeated transaction pins
+
+`BufferList.Unpin` resolves the transaction's tracked frame, delegates one release to the shared buffer manager, and then
+removes exactly one matching block occurrence from the local pin sequence. When another occurrence remains, block lookup
+continues to return the same frame. An untracked block returns `ErrBufferNotPinned` without calling the shared manager.
+Local state is mutated only after shared-manager unpin succeeds.
+
+### Test-first record
+
+Repeated pin tracking, one delegated release, remaining lookup, one-occurrence removal, and missing-block rejection were
+tested first. The initial build failed because `Unpin` and `ErrBufferNotPinned` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestBufferListReleasesOneOfRepeatedPins` | One unpin after two pins releases the shared frame once and retains one local occurrence and lookup |
+| `TestBufferListRejectsUnpinForMissingBlock` | An untracked block returns a distinguishable error without delegating an invalid release |
+
+This maps to the repeated-pin path of Java `BufferList.unpin`, including removing one list occurrence while retaining the
+block-to-buffer mapping. Removing that mapping after the final occurrence remains the next separate behavior.
+
 ## Next behavior
 
-Continue with Chapter 5 by tracking repeated pins for one block, then add single unpin and unpin-all as separate
-observable behaviors before composing the transaction lifecycle.
+Continue with Chapter 5 by removing buffer lookup after the final pin release, then add unpin-all separately before
+composing the transaction lifecycle.
 
 ## Sources
 
