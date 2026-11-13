@@ -1252,10 +1252,29 @@ were tested first. The initial build failed because `IDAllocator` did not exist.
 This maps to Java `Transaction.nextTxNumber`, replacing its synchronized static integer with an injectable, zero-value-ready
 atomic allocator. Persisting or restoring the sequence across process restarts is not part of the Java behavior here.
 
+## Feature 57: Initialize transaction-local state
+
+`transaction.New` consumes exactly one canonical ID from an injected `IDAllocator`, creates a fresh concurrency manager
+over the shared lock table, and creates fresh buffer ownership over the shared buffer port. The resulting `Transaction`
+exposes its recovery ID while keeping its local resource managers private. Separate constructor calls therefore share
+global coordination dependencies but never share local ownership objects.
+
+### Test-first record
+
+ID consumption, canonical ID exposure, distinct local concurrency and buffer managers, and empty initial pin state were
+tested first. The initial build failed because `New` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewInitializesIsolatedTransactionLocalState` | Two constructions consume successive IDs and create isolated local ownership over shared dependencies |
+
+This maps to the initialization portion of Java `Transaction`, but dependency assembly is explicit instead of reading
+static server state. START logging remains separate so constructor state and recovery side effects can be tested independently.
+
 ## Next behavior
 
-Continue with Chapter 5 by constructing a transaction from its allocated ID and collaborators, then append its START
-record as a separate behavior before composing commit and rollback.
+Continue with Chapter 5 by appending the transaction's START record as a separate behavior before composing commit and
+rollback.
 
 ## Sources
 
