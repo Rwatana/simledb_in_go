@@ -70,6 +70,9 @@ func (t *Transaction) ID() recovery.TransactionID {
 
 // Pin acquires a buffer for block and records it as transaction-local ownership.
 func (t *Transaction) Pin(block storage.BlockID) error {
+	if t.state != transactionActive {
+		return fmt.Errorf("pin block %v for transaction %d: %w", block, t.id, ErrTransactionCompleted)
+	}
 	return t.buffers.Pin(block)
 }
 
