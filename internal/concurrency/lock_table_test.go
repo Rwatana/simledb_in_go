@@ -481,3 +481,78 @@ func TestLockTableWaitsForCompetingSharedHolderBeforeAcquiringExclusive(t *testi
 		t.Fatalf("exclusive state after wait = %d, want -1", got)
 	}
 }
+
+func TestLockTableTimesOutBlockedExclusiveUpgrade(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	other := storage.NewBlockID("tbl", 2)
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(other); err != nil {
+		t.Fatal(err)
+	}
+
+	err := table.WaitExclusiveFor(block, 20*time.Millisecond)
+	if !errors.Is(err, ErrLockTimeout) {
+		t.Fatalf("WaitExclusiveFor() error = %v, want ErrLockTimeout", err)
+	}
+	if got := table.locks[block]; got != 2 {
+		t.Fatalf("shared holders after timeout = %d, want 2", got)
+	}
+	if got := table.locks[other]; got != 1 {
+		t.Fatalf("other shared holders = %d, want 1", got)
+	}
+	if table.exclusiveWaiters != 0 {
+		t.Fatalf("exclusive waiters after timeout = %d, want 0", table.exclusiveWaiters)
+	}
+}
+
+func TestLockTableBoundedExclusiveUpgradeAcquiresBeforeDeadline(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- table.WaitExclusiveFor(block, time.Second)
+	}()
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		table.mu.Lock()
+		waiting := table.exclusiveWaiters == 1
+		table.mu.Unlock()
+		if waiting {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("bounded exclusive request did not begin waiting")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	table.Unlock(block)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("WaitExclusiveFor() error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("bounded exclusive request did not acquire before deadline")
+	}
+	if got := table.locks[block]; got != -1 {
+		t.Fatalf("exclusive state after bounded wait = %d, want -1", got)
+	}
+	if table.exclusiveWaiters != 0 {
+		t.Fatalf("exclusive waiters after acquisition = %d, want 0", table.exclusiveWaiters)
+	}
+}

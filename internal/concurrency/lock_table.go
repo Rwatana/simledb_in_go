@@ -102,6 +102,42 @@ func (t *LockTable) WaitExclusive(block storage.BlockID) error {
 	return nil
 }
 
+// WaitExclusiveFor waits up to timeout for competing shared holders to release block, then upgrades the caller's shared hold.
+func (t *LockTable) WaitExclusiveFor(block storage.BlockID, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for t.locks[block] > 1 {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return ErrLockTimeout
+		}
+		expired := false
+		finished := false
+		t.exclusiveWaiters++
+		timer := time.AfterFunc(remaining, func() {
+			t.mu.Lock()
+			defer t.mu.Unlock()
+			if finished {
+				return
+			}
+			expired = true
+			if t.changed != nil {
+				t.changed.Broadcast()
+			}
+		})
+		t.waitForChangeLocked()
+		t.exclusiveWaiters--
+		finished = true
+		timer.Stop()
+		if expired && t.locks[block] > 1 {
+			return ErrLockTimeout
+		}
+	}
+	t.locks[block] = -1
+	return nil
+}
+
 // LockExclusive upgrades the sole shared holder on block to exclusive.
 func (t *LockTable) LockExclusive(block storage.BlockID) error {
 	t.mu.Lock()
