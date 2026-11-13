@@ -6,6 +6,7 @@ type lockMode uint8
 
 const (
 	sharedLock lockMode = iota + 1
+	exclusiveLock
 )
 
 // Manager tracks the block locks held by one transaction.
@@ -31,5 +32,20 @@ func (m *Manager) LockShared(block storage.BlockID) error {
 		return err
 	}
 	m.locks[block] = sharedLock
+	return nil
+}
+
+// LockExclusive upgrades this manager's shared block lock unless it already tracks exclusive ownership.
+func (m *Manager) LockExclusive(block storage.BlockID) error {
+	if m.locks[block] == exclusiveLock {
+		return nil
+	}
+	if err := m.LockShared(block); err != nil {
+		return err
+	}
+	if err := m.table.WaitExclusive(block); err != nil {
+		return err
+	}
+	m.locks[block] = exclusiveLock
 	return nil
 }
