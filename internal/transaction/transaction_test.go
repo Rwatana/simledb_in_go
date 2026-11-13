@@ -290,3 +290,50 @@ func TestTransactionCommitReturnsDurableLSNWhenUnpinFails(t *testing.T) {
 		t.Fatalf("shared acquisition after cleanup failure: %v", err)
 	}
 }
+
+func TestTransactionPinsBlockWithoutAcquiringLock(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	block := storage.NewBlockID("tbl", 1)
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+	frame := &buffer.Buffer{}
+	bufferManager := &recordingBufferPinner{frame: frame}
+	tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if len(bufferManager.blocks) != 1 || bufferManager.blocks[0] != block {
+		t.Fatalf("pin requests = %v, want [%v]", bufferManager.blocks, block)
+	}
+	if got, ok := tx.buffers.Buffer(block); !ok || got != frame {
+		t.Fatalf("transaction buffer = (%p, %v), want (%p, true)", got, ok, frame)
+	}
+}
+
+func TestTransactionPinFailureDoesNotRecordBuffer(t *testing.T) {
+	wantErr := errors.New("pin failed")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	block := storage.NewBlockID("tbl", 1)
+	bufferManager := &recordingBufferPinner{err: wantErr}
+	tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.Pin(block); !errors.Is(err, wantErr) {
+		t.Fatalf("Pin() error = %v, want %v", err, wantErr)
+	}
+	if _, ok := tx.buffers.Buffer(block); ok {
+		t.Fatal("failed transaction pin recorded a buffer")
+	}
+}
