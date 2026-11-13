@@ -87,6 +87,25 @@ func (t *Transaction) GetString(block storage.BlockID, offset int) (string, erro
 	return string(value), nil
 }
 
+// SetInt writes a four-byte integer to a pinned block and optionally records its old value.
+func (t *Transaction) SetInt(block storage.BlockID, offset, value int32, logUpdate bool) error {
+	if logUpdate {
+		return fmt.Errorf("set integer in transaction buffer %v at offset %d: logged updates are not implemented", block, offset)
+	}
+	frame, ok := t.buffers.Buffer(block)
+	if !ok {
+		return fmt.Errorf("set integer in transaction buffer %v at offset %d: %w", block, offset, ErrBufferNotPinned)
+	}
+	if err := t.locks.LockExclusive(block); err != nil {
+		return fmt.Errorf("set integer in transaction buffer %v at offset %d: acquire exclusive lock: %w", block, offset, err)
+	}
+	if err := frame.Contents().SetInt(int(offset), value); err != nil {
+		return fmt.Errorf("set integer in transaction buffer %v at offset %d: %w", block, offset, err)
+	}
+	frame.MarkModified(buffer.TransactionID(t.id))
+	return nil
+}
+
 // Commit flushes this transaction's modified buffers and makes its COMMIT marker durable.
 func (t *Transaction) Commit() (logmanager.LSN, error) {
 	flush := func(transaction recovery.TransactionID) error {
