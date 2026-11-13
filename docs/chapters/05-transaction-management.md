@@ -1626,9 +1626,31 @@ failure were tested first. The initial build failed because `ErrTransactionCompl
 
 Java relies on callers discarding a completed `Transaction`; Go makes that lifecycle invariant explicit and testable.
 
+## Feature 75: Reject repeated rollback after durable ROLLBACK
+
+The lifecycle state now distinguishes a durable rollback. `Rollback` checks for active state before iterator creation and
+marks the transaction rolled back immediately after the ROLLBACK marker is durable, before lock or pin cleanup. A later
+rollback returns `ErrTransactionCompleted` without iterator, buffer, log, lock, or pin activity.
+
+Failure before durability leaves the transaction active and permits retry. Post-durability unpin failure remains
+terminal because a second ROLLBACK marker would misrepresent the already-completed lifecycle.
+
+### Test-first record
+
+Repeated-rollback rejection, absence of repeat I/O, retry after iterator failure, and terminal state after cleanup failure
+were tested first. The initial tests showed that rollback could append multiple terminal markers.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRejectsRepeatedRollbackAfterDurability` | A second rollback returns the completed error before iterator creation or persistence |
+| `TestTransactionRollbackFailureKeepsLocksAndPins` | Failure before durability remains retryable and can later complete |
+| `TestTransactionRollbackReturnsDurableLSNWhenUnpinFails` | Cleanup failure cannot cause a second ROLLBACK marker |
+
+As with commit, this makes Java's caller-side discard convention an explicit Go lifecycle invariant.
+
 ## Next behavior
 
-Continue with Chapter 5 by rejecting repeated rollback after a durable ROLLBACK.
+Continue with Chapter 5 by rejecting buffer and value access after transaction completion.
 
 ## Sources
 
