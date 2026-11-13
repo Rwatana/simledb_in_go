@@ -1686,9 +1686,29 @@ tested first. Both cases initially returned `ErrBufferNotPinned` and therefore d
 
 This makes Java's completed-transaction discard convention explicit while preserving cleanup retry.
 
+## Feature 78: Reject string reads after transaction completion
+
+`Transaction.GetString` now applies the same active-state boundary before buffer lookup or shared-lock acquisition.
+Committed and rolled-back transactions return `ErrTransactionCompleted` instead of observing stale page contents or
+acquiring new lock ownership. The lifecycle error takes precedence over an absent local pin.
+
+As with integer reads, this guard does not disable `Unpin`: a terminal transaction may still need to retry releasing a
+pin retained by failed post-durability cleanup.
+
+### Test-first record
+
+Commit and rollback completion, missing-pin error precedence, and absence of shared-lock acquisition were tested first.
+Both cases initially returned `ErrBufferNotPinned` because string reads had no lifecycle validation.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRejectsGetStringAfterCompletion` | Completed transactions reject string reads before buffer lookup and lock acquisition |
+
+String and integer reads now share the same explicit completed-transaction boundary.
+
 ## Next behavior
 
-Continue with Chapter 5 by rejecting string reads after transaction completion, then integer and string writes separately.
+Continue with Chapter 5 by rejecting integer writes after transaction completion, then string writes separately.
 
 ## Sources
 
