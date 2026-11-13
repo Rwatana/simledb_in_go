@@ -1071,10 +1071,33 @@ Blocked state and upgrade after the competing holder releases were tested first.
 
 This implements the unbounded wait/recheck portion of Java `LockTable.xLock`. Bounded abort remains separate.
 
+## Feature 48: Time out a blocked exclusive upgrade
+
+`WaitExclusiveFor` applies a caller-provided deadline to exclusive upgrade waiting. While competing shared holders
+remain, the request registers itself as an exclusive waiter and sleeps on the table condition. A deadline timer
+reacquires the table mutex and wakes that condition. The awakened request always removes its waiter registration before
+either returning `ErrLockTimeout` with the shared count unchanged or upgrading the sole remaining shared hold to `-1`.
+
+The existing count-two to count-one notification path in the
+[editable Draw.io diagram](../diagrams/ch05-lock-release-notification.drawio) and
+[rendered SVG](../diagrams/ch05-lock-release-notification.svg) also serves bounded exclusive waiters.
+
+### Test-first record
+
+Deadline abort/state preservation, waiter cleanup, and successful upgrade before the deadline were tested first. The
+initial build failed because `WaitExclusiveFor` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableTimesOutBlockedExclusiveUpgrade` | Persistent competing shared holders cause a distinguishable timeout without lock-state mutation or a stale waiter registration |
+| `TestLockTableBoundedExclusiveUpgradeAcquiresBeforeDeadline` | The final competing release before the deadline grants exclusive state and removes the waiter registration |
+
+This maps to Java `LockTable.xLock`'s elapsed-time check and `LockAbortException`. As with bounded shared acquisition,
+Go accepts the duration explicitly so tests and future transaction policy do not depend on a package-global delay.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by applying a bounded timeout to exclusive-lock waiting, then add
-transaction-local lock tracking separately.
+Continue with Chapter 5 concurrency control by adding transaction-local lock tracking as a separate behavior.
 
 ## Sources
 
