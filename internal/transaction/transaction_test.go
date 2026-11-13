@@ -2,11 +2,13 @@ package transaction
 
 import (
 	"errors"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/buffer"
 	"github.com/Rwatana/simledb_in_go/internal/concurrency"
+	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
 	"github.com/Rwatana/simledb_in_go/internal/recovery"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
@@ -381,4 +383,88 @@ func TestTransactionUnpinPropagatesOwnershipErrors(t *testing.T) {
 	if err := tx.Unpin(block); !errors.Is(err, ErrBufferNotPinned) {
 		t.Fatalf("Unpin() error = %v, want ErrBufferNotPinned", err)
 	}
+}
+
+func TestTransactionGetIntReadsPinnedPageAndReusesSharedLock(t *testing.T) {
+	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	for attempt := 0; attempt < 2; attempt++ {
+		got, err := tx.GetInt(block, 8)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != 42 {
+			t.Fatalf("GetInt() = %d, want 42", got)
+		}
+	}
+	if err := table.LockExclusive(block); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("exclusive acquisition with competing shared hold error = %v, want ErrLockConflict", err)
+	}
+	table.Unlock(block)
+	if err := table.LockExclusive(block); err != nil {
+		t.Fatalf("repeated GetInt acquired more than one transaction shared hold: %v", err)
+	}
+}
+
+func TestTransactionGetIntReturnsMissingPinAndPageFailures(t *testing.T) {
+	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tx.GetInt(block, 8); !errors.Is(err, ErrBufferNotPinned) {
+		t.Fatalf("GetInt() without pin error = %v, want ErrBufferNotPinned", err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.GetInt(block, 62); err == nil {
+		t.Fatal("GetInt() outside page returned nil error")
+	}
+}
+
+func newTransactionDataBlock(t *testing.T, offset int, value int32) (*buffer.Manager, *logmanager.Manager, storage.BlockID) {
+	t.Helper()
+	files, err := storagefile.NewManager(filepath.Join(t.TempDir(), "database"), 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logs, err := logmanager.NewManager(files, "simpledb.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := storage.NewPage(files.BlockSize())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := page.SetInt(offset, value); err != nil {
+		t.Fatal(err)
+	}
+	block, err := files.Append("table.tbl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := files.Write(block, page); err != nil {
+		t.Fatal(err)
+	}
+	bufferManager, err := buffer.NewManager(files, logs, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bufferManager, logs, block
 }

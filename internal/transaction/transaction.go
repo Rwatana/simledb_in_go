@@ -55,6 +55,22 @@ func (t *Transaction) Unpin(block storage.BlockID) error {
 	return t.buffers.Unpin(block)
 }
 
+// GetInt reads a four-byte integer from a pinned block while retaining a shared lock.
+func (t *Transaction) GetInt(block storage.BlockID, offset int) (int32, error) {
+	frame, ok := t.buffers.Buffer(block)
+	if !ok {
+		return 0, fmt.Errorf("get integer from transaction buffer %v at offset %d: %w", block, offset, ErrBufferNotPinned)
+	}
+	if err := t.locks.LockShared(block); err != nil {
+		return 0, fmt.Errorf("get integer from transaction buffer %v at offset %d: acquire shared lock: %w", block, offset, err)
+	}
+	value, err := frame.Contents().GetInt(offset)
+	if err != nil {
+		return 0, fmt.Errorf("get integer from transaction buffer %v at offset %d: %w", block, offset, err)
+	}
+	return value, nil
+}
+
 // Commit flushes this transaction's modified buffers and makes its COMMIT marker durable.
 func (t *Transaction) Commit() (logmanager.LSN, error) {
 	flush := func(transaction recovery.TransactionID) error {

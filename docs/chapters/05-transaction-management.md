@@ -1408,9 +1408,32 @@ The initial build failed because `Transaction.Unpin` did not exist.
 
 This maps directly to Java `Transaction.unpin`, keeping buffer lifetime distinct from concurrency lifetime.
 
+## Feature 65: Read an integer through a shared transaction lock
+
+`Transaction.GetInt` first requires transaction-local ownership of the target buffer, then acquires a shared lock through
+the transaction's concurrency manager and reads the page's four-byte big-endian integer. The manager retains one global
+shared hold for the transaction and reuses it on repeated reads. Missing ownership, lock acquisition, and page-boundary
+failures retain the block and offset in their error context.
+
+Checking ownership before locking is an intentional Go safety difference from Java `Transaction.getInt`, which assumes
+the caller already pinned the block and indexes its buffer list after locking. The explicit check prevents a failed
+precondition from leaving a newly acquired lock behind.
+
+### Test-first record
+
+Pinned-page decoding, retained shared ownership, repeated-read lock reuse, missing-pin failure, and page-boundary failure
+were tested first. The initial build failed because `Transaction.GetInt` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionGetIntReadsPinnedPageAndReusesSharedLock` | Two reads return the stored integer while retaining exactly one transaction-local shared hold |
+| `TestTransactionGetIntReturnsMissingPinAndPageFailures` | Missing ownership is distinguishable and invalid offsets preserve the page error |
+
+This maps to Java `Transaction.getInt`; string decoding remains a separate behavior and PR.
+
 ## Next behavior
 
-Continue with Chapter 5 by implementing locked integer and string reads, then logged/no-log writes needed for rollback undo.
+Continue with Chapter 5 by implementing a locked string read, then logged/no-log writes needed for rollback undo.
 
 ## Sources
 
