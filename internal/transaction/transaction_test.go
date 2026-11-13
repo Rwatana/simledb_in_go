@@ -850,8 +850,8 @@ func TestTransactionRollbackInvokesDurabilityForOwnID(t *testing.T) {
 	if record.Operation() != recovery.OperationRollback || !owned || recordTransaction != tx.ID() {
 		t.Fatalf("latest record = operation %d transaction (%d, %v), want ROLLBACK for %d", record.Operation(), recordTransaction, owned, tx.ID())
 	}
-	if err := table.LockShared(block); !errors.Is(err, concurrency.ErrLockConflict) {
-		t.Fatalf("shared acquisition after rollback error = %v, want retained exclusive lock", err)
+	if err := table.LockShared(block); err != nil {
+		t.Fatalf("shared acquisition after durable rollback: %v", err)
 	}
 }
 
