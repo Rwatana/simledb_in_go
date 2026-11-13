@@ -197,6 +197,50 @@ func TestTransactionCommitFailureKeepsPinnedBuffers(t *testing.T) {
 	}
 }
 
+func TestTransactionRejectsRepeatedCommitAfterDurability(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	bufferManager := &recordingBufferPinner{}
+	logs := &recordingTransactionLog{}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	flushes := len(bufferManager.flushes)
+	records := len(logs.records)
+	logFlushes := len(logs.flushed)
+
+	if _, err := tx.Commit(); !errors.Is(err, ErrTransactionCompleted) {
+		t.Fatalf("second Commit() error = %v, want ErrTransactionCompleted", err)
+	}
+	if len(bufferManager.flushes) != flushes || len(logs.records) != records || len(logs.flushed) != logFlushes {
+		t.Fatalf("rejected commit performed I/O: buffer flushes %d->%d records %d->%d log flushes %d->%d", flushes, len(bufferManager.flushes), records, len(logs.records), logFlushes, len(logs.flushed))
+	}
+}
+
+func TestTransactionCommitDurabilityFailureRemainsRetryable(t *testing.T) {
+	wantErr := errors.New("flush failed")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	bufferManager := &recordingBufferPinner{flushErr: wantErr}
+	logs := &recordingTransactionLog{}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tx.Commit(); !errors.Is(err, wantErr) {
+		t.Fatalf("first Commit() error = %v, want %v", err, wantErr)
+	}
+	bufferManager.flushErr = nil
+	if _, err := tx.Commit(); err != nil {
+		t.Fatalf("Commit() retry after pre-durability failure: %v", err)
+	}
+}
+
 func TestTransactionCommitReleasesLocksAfterDurability(t *testing.T) {
 	var allocator IDAllocator
 	var table concurrency.LockTable
@@ -313,6 +357,9 @@ func TestTransactionCommitReturnsDurableLSNWhenUnpinFails(t *testing.T) {
 	}
 	if got, ok := tx.buffers.Buffer(block); !ok || got != frame {
 		t.Fatalf("buffer after failed cleanup = (%p, %v), want (%p, true)", got, ok, frame)
+	}
+	if _, err := tx.Commit(); !errors.Is(err, ErrTransactionCompleted) {
+		t.Fatalf("Commit() after durable cleanup failure error = %v, want ErrTransactionCompleted", err)
 	}
 	if err := table.LockShared(block); err != nil {
 		t.Fatalf("shared acquisition after cleanup failure: %v", err)

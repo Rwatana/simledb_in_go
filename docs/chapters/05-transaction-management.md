@@ -1607,9 +1607,28 @@ were tested first. The initial tests failed because rollback did not invoke unpi
 
 This completes Java `Transaction.rollback` ordering: recovery rollback, concurrency release, then buffer unpin-all.
 
+## Feature 74: Reject repeated commit after durable COMMIT
+
+`Transaction` now tracks active and committed lifecycle state. `Commit` changes state immediately after the COMMIT marker
+is durable and before lock or pin cleanup. A later commit returns `ErrTransactionCompleted` before buffer or log I/O.
+Durability failure leaves the transaction active and retryable; post-durability cleanup failure still leaves it committed.
+
+### Test-first record
+
+Repeated-commit rejection, absence of repeat I/O, retry after pre-durability failure, and terminal state after cleanup
+failure were tested first. The initial build failed because `ErrTransactionCompleted` and lifecycle state did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRejectsRepeatedCommitAfterDurability` | A second commit returns the completed error and performs no additional persistence |
+| `TestTransactionCommitDurabilityFailureRemainsRetryable` | Failure before durable COMMIT permits a later successful retry |
+| `TestTransactionCommitReturnsDurableLSNWhenUnpinFails` | Cleanup failure cannot make an already-durable transaction commit again |
+
+Java relies on callers discarding a completed `Transaction`; Go makes that lifecycle invariant explicit and testable.
+
 ## Next behavior
 
-Continue with Chapter 5 by enforcing transaction terminal state after commit or rollback.
+Continue with Chapter 5 by rejecting repeated rollback after a durable ROLLBACK.
 
 ## Sources
 

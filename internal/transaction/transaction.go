@@ -1,6 +1,7 @@
 package transaction
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Rwatana/simledb_in_go/internal/buffer"
@@ -8,6 +9,16 @@ import (
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
 	"github.com/Rwatana/simledb_in_go/internal/recovery"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
+)
+
+// ErrTransactionCompleted reports an operation attempted after a durable transaction outcome.
+var ErrTransactionCompleted = errors.New("transaction is completed")
+
+type transactionState uint8
+
+const (
+	transactionActive transactionState = iota
+	transactionCommitted
 )
 
 // BufferManager provides the transaction-scoped buffer operations needed by its lifecycle.
@@ -24,6 +35,7 @@ type Transaction struct {
 	bufferManager BufferManager
 	logs          recovery.DurableLog
 	iterator      recovery.EncodedRecordIteratorFactory
+	state         transactionState
 }
 
 // New allocates an identity, appends its START record, and creates isolated local ownership backed by shared managers.
@@ -176,6 +188,9 @@ func (t *Transaction) Rollback() (logmanager.LSN, error) {
 
 // Commit flushes this transaction's modified buffers and makes its COMMIT marker durable.
 func (t *Transaction) Commit() (logmanager.LSN, error) {
+	if t.state != transactionActive {
+		return 0, fmt.Errorf("commit transaction %d: %w", t.id, ErrTransactionCompleted)
+	}
 	flush := func(transaction recovery.TransactionID) error {
 		return t.bufferManager.FlushAll(buffer.TransactionID(transaction))
 	}
@@ -183,6 +198,7 @@ func (t *Transaction) Commit() (logmanager.LSN, error) {
 	if err != nil {
 		return 0, err
 	}
+	t.state = transactionCommitted
 	t.locks.Release()
 	if err := t.buffers.UnpinAll(); err != nil {
 		return lsn, fmt.Errorf("commit transaction %d: unpin buffers after durable commit: %w", t.id, err)
