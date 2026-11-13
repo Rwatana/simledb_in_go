@@ -1350,10 +1350,30 @@ were tested first. The initial success test failed because the exclusive lock re
 This adds the `concurMgr.release()` portion of Java `Transaction.commit` after recovery commit. Buffer pin cleanup remains
 separate so its ordering and failure behavior can be tested independently.
 
+## Feature 62: Unpin buffers after committed lock release
+
+After durable commit and local lock release, `Transaction.Commit` calls `BufferList.UnpinAll`. Successful cleanup removes
+every pin occurrence and buffer lookup. Because lock release happens first, a competing shared acquisition can already
+succeed when the first shared-manager unpin is observed. If unpin fails, the method returns cleanup context together with
+the already-durable COMMIT LSN; the failed occurrence remains locally tracked for retry while locks stay released.
+
+### Test-first record
+
+Lock-before-unpin ordering, complete pin cleanup, durable LSN preservation after cleanup failure, and failed-occurrence
+retention were tested first. The initial tests failed because commit never invoked unpin-all.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionCommitUnpinsBuffersAfterLockRelease` | Commit releases locks before unpinning and clears all local buffer ownership |
+| `TestTransactionCommitReturnsDurableLSNWhenUnpinFails` | Post-commit unpin failure returns the durable LSN and retains the failed pin while locks remain released |
+
+This completes Java `Transaction.commit` ordering: recovery commit, concurrency release, then `BufferList.unpinAll`.
+Go additionally reports cleanup failure without obscuring that COMMIT is already durable.
+
 ## Next behavior
 
-Continue with Chapter 5 by unpinning all transaction buffers after durable commit and lock release as a separate lifecycle
-behavior without mixing rollback.
+Continue with Chapter 5 by composing transaction rollback durability, then add rollback lock release and buffer unpin as
+separate lifecycle behaviors.
 
 ## Sources
 
