@@ -1095,9 +1095,30 @@ initial build failed because `WaitExclusiveFor` did not exist.
 This maps to Java `LockTable.xLock`'s elapsed-time check and `LockAbortException`. As with bounded shared acquisition,
 Go accepts the duration explicitly so tests and future transaction policy do not depend on a package-global delay.
 
+## Feature 49: Reuse a transaction-local shared lock
+
+`Manager` represents the lock state of one transaction and receives the shared `LockTable` as a constructor dependency.
+Its local map records blocks already held by that transaction. `LockShared` asks the table to acquire only when the
+block is absent locally, so a repeated request remains one global shared hold. Different blocks are acquired and
+recorded independently.
+
+### Test-first record
+
+Repeated acquisition, independent block state, and local shared-mode recording were tested first. The initial build
+failed because `Manager`, `NewManager`, and the local shared mode did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestManagerReusesTransactionSharedLock` | One transaction's repeated shared request reuses its existing global hold while a different block is acquired independently |
+
+This maps to Java `ConcurrencyMgr.sLock` and its per-instance `locks` map. Go injects the table rather than hiding it in
+a static field, which keeps the global coordination boundary explicit and independently testable. Exclusive upgrade and
+release remain separate behaviors.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by adding transaction-local lock tracking as a separate behavior.
+Continue with Chapter 5 concurrency control by adding transaction-local exclusive upgrade as a separate behavior, then
+release locally tracked locks separately.
 
 ## Sources
 
