@@ -65,5 +65,11 @@ func (l *BufferList) Unpin(block storage.BlockID) error {
 			break
 		}
 	}
+	for _, pinned := range l.pins {
+		if pinned == block {
+			return nil
+		}
+	}
+	delete(l.buffers, block)
 	return nil
 }
