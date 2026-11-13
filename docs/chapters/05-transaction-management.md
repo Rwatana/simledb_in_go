@@ -1431,9 +1431,32 @@ were tested first. The initial build failed because `Transaction.GetInt` did not
 
 This maps to Java `Transaction.getInt`; string decoding remains a separate behavior and PR.
 
+## Feature 66: Read a string through a shared transaction lock
+
+`Transaction.GetString` requires transaction-local buffer ownership, acquires a shared lock through the same local
+concurrency manager used by integer reads, then decodes the page's four-byte length prefix and returns the payload as a
+Go string. Repeated reads reuse one global shared hold. Missing ownership, negative or out-of-range lengths, lock
+failure, and page-boundary failure retain block and offset context.
+
+As with `GetInt`, ownership is checked before locking so a missing pin cannot leave a newly acquired shared hold behind.
+The stored bytes are converted directly to a Go string, matching SimpleDB's byte-preserving storage contract without
+adding Unicode normalization or validation at the transaction layer.
+
+### Test-first record
+
+UTF-8 payload decoding, retained shared ownership, repeated-read lock reuse, missing-pin failure, negative length, and
+page-boundary failure were tested first. The initial build failed because `Transaction.GetString` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionGetStringReadsPinnedPageAndReusesSharedLock` | Two reads return the stored UTF-8 string while retaining exactly one transaction-local shared hold |
+| `TestTransactionGetStringReturnsMissingPinAndPageFailures` | Missing ownership, negative lengths, and invalid offsets return explicit errors |
+
+This maps to Java `Transaction.getString`; mutation remains in later, independently tested behaviors.
+
 ## Next behavior
 
-Continue with Chapter 5 by implementing a locked string read, then logged/no-log writes needed for rollback undo.
+Continue with Chapter 5 by implementing the no-log integer write path, then its logged old-value capture.
 
 ## Sources
 

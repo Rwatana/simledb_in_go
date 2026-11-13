@@ -438,6 +438,62 @@ func TestTransactionGetIntReturnsMissingPinAndPageFailures(t *testing.T) {
 	}
 }
 
+func TestTransactionGetStringReadsPinnedPageAndReusesSharedLock(t *testing.T) {
+	bufferManager, logs, block := newTransactionStringBlock(t, 8, "こんにちは")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	for attempt := 0; attempt < 2; attempt++ {
+		got, err := tx.GetString(block, 8)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "こんにちは" {
+			t.Fatalf("GetString() = %q, want %q", got, "こんにちは")
+		}
+	}
+	if err := table.LockExclusive(block); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("exclusive acquisition with competing shared hold error = %v, want ErrLockConflict", err)
+	}
+	table.Unlock(block)
+	if err := table.LockExclusive(block); err != nil {
+		t.Fatalf("repeated GetString acquired more than one transaction shared hold: %v", err)
+	}
+}
+
+func TestTransactionGetStringReturnsMissingPinAndPageFailures(t *testing.T) {
+	bufferManager, logs, block := newTransactionDataBlock(t, 8, -1)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tx.GetString(block, 8); !errors.Is(err, ErrBufferNotPinned) {
+		t.Fatalf("GetString() without pin error = %v, want ErrBufferNotPinned", err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.GetString(block, 8); err == nil {
+		t.Fatal("GetString() with negative length returned nil error")
+	}
+	if _, err := tx.GetString(block, 62); err == nil {
+		t.Fatal("GetString() outside page returned nil error")
+	}
+}
+
 func newTransactionDataBlock(t *testing.T, offset int, value int32) (*buffer.Manager, *logmanager.Manager, storage.BlockID) {
 	t.Helper()
 	files, err := storagefile.NewManager(filepath.Join(t.TempDir(), "database"), 64)
@@ -453,6 +509,37 @@ func newTransactionDataBlock(t *testing.T, offset int, value int32) (*buffer.Man
 		t.Fatal(err)
 	}
 	if err := page.SetInt(offset, value); err != nil {
+		t.Fatal(err)
+	}
+	block, err := files.Append("table.tbl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := files.Write(block, page); err != nil {
+		t.Fatal(err)
+	}
+	bufferManager, err := buffer.NewManager(files, logs, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bufferManager, logs, block
+}
+
+func newTransactionStringBlock(t *testing.T, offset int, value string) (*buffer.Manager, *logmanager.Manager, storage.BlockID) {
+	t.Helper()
+	files, err := storagefile.NewManager(filepath.Join(t.TempDir(), "database"), 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logs, err := logmanager.NewManager(files, "simpledb.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := storage.NewPage(files.BlockSize())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := page.SetBytes(offset, []byte(value)); err != nil {
 		t.Fatal(err)
 	}
 	block, err := files.Append("table.tbl")
