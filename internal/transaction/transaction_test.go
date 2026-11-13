@@ -494,6 +494,77 @@ func TestTransactionGetStringReturnsMissingPinAndPageFailures(t *testing.T) {
 	}
 }
 
+func TestTransactionSetIntWithoutLoggingUpdatesPinnedPageExclusively(t *testing.T) {
+	bufferManager, _, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	logs := &recordingTransactionLog{}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.SetInt(block, 8, 77, false); err != nil {
+		t.Fatal(err)
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("SetInt removed transaction buffer ownership")
+	}
+	got, err := frame.Contents().GetInt(8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 77 {
+		t.Fatalf("stored integer = %d, want 77", got)
+	}
+	if modifiedBy, dirty := frame.ModifyingTransaction(); !dirty || modifiedBy != buffer.TransactionID(tx.ID()) {
+		t.Fatalf("modifying transaction = (%d, %v), want (%d, true)", modifiedBy, dirty, tx.ID())
+	}
+	if lsn, ok := frame.RecoveryLSN(); ok {
+		t.Fatalf("no-log SetInt recovery LSN = %d, want absent", lsn)
+	}
+	if len(logs.records) != 1 {
+		t.Fatalf("log records = %d, want START only", len(logs.records))
+	}
+	if err := table.LockShared(block); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("shared acquisition after SetInt error = %v, want ErrLockConflict", err)
+	}
+}
+
+func TestTransactionSetIntWithoutLoggingReturnsPreconditionAndPageFailures(t *testing.T) {
+	bufferManager, _, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.SetInt(block, 8, 77, false); !errors.Is(err, ErrBufferNotPinned) {
+		t.Fatalf("SetInt() without pin error = %v, want ErrBufferNotPinned", err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.SetInt(block, 62, 77, false); err == nil {
+		t.Fatal("SetInt() outside page returned nil error")
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("failed SetInt removed transaction buffer ownership")
+	}
+	if _, dirty := frame.ModifyingTransaction(); dirty {
+		t.Fatal("failed SetInt marked buffer modified")
+	}
+	if err := tx.SetInt(block, 8, 77, true); err == nil {
+		t.Fatal("logged SetInt silently used the no-log path")
+	}
+}
+
 func newTransactionDataBlock(t *testing.T, offset int, value int32) (*buffer.Manager, *logmanager.Manager, storage.BlockID) {
 	t.Helper()
 	files, err := storagefile.NewManager(filepath.Join(t.TempDir(), "database"), 64)
