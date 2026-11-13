@@ -22,6 +22,18 @@ type recordingTransactionLog struct {
 	events   *[]string
 }
 
+type failingUpdateTransactionLog struct {
+	recordingTransactionLog
+	updateErr error
+}
+
+func (l *failingUpdateTransactionLog) Append(record []byte) (logmanager.LSN, error) {
+	if len(l.records) > 0 {
+		return 0, l.updateErr
+	}
+	return l.recordingTransactionLog.Append(record)
+}
+
 func (l *recordingTransactionLog) Append(record []byte) (logmanager.LSN, error) {
 	if l.err != nil {
 		return 0, l.err
@@ -560,8 +572,86 @@ func TestTransactionSetIntWithoutLoggingReturnsPreconditionAndPageFailures(t *te
 	if _, dirty := frame.ModifyingTransaction(); dirty {
 		t.Fatal("failed SetInt marked buffer modified")
 	}
-	if err := tx.SetInt(block, 8, 77, true); err == nil {
-		t.Fatal("logged SetInt silently used the no-log path")
+}
+
+func TestTransactionSetIntLogsPreviousValueBeforeMutation(t *testing.T) {
+	bufferManager, _, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	logs := &recordingTransactionLog{}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.SetInt(block, 8, 77, true); err != nil {
+		t.Fatal(err)
+	}
+	if len(logs.records) != 2 {
+		t.Fatalf("log records = %d, want START and SETINT", len(logs.records))
+	}
+	record, err := recovery.DecodeSetIntRecord(logs.records[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.TransactionID() != tx.ID() || record.Block() != block || record.Offset() != 8 || record.OldValue() != 42 {
+		t.Fatalf("SETINT = tx %d block %v offset %d old %d", record.TransactionID(), record.Block(), record.Offset(), record.OldValue())
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("SetInt removed transaction buffer ownership")
+	}
+	got, err := frame.Contents().GetInt(8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 77 {
+		t.Fatalf("stored integer = %d, want 77", got)
+	}
+	if modifiedBy, dirty := frame.ModifyingTransaction(); !dirty || modifiedBy != buffer.TransactionID(tx.ID()) {
+		t.Fatalf("modifying transaction = (%d, %v), want (%d, true)", modifiedBy, dirty, tx.ID())
+	}
+	if lsn, ok := frame.RecoveryLSN(); !ok || lsn != 2 {
+		t.Fatalf("recovery LSN = (%d, %v), want (2, true)", lsn, ok)
+	}
+}
+
+func TestTransactionSetIntLogFailurePreservesPageAndMetadata(t *testing.T) {
+	wantErr := errors.New("append setint failed")
+	bufferManager, _, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	logs := &failingUpdateTransactionLog{updateErr: wantErr}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.SetInt(block, 8, 77, true); !errors.Is(err, wantErr) {
+		t.Fatalf("SetInt() error = %v, want %v", err, wantErr)
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("failed SetInt removed transaction buffer ownership")
+	}
+	got, err := frame.Contents().GetInt(8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 42 {
+		t.Fatalf("integer after log failure = %d, want old value 42", got)
+	}
+	if _, dirty := frame.ModifyingTransaction(); dirty {
+		t.Fatal("log failure marked buffer modified")
+	}
+	if _, ok := frame.RecoveryLSN(); ok {
+		t.Fatal("log failure recorded a recovery LSN")
 	}
 }
 
