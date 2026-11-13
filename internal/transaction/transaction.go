@@ -50,6 +50,11 @@ func (t *Transaction) Pin(block storage.BlockID) error {
 	return t.buffers.Pin(block)
 }
 
+// Unpin releases one transaction-local buffer pin for block.
+func (t *Transaction) Unpin(block storage.BlockID) error {
+	return t.buffers.Unpin(block)
+}
+
 // Commit flushes this transaction's modified buffers and makes its COMMIT marker durable.
 func (t *Transaction) Commit() (logmanager.LSN, error) {
 	flush := func(transaction recovery.TransactionID) error {
