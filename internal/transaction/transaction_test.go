@@ -570,6 +570,45 @@ func TestTransactionGetIntReturnsMissingPinAndPageFailures(t *testing.T) {
 	}
 }
 
+func TestTransactionRejectsGetIntAfterCompletion(t *testing.T) {
+	tests := []struct {
+		name     string
+		complete func(*Transaction) error
+	}{
+		{name: "commit", complete: func(tx *Transaction) error { _, err := tx.Commit(); return err }},
+		{name: "rollback", complete: func(tx *Transaction) error { _, err := tx.Rollback(); return err }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var allocator IDAllocator
+			var table concurrency.LockTable
+			bufferManager := &recordingBufferPinner{}
+			logs := &recordingTransactionLog{}
+			start := recovery.EncodeStartRecord(1)
+			factory := func() (recovery.EncodedRecordIterator, error) {
+				return &transactionRecordIterator{records: [][]byte{start}}, nil
+			}
+			tx, err := New(&allocator, &table, bufferManager, logs, factory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := test.complete(tx); err != nil {
+				t.Fatal(err)
+			}
+			block := storage.NewBlockID("tbl", 1)
+			if err := table.LockShared(block); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := tx.GetInt(block, 0); !errors.Is(err, ErrTransactionCompleted) {
+				t.Fatalf("GetInt() error = %v, want ErrTransactionCompleted", err)
+			}
+			if err := table.LockExclusive(block); err != nil {
+				t.Fatalf("completed GetInt acquired a shared lock: %v", err)
+			}
+		})
+	}
+}
+
 func TestTransactionGetStringReadsPinnedPageAndReusesSharedLock(t *testing.T) {
 	bufferManager, logs, block := newTransactionStringBlock(t, 8, "こんにちは")
 	var allocator IDAllocator

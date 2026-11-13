@@ -1666,9 +1666,29 @@ tested first. Both completed-state cases initially acquired a new pin.
 
 Java relies on completed transactions no longer being used; Go rejects this resource reacquisition explicitly.
 
+## Feature 77: Reject integer reads after transaction completion
+
+`Transaction.GetInt` now validates active lifecycle state before buffer lookup or shared-lock acquisition. Committed and
+rolled-back transactions return `ErrTransactionCompleted`, so completion cannot be followed by stale page access or new
+lock ownership. Lifecycle validation also takes precedence over the ordinary missing-pin error.
+
+`Unpin` intentionally remains available after completion: a durable commit or rollback whose cleanup failed retains the
+failed pin specifically so callers can retry releasing it without reopening data access.
+
+### Test-first record
+
+Commit and rollback completion, error precedence over missing ownership, and absence of shared-lock acquisition were
+tested first. Both cases initially returned `ErrBufferNotPinned` and therefore did not enforce lifecycle state.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRejectsGetIntAfterCompletion` | Completed transactions reject integer reads before buffer lookup and lock acquisition |
+
+This makes Java's completed-transaction discard convention explicit while preserving cleanup retry.
+
 ## Next behavior
 
-Continue with Chapter 5 by rejecting buffer unpin after transaction completion, then reads and writes separately.
+Continue with Chapter 5 by rejecting string reads after transaction completion, then integer and string writes separately.
 
 ## Sources
 
