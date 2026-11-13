@@ -337,3 +337,48 @@ func TestTransactionPinFailureDoesNotRecordBuffer(t *testing.T) {
 		t.Fatal("failed transaction pin recorded a buffer")
 	}
 }
+
+func TestTransactionUnpinsFinalOccurrenceWithoutReleasingLock(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	block := storage.NewBlockID("tbl", 1)
+	frame := &buffer.Buffer{}
+	bufferManager := &recordingBufferPinner{frame: frame}
+	tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.locks.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.Unpin(block); err != nil {
+		t.Fatal(err)
+	}
+	if len(bufferManager.unpins) != 1 || bufferManager.unpins[0] != frame {
+		t.Fatalf("unpin requests = %v, want [%p]", bufferManager.unpins, frame)
+	}
+	if _, ok := tx.buffers.Buffer(block); ok {
+		t.Fatal("buffer remains tracked after final transaction unpin")
+	}
+	if err := table.LockShared(block); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("shared acquisition after unpin error = %v, want ErrLockConflict", err)
+	}
+}
+
+func TestTransactionUnpinPropagatesOwnershipErrors(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	block := storage.NewBlockID("tbl", 1)
+	tx, err := New(&allocator, &table, &recordingBufferPinner{}, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.Unpin(block); !errors.Is(err, ErrBufferNotPinned) {
+		t.Fatalf("Unpin() error = %v, want ErrBufferNotPinned", err)
+	}
+}

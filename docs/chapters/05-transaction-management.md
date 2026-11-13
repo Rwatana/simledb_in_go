@@ -1390,10 +1390,27 @@ failed because `Transaction.Pin` did not exist.
 This maps directly to Java `Transaction.pin`, which delegates to `BufferList.pin`; value access methods acquire their own
 locks separately.
 
+## Feature 64: Unpin a block through a transaction
+
+`Transaction.Unpin` delegates one occurrence to `BufferList.Unpin`. Releasing the final occurrence removes the local
+block-to-buffer lookup, and missing ownership or shared-manager failures are returned unchanged through the wrapped error
+chain. Buffer unpin is independent from concurrency ownership, so an exclusive block lock remains held afterward.
+
+### Test-first record
+
+One delegated release, final lookup removal, lock preservation, and missing-block error propagation were tested first.
+The initial build failed because `Transaction.Unpin` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionUnpinsFinalOccurrenceWithoutReleasingLock` | Final transaction unpin removes buffer ownership while leaving its exclusive lock intact |
+| `TestTransactionUnpinPropagatesOwnershipErrors` | Unpinning an unowned block returns `ErrBufferNotPinned` |
+
+This maps directly to Java `Transaction.unpin`, keeping buffer lifetime distinct from concurrency lifetime.
+
 ## Next behavior
 
-Continue with Chapter 5 by adding transaction-level unpin delegation, then implement locked value reads and writes needed
-for rollback undo.
+Continue with Chapter 5 by implementing locked integer and string reads, then logged/no-log writes needed for rollback undo.
 
 ## Sources
 
