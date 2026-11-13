@@ -27,6 +27,20 @@ type failingUpdateTransactionLog struct {
 	updateErr error
 }
 
+type transactionRecordIterator struct {
+	records [][]byte
+	index   int
+}
+
+func (i *transactionRecordIterator) Next() ([]byte, bool, error) {
+	if i.index >= len(i.records) {
+		return nil, false, nil
+	}
+	record := i.records[i.index]
+	i.index++
+	return record, true, nil
+}
+
 func (l *failingUpdateTransactionLog) Append(record []byte) (logmanager.LSN, error) {
 	if len(l.records) > 0 {
 		return 0, l.updateErr
@@ -815,6 +829,10 @@ func TestTransactionRollbackInvokesDurabilityForOwnID(t *testing.T) {
 	if err := tx.SetInt(block, 8, 77, true); err != nil {
 		t.Fatal(err)
 	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("transaction buffer missing before rollback")
+	}
 
 	lsn, err := tx.Rollback()
 	if err != nil {
@@ -822,10 +840,6 @@ func TestTransactionRollbackInvokesDurabilityForOwnID(t *testing.T) {
 	}
 	if lsn != 3 {
 		t.Fatalf("Rollback() LSN = %d, want 3", lsn)
-	}
-	frame, ok := tx.buffers.Buffer(block)
-	if !ok {
-		t.Fatal("rollback released transaction buffer ownership")
 	}
 	got, err := frame.Contents().GetInt(8)
 	if err != nil {
@@ -852,6 +866,9 @@ func TestTransactionRollbackInvokesDurabilityForOwnID(t *testing.T) {
 	}
 	if err := table.LockShared(block); err != nil {
 		t.Fatalf("shared acquisition after durable rollback: %v", err)
+	}
+	if _, ok := tx.buffers.Buffer(block); ok {
+		t.Fatal("buffer remains tracked after successful rollback cleanup")
 	}
 }
 
@@ -880,6 +897,47 @@ func TestTransactionRollbackFailureKeepsLocksAndPins(t *testing.T) {
 	}
 	if err := table.LockShared(block); !errors.Is(err, concurrency.ErrLockConflict) {
 		t.Fatalf("shared acquisition after failed rollback error = %v, want retained exclusive lock", err)
+	}
+}
+
+func TestTransactionRollbackReturnsDurableLSNWhenUnpinFails(t *testing.T) {
+	wantErr := errors.New("unpin failed")
+	start := recovery.EncodeStartRecord(1)
+	frame := &buffer.Buffer{}
+	bufferManager := &recordingBufferPinner{frame: frame, unpinErr: wantErr}
+	logs := &recordingTransactionLog{}
+	factory := func() (recovery.EncodedRecordIterator, error) {
+		return &transactionRecordIterator{records: [][]byte{start}}, nil
+	}
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, logs, factory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := storage.NewBlockID("tbl", 1)
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.locks.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+
+	lsn, err := tx.Rollback()
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Rollback() error = %v, want %v", err, wantErr)
+	}
+	if lsn != 2 {
+		t.Fatalf("Rollback() LSN after cleanup failure = %d, want durable LSN 2", lsn)
+	}
+	if len(logs.flushed) != 1 || logs.flushed[0] != lsn {
+		t.Fatalf("log flushes = %v, want [%d]", logs.flushed, lsn)
+	}
+	if got, ok := tx.buffers.Buffer(block); !ok || got != frame {
+		t.Fatalf("buffer after failed cleanup = (%p, %v), want (%p, true)", got, ok, frame)
+	}
+	if err := table.LockShared(block); err != nil {
+		t.Fatalf("lock remained held after durable rollback cleanup failure: %v", err)
 	}
 }
 

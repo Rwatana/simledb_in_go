@@ -1588,9 +1588,28 @@ first. The success test initially failed because the exclusive lock remained aft
 
 This adds the `concurMgr.release()` portion of Java `Transaction.rollback` after recovery durability.
 
+## Feature 73: Unpin buffers after rolled-back lock release
+
+After durable rollback and local lock release, `Transaction.Rollback` calls `BufferList.UnpinAll`. Successful cleanup
+removes every pin occurrence and block lookup. If shared-manager unpin fails, rollback returns the already-durable marker
+LSN with cleanup context; the failed occurrence remains tracked for retry while locks stay released. Earlier rollback
+failure still returns before either cleanup phase.
+
+### Test-first record
+
+Complete pin cleanup, lock-before-unpin ordering, durable LSN preservation on cleanup failure, and failed-pin retention
+were tested first. The initial tests failed because rollback did not invoke unpin-all.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRollbackInvokesDurabilityForOwnID` | Durable rollback restores data, releases locks, and removes the original transaction pin |
+| `TestTransactionRollbackReturnsDurableLSNWhenUnpinFails` | Cleanup failure returns the durable LSN, retains the failed pin, and leaves locks released |
+
+This completes Java `Transaction.rollback` ordering: recovery rollback, concurrency release, then buffer unpin-all.
+
 ## Next behavior
 
-Continue with Chapter 5 by unpinning every transaction buffer only after durable rollback and lock release.
+Continue with Chapter 5 by enforcing transaction terminal state after commit or rollback.
 
 ## Sources
 
