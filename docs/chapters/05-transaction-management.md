@@ -1213,9 +1213,29 @@ lookup mapping remained after the final occurrence was removed.
 This completes the final-pin path of Java `BufferList.unpin` while preserving the repeated-pin behavior from Feature 53.
 Bulk unpin remains separate because it has different iteration and partial-failure behavior.
 
+## Feature 55: Release all transaction buffer pins
+
+`BufferList.UnpinAll` repeatedly releases the first local occurrence until the acquisition-ordered sequence is empty.
+Delegating through `Unpin` gives repeated pins one shared-manager release each and reuses the existing rule that removes a
+block lookup only after its final occurrence. Once successful, both local collections are empty and a later call is a
+no-op.
+
+### Test-first record
+
+Multiple blocks, repeated occurrences, acquisition-order release, complete cleanup, and repeated-call idempotence were
+tested first. The initial build failed because `UnpinAll` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestBufferListReleasesAllPinOccurrences` | Bulk release delegates once per occurrence in acquisition order and clears every local buffer and pin record |
+
+This maps to Java `BufferList.unpinAll`. Go returns an error so a shared-manager failure is visible; defining an explicit
+partial-failure retry contract remains separate from the successful bulk-release behavior.
+
 ## Next behavior
 
-Continue with Chapter 5 by adding unpin-all as a separate behavior before composing the transaction lifecycle.
+Continue with Chapter 5 by composing transaction construction and lifecycle around recovery, concurrency, and buffer
+ownership as separate behaviors.
 
 ## Sources
 
