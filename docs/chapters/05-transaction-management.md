@@ -1135,9 +1135,29 @@ This maps to Java `ConcurrencyMgr.xLock`: obtain shared ownership if necessary, 
 replace the local `S` marker with `X`. Go keeps error propagation explicit and does not update local ownership after a
 failed table operation. Releasing the transaction's tracked locks remains a separate behavior.
 
+## Feature 51: Release all transaction-local locks
+
+`Manager.Release` visits each block recorded by one transaction, asks the shared `LockTable` to release that block once,
+then clears the local ownership map. Shared and exclusive modes both correspond to one table entry per manager, so the
+same release operation handles either mode. An empty map makes a repeated release a no-op, while another manager's local
+and global locks are outside the iteration and remain unchanged.
+
+### Test-first record
+
+Shared and exclusive release, local cleanup, repeated-release idempotence, and isolation from another manager were
+tested first. The initial build failed because `Release` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestManagerReleasesAllTransactionLocks` | Releasing one manager removes each of its global holds and local records exactly once without affecting another manager |
+
+This maps directly to Java `ConcurrencyMgr.release`, including one global unlock per locally tracked block followed by
+clearing the transaction's map. Connecting this lifecycle to commit and rollback remains a separate transaction behavior.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by releasing all transaction-local locks as a separate behavior.
+Continue with Chapter 5 by composing the transaction lifecycle around recovery, concurrency, and buffer ownership in
+separate observable behaviors.
 
 ## Sources
 

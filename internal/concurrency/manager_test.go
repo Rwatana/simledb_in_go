@@ -65,3 +65,41 @@ func TestManagerUpgradesTransactionLockToExclusiveOnce(t *testing.T) {
 		t.Fatalf("local other lock = %v, want shared", got)
 	}
 }
+
+func TestManagerReleasesAllTransactionLocks(t *testing.T) {
+	var table LockTable
+	manager := NewManager(&table)
+	otherManager := NewManager(&table)
+	sharedBlock := storage.NewBlockID("tbl", 1)
+	exclusiveBlock := storage.NewBlockID("tbl", 2)
+	otherBlock := storage.NewBlockID("tbl", 3)
+
+	if err := manager.LockShared(sharedBlock); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.LockExclusive(exclusiveBlock); err != nil {
+		t.Fatal(err)
+	}
+	if err := otherManager.LockShared(otherBlock); err != nil {
+		t.Fatal(err)
+	}
+
+	manager.Release()
+	manager.Release()
+
+	if _, ok := table.locks[sharedBlock]; ok {
+		t.Fatal("shared block remains globally locked")
+	}
+	if _, ok := table.locks[exclusiveBlock]; ok {
+		t.Fatal("exclusive block remains globally locked")
+	}
+	if got := table.locks[otherBlock]; got != 1 {
+		t.Fatalf("other manager block state = %d, want 1", got)
+	}
+	if len(manager.locks) != 0 {
+		t.Fatalf("local locks after release = %d, want 0", len(manager.locks))
+	}
+	if got := otherManager.locks[otherBlock]; got != sharedLock {
+		t.Fatalf("other manager local lock = %v, want shared", got)
+	}
+}
