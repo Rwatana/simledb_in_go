@@ -71,6 +71,22 @@ func (t *Transaction) GetInt(block storage.BlockID, offset int) (int32, error) {
 	return value, nil
 }
 
+// GetString reads a length-prefixed string from a pinned block while retaining a shared lock.
+func (t *Transaction) GetString(block storage.BlockID, offset int) (string, error) {
+	frame, ok := t.buffers.Buffer(block)
+	if !ok {
+		return "", fmt.Errorf("get string from transaction buffer %v at offset %d: %w", block, offset, ErrBufferNotPinned)
+	}
+	if err := t.locks.LockShared(block); err != nil {
+		return "", fmt.Errorf("get string from transaction buffer %v at offset %d: acquire shared lock: %w", block, offset, err)
+	}
+	value, err := frame.Contents().GetBytes(offset)
+	if err != nil {
+		return "", fmt.Errorf("get string from transaction buffer %v at offset %d: %w", block, offset, err)
+	}
+	return string(value), nil
+}
+
 // Commit flushes this transaction's modified buffers and makes its COMMIT marker durable.
 func (t *Transaction) Commit() (logmanager.LSN, error) {
 	flush := func(transaction recovery.TransactionID) error {
