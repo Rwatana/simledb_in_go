@@ -1648,9 +1648,27 @@ were tested first. The initial tests showed that rollback could append multiple 
 
 As with commit, this makes Java's caller-side discard convention an explicit Go lifecycle invariant.
 
+## Feature 76: Reject buffer pin after transaction completion
+
+`Transaction.Pin` now checks active lifecycle state before delegating to `BufferList`. A committed or rolled-back
+transaction returns `ErrTransactionCompleted` without invoking the shared buffer manager or recording local ownership.
+Failure before commit/rollback durability leaves the transaction active, so pinning remains available for retry handling.
+
+### Test-first record
+
+Commit and rollback completion, absence of buffer-manager calls, unchanged local ownership, and pre-durability retry were
+tested first. Both completed-state cases initially acquired a new pin.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRejectsPinAfterCompletion` | Neither committed nor rolled-back transactions can acquire a new buffer pin |
+| `TestTransactionPinRemainsAvailableAfterCommitDurabilityFailure` | A failed pre-durability commit does not prematurely disable pinning |
+
+Java relies on completed transactions no longer being used; Go rejects this resource reacquisition explicitly.
+
 ## Next behavior
 
-Continue with Chapter 5 by rejecting buffer and value access after transaction completion.
+Continue with Chapter 5 by rejecting buffer unpin after transaction completion, then reads and writes separately.
 
 ## Sources
 

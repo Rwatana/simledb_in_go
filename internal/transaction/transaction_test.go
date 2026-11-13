@@ -413,6 +413,65 @@ func TestTransactionPinFailureDoesNotRecordBuffer(t *testing.T) {
 	}
 }
 
+func TestTransactionRejectsPinAfterCompletion(t *testing.T) {
+	tests := []struct {
+		name     string
+		complete func(*Transaction) error
+	}{
+		{name: "commit", complete: func(tx *Transaction) error { _, err := tx.Commit(); return err }},
+		{name: "rollback", complete: func(tx *Transaction) error { _, err := tx.Rollback(); return err }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var allocator IDAllocator
+			var table concurrency.LockTable
+			frame := &buffer.Buffer{}
+			bufferManager := &recordingBufferPinner{frame: frame}
+			logs := &recordingTransactionLog{}
+			start := recovery.EncodeStartRecord(1)
+			factory := func() (recovery.EncodedRecordIterator, error) {
+				return &transactionRecordIterator{records: [][]byte{start}}, nil
+			}
+			tx, err := New(&allocator, &table, bufferManager, logs, factory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := test.complete(tx); err != nil {
+				t.Fatal(err)
+			}
+			block := storage.NewBlockID("tbl", 1)
+			if err := tx.Pin(block); !errors.Is(err, ErrTransactionCompleted) {
+				t.Fatalf("Pin() error = %v, want ErrTransactionCompleted", err)
+			}
+			if len(bufferManager.blocks) != 0 {
+				t.Fatalf("completed Pin() reached buffer manager: %v", bufferManager.blocks)
+			}
+			if _, ok := tx.buffers.Buffer(block); ok {
+				t.Fatal("completed Pin() recorded local ownership")
+			}
+		})
+	}
+}
+
+func TestTransactionPinRemainsAvailableAfterCommitDurabilityFailure(t *testing.T) {
+	wantErr := errors.New("flush failed")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	frame := &buffer.Buffer{}
+	bufferManager := &recordingBufferPinner{frame: frame, flushErr: wantErr}
+	tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Commit(); !errors.Is(err, wantErr) {
+		t.Fatalf("Commit() error = %v, want %v", err, wantErr)
+	}
+	block := storage.NewBlockID("tbl", 1)
+	if err := tx.Pin(block); err != nil {
+		t.Fatalf("Pin() after pre-durability failure: %v", err)
+	}
+}
+
 func TestTransactionUnpinsFinalOccurrenceWithoutReleasingLock(t *testing.T) {
 	var allocator IDAllocator
 	var table concurrency.LockTable
