@@ -168,6 +168,9 @@ func (t *Transaction) Rollback() (logmanager.LSN, error) {
 		return 0, err
 	}
 	t.locks.Release()
+	if err := t.buffers.UnpinAll(); err != nil {
+		return lsn, fmt.Errorf("rollback transaction %d: unpin buffers after durable rollback: %w", t.id, err)
+	}
 	return lsn, nil
 }
 
