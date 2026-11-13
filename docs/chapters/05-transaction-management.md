@@ -1462,8 +1462,8 @@ not append a SETINT record or associate a recovery LSN, which is the write mode 
 own restoration.
 
 Missing ownership is rejected before locking. A page-boundary failure occurs after exclusive acquisition but before the
-dirty marker, so no invalid page mutation can be flushed. Until the next independently tested feature adds old-value
-logging, `logUpdate == true` returns an explicit error instead of silently performing an unlogged update.
+dirty marker, so no invalid page mutation can be flushed. At this stack point, `logUpdate == true` returned an explicit
+error instead of silently performing an unlogged update; the next feature replaces that guard with WAL metadata.
 
 ### Test-first record
 
@@ -1478,9 +1478,32 @@ because `Transaction.SetInt` did not exist.
 
 This maps to Java `Transaction.setInt(..., false)` and supplies the `IntegerUndoTarget` signature used by SETINT undo.
 
+## Feature 68: Log the previous integer before a transaction write
+
+The `logUpdate == true` path now acquires the transaction's exclusive block lock and calls
+`recovery.LogPreviousInteger` before changing the page. The SETINT record captures the current transaction ID, assigned
+block, offset, and old integer. Only a successful append permits the new value to be stored; the frame is then marked
+dirty and associated with the returned recovery LSN for later WAL-ordered buffer flush.
+
+If recovery append fails, `SetInt` returns the wrapped cause while the page retains its old value and the frame remains
+clean with no recovery LSN. The existing `logUpdate == false` branch still performs no append and records no LSN.
+
+### Test-first record
+
+Old-value capture, append-before-mutate ordering, SETINT field identity, dirty attribution, recovery LSN propagation, and
+append-failure atomicity were tested first. The initial success test failed with the deliberate logged-update guard from
+Feature 67.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionSetIntLogsPreviousValueBeforeMutation` | SETINT records the old value before the page changes, then the frame carries the returned LSN |
+| `TestTransactionSetIntLogFailurePreservesPageAndMetadata` | Append failure preserves the old page value and clean metadata |
+
+This maps to Java `Transaction.setInt(..., true)` and its `RecoveryMgr.setInt` old-value append.
+
 ## Next behavior
 
-Continue with Chapter 5 by capturing and recording the old integer before a logged write.
+Continue with Chapter 5 by implementing the no-log string write path, then its logged old-value capture.
 
 ## Sources
 

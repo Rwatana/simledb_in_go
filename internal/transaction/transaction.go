@@ -89,9 +89,6 @@ func (t *Transaction) GetString(block storage.BlockID, offset int) (string, erro
 
 // SetInt writes a four-byte integer to a pinned block and optionally records its old value.
 func (t *Transaction) SetInt(block storage.BlockID, offset, value int32, logUpdate bool) error {
-	if logUpdate {
-		return fmt.Errorf("set integer in transaction buffer %v at offset %d: logged updates are not implemented", block, offset)
-	}
 	frame, ok := t.buffers.Buffer(block)
 	if !ok {
 		return fmt.Errorf("set integer in transaction buffer %v at offset %d: %w", block, offset, ErrBufferNotPinned)
@@ -99,10 +96,23 @@ func (t *Transaction) SetInt(block storage.BlockID, offset, value int32, logUpda
 	if err := t.locks.LockExclusive(block); err != nil {
 		return fmt.Errorf("set integer in transaction buffer %v at offset %d: acquire exclusive lock: %w", block, offset, err)
 	}
+	var lsn logmanager.LSN
+	if logUpdate {
+		var err error
+		lsn, err = recovery.LogPreviousInteger(t.logs, t.id, frame, offset)
+		if err != nil {
+			return fmt.Errorf("set integer in transaction buffer %v at offset %d: log previous value: %w", block, offset, err)
+		}
+	}
 	if err := frame.Contents().SetInt(int(offset), value); err != nil {
 		return fmt.Errorf("set integer in transaction buffer %v at offset %d: %w", block, offset, err)
 	}
 	frame.MarkModified(buffer.TransactionID(t.id))
+	if lsn > 0 {
+		if err := frame.RecordRecoveryLSN(lsn); err != nil {
+			return fmt.Errorf("set integer in transaction buffer %v at offset %d: record recovery LSN %d: %w", block, offset, lsn, err)
+		}
+	}
 	return nil
 }
 
