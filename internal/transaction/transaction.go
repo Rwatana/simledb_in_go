@@ -19,6 +19,7 @@ type transactionState uint8
 const (
 	transactionActive transactionState = iota
 	transactionCommitted
+	transactionRolledBack
 )
 
 // BufferManager provides the transaction-scoped buffer operations needed by its lifecycle.
@@ -169,6 +170,9 @@ func (t *Transaction) SetString(block storage.BlockID, offset int32, value strin
 
 // Rollback restores this transaction's logged updates and makes its ROLLBACK marker durable.
 func (t *Transaction) Rollback() (logmanager.LSN, error) {
+	if t.state != transactionActive {
+		return 0, fmt.Errorf("rollback transaction %d: %w", t.id, ErrTransactionCompleted)
+	}
 	if t.iterator == nil {
 		return 0, fmt.Errorf("rollback transaction %d: recovery iterator factory is not configured", t.id)
 	}
@@ -179,6 +183,7 @@ func (t *Transaction) Rollback() (logmanager.LSN, error) {
 	if err != nil {
 		return 0, err
 	}
+	t.state = transactionRolledBack
 	t.locks.Release()
 	if err := t.buffers.UnpinAll(); err != nil {
 		return lsn, fmt.Errorf("rollback transaction %d: unpin buffers after durable rollback: %w", t.id, err)

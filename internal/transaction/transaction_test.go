@@ -924,7 +924,13 @@ func TestTransactionRollbackFailureKeepsLocksAndPins(t *testing.T) {
 	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
 	var allocator IDAllocator
 	var table concurrency.LockTable
-	factory := func() (recovery.EncodedRecordIterator, error) { return nil, wantErr }
+	fail := true
+	factory := func() (recovery.EncodedRecordIterator, error) {
+		if fail {
+			return nil, wantErr
+		}
+		return logs.Iterator()
+	}
 	tx, err := New(&allocator, &table, bufferManager, logs, factory)
 	if err != nil {
 		t.Fatal(err)
@@ -944,6 +950,40 @@ func TestTransactionRollbackFailureKeepsLocksAndPins(t *testing.T) {
 	}
 	if err := table.LockShared(block); !errors.Is(err, concurrency.ErrLockConflict) {
 		t.Fatalf("shared acquisition after failed rollback error = %v, want retained exclusive lock", err)
+	}
+	fail = false
+	if _, err := tx.Rollback(); err != nil {
+		t.Fatalf("Rollback() retry after pre-durability failure: %v", err)
+	}
+}
+
+func TestTransactionRejectsRepeatedRollbackAfterDurability(t *testing.T) {
+	start := recovery.EncodeStartRecord(1)
+	bufferManager := &recordingBufferPinner{}
+	logs := &recordingTransactionLog{}
+	iteratorCalls := 0
+	factory := func() (recovery.EncodedRecordIterator, error) {
+		iteratorCalls++
+		return &transactionRecordIterator{records: [][]byte{start}}, nil
+	}
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, logs, factory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	flushes := len(bufferManager.flushes)
+	records := len(logs.records)
+	logFlushes := len(logs.flushed)
+
+	if _, err := tx.Rollback(); !errors.Is(err, ErrTransactionCompleted) {
+		t.Fatalf("second Rollback() error = %v, want ErrTransactionCompleted", err)
+	}
+	if iteratorCalls != 1 || len(bufferManager.flushes) != flushes || len(logs.records) != records || len(logs.flushed) != logFlushes {
+		t.Fatalf("rejected rollback performed I/O: iterators %d buffer flushes %d->%d records %d->%d log flushes %d->%d", iteratorCalls, flushes, len(bufferManager.flushes), records, len(logs.records), logFlushes, len(logs.flushed))
 	}
 }
 
@@ -982,6 +1022,9 @@ func TestTransactionRollbackReturnsDurableLSNWhenUnpinFails(t *testing.T) {
 	}
 	if got, ok := tx.buffers.Buffer(block); !ok || got != frame {
 		t.Fatalf("buffer after failed cleanup = (%p, %v), want (%p, true)", got, ok, frame)
+	}
+	if _, err := tx.Rollback(); !errors.Is(err, ErrTransactionCompleted) {
+		t.Fatalf("Rollback() after durable cleanup failure error = %v, want ErrTransactionCompleted", err)
 	}
 	if err := table.LockShared(block); err != nil {
 		t.Fatalf("lock remained held after durable rollback cleanup failure: %v", err)
