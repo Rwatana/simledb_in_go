@@ -1154,10 +1154,30 @@ tested first. The initial build failed because `Release` did not exist.
 This maps directly to Java `ConcurrencyMgr.release`, including one global unlock per locally tracked block followed by
 clearing the transaction's map. Connecting this lifecycle to commit and rollback remains a separate transaction behavior.
 
+## Feature 52: Track a transaction-pinned buffer
+
+`transaction.BufferList` receives the shared buffer manager through the narrow `BufferPinner` port. `Pin` delegates the
+block request first and records both the returned frame and one pin occurrence only after that request succeeds. `Buffer`
+then exposes the frame currently owned for a block, while an unpinned block is reported as absent. A failed shared-manager
+pin leaves both local collections unchanged.
+
+### Test-first record
+
+Successful delegation and lookup, one local pin occurrence, missing-block lookup, and failure atomicity were tested first.
+The initial build failed because `NewBufferList` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestBufferListPinsAndTracksBlock` | A successful shared-manager pin records its frame and one local occurrence for later transaction use |
+| `TestBufferListDoesNotTrackFailedPin` | A failed pin propagates its cause without creating transaction-local ownership |
+
+This maps to Java `BufferList.pin` and `getBuffer`. Go introduces a small port so transaction-local ownership depends only
+on the shared manager operation it currently needs. Repeated pins and both unpin paths remain separate behaviors.
+
 ## Next behavior
 
-Continue with Chapter 5 by composing the transaction lifecycle around recovery, concurrency, and buffer ownership in
-separate observable behaviors.
+Continue with Chapter 5 by tracking repeated pins for one block, then add single unpin and unpin-all as separate
+observable behaviors before composing the transaction lifecycle.
 
 ## Sources
 
