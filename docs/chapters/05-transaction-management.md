@@ -1115,10 +1115,29 @@ This maps to Java `ConcurrencyMgr.sLock` and its per-instance `locks` map. Go in
 a static field, which keeps the global coordination boundary explicit and independently testable. Exclusive upgrade and
 release remain separate behaviors.
 
+## Feature 50: Upgrade a transaction-local lock to exclusive
+
+`Manager.LockExclusive` first returns immediately when the transaction already records exclusive ownership. Otherwise
+it reuses `LockShared` to establish the transaction's one shared hold, asks the shared table to wait for and perform the
+exclusive upgrade, and records the exclusive local mode only after that upgrade succeeds. Locks tracked for other blocks
+remain unchanged.
+
+### Test-first record
+
+Acquisition from no local lock, repeated exclusive reuse, and preservation of another local shared lock were tested
+first. The initial build failed because `LockExclusive` and the local exclusive mode did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestManagerUpgradesTransactionLockToExclusiveOnce` | A transaction establishes and upgrades one block exactly once while retaining a different shared block |
+
+This maps to Java `ConcurrencyMgr.xLock`: obtain shared ownership if necessary, upgrade through the global table, then
+replace the local `S` marker with `X`. Go keeps error propagation explicit and does not update local ownership after a
+failed table operation. Releasing the transaction's tracked locks remains a separate behavior.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by adding transaction-local exclusive upgrade as a separate behavior, then
-release locally tracked locks separately.
+Continue with Chapter 5 concurrency control by releasing all transaction-local locks as a separate behavior.
 
 ## Sources
 
