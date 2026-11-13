@@ -54,5 +54,8 @@ func (t *Transaction) Commit() (logmanager.LSN, error) {
 		return 0, err
 	}
 	t.locks.Release()
+	if err := t.buffers.UnpinAll(); err != nil {
+		return lsn, fmt.Errorf("commit transaction %d: unpin buffers after durable commit: %w", t.id, err)
+	}
 	return lsn, nil
 }
