@@ -1,5 +1,7 @@
 package record
 
+import "fmt"
+
 // RID identifies one record slot within a file block.
 type RID struct {
 	blockNumber int
@@ -24,4 +26,9 @@ func (r RID) Slot() int {
 // Equal reports whether r and other identify the same record slot.
 func (r RID) Equal(other RID) bool {
 	return r.blockNumber == other.blockNumber && r.slot == other.slot
+}
+
+// String returns the identifier as a block-and-slot coordinate pair.
+func (r RID) String() string {
+	return fmt.Sprintf("[%d, %d]", r.blockNumber, r.slot)
 }
