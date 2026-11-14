@@ -538,3 +538,71 @@ func TestTableScanNextRejectsClosedScan(t *testing.T) {
 		t.Fatalf("Next() on closed scan = (%t, %v), want explicit error", ok, err)
 	}
 }
+
+func TestTableScanGetIntReadsTheCurrentRecordField(t *testing.T) {
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{value: 42},
+		size:                       1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 1
+
+	got, err := scan.GetInt("id")
+	if err != nil || got != 42 {
+		t.Fatalf("GetInt(id) = (%d, %v), want (42, nil)", got, err)
+	}
+	wantRead := integerRead{block: storage.NewBlockID("student.tbl", 0), offset: 12}
+	if len(transaction.reads) != 1 || transaction.reads[0] != wantRead {
+		t.Fatalf("integer reads = %v, want [%v]", transaction.reads, wantRead)
+	}
+	if scan.currentSlot != 1 || scan.recordPage.Block().Number() != 0 {
+		t.Fatalf("scan state changed after read: page=%v slot=%d", scan.recordPage.Block(), scan.currentSlot)
+	}
+}
+
+func TestTableScanGetIntWrapsFieldAndReadFailures(t *testing.T) {
+	readErr := errors.New("read failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{readErr: readErr},
+		size:                       1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 1
+
+	if _, err := scan.GetInt("missing"); err == nil || !strings.Contains(err.Error(), "student.tbl") || len(transaction.reads) != 0 {
+		t.Fatalf("GetInt(missing) = %v with reads %v, want contextual lookup failure", err, transaction.reads)
+	}
+	if _, err := scan.GetInt("id"); !errors.Is(err, readErr) || !strings.Contains(err.Error(), "block 0 slot 1 field \"id\"") {
+		t.Fatalf("GetInt(id) error = %v, want contextual wrapped read failure", err)
+	}
+	if scan.currentSlot != 1 || scan.recordPage.Block().Number() != 0 {
+		t.Fatalf("scan state changed after failed read: page=%v slot=%d", scan.recordPage.Block(), scan.currentSlot)
+	}
+}
+
+func TestTableScanGetIntRequiresACurrentRecord(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if _, err := scan.GetInt("id"); err == nil || len(transaction.reads) != 0 {
+		t.Fatalf("GetInt() before first = %v with reads %v, want explicit error", err, transaction.reads)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if _, err := scan.GetInt("id"); err == nil || len(transaction.reads) != 0 {
+		t.Fatalf("GetInt() after close = %v with reads %v, want explicit error", err, transaction.reads)
+	}
+}
