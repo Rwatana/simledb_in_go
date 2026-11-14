@@ -305,3 +305,18 @@ func (s *TableScan) Insert() error {
 		return nil
 	}
 }
+
+// Delete marks the current record slot empty.
+func (s *TableScan) Delete() error {
+	if s.recordPage == nil {
+		return fmt.Errorf("delete through table scan for %q: no current record page", s.fileName)
+	}
+	if s.currentSlot < 0 {
+		return fmt.Errorf("delete through table scan for %q: no current record", s.fileName)
+	}
+	block := s.recordPage.Block()
+	if err := s.recordPage.Delete(s.currentSlot); err != nil {
+		return fmt.Errorf("delete through table scan for %q at block %d slot %d: %w", s.fileName, block.Number(), s.currentSlot, err)
+	}
+	return nil
+}
