@@ -12,6 +12,7 @@ behavior remains a separate Issue, branch, commit, and stacked Pull Request.
 | `internal/metadata.NewTableManager` | `simpledb/metadata/TableMgr.java` constructor | Retained catalog layouts for table metadata operations |
 | `internal/metadata.NewViewCatalogSchema` | `simpledb/metadata/ViewMgr.java` constructor | Logical description of each `viewcat` record |
 | `internal/metadata.NewStatInfo` | `simpledb/metadata/StatInfo.java` constructor | Immutable observed block and record counts |
+| `internal/metadata.NewStatManager` | `simpledb/metadata/StatMgr.java` constructor | Statistics cache state and table metadata dependency |
 
 ## Feature 1: Construct the table catalog layout
 
@@ -305,3 +306,20 @@ The test first failed to compile because `StatInfo.DistinctValues` did not exist
 
 This maps Java `StatInfo.distinctValues`. Real per-field cardinality collection remains intentionally outside this
 educational manager. Java `StatInfo`'s public behavior column is now complete.
+
+## Feature 16: Initialize the statistics manager
+
+`NewStatManager` retains the table metadata manager and starts with an allocated empty statistics cache and zero lookup
+calls. A mutex is part of the state from the beginning so later cache and refresh operations can preserve Java's
+synchronized behavior without changing ownership.
+
+Unlike Java `StatMgr(TableMgr, Transaction)`, the Go constructor performs no full-database scan. Initial refresh is a
+fallible I/O behavior and remains separate from deterministic dependency setup.
+
+### Test-first record
+
+The test first failed to compile because `NewStatManager` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewStatManagerStartsWithEmptyCache` | Initialization retains the exact table manager and allocates empty cache state with zero calls |
