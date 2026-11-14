@@ -11,6 +11,7 @@ type TableScanTransaction interface {
 	RecordTransaction
 	Size(string) (int, error)
 	Append(string) (storage.BlockID, error)
+	Unpin(storage.BlockID) error
 }
 
 // TableScan traverses fixed-layout records across a table file.
@@ -57,4 +58,17 @@ func NewTableScan(transaction TableScanTransaction, tableName string, layout *La
 		fileName:    fileName,
 		currentSlot: -1,
 	}, nil
+}
+
+// Close releases the current record-page pin.
+func (s *TableScan) Close() error {
+	if s.recordPage == nil {
+		return nil
+	}
+	block := s.recordPage.Block()
+	if err := s.transaction.Unpin(block); err != nil {
+		return fmt.Errorf("close table scan for %q: unpin block %v: %w", s.fileName, block, err)
+	}
+	s.recordPage = nil
+	return nil
 }

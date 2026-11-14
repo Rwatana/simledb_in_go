@@ -523,6 +523,24 @@ The tests first failed because the zero-size path still returned the explicit de
 
 This maps the empty-file branch of Java `TableScan.TableScan` and its call to `moveToNewBlock`.
 
+## Feature 31: Close a table scan
+
+`TableScan.Close` unpins the block retained by the current record page. A successful release clears the page reference,
+making repeated closes no-op successes. An unpin failure retains the page for retry and returns table and block context.
+Closing an already empty scan performs no transaction access.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.Close` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanCloseUnpinsCurrentBlockOnce` | A successful close unpins once and subsequent closes are idempotent |
+| `TestTableScanCloseRetainsPageForUnpinRetry` | Failed unpin retains the page and a later close retries it |
+| `TestTableScanCloseWithoutCurrentPageDoesNothing` | No current page produces a no-op success |
+
+This maps Java `TableScan.close` while adding explicit error propagation, idempotency, and cleanup retry behavior.
+
 ## Next behavior
 
-Close a table scan by unpinning its current record page as the next stacked PR.
+Move a table scan back to the first block and before-first cursor position as the next stacked PR.
