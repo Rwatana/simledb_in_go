@@ -51,3 +51,29 @@ func TestLayoutExposesAssociatedSchema(t *testing.T) {
 		t.Fatal("Schema() does not expose the associated declarations")
 	}
 }
+
+func TestLayoutFromMetadataPreservesPhysicalDescription(t *testing.T) {
+	var schema Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 20)
+	offsets := map[string]int{"id": 12, "name": 40}
+
+	layout := NewLayoutFromMetadata(&schema, offsets, 128)
+	if layout.Schema() != &schema {
+		t.Fatal("Schema() does not return the metadata schema")
+	}
+	if got := layout.SlotSize(); got != 128 {
+		t.Fatalf("SlotSize() = %d, want 128", got)
+	}
+	for name, want := range offsets {
+		got, ok := layout.Offset(name)
+		if !ok || got != want {
+			t.Fatalf("Offset(%q) = (%d, %v), want (%d, true)", name, got, ok, want)
+		}
+	}
+
+	offsets["id"] = 99
+	if got, _ := layout.Offset("id"); got != 12 {
+		t.Fatalf("Offset(id) after caller mutation = %d, want 12", got)
+	}
+}

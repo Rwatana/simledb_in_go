@@ -196,6 +196,24 @@ The test first failed to compile because the schema accessor did not exist.
 
 This maps Java `Layout.schema` directly while documenting the mutation boundary explicitly.
 
+## Feature 12: Reconstruct a layout from catalog metadata
+
+`NewLayoutFromMetadata` accepts an associated schema, precomputed field offsets, and a precomputed slot size. It retains
+those physical values exactly rather than rerunning schema-based sizing, matching the path used after catalog reads.
+
+The Go constructor copies the offset map, so later mutation by the catalog assembly code cannot silently alter an
+already-created layout. Validation of inconsistent catalog metadata remains outside this behavior.
+
+### Test-first record
+
+The test first failed to compile because the metadata constructor did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLayoutFromMetadataPreservesPhysicalDescription` | Supplied schema, non-derived offsets, and slot size are preserved, and caller map mutation is isolated |
+
+This maps Java `Layout(Schema, Map<String,Integer>, int)` with defensive map ownership.
+
 ## Next behavior
 
-Construct a layout from catalog-provided offsets and slot size as the next stacked PR.
+Begin `RecordPage` with integer field reads as the next stacked PR; pinning and page ownership remain transaction concerns.

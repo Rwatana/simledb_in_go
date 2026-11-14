@@ -24,6 +24,15 @@ func NewLayout(schema *Schema) *Layout {
 	return layout
 }
 
+// NewLayoutFromMetadata returns a layout using precomputed physical metadata.
+func NewLayoutFromMetadata(schema *Schema, offsets map[string]int, slotSize int) *Layout {
+	copiedOffsets := make(map[string]int, len(offsets))
+	for name, offset := range offsets {
+		copiedOffsets[name] = offset
+	}
+	return &Layout{schema: schema, offsets: copiedOffsets, slotSize: slotSize}
+}
+
 // Schema returns the logical schema associated with this layout.
 func (l *Layout) Schema() *Schema {
 	return l.schema
