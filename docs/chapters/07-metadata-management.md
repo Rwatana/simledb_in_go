@@ -218,3 +218,24 @@ The test first failed to compile because `ViewManager.CreateView` did not exist.
 | `TestViewManagerCreateViewStoresDefinitionInNewViewFile` | A first view creates one formatted `viewcat` block and stores its name and SQL definition in the first occupied slot |
 
 This maps Java `ViewMgr.createView` while adding explicit layout, scan, and cleanup error propagation.
+
+## Feature 11: Look up a view definition
+
+`ViewManager.ViewDefinition` reconstructs the `viewcat` layout, scans occupied rows in record order, and returns the
+first definition whose `viewname` matches. Exhaustion returns an empty value with `found == false`; a stored empty SQL
+string remains distinguishable through `found == true`.
+
+The scan closes after a match, exhaustion, or read failure. Layout, scan, field-read, and cleanup errors retain the
+requested view name as context. Duplicate-name policy remains unchanged: the first catalog row wins, matching Java's
+loop and break behavior.
+
+### Test-first record
+
+The test first failed to compile because `ViewManager.ViewDefinition` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestViewManagerViewDefinitionFindsMatchAndReportsAbsence` | Lookup skips earlier non-matches, returns the matching SQL definition, and reports catalog exhaustion without an error |
+
+Go uses an explicit `(string, bool, error)` result instead of Java's nullable string, separating absence from failures.
+Java `ViewMgr`'s public behavior column is now complete.
