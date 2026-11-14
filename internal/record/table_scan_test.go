@@ -700,3 +700,65 @@ func TestTableScanHasFieldUsesTheRetainedLayoutWithoutARecord(t *testing.T) {
 		t.Fatalf("HasField after close = id:%t missing:%t, want true false", scan.HasField("id"), scan.HasField("missing"))
 	}
 }
+
+func TestTableScanSetIntWritesTheCurrentRecordFieldWithLogging(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 1
+
+	if err := scan.SetInt("id", -7); err != nil {
+		t.Fatalf("SetInt(id, -7) error = %v", err)
+	}
+	wantWrite := integerWrite{block: storage.NewBlockID("student.tbl", 0), offset: 12, value: -7, logUpdate: true}
+	if len(transaction.writes) != 1 || transaction.writes[0] != wantWrite {
+		t.Fatalf("integer writes = %v, want [%v]", transaction.writes, wantWrite)
+	}
+	if scan.currentSlot != 1 || scan.recordPage.Block().Number() != 0 {
+		t.Fatalf("scan state changed after write: page=%v slot=%d", scan.recordPage.Block(), scan.currentSlot)
+	}
+}
+
+func TestTableScanSetIntWrapsFieldAndWriteFailures(t *testing.T) {
+	writeErr := errors.New("write failed")
+	transaction := &recordingTableTransaction{size: 1}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 1
+
+	if err := scan.SetInt("missing", 5); err == nil || !strings.Contains(err.Error(), "student.tbl") || len(transaction.writes) != 0 {
+		t.Fatalf("SetInt(missing) = %v with writes %v, want contextual lookup failure", err, transaction.writes)
+	}
+	transaction.writeErr = writeErr
+	if err := scan.SetInt("id", 5); !errors.Is(err, writeErr) || !strings.Contains(err.Error(), "block 0 slot 1 field \"id\"") {
+		t.Fatalf("SetInt(id) error = %v, want contextual wrapped write failure", err)
+	}
+	if scan.currentSlot != 1 || scan.recordPage.Block().Number() != 0 {
+		t.Fatalf("scan state changed after failed write: page=%v slot=%d", scan.recordPage.Block(), scan.currentSlot)
+	}
+}
+
+func TestTableScanSetIntRequiresACurrentRecord(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if err := scan.SetInt("id", 5); err == nil || len(transaction.writes) != 0 {
+		t.Fatalf("SetInt() before first = %v with writes %v, want explicit error", err, transaction.writes)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if err := scan.SetInt("id", 5); err == nil || len(transaction.writes) != 0 {
+		t.Fatalf("SetInt() after close = %v with writes %v, want explicit error", err, transaction.writes)
+	}
+}
