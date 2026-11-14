@@ -214,6 +214,25 @@ The test first failed to compile because the metadata constructor did not exist.
 
 This maps Java `Layout(Schema, Map<String,Integer>, int)` with defensive map ownership.
 
+## Feature 13: Initialize a pinned record page
+
+`NewRecordPage` accepts a narrow transaction boundary, block identifier, and layout. It pins the block exactly once
+before returning a usable `RecordPage`; a pin failure returns no page and wraps the block context.
+
+The record page retains these dependencies for later field operations. This PR does not read or mutate any record bytes,
+format the block, search slots, or define unpin ownership.
+
+### Test-first record
+
+The tests first failed to compile because `NewRecordPage` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewRecordPagePinsTargetBlock` | Successful initialization pins the requested block exactly once and returns a page |
+| `TestNewRecordPageReturnsPinFailure` | Pin failure returns no page and retains the cause plus block context |
+
+This maps the pinning boundary of Java `RecordPage(Transaction, BlockId, Layout)` without mixing in field access.
+
 ## Next behavior
 
-Begin `RecordPage` with integer field reads as the next stacked PR; pinning and page ownership remain transaction concerns.
+Read one integer field from a specified record slot as the next stacked PR.
