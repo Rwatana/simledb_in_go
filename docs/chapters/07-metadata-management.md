@@ -323,3 +323,22 @@ The test first failed to compile because `NewStatManager` did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestNewStatManagerStartsWithEmptyCache` | Initialization retains the exact table manager and allocates empty cache state with zero calls |
+
+## Feature 17: Calculate statistics for one table
+
+`StatManager.calculateTableStats` scans every occupied record in a supplied table layout. It increments the record count
+for each row and uses the current RID's zero-based block number plus one as the observed block count. A table with no
+occupied rows therefore reports zero blocks, matching Java `StatMgr.calcTableStats` even though table-scan initialization
+may have formatted an empty physical block.
+
+The scan closes on exhaustion or failure, and errors retain table and record context. This focused calculation does not
+change the manager cache or lookup counter; refresh and lookup policy remain later behaviors.
+
+### Test-first record
+
+After the multi-block fixture was prepared, the test first failed to compile because `calculateTableStats` did not
+exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestStatManagerCalculateTableStatsCountsRecordsAndBlocks` | Nine occupied records spanning two blocks produce `(2 blocks, 9 records)` without mutating cache state |

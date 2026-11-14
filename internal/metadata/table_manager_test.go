@@ -39,10 +39,13 @@ func newEmptyCatalogTransaction(blockSize int) *catalogTransaction {
 }
 
 func (t *catalogTransaction) Size(fileName string) (int, error) {
-	if _, ok := t.pages[storage.NewBlockID(fileName, 0)]; !ok {
-		return 0, nil
+	size := 0
+	for {
+		if _, ok := t.pages[storage.NewBlockID(fileName, size)]; !ok {
+			return size, nil
+		}
+		size++
 	}
-	return 1, nil
 }
 
 func (t *catalogTransaction) Append(fileName string) (storage.BlockID, error) {
