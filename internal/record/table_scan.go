@@ -177,3 +177,19 @@ func (s *TableScan) GetInt(fieldName string) (int32, error) {
 	}
 	return value, nil
 }
+
+// GetString reads a string field from the current record.
+func (s *TableScan) GetString(fieldName string) (string, error) {
+	if s.recordPage == nil {
+		return "", fmt.Errorf("read string field %q from table scan for %q: no current record page", fieldName, s.fileName)
+	}
+	if s.currentSlot < 0 {
+		return "", fmt.Errorf("read string field %q from table scan for %q: no current record", fieldName, s.fileName)
+	}
+	block := s.recordPage.Block()
+	value, err := s.recordPage.GetString(s.currentSlot, fieldName)
+	if err != nil {
+		return "", fmt.Errorf("read table %q block %d slot %d field %q as string: %w", s.fileName, block.Number(), s.currentSlot, fieldName, err)
+	}
+	return value, nil
+}
