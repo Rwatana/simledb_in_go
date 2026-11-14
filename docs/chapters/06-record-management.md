@@ -233,6 +233,23 @@ The tests first failed to compile because `NewRecordPage` did not exist.
 
 This maps the pinning boundary of Java `RecordPage(Transaction, BlockId, Layout)` without mixing in field access.
 
+## Feature 14: Read an integer field from a record slot
+
+`RecordPage.GetInt` resolves the field offset, adds it to `slot * Layout.SlotSize()`, and asks the retained transaction to
+read exactly one integer from the retained block. An unknown field stops before transaction access. Read failures retain
+the block, slot, field name, and calculated byte position while wrapping the transaction cause.
+
+### Test-first record
+
+The tests first failed to compile because `RecordPage.GetInt` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageGetIntReadsCalculatedFieldPosition` | Slot and layout metadata select one transaction integer read and return its value |
+| `TestRecordPageGetIntReportsLookupAndReadFailures` | Unknown fields prevent reads, while transaction failures retain complete record context |
+
+This maps Java `RecordPage.getInt` and makes its implicit map/transaction failures explicit Go errors.
+
 ## Next behavior
 
-Read one integer field from a specified record slot as the next stacked PR.
+Read one string field from a specified record slot as the next stacked PR.

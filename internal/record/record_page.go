@@ -26,3 +26,17 @@ func NewRecordPage(transaction RecordTransaction, block storage.BlockID, layout 
 	}
 	return &RecordPage{transaction: transaction, block: block, layout: layout}, nil
 }
+
+// GetInt reads an integer field from slot.
+func (p *RecordPage) GetInt(slot int, fieldName string) (int32, error) {
+	fieldOffset, ok := p.layout.Offset(fieldName)
+	if !ok {
+		return 0, fmt.Errorf("read integer from block %v slot %d: field %q is not in layout", p.block, slot, fieldName)
+	}
+	position := slot*p.layout.SlotSize() + fieldOffset
+	value, err := p.transaction.GetInt(p.block, position)
+	if err != nil {
+		return 0, fmt.Errorf("read integer from block %v slot %d field %q at offset %d: %w", p.block, slot, fieldName, position, err)
+	}
+	return value, nil
+}
