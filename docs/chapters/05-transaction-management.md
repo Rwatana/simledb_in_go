@@ -1791,9 +1791,32 @@ length, EOF sentinel contention, repeated-lock reuse, and file-manager error pro
 
 The negative block number is a lock namespace value only; it is never passed to physical file I/O.
 
+## Feature 83: Append a file block under an EOF exclusive lock
+
+`Transaction.Append` upgrades or acquires the lock on `BlockID(fileName, -1)` to exclusive ownership before delegating
+to the injected file manager. A transaction that called `Size` first upgrades its existing shared EOF lock, while
+repeated appends reuse the retained exclusive lock.
+
+`NewWithFileManager` adds the `Append` capability without removing `NewWithFileSizer`, so clients that only need logical
+lengths keep the narrower dependency. The returned `BlockID` and file errors come directly through the transaction
+boundary with file context.
+
+### Test-first record
+
+The tests first failed to compile because the file-manager constructor and append operation did not exist. They cover
+shared-to-exclusive EOF upgrade, repeated exclusive-lock reuse, sequential returned block identifiers, and append error
+propagation.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionAppendUpgradesAndReusesEOFExclusiveLock` | File growth holds one reusable exclusive EOF lock after size reads |
+| `TestTransactionAppendReturnsFileFailure` | Physical append failures retain transaction and file context |
+
+This mirrors Java `Transaction.append` without allowing the EOF sentinel to reach physical file addressing.
+
 ## Next behavior
 
-Continue with Chapter 5 by adding transactional file append under an exclusive EOF lock.
+Continue with Chapter 5 by exposing block size, then available buffer count, as separate transaction behaviors.
 
 ## Sources
 
