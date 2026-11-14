@@ -676,3 +676,27 @@ func TestTableScanGetStringRequiresACurrentRecord(t *testing.T) {
 		t.Fatalf("GetString() after close = %v with reads %v, want explicit error", err, transaction.stringReads)
 	}
 }
+
+func TestTableScanHasFieldUsesTheRetainedLayoutWithoutARecord(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	var schema Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 20)
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	if !scan.HasField("id") || !scan.HasField("name") || scan.HasField("missing") {
+		t.Fatalf("HasField results = id:%t name:%t missing:%t, want true true false", scan.HasField("id"), scan.HasField("name"), scan.HasField("missing"))
+	}
+	if len(transaction.reads) != 0 || len(transaction.stringReads) != 0 {
+		t.Fatalf("HasField performed record reads: integers=%v strings=%v", transaction.reads, transaction.stringReads)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if !scan.HasField("id") || scan.HasField("missing") {
+		t.Fatalf("HasField after close = id:%t missing:%t, want true false", scan.HasField("id"), scan.HasField("missing"))
+	}
+}
