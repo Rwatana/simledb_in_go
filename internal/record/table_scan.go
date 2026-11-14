@@ -242,3 +242,27 @@ func (s *TableScan) InsertInBlock() (bool, error) {
 	s.currentSlot = next
 	return next >= 0, nil
 }
+
+// MoveToNewBlock appends, pins, and formats a new table block.
+func (s *TableScan) MoveToNewBlock() error {
+	if s.recordPage == nil {
+		return fmt.Errorf("move table scan for %q to new block: no current record page", s.fileName)
+	}
+	if err := s.Close(); err != nil {
+		return fmt.Errorf("move table scan for %q to new block: close current page: %w", s.fileName, err)
+	}
+	block, err := s.transaction.Append(s.fileName)
+	if err != nil {
+		return fmt.Errorf("move table scan for %q to new block: append: %w", s.fileName, err)
+	}
+	page, err := NewRecordPage(s.transaction, block, s.layout)
+	if err != nil {
+		return fmt.Errorf("move table scan for %q to new block %v: %w", s.fileName, block, err)
+	}
+	s.recordPage = page
+	if err := page.Format(); err != nil {
+		return fmt.Errorf("move table scan for %q to new block %v: format: %w", s.fileName, block, err)
+	}
+	s.currentSlot = -1
+	return nil
+}
