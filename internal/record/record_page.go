@@ -109,6 +109,18 @@ func (p *RecordPage) Delete(slot int) error {
 	return nil
 }
 
+// Occupy marks slot used with transaction logging enabled.
+func (p *RecordPage) Occupy(slot int) error {
+	position := slot * p.layout.SlotSize()
+	if position < math.MinInt32 || position > math.MaxInt32 {
+		return fmt.Errorf("occupy record in block %v slot %d: offset %d exceeds int32 range", p.block, slot, position)
+	}
+	if err := p.transaction.SetInt(p.block, int32(position), recordSlotUsed, true); err != nil {
+		return fmt.Errorf("occupy record in block %v slot %d at offset %d: %w", p.block, slot, position, err)
+	}
+	return nil
+}
+
 // Format initializes every complete record slot in the block without logging.
 func (p *RecordPage) Format() error {
 	slotSize := p.layout.SlotSize()
