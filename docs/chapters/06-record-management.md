@@ -493,8 +493,7 @@ This maps Java `RID.toString`. Java `RID` and the Go value now have matching pub
 
 `NewTableScan` derives the `.tbl` filename, reads its size once, and for a non-empty file creates a `RecordPage` pinned to
 block zero. The cursor begins at slot `-1`, matching the before-first position used by later iteration. Size and pin errors
-retain table context. A zero-size file currently returns an explicit error so its append-and-format path can remain the
-next independent behavior.
+retain table context. This feature isolated the non-empty branch before the following empty-file behavior was added.
 
 ### Test-first record
 
@@ -507,6 +506,23 @@ The tests first failed to compile because `NewTableScan` did not exist.
 
 This maps the existing-file branch of Java `TableScan.TableScan`.
 
+## Feature 30: Initialize a scan for an empty table
+
+When the initial table size is zero, `NewTableScan` appends exactly one first block, creates a pinned `RecordPage` for the
+returned block, and formats every complete slot without logging. The cursor then begins at `-1`, exactly like the existing
+table path. Append, pin, and format failures stop the sequence and retain table context.
+
+### Test-first record
+
+The tests first failed because the zero-size path still returned the explicit deferred error from Feature 29.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewTableScanAppendsPinsAndFormatsEmptyTable` | Empty initialization appends, pins, no-log formats, and positions the before-first cursor |
+| `TestNewTableScanReportsEmptyTableAppendPinAndFormatFailures` | Each failed initialization stage stops later work and retains context |
+
+This maps the empty-file branch of Java `TableScan.TableScan` and its call to `moveToNewBlock`.
+
 ## Next behavior
 
-Initialize a table scan by appending and formatting the first block of an empty table as the next stacked PR.
+Close a table scan by unpinning its current record page as the next stacked PR.
