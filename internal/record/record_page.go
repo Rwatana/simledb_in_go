@@ -2,6 +2,7 @@ package record
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
@@ -11,6 +12,7 @@ type RecordTransaction interface {
 	Pin(storage.BlockID) error
 	GetInt(storage.BlockID, int) (int32, error)
 	GetString(storage.BlockID, int) (string, error)
+	SetInt(storage.BlockID, int32, int32, bool) error
 }
 
 // RecordPage addresses fixed-size record slots within one pinned block.
@@ -54,4 +56,20 @@ func (p *RecordPage) GetString(slot int, fieldName string) (string, error) {
 		return "", fmt.Errorf("read string from block %v slot %d field %q at offset %d: %w", p.block, slot, fieldName, position, err)
 	}
 	return value, nil
+}
+
+// SetInt writes an integer field in slot with transaction logging enabled.
+func (p *RecordPage) SetInt(slot int, fieldName string, value int32) error {
+	fieldOffset, ok := p.layout.Offset(fieldName)
+	if !ok {
+		return fmt.Errorf("write integer to block %v slot %d: field %q is not in layout", p.block, slot, fieldName)
+	}
+	position := slot*p.layout.SlotSize() + fieldOffset
+	if position < math.MinInt32 || position > math.MaxInt32 {
+		return fmt.Errorf("write integer to block %v slot %d field %q: offset %d exceeds int32 range", p.block, slot, fieldName, position)
+	}
+	if err := p.transaction.SetInt(p.block, int32(position), value, true); err != nil {
+		return fmt.Errorf("write integer to block %v slot %d field %q at offset %d: %w", p.block, slot, fieldName, position, err)
+	}
+	return nil
 }
