@@ -15,3 +15,8 @@ func NewStatInfo(blocks, records int) *StatInfo {
 func (s *StatInfo) BlocksAccessed() int {
 	return s.blocks
 }
+
+// RecordsOutput returns the estimated number of table records produced.
+func (s *StatInfo) RecordsOutput() int {
+	return s.records
+}

@@ -273,3 +273,18 @@ The test first failed to compile because `StatInfo.BlocksAccessed` did not exist
 | `TestStatInfoBlocksAccessedReturnsObservedBlocks` | Positive and zero observed block counts are returned exactly |
 
 This maps Java `StatInfo.blocksAccessed` directly.
+
+## Feature 14: Report estimated table records output
+
+`StatInfo.RecordsOutput` returns the stored observed record count unchanged. Positive and zero cardinalities require no
+recalculation, mutation, or I/O.
+
+### Test-first record
+
+The test first failed to compile because `StatInfo.RecordsOutput` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestStatInfoRecordsOutputReturnsObservedRecords` | Positive and zero observed record counts are returned exactly |
+
+This maps Java `StatInfo.recordsOutput` directly.
