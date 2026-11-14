@@ -10,6 +10,7 @@ behavior remains a separate Issue, branch, commit, and stacked Pull Request.
 | `internal/metadata.NewTableCatalogLayout` | `simpledb/metadata/TableMgr.java` constructor (`tcatSchema`, `tcatLayout`) | Physical description of each `tblcat` record |
 | `internal/metadata.NewFieldCatalogLayout` | `simpledb/metadata/TableMgr.java` constructor (`fcatSchema`, `fcatLayout`) | Physical description of each `fldcat` record |
 | `internal/metadata.NewTableManager` | `simpledb/metadata/TableMgr.java` constructor | Retained catalog layouts for table metadata operations |
+| `internal/metadata.NewViewCatalogSchema` | `simpledb/metadata/ViewMgr.java` constructor | Logical description of each `viewcat` record |
 
 ## Feature 1: Construct the table catalog layout
 
@@ -143,3 +144,22 @@ The tests first failed to compile because `TableManager.Layout` did not exist.
 | --- | --- |
 | `TestTableManagerLayoutReconstructsStoredPhysicalMetadata` | Stored catalog order, types, lengths, offsets, and slot size reconstruct the field-catalog layout and both scans close |
 | `TestTableManagerLayoutReportsMissingTableAndClosesTableCatalog` | An absent table returns contextual failure after closing `tblcat` without opening `fldcat` |
+
+## Feature 7: Construct the view catalog schema
+
+`NewViewCatalogSchema` declares `viewname` followed by `viewdef`, matching Java `ViewMgr`. View names reuse the shared
+16-character catalog-name limit, while SQL definitions use the book's 100-character limit.
+
+The function returns only a logical schema and performs no transaction or catalog I/O. Registering `viewcat`, inserting
+view definitions, and looking them up remain separate observable behaviors.
+
+### Test-first record
+
+The test first failed to compile because `NewViewCatalogSchema` and `MaxViewDefinitionLength` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewViewCatalogSchemaDescribesStoredViewDefinitions` | View catalog field order, varchar types, shared name limit, and definition limit match the book |
+
+This extracts the deterministic schema portion of Java `ViewMgr(boolean, TableMgr, Transaction)` before adding its
+new-database side effect.
