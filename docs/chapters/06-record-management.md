@@ -669,6 +669,21 @@ The tests first failed to compile because `TableScan.GetString` did not exist.
 
 This maps Java `TableScan.getString` while making invalid cursor state and read errors explicit.
 
+## Feature 39: Check table scan field membership
+
+`TableScan.HasField` asks the schema retained by its layout whether a field is declared. Membership is layout metadata,
+so it remains available before the first record and after the scan's current page is closed, without transaction access.
+
+### Test-first record
+
+The test first failed to compile because `TableScan.HasField` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanHasFieldUsesTheRetainedLayoutWithoutARecord` | Registered integer and string fields are found, missing fields are rejected, and closing the page does not affect metadata |
+
+This maps Java `TableScan.hasField` directly to the immutable layout/schema metadata retained by the Go scan.
+
 ## Next behavior
 
-Report whether the table scan's layout contains a field.
+Write an integer field in the table scan's current record.

@@ -193,3 +193,8 @@ func (s *TableScan) GetString(fieldName string) (string, error) {
 	}
 	return value, nil
 }
+
+// HasField reports whether the table layout declares fieldName.
+func (s *TableScan) HasField(fieldName string) bool {
+	return s.layout.Schema().HasField(fieldName)
+}
