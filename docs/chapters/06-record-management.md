@@ -817,6 +817,27 @@ The tests first failed to compile because `TableScan.GetRID` did not exist.
 
 This maps Java `TableScan.getRid` while representing unavailable current-record state as an error.
 
+## Feature 47: Move a table scan to a record identifier
+
+`TableScan.MoveToRID` validates non-negative RID coordinates, closes any current page, and pins the RID's block within
+the scan's retained table file. The cursor changes only after the target page is ready. A close failure retains the old
+page and cursor; a target pin failure leaves no page and preserves the old cursor. Because close is idempotent, an
+already-closed scan can be reopened at an RID.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.MoveToRID` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanMoveToRIDReleasesCurrentPageAndPinsTargetCoordinates` | Repositioning unpins the old page, pins the RID block, and adopts its slot |
+| `TestTableScanMoveToRIDStopsOnCloseFailure` | Failed release stops before target pin and retains old state |
+| `TestTableScanMoveToRIDReportsTargetPinFailureAfterClose` | Failed target pin leaves no page and preserves the cursor |
+| `TestTableScanMoveToRIDCanReopenAClosedScan` | A closed scan can pin and adopt valid RID coordinates |
+| `TestTableScanMoveToRIDRejectsNegativeCoordinatesBeforeStateChange` | Invalid coordinates are rejected before unpin or pin access |
+
+This maps Java `TableScan.moveToRid` with explicit coordinate validation and retryable state transitions.
+
 ## Next behavior
 
-Move a table scan to a supplied record identifier.
+Begin Chapter 7 query values with an integer constant representation.
