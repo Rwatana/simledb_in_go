@@ -155,16 +155,25 @@ func (p *RecordPage) Format() error {
 
 // NextAfter returns the next occupied slot after slot, or -1 when none remains.
 func (p *RecordPage) NextAfter(slot int) (int, error) {
+	return p.searchAfter(slot, recordSlotUsed, "occupied")
+}
+
+// NextEmptyAfter returns the next empty slot after slot without modifying it.
+func (p *RecordPage) NextEmptyAfter(slot int) (int, error) {
+	return p.searchAfter(slot, recordSlotEmpty, "empty")
+}
+
+func (p *RecordPage) searchAfter(slot int, target int32, description string) (int, error) {
 	if slot < -1 {
-		return -1, fmt.Errorf("find occupied record in block %v: starting slot %d is before -1", p.block, slot)
+		return -1, fmt.Errorf("find %s record in block %v: starting slot %d is before -1", description, p.block, slot)
 	}
 	slotSize := p.layout.SlotSize()
 	if slotSize <= 0 {
-		return -1, fmt.Errorf("find occupied record in block %v: slot size %d must be positive", p.block, slotSize)
+		return -1, fmt.Errorf("find %s record in block %v: slot size %d must be positive", description, p.block, slotSize)
 	}
 	blockSize, err := p.transaction.BlockSize()
 	if err != nil {
-		return -1, fmt.Errorf("find occupied record in block %v: read block size: %w", p.block, err)
+		return -1, fmt.Errorf("find %s record in block %v: read block size: %w", description, p.block, err)
 	}
 	slotCount := blockSize / slotSize
 	if slot >= slotCount-1 {
@@ -175,9 +184,9 @@ func (p *RecordPage) NextAfter(slot int) (int, error) {
 		position := candidate * slotSize
 		flag, err := p.transaction.GetInt(p.block, position)
 		if err != nil {
-			return -1, fmt.Errorf("find occupied record in block %v slot %d flag at offset %d: %w", p.block, candidate, position, err)
+			return -1, fmt.Errorf("find %s record in block %v slot %d flag at offset %d: %w", description, p.block, candidate, position, err)
 		}
-		if flag == recordSlotUsed {
+		if flag == target {
 			return candidate, nil
 		}
 	}
