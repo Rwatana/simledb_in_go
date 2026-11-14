@@ -320,3 +320,14 @@ func (s *TableScan) Delete() error {
 	}
 	return nil
 }
+
+// GetRID returns the record identifier at the current scan position.
+func (s *TableScan) GetRID() (RID, error) {
+	if s.recordPage == nil {
+		return RID{}, fmt.Errorf("read current RID from table scan for %q: no current record page", s.fileName)
+	}
+	if s.currentSlot < 0 {
+		return RID{}, fmt.Errorf("read current RID from table scan for %q: no current record", s.fileName)
+	}
+	return NewRID(s.recordPage.Block().Number(), s.currentSlot), nil
+}
