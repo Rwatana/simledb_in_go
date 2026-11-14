@@ -258,3 +258,18 @@ The test first failed to compile because `NewStatInfo` did not exist.
 | `TestNewStatInfoRetainsObservedCounts` | Initialization preserves supplied non-empty and empty block/record observations exactly |
 
 This maps Java `StatInfo(int, int)` to a Go value with package-private immutable state.
+
+## Feature 13: Report estimated table blocks accessed
+
+`StatInfo.BlocksAccessed` returns the stored observed block count unchanged. It preserves zero for an empty observation
+and performs no mutation or I/O.
+
+### Test-first record
+
+The test first failed to compile because `StatInfo.BlocksAccessed` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestStatInfoBlocksAccessedReturnsObservedBlocks` | Positive and zero observed block counts are returned exactly |
+
+This maps Java `StatInfo.blocksAccessed` directly.
