@@ -385,3 +385,50 @@ func TestStatManagerRefreshPreservesTableStatisticsScanFailure(t *testing.T) {
 		t.Errorf("statistics cache = %v, want the prior stale snapshot retained", manager.stats)
 	}
 }
+
+func TestStatManagerStatisticsCachesFirstLookup(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(256)
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	layout := record.NewLayout(&schema)
+	scan, err := record.NewTableScan(transaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if err := scan.Insert(); err != nil {
+		t.Fatalf("Insert() error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	manager := NewStatManager(nil)
+	first, err := manager.Statistics("student", layout, transaction)
+	if err != nil {
+		t.Fatalf("Statistics(first) error = %v", err)
+	}
+	if first.RecordsOutput() != 1 {
+		t.Fatalf("first records = %d, want 1", first.RecordsOutput())
+	}
+
+	scan, err = record.NewTableScan(transaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan(second) error = %v", err)
+	}
+	if err := scan.Insert(); err != nil {
+		t.Fatalf("Insert(second) error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close(second) error = %v", err)
+	}
+	second, err := manager.Statistics("student", layout, transaction)
+	if err != nil {
+		t.Fatalf("Statistics(second) error = %v", err)
+	}
+	if second != first || second.RecordsOutput() != 1 {
+		t.Fatalf("second statistics = %p (%d records), want cached %p (1 record)", second, second.RecordsOutput(), first)
+	}
+	if manager.calls != 2 || manager.stats["student"] != first {
+		t.Fatalf("manager state = (%d calls, %p cached), want (2 calls, %p cached)", manager.calls, manager.stats["student"], first)
+	}
+}
