@@ -740,6 +740,27 @@ The tests first failed to compile because `TableScan.InsertInBlock` did not exis
 This isolates the current-block portion of Java `TableScan.insert` before existing-block movement and new-block
 rollover are added.
 
+## Feature 43: Move a table scan to a new formatted block
+
+`TableScan.MoveToNewBlock` closes the current page, appends one block, pins it, and formats every complete slot without
+logging. The cursor becomes `-1` only after formatting succeeds. Close failure retains the old page; append or pin
+failure leaves the scan closed; format failure retains the new pinned page so cleanup can be retried. All failures keep
+the previous cursor.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.MoveToNewBlock` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanMoveToNewBlockClosesAppendsPinsAndFormats` | One appended block is pinned, no-log formatted, and positioned before its first slot |
+| `TestTableScanMoveToNewBlockStopsOnCloseFailure` | Failed release stops before append and retains the old page and cursor |
+| `TestTableScanMoveToNewBlockReportsAppendAndPinFailuresAfterClose` | Append and pin failures leave no current page and preserve the cursor |
+| `TestTableScanMoveToNewBlockRetainsPinnedPageOnFormatFailure` | Format failure retains the new page for cleanup and preserves the cursor |
+| `TestTableScanMoveToNewBlockRejectsClosedScan` | A scan without a current page cannot append a rollover block |
+
+This maps Java `TableScan.moveToNewBlock` with explicit stage errors and retryable cleanup state.
+
 ## Next behavior
 
-Append and format a new table block for insertion rollover.
+Compose current-block insertion, existing-block movement, and new-block rollover into table insertion.

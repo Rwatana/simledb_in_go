@@ -922,3 +922,132 @@ func TestTableScanInsertInBlockRejectsClosedScan(t *testing.T) {
 		t.Fatalf("InsertInBlock() after close = (%t, %v), want explicit error", inserted, err)
 	}
 }
+
+func TestTableScanMoveToNewBlockClosesAppendsPinsAndFormats(t *testing.T) {
+	newBlock := storage.NewBlockID("student.tbl", 1)
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16},
+		size:                       1,
+		appendBlock:                newBlock,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 2
+
+	if err := scan.MoveToNewBlock(); err != nil {
+		t.Fatalf("MoveToNewBlock() error = %v", err)
+	}
+	blockZero := storage.NewBlockID("student.tbl", 0)
+	if len(transaction.unpinCalls) != 1 || transaction.unpinCalls[0] != blockZero {
+		t.Fatalf("Unpin calls = %v, want [%v]", transaction.unpinCalls, blockZero)
+	}
+	if len(transaction.appendCalls) != 1 || transaction.appendCalls[0] != "student.tbl" {
+		t.Fatalf("Append calls = %v, want [student.tbl]", transaction.appendCalls)
+	}
+	if len(transaction.pins) != 2 || transaction.pins[1] != newBlock {
+		t.Fatalf("Pin calls = %v, want block zero then %v", transaction.pins, newBlock)
+	}
+	wantWrites := []integerWrite{
+		{block: newBlock, offset: 0, value: recordSlotEmpty, logUpdate: false},
+		{block: newBlock, offset: 4, value: 0, logUpdate: false},
+		{block: newBlock, offset: 8, value: recordSlotEmpty, logUpdate: false},
+		{block: newBlock, offset: 12, value: 0, logUpdate: false},
+	}
+	if len(transaction.writes) != len(wantWrites) {
+		t.Fatalf("format writes = %v, want %v", transaction.writes, wantWrites)
+	}
+	for index := range wantWrites {
+		if transaction.writes[index] != wantWrites[index] {
+			t.Fatalf("format write %d = %v, want %v", index, transaction.writes[index], wantWrites[index])
+		}
+	}
+	if scan.recordPage == nil || scan.recordPage.Block() != newBlock || scan.currentSlot != -1 {
+		t.Fatalf("scan state after new block = page %v slot %d", scan.recordPage, scan.currentSlot)
+	}
+}
+
+func TestTableScanMoveToNewBlockStopsOnCloseFailure(t *testing.T) {
+	unpinErr := errors.New("unpin failed")
+	transaction := &recordingTableTransaction{size: 1, unpinErr: unpinErr}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 2
+
+	if err := scan.MoveToNewBlock(); !errors.Is(err, unpinErr) {
+		t.Fatalf("MoveToNewBlock() error = %v, want close failure", err)
+	}
+	if len(transaction.appendCalls) != 0 || len(transaction.pins) != 1 || scan.recordPage == nil || scan.currentSlot != 2 {
+		t.Fatalf("state after close failure: appends=%v pins=%v page=%v slot=%d", transaction.appendCalls, transaction.pins, scan.recordPage, scan.currentSlot)
+	}
+}
+
+func TestTableScanMoveToNewBlockReportsAppendAndPinFailuresAfterClose(t *testing.T) {
+	appendErr := errors.New("append failed")
+	appendTransaction := &recordingTableTransaction{size: 1, appendErr: appendErr}
+	appendScan, err := NewTableScan(appendTransaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan(append) error = %v", err)
+	}
+	appendScan.currentSlot = 2
+	if err := appendScan.MoveToNewBlock(); !errors.Is(err, appendErr) || appendScan.recordPage != nil || appendScan.currentSlot != 2 {
+		t.Fatalf("MoveToNewBlock(append failure) = %v, page=%v slot=%d", err, appendScan.recordPage, appendScan.currentSlot)
+	}
+
+	pinErr := errors.New("pin failed")
+	newBlock := storage.NewBlockID("student.tbl", 1)
+	pinTransaction := &recordingTableTransaction{size: 1, appendBlock: newBlock}
+	pinScan, err := NewTableScan(pinTransaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan(pin) error = %v", err)
+	}
+	pinScan.currentSlot = 2
+	pinTransaction.pinErr = pinErr
+	if err := pinScan.MoveToNewBlock(); !errors.Is(err, pinErr) || pinScan.recordPage != nil || pinScan.currentSlot != 2 {
+		t.Fatalf("MoveToNewBlock(pin failure) = %v, page=%v slot=%d", err, pinScan.recordPage, pinScan.currentSlot)
+	}
+}
+
+func TestTableScanMoveToNewBlockRetainsPinnedPageOnFormatFailure(t *testing.T) {
+	formatErr := errors.New("format failed")
+	newBlock := storage.NewBlockID("student.tbl", 1)
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16},
+		size:                       1,
+		appendBlock:                newBlock,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 2
+	transaction.writeErr = formatErr
+
+	if err := scan.MoveToNewBlock(); !errors.Is(err, formatErr) {
+		t.Fatalf("MoveToNewBlock() error = %v, want format failure", err)
+	}
+	if scan.recordPage == nil || scan.recordPage.Block() != newBlock || scan.currentSlot != 2 || len(transaction.writes) != 1 {
+		t.Fatalf("state after format failure: page=%v slot=%d writes=%v", scan.recordPage, scan.currentSlot, transaction.writes)
+	}
+}
+
+func TestTableScanMoveToNewBlockRejectsClosedScan(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if err := scan.MoveToNewBlock(); err == nil || len(transaction.appendCalls) != 0 {
+		t.Fatalf("MoveToNewBlock() after close = %v with appends %v, want explicit error", err, transaction.appendCalls)
+	}
+}
