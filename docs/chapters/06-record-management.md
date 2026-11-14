@@ -163,6 +163,21 @@ The test first failed to compile because `NewLayout` did not exist.
 This maps Java `Layout(Schema)`, `lengthInBytes`, and `offset`. Java asks its configured charset encoder for maximum
 bytes per character; Go uses the fixed `utf8.UTFMax` bound for its explicit UTF-8 representation.
 
+## Feature 10: Expose the record slot size
+
+`Layout.SlotSize` returns the offset calculation's final byte position: the four-byte empty/in-use flag followed by all
+encoded field widths. An empty schema therefore still occupies four bytes so each slot can carry its occupancy state.
+
+### Test-first record
+
+The test first failed to compile because the slot-size accessor did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLayoutSlotSizeIncludesFlagAndEncodedFields` | Mixed fields include the flag and encoded widths, while an empty schema retains only the flag |
+
+This maps Java `Layout.slotSize` without exposing mutable layout state.
+
 ## Next behavior
 
-Expose the calculated slot size as the next stacked PR.
+Expose the layout schema as the next stacked PR.
