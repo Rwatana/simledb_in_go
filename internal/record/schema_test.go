@@ -117,3 +117,19 @@ func TestSchemaHasFieldReportsMembership(t *testing.T) {
 		t.Fatal("HasField(missing) = true, want false")
 	}
 }
+
+func TestSchemaTypeOfReportsLogicalType(t *testing.T) {
+	var schema Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 20)
+
+	for name, want := range map[string]FieldType{"id": IntegerField, "name": VarcharField} {
+		got, ok := schema.TypeOf(name)
+		if !ok || got != want {
+			t.Fatalf("TypeOf(%q) = (%v, %v), want (%v, true)", name, got, ok, want)
+		}
+	}
+	if _, ok := schema.TypeOf("missing"); ok {
+		t.Fatal("TypeOf(missing) unexpectedly found")
+	}
+}

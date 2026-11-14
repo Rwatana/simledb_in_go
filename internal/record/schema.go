@@ -66,6 +66,12 @@ func (s *Schema) HasField(name string) bool {
 	return ok
 }
 
+// TypeOf returns the logical type registered for name.
+func (s *Schema) TypeOf(name string) (FieldType, bool) {
+	definition, ok := s.Field(name)
+	return definition.Type, ok
+}
+
 // Fields returns field names in declaration order.
 func (s *Schema) Fields() []string {
 	return append([]string(nil), s.fields...)
