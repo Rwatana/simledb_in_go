@@ -56,6 +56,45 @@ func (m *ViewManager) CreateView(viewName, definition string, transaction record
 	return nil
 }
 
+// ViewDefinition returns the stored SQL definition for viewName and reports whether it exists.
+func (m *ViewManager) ViewDefinition(viewName string, transaction record.TableScanTransaction) (definition string, found bool, err error) {
+	if m.tables == nil {
+		return "", false, fmt.Errorf("look up view %q: table manager is nil", viewName)
+	}
+	layout, err := m.tables.Layout("viewcat", transaction)
+	if err != nil {
+		return "", false, fmt.Errorf("look up view %q: load view catalog layout: %w", viewName, err)
+	}
+	err = withCatalogScan(transaction, "viewcat", layout, func(scan *record.TableScan) error {
+		for {
+			hasRow, err := scan.Next()
+			if err != nil {
+				return fmt.Errorf("scan view catalog: %w", err)
+			}
+			if !hasRow {
+				return nil
+			}
+			name, err := scan.GetString("viewname")
+			if err != nil {
+				return fmt.Errorf("read view name: %w", err)
+			}
+			if name != viewName {
+				continue
+			}
+			definition, err = scan.GetString("viewdef")
+			if err != nil {
+				return fmt.Errorf("read definition for view %q: %w", viewName, err)
+			}
+			found = true
+			return nil
+		}
+	})
+	if err != nil {
+		return "", false, fmt.Errorf("look up view %q: %w", viewName, err)
+	}
+	return definition, found, nil
+}
+
 // NewViewCatalogSchema constructs the logical schema of the view catalog.
 func NewViewCatalogSchema() *record.Schema {
 	var schema record.Schema
