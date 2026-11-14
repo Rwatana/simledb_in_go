@@ -437,3 +437,104 @@ func TestTableScanMoveToNextBlockRejectsClosedScan(t *testing.T) {
 		t.Fatalf("MoveToNextBlock() on closed scan = %v with pins %v, want explicit error without pin", err, transaction.pins)
 	}
 }
+
+func TestTableScanNextSkipsEmptyBlocksAndFindsTheNextRecord(t *testing.T) {
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{
+			blockSize:  16,
+			readValues: []int32{recordSlotEmpty, recordSlotEmpty, recordSlotEmpty, recordSlotEmpty, recordSlotUsed, recordSlotEmpty},
+		},
+		size: 3,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	if ok, err := scan.Next(); err != nil || !ok {
+		t.Fatalf("Next() = (%t, %v), want (true, nil)", ok, err)
+	}
+	if scan.recordPage.Block().Number() != 2 || scan.currentSlot != 0 {
+		t.Fatalf("scan position = block %d slot %d, want block 2 slot 0", scan.recordPage.Block().Number(), scan.currentSlot)
+	}
+	wantPins := []storage.BlockID{
+		storage.NewBlockID("student.tbl", 0),
+		storage.NewBlockID("student.tbl", 1),
+		storage.NewBlockID("student.tbl", 2),
+	}
+	if len(transaction.pins) != len(wantPins) {
+		t.Fatalf("Pin calls = %v, want %v", transaction.pins, wantPins)
+	}
+	for index := range wantPins {
+		if transaction.pins[index] != wantPins[index] {
+			t.Fatalf("Pin call %d = %v, want %v", index, transaction.pins[index], wantPins[index])
+		}
+	}
+	if len(transaction.unpinCalls) != 2 || transaction.unpinCalls[0] != wantPins[0] || transaction.unpinCalls[1] != wantPins[1] {
+		t.Fatalf("Unpin calls = %v, want first two blocks", transaction.unpinCalls)
+	}
+	if ok, err := scan.Next(); err != nil || ok || scan.recordPage.Block().Number() != 2 || scan.currentSlot != -1 {
+		t.Fatalf("Next() after final record = (%t, %v), block %d slot %d; want final exhaustion", ok, err, scan.recordPage.Block().Number(), scan.currentSlot)
+	}
+}
+
+func TestTableScanNextStopsAtAnEmptyLastBlock(t *testing.T) {
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{
+			blockSize:  8,
+			readValues: []int32{recordSlotEmpty},
+		},
+		size: 1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	if ok, err := scan.Next(); err != nil || ok {
+		t.Fatalf("Next() = (%t, %v), want (false, nil)", ok, err)
+	}
+	if len(transaction.pins) != 1 || len(transaction.unpinCalls) != 0 || scan.recordPage.Block().Number() != 0 || scan.currentSlot != -1 {
+		t.Fatalf("state after final exhaustion: pins=%v unpins=%v page=%v slot=%d", transaction.pins, transaction.unpinCalls, scan.recordPage.Block(), scan.currentSlot)
+	}
+}
+
+func TestTableScanNextWrapsTraversalFailure(t *testing.T) {
+	sizeErr := errors.New("size failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 8, readValues: []int32{recordSlotEmpty}},
+		size:                       2,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	transaction.sizeErr = sizeErr
+
+	if ok, err := scan.Next(); ok || !errors.Is(err, sizeErr) || !strings.Contains(err.Error(), "continue after block 0") {
+		t.Fatalf("Next() = (%t, %v), want contextual traversal failure", ok, err)
+	}
+	if len(transaction.pins) != 1 || len(transaction.unpinCalls) != 0 || scan.currentSlot != -1 {
+		t.Fatalf("state after failure: pins=%v unpins=%v slot=%d", transaction.pins, transaction.unpinCalls, scan.currentSlot)
+	}
+}
+
+func TestTableScanNextRejectsClosedScan(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if ok, err := scan.Next(); ok || err == nil {
+		t.Fatalf("Next() on closed scan = (%t, %v), want explicit error", ok, err)
+	}
+}
