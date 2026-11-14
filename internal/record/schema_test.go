@@ -102,3 +102,18 @@ func TestSchemaAddAllFromPreservesSourceOrderAndMetadata(t *testing.T) {
 		t.Fatalf("Field(label) = (%+v, %v), want varchar length 18", label, labelOK)
 	}
 }
+
+func TestSchemaHasFieldReportsMembership(t *testing.T) {
+	var schema Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 20)
+
+	for _, name := range []string{"id", "name"} {
+		if !schema.HasField(name) {
+			t.Fatalf("HasField(%q) = false, want true", name)
+		}
+	}
+	if schema.HasField("missing") {
+		t.Fatal("HasField(missing) = true, want false")
+	}
+}

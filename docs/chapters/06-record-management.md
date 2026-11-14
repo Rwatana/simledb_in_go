@@ -98,6 +98,21 @@ The test first failed to compile because the all-field merge operation did not e
 
 This maps Java `Schema.addAll` while retaining the immutable field-list boundary used by the Go schema.
 
+## Feature 6: Check field membership
+
+`Schema.HasField` performs a read-only definition lookup and reports whether a name is declared. It works for every
+field type without exposing either the internal map or the declaration-order slice.
+
+### Test-first record
+
+The test first failed to compile because the membership operation did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSchemaHasFieldReportsMembership` | Declared integer and varchar names are present, while an unknown name is absent |
+
+This maps Java `Schema.hasField` directly to a Go boolean query.
+
 ## Next behavior
 
-Add field-membership lookup as the next stacked PR.
+Add a field-type accessor as the next stacked PR, followed by conceptual-length access in a separate PR.
