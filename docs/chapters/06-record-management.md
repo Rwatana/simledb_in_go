@@ -113,6 +113,21 @@ The test first failed to compile because the membership operation did not exist.
 
 This maps Java `Schema.hasField` directly to a Go boolean query.
 
+## Feature 7: Read a field's logical type
+
+`Schema.TypeOf` delegates to the definition lookup and returns the registered `FieldType` plus an existence flag. The
+flag keeps unknown names explicit instead of relying on Java's implicit null dereference.
+
+### Test-first record
+
+The test first failed to compile because the type accessor did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSchemaTypeOfReportsLogicalType` | Integer and varchar fields return their logical type, while an unknown name is absent |
+
+This maps Java `Schema.type` to a Go accessor with explicit presence.
+
 ## Next behavior
 
-Add a field-type accessor as the next stacked PR, followed by conceptual-length access in a separate PR.
+Add conceptual-length access as the next stacked PR.
