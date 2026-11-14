@@ -87,3 +87,30 @@ func TestViewManagerCreateViewStoresDefinitionInNewViewFile(t *testing.T) {
 		t.Fatalf("append calls = %v, want %v", got, want)
 	}
 }
+
+func TestViewManagerViewDefinitionFindsMatchAndReportsAbsence(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewViewManager(tables)
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateView("seniors", "select sid from student where gradyear=2020", transaction); err != nil {
+		t.Fatalf("CreateView(seniors) error = %v", err)
+	}
+	if err := manager.CreateView("majors", "select sid from student where majorid=10", transaction); err != nil {
+		t.Fatalf("CreateView(majors) error = %v", err)
+	}
+
+	definition, found, err := manager.ViewDefinition("majors", transaction)
+	if err != nil || !found || definition != "select sid from student where majorid=10" {
+		t.Fatalf("ViewDefinition(majors) = (%q, %v, %v), want matching definition", definition, found, err)
+	}
+	definition, found, err = manager.ViewDefinition("missing", transaction)
+	if err != nil || found || definition != "" {
+		t.Fatalf("ViewDefinition(missing) = (%q, %v, %v), want (\"\", false, nil)", definition, found, err)
+	}
+}
