@@ -1725,9 +1725,31 @@ no new exclusive lock, and no additional recovery record. All four cases initial
 
 This adds the write-side lifecycle boundary without changing active transaction write semantics.
 
+## Feature 80: Reject string writes after transaction completion
+
+`Transaction.SetString` now checks active lifecycle state before buffer lookup, exclusive-lock acquisition, optional
+SETSTRING logging, or page mutation. Logged and no-log writes both return `ErrTransactionCompleted` after COMMIT or
+ROLLBACK, matching the integer write boundary.
+
+Rejected calls neither append recovery records nor change lock ownership, and retained pins remain available to
+`Unpin` for cleanup retry.
+
+### Test-first record
+
+Commit and rollback completion were combined with both logging modes. The tests assert completed-state error precedence,
+no exclusive-lock acquisition, and no additional recovery append. All four cases initially returned
+`ErrBufferNotPinned`.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRejectsSetStringAfterCompletion` | Completed transactions reject logged and no-log string writes before side effects |
+
+All transaction page access now shares one terminal-state rule while cleanup release remains possible.
+
 ## Next behavior
 
-Continue with Chapter 5 by rejecting string writes after transaction completion.
+Continue with Chapter 5 by exposing startup recovery through the transaction boundary, then add transactional file-size
+and append operations in separate behaviors.
 
 ## Sources
 

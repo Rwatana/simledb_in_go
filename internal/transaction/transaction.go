@@ -153,6 +153,9 @@ func (t *Transaction) SetInt(block storage.BlockID, offset, value int32, logUpda
 
 // SetString writes a length-prefixed string to a pinned block and optionally records its old value.
 func (t *Transaction) SetString(block storage.BlockID, offset int32, value string, logUpdate bool) error {
+	if t.state != transactionActive {
+		return fmt.Errorf("set string in block %v at offset %d for transaction %d: %w", block, offset, t.id, ErrTransactionCompleted)
+	}
 	frame, ok := t.buffers.Buffer(block)
 	if !ok {
 		return fmt.Errorf("set string in transaction buffer %v at offset %d: %w", block, offset, ErrBufferNotPinned)

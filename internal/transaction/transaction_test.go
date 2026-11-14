@@ -1045,6 +1045,55 @@ func TestTransactionSetStringLogFailurePreservesPageAndMetadata(t *testing.T) {
 	}
 }
 
+func TestTransactionRejectsSetStringAfterCompletion(t *testing.T) {
+	completion := []struct {
+		name     string
+		complete func(*Transaction) error
+	}{
+		{name: "commit", complete: func(tx *Transaction) error { _, err := tx.Commit(); return err }},
+		{name: "rollback", complete: func(tx *Transaction) error { _, err := tx.Rollback(); return err }},
+	}
+	for _, completed := range completion {
+		for _, logUpdate := range []bool{false, true} {
+			name := completed.name + "/no-log"
+			if logUpdate {
+				name = completed.name + "/logged"
+			}
+			t.Run(name, func(t *testing.T) {
+				var allocator IDAllocator
+				var table concurrency.LockTable
+				bufferManager := &recordingBufferPinner{}
+				logs := &recordingTransactionLog{}
+				start := recovery.EncodeStartRecord(1)
+				factory := func() (recovery.EncodedRecordIterator, error) {
+					return &transactionRecordIterator{records: [][]byte{start}}, nil
+				}
+				tx, err := New(&allocator, &table, bufferManager, logs, factory)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := completed.complete(tx); err != nil {
+					t.Fatal(err)
+				}
+				block := storage.NewBlockID("tbl", 1)
+				if err := table.LockShared(block); err != nil {
+					t.Fatal(err)
+				}
+				recordsBefore := len(logs.records)
+				if err := tx.SetString(block, 0, "value", logUpdate); !errors.Is(err, ErrTransactionCompleted) {
+					t.Fatalf("SetString() error = %v, want ErrTransactionCompleted", err)
+				}
+				if len(logs.records) != recordsBefore {
+					t.Fatalf("SetString() appended %d records after completion", len(logs.records)-recordsBefore)
+				}
+				if err := table.LockExclusive(block); err != nil {
+					t.Fatalf("completed SetString acquired an exclusive lock: %v", err)
+				}
+			})
+		}
+	}
+}
+
 func TestTransactionRollbackInvokesDurabilityForOwnID(t *testing.T) {
 	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
 	var allocator IDAllocator
