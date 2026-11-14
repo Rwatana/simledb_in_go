@@ -143,6 +143,26 @@ The test first failed to compile because the length accessor did not exist.
 
 This maps Java `Schema.length` to a Go accessor with explicit presence.
 
+## Feature 9: Calculate physical field offsets
+
+`NewLayout` reserves four bytes at the start of each record slot for the empty/in-use flag, then walks a schema in
+declaration order. Integer fields occupy four bytes. Varchar fields reserve a four-byte payload-length prefix plus four
+bytes per conceptual character, which is the maximum width of one UTF-8 code point in Go.
+
+`Layout.Offset` returns the calculated byte position plus an existence flag, keeping unknown field names explicit.
+Slot-size access and catalog-metadata reconstruction remain separate behaviors.
+
+### Test-first record
+
+The test first failed to compile because `NewLayout` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLayoutCalculatesOrderedFieldOffsets` | Flag space, integer width, maximum UTF-8 varchar width, declaration order, and unknown lookup determine field offsets |
+
+This maps Java `Layout(Schema)`, `lengthInBytes`, and `offset`. Java asks its configured charset encoder for maximum
+bytes per character; Go uses the fixed `utf8.UTFMax` bound for its explicit UTF-8 representation.
+
 ## Next behavior
 
-Begin physical `Layout` construction as the next stacked PR, starting with one offset-calculation behavior.
+Expose the calculated slot size as the next stacked PR.
