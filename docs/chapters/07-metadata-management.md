@@ -11,6 +11,7 @@ behavior remains a separate Issue, branch, commit, and stacked Pull Request.
 | `internal/metadata.NewFieldCatalogLayout` | `simpledb/metadata/TableMgr.java` constructor (`fcatSchema`, `fcatLayout`) | Physical description of each `fldcat` record |
 | `internal/metadata.NewTableManager` | `simpledb/metadata/TableMgr.java` constructor | Retained catalog layouts for table metadata operations |
 | `internal/metadata.NewViewCatalogSchema` | `simpledb/metadata/ViewMgr.java` constructor | Logical description of each `viewcat` record |
+| `internal/metadata.NewStatInfo` | `simpledb/metadata/StatInfo.java` constructor | Immutable observed block and record counts |
 
 ## Feature 1: Construct the table catalog layout
 
@@ -239,3 +240,21 @@ The test first failed to compile because `ViewManager.ViewDefinition` did not ex
 
 Go uses an explicit `(string, bool, error)` result instead of Java's nullable string, separating absence from failures.
 Java `ViewMgr`'s public behavior column is now complete.
+
+## Feature 12: Initialize table statistics
+
+`NewStatInfo` retains the observed block and record counts that later planner estimates consume. Zero and positive counts
+are preserved exactly, and the fields remain private so callers cannot mutate a shared statistics snapshot.
+
+Initialization performs no transaction, catalog, or table I/O. The accessors and the book's deliberately simple
+distinct-value guess remain separate observable behaviors.
+
+### Test-first record
+
+The test first failed to compile because `NewStatInfo` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewStatInfoRetainsObservedCounts` | Initialization preserves supplied non-empty and empty block/record observations exactly |
+
+This maps Java `StatInfo(int, int)` to a Go value with package-private immutable state.
