@@ -305,6 +305,51 @@ func TestRecordPageDeleteRejectsInvalidPositionAndWrapsFailures(t *testing.T) {
 	}
 }
 
+func TestRecordPageOccupyWritesUsedFlagWithLogging(t *testing.T) {
+	transaction := &recordingRecordTransaction{}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddIntegerField("id")
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	if err := page.Occupy(2); err != nil {
+		t.Fatalf("Occupy(2) error = %v", err)
+	}
+	want := integerWrite{block: block, offset: 16, value: recordSlotUsed, logUpdate: true}
+	if len(transaction.writes) != 1 || transaction.writes[0] != want {
+		t.Fatalf("Occupy calls = %v, want [%v]", transaction.writes, want)
+	}
+	if len(transaction.reads) != 0 || len(transaction.stringWrites) != 0 {
+		t.Fatalf("Occupy extra access: reads=%v stringWrites=%v", transaction.reads, transaction.stringWrites)
+	}
+}
+
+func TestRecordPageOccupyRejectsInvalidPositionAndWrapsFailures(t *testing.T) {
+	writeErr := errors.New("occupy failed")
+	transaction := &recordingRecordTransaction{writeErr: writeErr}
+	block := storage.NewBlockID("records.tbl", 3)
+	page, err := NewRecordPage(transaction, block, NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+	if err := page.Occupy(2); !errors.Is(err, writeErr) || !strings.Contains(err.Error(), "offset 8") {
+		t.Fatalf("Occupy write error = %v, want contextual wrapped failure", err)
+	}
+
+	overflow := NewLayoutFromMetadata(&Schema{}, nil, math.MaxInt32)
+	overflowTransaction := &recordingRecordTransaction{}
+	overflowPage, err := NewRecordPage(overflowTransaction, block, overflow)
+	if err != nil {
+		t.Fatalf("NewRecordPage(overflow) error = %v", err)
+	}
+	if err := overflowPage.Occupy(2); err == nil || len(overflowTransaction.writes) != 0 {
+		t.Fatalf("Occupy with overflowing position = %v with writes %v, want rejection", err, overflowTransaction.writes)
+	}
+}
+
 func TestRecordPageFormatInitializesCompleteSlotsWithoutLogging(t *testing.T) {
 	transaction := &recordingRecordTransaction{blockSize: 34}
 	block := storage.NewBlockID("records.tbl", 3)
