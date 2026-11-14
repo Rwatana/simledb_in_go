@@ -53,3 +53,30 @@ func TestSchemaAddVarcharFieldUsesSuppliedLength(t *testing.T) {
 		t.Fatalf("Field(name) = (%+v, %v), want varchar length 24", definition, ok)
 	}
 }
+
+func TestSchemaAddFromCopiesOneFieldDefinition(t *testing.T) {
+	var source Schema
+	source.AddVarcharField("name", 32)
+
+	var destination Schema
+	destination.AddIntegerField("id")
+	if ok := destination.AddFrom("name", &source); !ok {
+		t.Fatal("AddFrom(name) = false, want true")
+	}
+
+	if got, want := destination.Fields(), []string{"id", "name"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Fields() = %v, want %v", got, want)
+	}
+	definition, ok := destination.Field("name")
+	if !ok || definition.Type != VarcharField || definition.Length != 32 {
+		t.Fatalf("Field(name) = (%+v, %v), want varchar length 32", definition, ok)
+	}
+
+	before := destination.Fields()
+	if ok := destination.AddFrom("missing", &source); ok {
+		t.Fatal("AddFrom(missing) = true, want false")
+	}
+	if got := destination.Fields(); !reflect.DeepEqual(got, before) {
+		t.Fatalf("Fields() after missing copy = %v, want unchanged %v", got, before)
+	}
+}
