@@ -27,3 +27,14 @@ func TestNewViewCatalogSchemaDescribesStoredViewDefinitions(t *testing.T) {
 		}
 	}
 }
+
+func TestNewViewManagerRetainsTableManager(t *testing.T) {
+	tables := NewTableManager()
+	manager := NewViewManager(tables)
+	if manager == nil {
+		t.Fatal("NewViewManager() returned nil")
+	}
+	if manager.tables != tables {
+		t.Fatalf("table manager = %p, want %p", manager.tables, tables)
+	}
+}
