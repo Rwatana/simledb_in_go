@@ -38,6 +38,11 @@ func (s *Schema) AddIntegerField(name string) {
 	s.AddField(name, IntegerField, 0)
 }
 
+// AddVarcharField registers a varchar field with the supplied conceptual character length.
+func (s *Schema) AddVarcharField(name string, length int) {
+	s.AddField(name, VarcharField, length)
+}
+
 // Fields returns field names in declaration order.
 func (s *Schema) Fields() []string {
 	return append([]string(nil), s.fields...)
