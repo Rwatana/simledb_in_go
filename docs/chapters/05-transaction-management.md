@@ -1814,9 +1814,30 @@ propagation.
 
 This mirrors Java `Transaction.append` without allowing the EOF sentinel to reach physical file addressing.
 
+## Feature 84: Expose immutable block size through a transaction
+
+`Transaction.BlockSize` delegates immutable database block-size metadata through the configured full file manager. It
+does not acquire a data-block or EOF lock because the value is fixed when the file manager is created and cannot race
+with transaction activity.
+
+The operation returns a configuration error for transactions created with only `NewWithFileSizer`; the narrower
+constructor remains valid for size-only clients.
+
+### Test-first record
+
+The tests first failed to compile because `Transaction.BlockSize` did not exist. They cover successful delegation and
+the missing full-file-manager boundary.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionBlockSizeReturnsImmutableFileMetadata` | Transaction clients receive the configured immutable block size |
+| `TestTransactionBlockSizeRequiresFullFileManager` | Size-only transaction construction reports unavailable block metadata |
+
+This preserves Java `Transaction.blockSize` while making unavailable dependencies explicit in Go.
+
 ## Next behavior
 
-Continue with Chapter 5 by exposing block size, then available buffer count, as separate transaction behaviors.
+Continue with Chapter 5 by exposing the available buffer count as a separate transaction behavior.
 
 ## Sources
 
