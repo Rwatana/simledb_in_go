@@ -23,6 +23,49 @@ func NewStatManager(tables *TableManager) *StatManager {
 	}
 }
 
+// Refresh rebuilds statistics for every registered table and resets the lookup counter.
+func (m *StatManager) Refresh(transaction record.TableScanTransaction) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.tables == nil {
+		return fmt.Errorf("refresh table statistics: table manager is nil")
+	}
+	tableCatalogLayout, err := m.tables.Layout("tblcat", transaction)
+	if err != nil {
+		return fmt.Errorf("refresh table statistics: load table catalog layout: %w", err)
+	}
+	refreshed := make(map[string]*StatInfo)
+	if err := withCatalogScan(transaction, "tblcat", tableCatalogLayout, func(scan *record.TableScan) error {
+		for {
+			found, err := scan.Next()
+			if err != nil {
+				return fmt.Errorf("scan registered tables: %w", err)
+			}
+			if !found {
+				return nil
+			}
+			tableName, err := scan.GetString("tblname")
+			if err != nil {
+				return fmt.Errorf("read registered table name: %w", err)
+			}
+			layout, err := m.tables.Layout(tableName, transaction)
+			if err != nil {
+				return fmt.Errorf("load layout for table %q: %w", tableName, err)
+			}
+			stats, err := m.calculateTableStats(tableName, layout, transaction)
+			if err != nil {
+				return fmt.Errorf("calculate table %q: %w", tableName, err)
+			}
+			refreshed[tableName] = stats
+		}
+	}); err != nil {
+		return fmt.Errorf("refresh table statistics: %w", err)
+	}
+	m.stats = refreshed
+	m.calls = 0
+	return nil
+}
+
 func (m *StatManager) calculateTableStats(tableName string, layout *record.Layout, transaction record.TableScanTransaction) (*StatInfo, error) {
 	blocks := 0
 	records := 0
