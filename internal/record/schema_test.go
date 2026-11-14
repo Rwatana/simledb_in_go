@@ -25,3 +25,17 @@ func TestSchemaAddFieldPreservesOrderAndMetadata(t *testing.T) {
 		t.Fatal("Field(missing) unexpectedly found")
 	}
 }
+
+func TestSchemaAddIntegerFieldUsesIntegerMetadata(t *testing.T) {
+	var schema Schema
+	schema.AddField("prefix", VarcharField, 4)
+	schema.AddIntegerField("count")
+
+	if got, want := schema.Fields(), []string{"prefix", "count"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Fields() = %v, want %v", got, want)
+	}
+	definition, ok := schema.Field("count")
+	if !ok || definition.Type != IntegerField || definition.Length != 0 {
+		t.Fatalf("Field(count) = (%+v, %v), want integer length 0", definition, ok)
+	}
+}
