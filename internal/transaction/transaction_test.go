@@ -1326,6 +1326,22 @@ func TestTransactionBlockSizeRequiresFullFileManager(t *testing.T) {
 	}
 }
 
+func TestTransactionAvailableBuffersDelegatesWithoutChangingOwnership(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	bufferManager := &recordingBufferPinner{available: 3}
+	tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := tx.AvailableBuffers(); got != 3 {
+		t.Fatalf("AvailableBuffers() = %d, want 3", got)
+	}
+	if len(bufferManager.blocks) != 0 || len(bufferManager.unpins) != 0 {
+		t.Fatalf("availability query changed pin ownership: pins %v unpins %d", bufferManager.blocks, len(bufferManager.unpins))
+	}
+}
+
 func TestTransactionRollbackInvokesDurabilityForOwnID(t *testing.T) {
 	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
 	var allocator IDAllocator

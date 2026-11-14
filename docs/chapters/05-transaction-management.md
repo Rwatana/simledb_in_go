@@ -1835,9 +1835,25 @@ the missing full-file-manager boundary.
 
 This preserves Java `Transaction.blockSize` while making unavailable dependencies explicit in Go.
 
+## Feature 85: Expose available buffer count through a transaction
+
+`Transaction.AvailableBuffers` delegates to the shared buffer manager's concurrency-safe `Available` query. The method
+does not acquire transaction locks, pin frames, or change transaction-local buffer ownership.
+
+### Test-first record
+
+The test first failed to compile because `Transaction.AvailableBuffers` did not exist. It verifies the delegated count
+and confirms that neither pin nor unpin activity occurs.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionAvailableBuffersDelegatesWithoutChangingOwnership` | Transaction clients observe pool availability without resource mutation |
+
+This completes the Java `Transaction.availableBuffs` boundary while retaining the Go manager's synchronized snapshot.
+
 ## Next behavior
 
-Continue with Chapter 5 by exposing the available buffer count as a separate transaction behavior.
+Continue in Chapter 6 with record layout and schema behaviors, preserving one observable behavior per stacked PR.
 
 ## Sources
 
