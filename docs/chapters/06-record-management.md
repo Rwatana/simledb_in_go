@@ -444,6 +444,21 @@ The test first failed to compile because `NewRID` did not exist.
 
 This maps Java `RID.RID` and `RID.blockNumber`; slot access remains a separate behavior.
 
+## Feature 26: Expose a record identifier slot number
+
+`RID.Slot` returns the exact slot coordinate retained by `NewRID`, while the private fields keep the identifier immutable
+to callers.
+
+### Test-first record
+
+The test first failed to compile because `RID.Slot` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRIDSlotReturnsConstructedValue` | A constructed RID returns its exact slot number |
+
+This maps Java `RID.slot`.
+
 ## Next behavior
 
-Expose the record identifier's slot number as the next stacked PR.
+Compare record identifiers by both coordinates as the next stacked PR.
