@@ -115,3 +115,25 @@ not exist.
 | `TestTableManagerCreateTablePreservesFieldCatalogTypeWriteFailure` | A field type write failure retains context and stops subsequent metadata writes |
 | `TestTableManagerCreateTablePreservesFieldCatalogLengthWriteFailure` | A field length write failure retains context and stops before offset storage |
 | `TestTableManagerCreateTablePreservesFieldCatalogOffsetWriteFailure` | A field offset write failure retains context after earlier metadata is stored |
+
+## Feature 5: Initialize new database catalogs
+
+`TableManager.InitializeCatalogs` registers `tblcat` and `fldcat` using the same `CreateTable` path as every later user
+table. On an empty database, the existing table-scan initialization appends, pins, and formats each first catalog block;
+the catalog layouts then describe themselves through two table rows and seven field rows.
+
+The operation stops after the first failed catalog registration and adds bootstrap context without hiding the underlying
+scan, write, or cleanup error. Detecting whether the database is new remains composition-root policy rather than state
+inside the metadata manager.
+
+### Test-first record
+
+The test first failed to compile because `TableManager.InitializeCatalogs` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableManagerInitializeCatalogsStoresTheirOwnMetadata` | Empty catalog files are appended and formatted once, then store complete self-describing table and field rows in declaration order |
+| `TestTableManagerInitializeCatalogsPreservesTableCatalogFailure` | Failure opening `tblcat` retains bootstrap context and has no catalog side effects |
+| `TestTableManagerInitializeCatalogsPreservesFieldCatalogFailure` | Failure opening `fldcat` retains bootstrap context after the table catalog row is written |
+
+This maps the `isNew` branch of Java `TableMgr` while making bootstrap an explicit, separately testable Go operation.

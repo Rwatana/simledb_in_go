@@ -22,6 +22,17 @@ func NewTableManager() *TableManager {
 	}
 }
 
+// InitializeCatalogs creates and registers the table and field catalogs for a new database.
+func (m *TableManager) InitializeCatalogs(transaction record.TableScanTransaction) error {
+	if err := m.CreateTable("tblcat", m.tableCatalogLayout.Schema(), transaction); err != nil {
+		return fmt.Errorf("initialize table catalog: %w", err)
+	}
+	if err := m.CreateTable("fldcat", m.fieldCatalogLayout.Schema(), transaction); err != nil {
+		return fmt.Errorf("initialize field catalog: %w", err)
+	}
+	return nil
+}
+
 // CreateTable stores one table's schema and physical layout in the catalogs.
 func (m *TableManager) CreateTable(tableName string, schema *record.Schema, transaction record.TableScanTransaction) error {
 	if schema == nil {
