@@ -57,3 +57,49 @@ func TestStatManagerCalculateTableStatsCountsRecordsAndBlocks(t *testing.T) {
 		t.Fatalf("manager state = (%d calls, %v), want unchanged", manager.calls, manager.stats)
 	}
 }
+
+func TestStatManagerRefreshRebuildsEveryRegisteredTable(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	if err := tables.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable(student) error = %v", err)
+	}
+	layout := record.NewLayout(&schema)
+	scan, err := record.NewTableScan(transaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan(student) error = %v", err)
+	}
+	for id := 0; id < 2; id++ {
+		if err := scan.Insert(); err != nil {
+			t.Fatalf("Insert(%d) error = %v", id, err)
+		}
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close(student) error = %v", err)
+	}
+
+	manager := NewStatManager(tables)
+	manager.calls = 99
+	manager.stats["stale"] = NewStatInfo(99, 99)
+	if err := manager.Refresh(transaction); err != nil {
+		t.Fatalf("Refresh() error = %v", err)
+	}
+	if manager.calls != 0 {
+		t.Fatalf("calls = %d, want 0", manager.calls)
+	}
+	if len(manager.stats) != 3 || manager.stats["stale"] != nil {
+		t.Fatalf("cache = %v, want only tblcat, fldcat, student", manager.stats)
+	}
+	wantRecords := map[string]int{"tblcat": 3, "fldcat": 8, "student": 2}
+	for tableName, records := range wantRecords {
+		stats := manager.stats[tableName]
+		if stats == nil || stats.RecordsOutput() != records {
+			t.Fatalf("%s statistics = %v, want %d records", tableName, stats, records)
+		}
+	}
+}

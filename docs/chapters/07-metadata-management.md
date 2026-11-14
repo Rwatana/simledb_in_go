@@ -342,3 +342,23 @@ exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestStatManagerCalculateTableStatsCountsRecordsAndBlocks` | Nine occupied records spanning two blocks produce `(2 blocks, 9 records)` without mutating cache state |
+
+## Feature 18: Refresh all table statistics
+
+`StatManager.Refresh` reconstructs the `tblcat` layout, walks every registered table name, reconstructs each table's
+layout, and calculates a fresh `StatInfo`. Only after the entire scan succeeds does it replace the cache and reset the
+lookup counter to zero, so a partial refresh cannot discard the previous usable snapshot.
+
+The manager mutex covers the refresh and state commit, preserving Java's synchronized semantics. The outer table-catalog
+scan and every nested layout/table scan close through the existing cleanup boundary with table context.
+
+### Test-first record
+
+The test first failed to compile because `StatManager.Refresh` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestStatManagerRefreshRebuildsEveryRegisteredTable` | Refresh replaces stale cache state with `tblcat`, `fldcat`, and user-table snapshots and resets the call counter |
+
+This maps Java `StatMgr.refreshStatistics` while exposing the fallible refresh explicitly instead of hiding it in a
+constructor.
