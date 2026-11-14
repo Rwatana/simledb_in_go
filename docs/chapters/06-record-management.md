@@ -594,6 +594,25 @@ The tests first failed to compile because `TableScan.AtLastBlock` did not exist.
 
 This maps Java `TableScan.atLastBlock` with explicit error handling.
 
+## Feature 35: Move a table scan to the next block
+
+`TableScan.MoveToNextBlock` captures the current block number, closes that page, and pins the next numbered block for
+the same table file. The cursor becomes `-1` only after the replacement page is ready. A close failure leaves the old
+page and cursor available for retry; a subsequent pin failure leaves the scan closed while preserving the old cursor.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.MoveToNextBlock` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanMoveToNextBlockReleasesCurrentPageAndResetsCursor` | Moving releases block zero, pins block one, and restores the before-first cursor |
+| `TestTableScanMoveToNextBlockStopsOnCloseFailure` | A failed release stops before the next pin and retains current state |
+| `TestTableScanMoveToNextBlockReportsPinFailureAfterClose` | A failed next-block pin leaves no current page and preserves cursor state |
+| `TestTableScanMoveToNextBlockRejectsClosedScan` | A scan without a current page cannot derive or pin a next block |
+
+This maps Java `TableScan.moveToBlock(rp.block().number()+1)` while keeping release and pin failures explicit.
+
 ## Next behavior
 
-Move a table scan to the next existing block as the next stacked PR.
+Compose current-block search, last-block detection, and next-block movement into cross-block table iteration.
