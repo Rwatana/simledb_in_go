@@ -9,16 +9,21 @@ import (
 )
 
 type recordingBufferPinner struct {
-	frame    *buffer.Buffer
-	frames   map[storage.BlockID]*buffer.Buffer
-	err      error
-	unpinErr error
-	blocks   []storage.BlockID
-	unpins   []*buffer.Buffer
-	flushes  []buffer.TransactionID
-	flushErr error
-	events   *[]string
-	onUnpin  func(*buffer.Buffer)
+	frame     *buffer.Buffer
+	frames    map[storage.BlockID]*buffer.Buffer
+	err       error
+	unpinErr  error
+	blocks    []storage.BlockID
+	unpins    []*buffer.Buffer
+	flushes   []buffer.TransactionID
+	flushErr  error
+	events    *[]string
+	onUnpin   func(*buffer.Buffer)
+	available int
+}
+
+func (p *recordingBufferPinner) Available() int {
+	return p.available
 }
 
 func (p *recordingBufferPinner) Pin(block storage.BlockID) (*buffer.Buffer, error) {
