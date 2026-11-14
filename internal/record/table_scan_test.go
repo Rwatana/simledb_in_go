@@ -245,3 +245,74 @@ func TestTableScanBeforeFirstReportsRepinFailureAfterClose(t *testing.T) {
 		t.Fatalf("state after repin failure: page=%v slot=%d unpins=%v pins=%v", scan.recordPage, scan.currentSlot, transaction.unpinCalls, transaction.pins)
 	}
 }
+
+func TestTableScanNextInBlockAdvancesToOccupiedSlotsAndReportsExhaustion(t *testing.T) {
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{
+			blockSize:  32,
+			readValues: []int32{recordSlotUsed, recordSlotEmpty, recordSlotUsed, recordSlotEmpty},
+		},
+		size: 1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	if ok, err := scan.NextInBlock(); err != nil || !ok || scan.currentSlot != 0 {
+		t.Fatalf("first NextInBlock() = (%t, %v), slot %d; want (true, nil), slot 0", ok, err, scan.currentSlot)
+	}
+	if ok, err := scan.NextInBlock(); err != nil || !ok || scan.currentSlot != 2 {
+		t.Fatalf("second NextInBlock() = (%t, %v), slot %d; want (true, nil), slot 2", ok, err, scan.currentSlot)
+	}
+	if ok, err := scan.NextInBlock(); err != nil || ok || scan.currentSlot != -1 {
+		t.Fatalf("third NextInBlock() = (%t, %v), slot %d; want (false, nil), slot -1", ok, err, scan.currentSlot)
+	}
+	wantOffsets := []int{0, 8, 16, 24}
+	if len(transaction.reads) != len(wantOffsets) {
+		t.Fatalf("flag reads = %v, want offsets %v", transaction.reads, wantOffsets)
+	}
+	for index, offset := range wantOffsets {
+		if transaction.reads[index].offset != offset {
+			t.Fatalf("flag read %d offset = %d, want %d", index, transaction.reads[index].offset, offset)
+		}
+	}
+}
+
+func TestTableScanNextInBlockPreservesCursorOnReadFailure(t *testing.T) {
+	readErr := errors.New("flag read failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16, readErr: readErr},
+		size:                       1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 0
+
+	if ok, err := scan.NextInBlock(); ok || !errors.Is(err, readErr) || !strings.Contains(err.Error(), "student.tbl") {
+		t.Fatalf("NextInBlock() = (%t, %v), want contextual read failure", ok, err)
+	}
+	if scan.currentSlot != 0 {
+		t.Fatalf("cursor after failure = %d, want 0", scan.currentSlot)
+	}
+}
+
+func TestTableScanNextInBlockRejectsClosedScan(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if ok, err := scan.NextInBlock(); ok || err == nil {
+		t.Fatalf("NextInBlock() on closed scan = (%t, %v), want explicit error", ok, err)
+	}
+}
