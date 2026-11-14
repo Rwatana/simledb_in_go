@@ -80,3 +80,25 @@ func TestSchemaAddFromCopiesOneFieldDefinition(t *testing.T) {
 		t.Fatalf("Fields() after missing copy = %v, want unchanged %v", got, before)
 	}
 }
+
+func TestSchemaAddAllFromPreservesSourceOrderAndMetadata(t *testing.T) {
+	var source Schema
+	source.AddIntegerField("count")
+	source.AddVarcharField("label", 18)
+
+	var destination Schema
+	destination.AddVarcharField("prefix", 4)
+	destination.AddAllFrom(&source)
+
+	if got, want := destination.Fields(), []string{"prefix", "count", "label"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Fields() = %v, want %v", got, want)
+	}
+	count, countOK := destination.Field("count")
+	if !countOK || count.Type != IntegerField || count.Length != 0 {
+		t.Fatalf("Field(count) = (%+v, %v), want integer length 0", count, countOK)
+	}
+	label, labelOK := destination.Field("label")
+	if !labelOK || label.Type != VarcharField || label.Length != 18 {
+		t.Fatalf("Field(label) = (%+v, %v), want varchar length 18", label, labelOK)
+	}
+}
