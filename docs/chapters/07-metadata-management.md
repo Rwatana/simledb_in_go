@@ -192,3 +192,20 @@ The test first failed to compile because `NewViewCatalogSchema` and `MaxViewDefi
 
 This extracts the deterministic schema portion of Java `ViewMgr(boolean, TableMgr, Transaction)` before adding its
 new-database side effect.
+
+## Feature 8: Initialize the view metadata manager
+
+`NewViewManager` retains the supplied `TableManager` for later `viewcat` registration and lookup. It performs no
+transaction, file, or catalog I/O, keeping dependency setup independently testable from the new-database side effect in
+Java's constructor.
+
+### Test-first record
+
+The test first failed to compile because `NewViewManager` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewViewManagerRetainsTableManager` | A new view manager retains the exact table metadata manager supplied by its caller |
+
+The Go constructor intentionally accepts only the dependency it can initialize without failure. Registering `viewcat`
+remains the next explicit behavior.
