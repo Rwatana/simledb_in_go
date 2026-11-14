@@ -1172,3 +1172,64 @@ func TestTableScanInsertRejectsClosedScan(t *testing.T) {
 		t.Fatal("Insert() after close succeeded, want explicit error")
 	}
 }
+
+func TestTableScanDeleteMarksTheCurrentSlotEmptyWithLogging(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 1
+
+	if err := scan.Delete(); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	wantWrite := integerWrite{block: storage.NewBlockID("student.tbl", 0), offset: 8, value: recordSlotEmpty, logUpdate: true}
+	if len(transaction.writes) != 1 || transaction.writes[0] != wantWrite {
+		t.Fatalf("delete writes = %v, want [%v]", transaction.writes, wantWrite)
+	}
+	if scan.currentSlot != 1 || scan.recordPage.Block().Number() != 0 {
+		t.Fatalf("scan state changed after delete: page=%v slot=%d", scan.recordPage.Block(), scan.currentSlot)
+	}
+}
+
+func TestTableScanDeleteWrapsWriteFailureAndPreservesPosition(t *testing.T) {
+	writeErr := errors.New("delete failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{writeErr: writeErr},
+		size:                       1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 1
+
+	if err := scan.Delete(); !errors.Is(err, writeErr) || !strings.Contains(err.Error(), "block 0 slot 1") {
+		t.Fatalf("Delete() error = %v, want contextual wrapped failure", err)
+	}
+	if scan.currentSlot != 1 || scan.recordPage.Block().Number() != 0 {
+		t.Fatalf("scan state changed after failed delete: page=%v slot=%d", scan.recordPage.Block(), scan.currentSlot)
+	}
+}
+
+func TestTableScanDeleteRequiresACurrentRecord(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if err := scan.Delete(); err == nil || len(transaction.writes) != 0 {
+		t.Fatalf("Delete() before first = %v with writes %v, want explicit error", err, transaction.writes)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if err := scan.Delete(); err == nil || len(transaction.writes) != 0 {
+		t.Fatalf("Delete() after close = %v with writes %v, want explicit error", err, transaction.writes)
+	}
+}
