@@ -66,6 +66,22 @@ The test first failed to compile because the varchar convenience method did not 
 
 This maps Java `Schema.addStringField` to terminology that matches the logical varchar type.
 
+## Feature 4: Copy one field from another schema
+
+`Schema.AddFrom` looks up one named field in a source schema, copies its type and conceptual length through the generic
+registration path, and appends the name to the destination declaration order. It reports whether the source field exists;
+a missing name leaves the destination unchanged instead of causing Java's implicit null dereference.
+
+### Test-first record
+
+The test first failed to compile because the field-copy operation did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSchemaAddFromCopiesOneFieldDefinition` | One named source field preserves type and length in destination order, while a missing field is reported without mutation |
+
+This maps Java `Schema.add` to a Go operation with an explicit missing-field result.
+
 ## Next behavior
 
-Add copying one named field from another schema, then merging every field in a separate stacked PR.
+Add merging every field from another schema as the next stacked PR.
