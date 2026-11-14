@@ -43,6 +43,16 @@ func (s *Schema) AddVarcharField(name string, length int) {
 	s.AddField(name, VarcharField, length)
 }
 
+// AddFrom copies one named field definition from source and reports whether it exists.
+func (s *Schema) AddFrom(name string, source *Schema) bool {
+	definition, ok := source.Field(name)
+	if !ok {
+		return false
+	}
+	s.AddField(name, definition.Type, definition.Length)
+	return true
+}
+
 // Fields returns field names in declaration order.
 func (s *Schema) Fields() []string {
 	return append([]string(nil), s.fields...)
