@@ -187,3 +187,61 @@ func TestTableScanCloseWithoutCurrentPageDoesNothing(t *testing.T) {
 		t.Fatalf("Close() = %v with calls %v, want no-op success", err, transaction.unpinCalls)
 	}
 }
+
+func TestTableScanBeforeFirstRepinsBlockZeroAndResetsCursor(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 2}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 3
+
+	if err := scan.BeforeFirst(); err != nil {
+		t.Fatalf("BeforeFirst() error = %v", err)
+	}
+	wantBlock := storage.NewBlockID("student.tbl", 0)
+	if len(transaction.unpinCalls) != 1 || transaction.unpinCalls[0] != wantBlock {
+		t.Fatalf("Unpin calls = %v, want [%v]", transaction.unpinCalls, wantBlock)
+	}
+	if len(transaction.pins) != 2 || transaction.pins[1] != wantBlock {
+		t.Fatalf("Pin calls = %v, want initial and rewind block zero", transaction.pins)
+	}
+	if scan.recordPage == nil || scan.recordPage.Block() != wantBlock || scan.currentSlot != -1 {
+		t.Fatalf("scan state after BeforeFirst = %+v, want block zero before first slot", scan)
+	}
+}
+
+func TestTableScanBeforeFirstStopsOnCloseFailure(t *testing.T) {
+	unpinErr := errors.New("unpin failed")
+	transaction := &recordingTableTransaction{size: 2, unpinErr: unpinErr}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 3
+
+	if err := scan.BeforeFirst(); !errors.Is(err, unpinErr) {
+		t.Fatalf("BeforeFirst() error = %v, want close failure", err)
+	}
+	if len(transaction.pins) != 1 || scan.recordPage == nil || scan.currentSlot != 3 {
+		t.Fatalf("state after close failure: pins=%v page=%v slot=%d", transaction.pins, scan.recordPage, scan.currentSlot)
+	}
+}
+
+func TestTableScanBeforeFirstReportsRepinFailureAfterClose(t *testing.T) {
+	pinErr := errors.New("repin failed")
+	transaction := &recordingTableTransaction{size: 2}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 3
+	transaction.pinErr = pinErr
+
+	if err := scan.BeforeFirst(); !errors.Is(err, pinErr) || !strings.Contains(err.Error(), "block 0") {
+		t.Fatalf("BeforeFirst() error = %v, want contextual repin failure", err)
+	}
+	if scan.recordPage != nil || scan.currentSlot != 3 || len(transaction.unpinCalls) != 1 || len(transaction.pins) != 2 {
+		t.Fatalf("state after repin failure: page=%v slot=%d unpins=%v pins=%v", scan.recordPage, scan.currentSlot, transaction.unpinCalls, transaction.pins)
+	}
+}
