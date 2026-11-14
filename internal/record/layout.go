@@ -29,6 +29,11 @@ func (l *Layout) Offset(name string) (int, bool) {
 	return offset, ok
 }
 
+// SlotSize returns the total byte width of one record slot.
+func (l *Layout) SlotSize() int {
+	return l.slotSize
+}
+
 func fieldLengthInBytes(definition FieldDefinition) int {
 	if definition.Type == IntegerField {
 		return encodedIntegerSize
