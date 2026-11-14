@@ -461,6 +461,61 @@ func TestRecordPageNextAfterRejectsInvalidInputAndWrapsFailures(t *testing.T) {
 	}
 }
 
+func TestRecordPageNextEmptyAfterFindsEmptySlotWithoutWriting(t *testing.T) {
+	transaction := &recordingRecordTransaction{blockSize: 34, readValues: []int32{recordSlotUsed, recordSlotEmpty}}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddIntegerField("id")
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	got, err := page.NextEmptyAfter(-1)
+	if err != nil || got != 1 {
+		t.Fatalf("NextEmptyAfter(-1) = (%d, %v), want (1, nil)", got, err)
+	}
+	wantReads := []integerRead{{block: block, offset: 0}, {block: block, offset: 8}}
+	if len(transaction.reads) != len(wantReads) {
+		t.Fatalf("NextEmptyAfter reads = %v, want %v", transaction.reads, wantReads)
+	}
+	for index := range wantReads {
+		if transaction.reads[index] != wantReads[index] {
+			t.Fatalf("NextEmptyAfter read %d = %v, want %v", index, transaction.reads[index], wantReads[index])
+		}
+	}
+	if len(transaction.writeOperations) != 0 {
+		t.Fatalf("NextEmptyAfter writes = %v, want none", transaction.writeOperations)
+	}
+
+	fullTransaction := &recordingRecordTransaction{blockSize: 17, readValues: []int32{recordSlotUsed, recordSlotUsed}}
+	fullPage, err := NewRecordPage(fullTransaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage(full) error = %v", err)
+	}
+	got, err = fullPage.NextEmptyAfter(-1)
+	if err != nil || got != -1 {
+		t.Fatalf("NextEmptyAfter(-1) = (%d, %v), want (-1, nil)", got, err)
+	}
+	if len(fullTransaction.reads) != 2 {
+		t.Fatalf("NextEmptyAfter full-page reads = %v, want two complete slots", fullTransaction.reads)
+	}
+}
+
+func TestRecordPageNextEmptyAfterWrapsFlagReadFailure(t *testing.T) {
+	readErr := errors.New("empty flag read failed")
+	transaction := &recordingRecordTransaction{blockSize: 8, readErr: readErr}
+	block := storage.NewBlockID("records.tbl", 3)
+	page, err := NewRecordPage(transaction, block, NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	if _, err := page.NextEmptyAfter(-1); !errors.Is(err, readErr) || !strings.Contains(err.Error(), "slot 0 flag at offset 0") {
+		t.Fatalf("NextEmptyAfter() read error = %v, want contextual wrapped failure", err)
+	}
+}
+
 func TestNewRecordPagePinsTargetBlock(t *testing.T) {
 	transaction := &recordingRecordTransaction{}
 	block := storage.NewBlockID("records.tbl", 3)

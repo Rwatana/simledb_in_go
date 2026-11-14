@@ -359,6 +359,24 @@ The tests first failed to compile because `RecordPage.NextAfter` did not exist.
 
 This maps Java `RecordPage.nextAfter` and the used-flag branch of `searchAfter`.
 
+## Feature 21: Find the next empty record slot
+
+`RecordPage.NextEmptyAfter` uses the same complete-slot boundary and ordered flag scan as `NextAfter`, but targets the
+empty occupancy value. It returns the first reusable slot or `-1` at exhaustion and performs no writes, keeping slot
+selection separate from the later reservation step.
+
+### Test-first record
+
+The tests first failed to compile because `RecordPage.NextEmptyAfter` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageNextEmptyAfterFindsEmptySlotWithoutWriting` | The first empty flag is returned without writes, and incomplete trailing bytes are ignored |
+| `TestRecordPageNextEmptyAfterWrapsFlagReadFailure` | A flag-read failure retains block, slot, and byte-position context |
+
+This maps the empty-flag branch of Java `RecordPage.searchAfter`. The separate Go method intentionally exposes selection
+without combining it with the mutation performed by Java `insertAfter`.
+
 ## Next behavior
 
-Find the next empty record slot without changing its occupancy flag as the next stacked PR.
+Mark a selected record slot occupied as the next stacked PR.
