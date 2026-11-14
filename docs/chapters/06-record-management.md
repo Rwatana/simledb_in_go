@@ -318,6 +318,27 @@ The tests first failed to compile because `RecordPage.Delete` did not exist.
 
 This maps Java `RecordPage.delete` and its private `setFlag(slot, EMPTY)` behavior.
 
+## Feature 19: Format a new record block
+
+`RecordPage.Format` obtains the transaction block size once, then initializes every complete fixed-size slot in physical
+order. Each slot receives an empty occupancy flag followed by zero for integer fields and an empty string for varchar
+fields in schema declaration order. Every write disables update logging because a newly appended block has no meaningful
+old values. An incomplete trailing region is left untouched.
+
+Unlike the Java method, the Go method rejects non-positive slot sizes and returns contextual errors for block-size lookup,
+layout lookup, offset overflow, and the first failed flag or field write.
+
+### Test-first record
+
+The tests first failed to compile because `RecordPage.Format` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageFormatInitializesCompleteSlotsWithoutLogging` | Complete slots are initialized in schema order without logging while trailing bytes remain untouched |
+| `TestRecordPageFormatRejectsInvalidLayoutAndWrapsFailures` | Invalid layout and transaction failures stop formatting with physical context |
+
+This maps Java `RecordPage.format` and its `isValidSlot` boundary rule.
+
 ## Next behavior
 
-Format a new record block without logging as the next stacked PR.
+Find the next occupied record slot as the next stacked PR.
