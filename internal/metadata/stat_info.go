@@ -10,3 +10,8 @@ type StatInfo struct {
 func NewStatInfo(blocks, records int) *StatInfo {
 	return &StatInfo{blocks: blocks, records: records}
 }
+
+// BlocksAccessed returns the estimated number of table blocks accessed.
+func (s *StatInfo) BlocksAccessed() int {
+	return s.blocks
+}
