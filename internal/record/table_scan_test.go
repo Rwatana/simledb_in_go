@@ -316,3 +316,49 @@ func TestTableScanNextInBlockRejectsClosedScan(t *testing.T) {
 		t.Fatalf("NextInBlock() on closed scan = (%t, %v), want explicit error", ok, err)
 	}
 }
+
+func TestTableScanAtLastBlockComparesCurrentBlockWithFileSize(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 3}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	if last, err := scan.AtLastBlock(); err != nil || last {
+		t.Fatalf("AtLastBlock() on block 0 = (%t, %v), want (false, nil)", last, err)
+	}
+	scan.recordPage = &RecordPage{transaction: transaction, block: storage.NewBlockID("student.tbl", 2), layout: scan.layout}
+	if last, err := scan.AtLastBlock(); err != nil || !last {
+		t.Fatalf("AtLastBlock() on block 2 = (%t, %v), want (true, nil)", last, err)
+	}
+	if len(transaction.sizeCalls) != 3 {
+		t.Fatalf("Size calls = %v, want initialization plus one per AtLastBlock call", transaction.sizeCalls)
+	}
+}
+
+func TestTableScanAtLastBlockRejectsUnavailableStateAndWrapsSizeFailure(t *testing.T) {
+	sizeErr := errors.New("size failed")
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	transaction.sizeErr = sizeErr
+	if last, err := scan.AtLastBlock(); last || !errors.Is(err, sizeErr) || !strings.Contains(err.Error(), "block 0") {
+		t.Fatalf("AtLastBlock() size failure = (%t, %v), want contextual failure", last, err)
+	}
+
+	transaction.sizeErr = nil
+	transaction.size = 0
+	if last, err := scan.AtLastBlock(); last || err == nil {
+		t.Fatalf("AtLastBlock() with zero size = (%t, %v), want explicit error", last, err)
+	}
+
+	sizeCallCount := len(transaction.sizeCalls)
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if last, err := scan.AtLastBlock(); last || err == nil || len(transaction.sizeCalls) != sizeCallCount {
+		t.Fatalf("AtLastBlock() after close = (%t, %v), size calls %v", last, err, transaction.sizeCalls)
+	}
+}

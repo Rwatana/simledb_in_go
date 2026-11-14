@@ -100,3 +100,19 @@ func (s *TableScan) NextInBlock() (bool, error) {
 	s.currentSlot = next
 	return next >= 0, nil
 }
+
+// AtLastBlock reports whether the current page is the table file's final block.
+func (s *TableScan) AtLastBlock() (bool, error) {
+	if s.recordPage == nil {
+		return false, fmt.Errorf("inspect table scan for %q: no current record page", s.fileName)
+	}
+	block := s.recordPage.Block()
+	size, err := s.transaction.Size(s.fileName)
+	if err != nil {
+		return false, fmt.Errorf("inspect table scan for %q at block %d: read file size: %w", s.fileName, block.Number(), err)
+	}
+	if size <= 0 {
+		return false, fmt.Errorf("inspect table scan for %q at block %d: file size %d must be positive", s.fileName, block.Number(), size)
+	}
+	return block.Number() == size-1, nil
+}

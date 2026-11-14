@@ -577,6 +577,23 @@ The tests first failed to compile because `TableScan.NextInBlock` did not exist.
 
 This isolates the current-block portion of Java `TableScan.next` before cross-block traversal is added.
 
+## Feature 34: Detect the last table scan block
+
+`TableScan.AtLastBlock` requires a current record page, reads the retained table filename's size once, and compares the
+current block number with `size - 1`. Size failures retain table and block context, and a non-positive size while a page
+is current is rejected as inconsistent state.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.AtLastBlock` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanAtLastBlockComparesCurrentBlockWithFileSize` | Current block and one size lookup determine first-versus-last status |
+| `TestTableScanAtLastBlockRejectsUnavailableStateAndWrapsSizeFailure` | Closed, inconsistent, and failed-size states return explicit context |
+
+This maps Java `TableScan.atLastBlock` with explicit error handling.
+
 ## Next behavior
 
-Report whether the current table-scan page is the file's last block as the next stacked PR.
+Move a table scan to the next existing block as the next stacked PR.
