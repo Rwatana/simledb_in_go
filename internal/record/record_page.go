@@ -7,7 +7,10 @@ import (
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
-const recordSlotEmpty int32 = 0
+const (
+	recordSlotEmpty int32 = 0
+	recordSlotUsed  int32 = 1
+)
 
 // RecordTransaction provides the transaction operations used by a record page.
 type RecordTransaction interface {
@@ -148,4 +151,35 @@ func (p *RecordPage) Format() error {
 		}
 	}
 	return nil
+}
+
+// NextAfter returns the next occupied slot after slot, or -1 when none remains.
+func (p *RecordPage) NextAfter(slot int) (int, error) {
+	if slot < -1 {
+		return -1, fmt.Errorf("find occupied record in block %v: starting slot %d is before -1", p.block, slot)
+	}
+	slotSize := p.layout.SlotSize()
+	if slotSize <= 0 {
+		return -1, fmt.Errorf("find occupied record in block %v: slot size %d must be positive", p.block, slotSize)
+	}
+	blockSize, err := p.transaction.BlockSize()
+	if err != nil {
+		return -1, fmt.Errorf("find occupied record in block %v: read block size: %w", p.block, err)
+	}
+	slotCount := blockSize / slotSize
+	if slot >= slotCount-1 {
+		return -1, nil
+	}
+
+	for candidate := slot + 1; candidate < slotCount; candidate++ {
+		position := candidate * slotSize
+		flag, err := p.transaction.GetInt(p.block, position)
+		if err != nil {
+			return -1, fmt.Errorf("find occupied record in block %v slot %d flag at offset %d: %w", p.block, candidate, position, err)
+		}
+		if flag == recordSlotUsed {
+			return candidate, nil
+		}
+	}
+	return -1, nil
 }
