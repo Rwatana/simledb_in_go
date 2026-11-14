@@ -183,6 +183,20 @@ func (t *Transaction) SetString(block storage.BlockID, offset int32, value strin
 	return nil
 }
 
+// Recover flushes this transaction's dirty buffers and makes restart recovery's CHECKPOINT durable.
+func (t *Transaction) Recover() (logmanager.LSN, error) {
+	if t.iterator == nil {
+		return 0, fmt.Errorf("recover transaction %d: recovery iterator factory is not configured", t.id)
+	}
+	if err := t.bufferManager.FlushAll(buffer.TransactionID(t.id)); err != nil {
+		return 0, fmt.Errorf("recover transaction %d: flush buffers before history scan: %w", t.id, err)
+	}
+	flush := func(transaction recovery.TransactionID) error {
+		return t.bufferManager.FlushAll(buffer.TransactionID(transaction))
+	}
+	return recovery.RecoverRestart(t.iterator, t.id, t, flush, t.logs)
+}
+
 // Rollback restores this transaction's logged updates and makes its ROLLBACK marker durable.
 func (t *Transaction) Rollback() (logmanager.LSN, error) {
 	if t.state != transactionActive {
