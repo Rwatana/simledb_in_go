@@ -51,6 +51,21 @@ The test first failed to compile because the integer convenience method did not 
 
 This maps Java `Schema.addIntField` to a Go name that spells out `Integer` while keeping one metadata path.
 
+## Feature 3: Register a varchar field
+
+`Schema.AddVarcharField` delegates to generic registration with `VarcharField` and the caller's conceptual character
+length. It preserves declaration order when mixed with integer or generic fields.
+
+### Test-first record
+
+The test first failed to compile because the varchar convenience method did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSchemaAddVarcharFieldUsesSuppliedLength` | Varchar convenience registration records varchar type, supplied length, and declaration order |
+
+This maps Java `Schema.addStringField` to terminology that matches the logical varchar type.
+
 ## Next behavior
 
-Add varchar-field convenience registration as the next stacked PR.
+Add copying one named field from another schema, then merging every field in a separate stacked PR.
