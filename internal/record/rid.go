@@ -15,3 +15,8 @@ func NewRID(blockNumber, slot int) RID {
 func (r RID) BlockNumber() int {
 	return r.blockNumber
 }
+
+// Slot returns the identifier's record slot number.
+func (r RID) Slot() int {
+	return r.slot
+}
