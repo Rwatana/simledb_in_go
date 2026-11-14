@@ -8,6 +8,7 @@ behavior remains a separate Issue, branch, commit, and stacked Pull Request.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/metadata.NewTableCatalogLayout` | `simpledb/metadata/TableMgr.java` constructor (`tcatSchema`, `tcatLayout`) | Physical description of each `tblcat` record |
+| `internal/metadata.NewFieldCatalogLayout` | `simpledb/metadata/TableMgr.java` constructor (`fcatSchema`, `fcatLayout`) | Physical description of each `fldcat` record |
 
 ## Feature 1: Construct the table catalog layout
 
@@ -34,3 +35,24 @@ The test first failed to compile because `NewTableCatalogLayout` and `MaxNameLen
 - Field types use the Go record package's named `FieldType` values instead of `java.sql.Types` integers.
 - The name limit is exported because it is shared catalog vocabulary; the layout itself exposes no mutable manager
   state.
+
+## Feature 2: Construct the field catalog layout
+
+`NewFieldCatalogLayout` declares `tblname`, `fldname`, `type`, `length`, and `offset` in the order stored by Java
+`TableMgr`. Both names use the shared 16-character limit. The remaining fields are integers that preserve enough logical
+and physical metadata to reconstruct a record layout later.
+
+The existing record sizing rules place the two maximum-width names before the three integers, yielding offsets 4, 72,
+140, 144, and 148 and a total slot width of 152 bytes. This PR only describes `fldcat`; persistent catalog creation and
+layout lookup remain later behaviors.
+
+### Test-first record
+
+The test first failed to compile because `NewFieldCatalogLayout` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewFieldCatalogLayoutDescribesFieldMetadata` | Field-catalog order, logical types, shared name limits, physical offsets, and slot size follow the book's catalog description |
+
+This maps the `fcatSchema` and `fcatLayout` portion of Java `TableMgr` without introducing the manager's transaction or
+catalog-population side effects prematurely.

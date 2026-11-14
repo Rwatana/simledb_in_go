@@ -13,3 +13,14 @@ func NewTableCatalogLayout() *record.Layout {
 	schema.AddIntegerField("slotsize")
 	return record.NewLayout(&schema)
 }
+
+// NewFieldCatalogLayout constructs the physical layout of the field catalog.
+func NewFieldCatalogLayout() *record.Layout {
+	var schema record.Schema
+	schema.AddVarcharField("tblname", MaxNameLength)
+	schema.AddVarcharField("fldname", MaxNameLength)
+	schema.AddIntegerField("type")
+	schema.AddIntegerField("length")
+	schema.AddIntegerField("offset")
+	return record.NewLayout(&schema)
+}
