@@ -161,3 +161,19 @@ func (s *TableScan) Next() (bool, error) {
 		}
 	}
 }
+
+// GetInt reads an integer field from the current record.
+func (s *TableScan) GetInt(fieldName string) (int32, error) {
+	if s.recordPage == nil {
+		return 0, fmt.Errorf("read integer field %q from table scan for %q: no current record page", fieldName, s.fileName)
+	}
+	if s.currentSlot < 0 {
+		return 0, fmt.Errorf("read integer field %q from table scan for %q: no current record", fieldName, s.fileName)
+	}
+	block := s.recordPage.Block()
+	value, err := s.recordPage.GetInt(s.currentSlot, fieldName)
+	if err != nil {
+		return 0, fmt.Errorf("read table %q block %d slot %d field %q as integer: %w", s.fileName, block.Number(), s.currentSlot, fieldName, err)
+	}
+	return value, nil
+}
