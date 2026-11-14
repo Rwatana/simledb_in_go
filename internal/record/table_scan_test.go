@@ -1274,3 +1274,98 @@ func TestTableScanGetRIDRequiresACurrentRecord(t *testing.T) {
 		t.Fatal("GetRID() after close succeeded, want explicit error")
 	}
 }
+
+func TestTableScanMoveToRIDReleasesCurrentPageAndPinsTargetCoordinates(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 3}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 1
+
+	if err := scan.MoveToRID(NewRID(2, 3)); err != nil {
+		t.Fatalf("MoveToRID([2, 3]) error = %v", err)
+	}
+	blockZero := storage.NewBlockID("student.tbl", 0)
+	blockTwo := storage.NewBlockID("student.tbl", 2)
+	if len(transaction.unpinCalls) != 1 || transaction.unpinCalls[0] != blockZero {
+		t.Fatalf("Unpin calls = %v, want [%v]", transaction.unpinCalls, blockZero)
+	}
+	if len(transaction.pins) != 2 || transaction.pins[1] != blockTwo {
+		t.Fatalf("Pin calls = %v, want initial block zero then %v", transaction.pins, blockTwo)
+	}
+	if scan.recordPage == nil || scan.recordPage.Block() != blockTwo || scan.currentSlot != 3 {
+		t.Fatalf("scan state after MoveToRID = page=%v slot=%d", scan.recordPage, scan.currentSlot)
+	}
+}
+
+func TestTableScanMoveToRIDStopsOnCloseFailure(t *testing.T) {
+	unpinErr := errors.New("unpin failed")
+	transaction := &recordingTableTransaction{size: 3, unpinErr: unpinErr}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 1
+
+	if err := scan.MoveToRID(NewRID(2, 3)); !errors.Is(err, unpinErr) {
+		t.Fatalf("MoveToRID() error = %v, want close failure", err)
+	}
+	if len(transaction.pins) != 1 || scan.recordPage == nil || scan.recordPage.Block().Number() != 0 || scan.currentSlot != 1 {
+		t.Fatalf("state after close failure: pins=%v page=%v slot=%d", transaction.pins, scan.recordPage, scan.currentSlot)
+	}
+}
+
+func TestTableScanMoveToRIDReportsTargetPinFailureAfterClose(t *testing.T) {
+	pinErr := errors.New("target pin failed")
+	transaction := &recordingTableTransaction{size: 3}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 1
+	transaction.pinErr = pinErr
+
+	if err := scan.MoveToRID(NewRID(2, 3)); !errors.Is(err, pinErr) || !strings.Contains(err.Error(), "[2, 3]") {
+		t.Fatalf("MoveToRID() error = %v, want contextual target-pin failure", err)
+	}
+	if scan.recordPage != nil || scan.currentSlot != 1 || len(transaction.pins) != 2 {
+		t.Fatalf("state after target-pin failure: page=%v slot=%d pins=%v", scan.recordPage, scan.currentSlot, transaction.pins)
+	}
+}
+
+func TestTableScanMoveToRIDCanReopenAClosedScan(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 3}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	if err := scan.MoveToRID(NewRID(1, 2)); err != nil {
+		t.Fatalf("MoveToRID() on closed scan error = %v", err)
+	}
+	if scan.recordPage == nil || scan.recordPage.Block().Number() != 1 || scan.currentSlot != 2 || len(transaction.unpinCalls) != 1 {
+		t.Fatalf("reopened state: page=%v slot=%d unpins=%v", scan.recordPage, scan.currentSlot, transaction.unpinCalls)
+	}
+}
+
+func TestTableScanMoveToRIDRejectsNegativeCoordinatesBeforeStateChange(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 3}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 1
+
+	for _, rid := range []RID{NewRID(-1, 0), NewRID(0, -1)} {
+		if err := scan.MoveToRID(rid); err == nil {
+			t.Fatalf("MoveToRID(%v) succeeded, want validation error", rid)
+		}
+	}
+	if len(transaction.unpinCalls) != 0 || len(transaction.pins) != 1 || scan.recordPage.Block().Number() != 0 || scan.currentSlot != 1 {
+		t.Fatalf("state after invalid RID: unpins=%v pins=%v page=%v slot=%d", transaction.unpinCalls, transaction.pins, scan.recordPage.Block(), scan.currentSlot)
+	}
+}

@@ -331,3 +331,21 @@ func (s *TableScan) GetRID() (RID, error) {
 	}
 	return NewRID(s.recordPage.Block().Number(), s.currentSlot), nil
 }
+
+// MoveToRID repositions the scan to rid within the retained table file.
+func (s *TableScan) MoveToRID(rid RID) error {
+	if rid.BlockNumber() < 0 || rid.Slot() < 0 {
+		return fmt.Errorf("move table scan for %q to RID %v: coordinates must be non-negative", s.fileName, rid)
+	}
+	if err := s.Close(); err != nil {
+		return fmt.Errorf("move table scan for %q to RID %v: close current page: %w", s.fileName, rid, err)
+	}
+	block := storage.NewBlockID(s.fileName, rid.BlockNumber())
+	page, err := NewRecordPage(s.transaction, block, s.layout)
+	if err != nil {
+		return fmt.Errorf("move table scan for %q to RID %v: %w", s.fileName, rid, err)
+	}
+	s.recordPage = page
+	s.currentSlot = rid.Slot()
+	return nil
+}
