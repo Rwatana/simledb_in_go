@@ -230,3 +230,27 @@ The test first failed to compile because `ViewManager.InitializeCatalog` did not
 | `TestViewManagerInitializeCatalogRequiresTableManager` | A missing table-manager dependency returns initialization context before transaction access |
 
 Creating and reading individual view definitions remain separate behaviors.
+
+## Feature 10: Store a view definition
+
+`ViewManager.CreateView` reconstructs the stored `viewcat` layout through `TableManager`, opens a table scan, inserts one
+record, and writes `viewname` and `viewdef`. If the view table file is empty, the existing scan initialization appends,
+pins, and formats its first block before insertion.
+
+The view scan uses the shared cleanup boundary, preserving operation and close failures with view-name context. SQL
+parsing, validation, and duplicate-name policy remain outside metadata storage, as in the book's focused `ViewMgr`.
+
+### Test-first record
+
+The test first failed to compile because `ViewManager.CreateView` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestViewManagerCreateViewStoresDefinitionInNewViewFile` | A first view creates one formatted `viewcat` block and stores its name and SQL definition in the first occupied slot |
+| `TestViewManagerCreateViewWrapsCatalogLayoutFailure` | A failed view-catalog layout lookup returns the cause with view-name and layout context |
+| `TestViewManagerCreateViewRequiresTableManager` | A missing table metadata dependency returns view-specific context before transaction access |
+| `TestViewManagerCreateViewPreservesViewNameWriteFailure` | A `viewname` write error preserves its cause and context and still closes the scan |
+| `TestViewManagerCreateViewPreservesViewDefinitionWriteFailure` | A `viewdef` write error is returned after the name write and still closes the scan |
+| `TestViewManagerCreateViewPreservesCatalogInsertFailure` | A row-occupancy write error preserves its cause and view context and closes the scan before field writes |
+
+This maps Java `ViewMgr.createView` while adding explicit layout, scan, and cleanup error propagation.
