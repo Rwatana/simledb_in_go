@@ -6,13 +6,14 @@ const encodedIntegerSize = 4
 
 // Layout stores physical byte offsets calculated for an ordered schema.
 type Layout struct {
+	schema   *Schema
 	offsets  map[string]int
 	slotSize int
 }
 
 // NewLayout calculates physical field offsets for schema.
 func NewLayout(schema *Schema) *Layout {
-	layout := &Layout{offsets: make(map[string]int)}
+	layout := &Layout{schema: schema, offsets: make(map[string]int)}
 	position := encodedIntegerSize
 	for _, name := range schema.Fields() {
 		layout.offsets[name] = position
@@ -21,6 +22,11 @@ func NewLayout(schema *Schema) *Layout {
 	}
 	layout.slotSize = position
 	return layout
+}
+
+// Schema returns the logical schema associated with this layout.
+func (l *Layout) Schema() *Schema {
+	return l.schema
 }
 
 // Offset returns the byte offset registered for name.
