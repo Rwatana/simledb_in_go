@@ -684,6 +684,24 @@ The test first failed to compile because `TableScan.HasField` did not exist.
 
 This maps Java `TableScan.hasField` directly to the immutable layout/schema metadata retained by the Go scan.
 
+## Feature 40: Write an integer field through a table scan
+
+`TableScan.SetInt` requires an open page and a cursor positioned on a record, then delegates one logged integer write to
+the current record page. Both successful and failed writes preserve scan position, and failures add table, block, slot,
+and field context around the record-page error.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.SetInt` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanSetIntWritesTheCurrentRecordFieldWithLogging` | The cursor slot and layout produce one logged write with the exact signed value |
+| `TestTableScanSetIntWrapsFieldAndWriteFailures` | Lookup and storage failures retain their causes and scan coordinates without moving the cursor |
+| `TestTableScanSetIntRequiresACurrentRecord` | Before-first and closed scans reject writes before transaction access |
+
+This maps Java `TableScan.setInt`; the existing record-page boundary preserves transaction logging for the update.
+
 ## Next behavior
 
-Write an integer field in the table scan's current record.
+Write a string field in the table scan's current record.

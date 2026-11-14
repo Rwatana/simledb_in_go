@@ -198,3 +198,18 @@ func (s *TableScan) GetString(fieldName string) (string, error) {
 func (s *TableScan) HasField(fieldName string) bool {
 	return s.layout.Schema().HasField(fieldName)
 }
+
+// SetInt writes an integer field in the current record.
+func (s *TableScan) SetInt(fieldName string, value int32) error {
+	if s.recordPage == nil {
+		return fmt.Errorf("write integer field %q through table scan for %q: no current record page", fieldName, s.fileName)
+	}
+	if s.currentSlot < 0 {
+		return fmt.Errorf("write integer field %q through table scan for %q: no current record", fieldName, s.fileName)
+	}
+	block := s.recordPage.Block()
+	if err := s.recordPage.SetInt(s.currentSlot, fieldName, value); err != nil {
+		return fmt.Errorf("write table %q block %d slot %d field %q as integer: %w", s.fileName, block.Number(), s.currentSlot, fieldName, err)
+	}
+	return nil
+}
