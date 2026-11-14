@@ -702,6 +702,24 @@ The tests first failed to compile because `TableScan.SetInt` did not exist.
 
 This maps Java `TableScan.setInt`; the existing record-page boundary preserves transaction logging for the update.
 
+## Feature 41: Write a string field through a table scan
+
+`TableScan.SetString` requires an open page and a cursor positioned on a record, then delegates one logged string write
+to the current record page. UTF-8 content is forwarded unchanged. Both successful and failed writes preserve scan
+position, and failures add table, block, slot, and field context around the record-page error.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.SetString` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanSetStringWritesTheCurrentRecordFieldWithLogging` | The cursor slot and layout produce one logged write with the exact UTF-8 value |
+| `TestTableScanSetStringWrapsFieldAndWriteFailures` | Lookup and storage failures retain their causes and scan coordinates without moving the cursor |
+| `TestTableScanSetStringRequiresACurrentRecord` | Before-first and closed scans reject writes before transaction access |
+
+This maps Java `TableScan.setString`; the existing record-page boundary preserves transaction logging for the update.
+
 ## Next behavior
 
-Write a string field in the table scan's current record.
+Insert into the next empty slot in the current table block.
