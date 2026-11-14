@@ -133,3 +133,19 @@ func TestSchemaTypeOfReportsLogicalType(t *testing.T) {
 		t.Fatal("TypeOf(missing) unexpectedly found")
 	}
 }
+
+func TestSchemaLengthOfReportsConceptualLength(t *testing.T) {
+	var schema Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 20)
+
+	for name, want := range map[string]int{"id": 0, "name": 20} {
+		got, ok := schema.LengthOf(name)
+		if !ok || got != want {
+			t.Fatalf("LengthOf(%q) = (%d, %v), want (%d, true)", name, got, ok, want)
+		}
+	}
+	if _, ok := schema.LengthOf("missing"); ok {
+		t.Fatal("LengthOf(missing) unexpectedly found")
+	}
+}
