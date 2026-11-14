@@ -339,6 +339,26 @@ The tests first failed to compile because `RecordPage.Format` did not exist.
 
 This maps Java `RecordPage.format` and its `isValidSlot` boundary rule.
 
+## Feature 20: Find the next occupied record slot
+
+`RecordPage.NextAfter` scans occupancy flags from the slot immediately after the caller's position and returns the first
+slot marked used. Passing `-1` begins at slot zero. Only complete slots are read, so trailing bytes smaller than one slot
+are ignored, and exhaustion returns `-1` without modifying the page.
+
+The Go API rejects starting positions before `-1` and non-positive slot sizes, and it returns contextual block-size and
+flag-read failures instead of relying on unchecked transaction calls.
+
+### Test-first record
+
+The tests first failed to compile because `RecordPage.NextAfter` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageNextAfterFindsOccupiedSlotWithinCompleteSlots` | Search starts after the caller's slot, returns the first used flag, and ignores incomplete trailing bytes |
+| `TestRecordPageNextAfterRejectsInvalidInputAndWrapsFailures` | Invalid starts/layouts and transaction failures return explicit context |
+
+This maps Java `RecordPage.nextAfter` and the used-flag branch of `searchAfter`.
+
 ## Next behavior
 
-Find the next occupied record slot as the next stacked PR.
+Find the next empty record slot without changing its occupancy flag as the next stacked PR.
