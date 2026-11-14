@@ -23,3 +23,17 @@ func TestLayoutCalculatesOrderedFieldOffsets(t *testing.T) {
 		t.Fatal("Offset(missing) unexpectedly found")
 	}
 }
+
+func TestLayoutSlotSizeIncludesFlagAndEncodedFields(t *testing.T) {
+	var schema Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 3)
+	schema.AddIntegerField("score")
+
+	if got, want := NewLayout(&schema).SlotSize(), 28; got != want {
+		t.Fatalf("SlotSize() = %d, want %d", got, want)
+	}
+	if got, want := NewLayout(&Schema{}).SlotSize(), 4; got != want {
+		t.Fatalf("empty SlotSize() = %d, want %d", got, want)
+	}
+}
