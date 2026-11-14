@@ -99,6 +99,95 @@ func (m *TableManager) CreateTable(tableName string, schema *record.Schema, tran
 	return nil
 }
 
+// Layout reconstructs the stored physical layout for tableName from the catalogs.
+func (m *TableManager) Layout(tableName string, transaction record.TableScanTransaction) (*record.Layout, error) {
+	slotSize := -1
+	if err := withCatalogScan(transaction, "tblcat", m.tableCatalogLayout, func(scan *record.TableScan) error {
+		for {
+			found, err := scan.Next()
+			if err != nil {
+				return fmt.Errorf("scan table catalog: %w", err)
+			}
+			if !found {
+				return fmt.Errorf("table %q is not registered", tableName)
+			}
+			name, err := scan.GetString("tblname")
+			if err != nil {
+				return fmt.Errorf("read registered table name: %w", err)
+			}
+			if name != tableName {
+				continue
+			}
+			storedSize, err := scan.GetInt("slotsize")
+			if err != nil {
+				return fmt.Errorf("read slot size for table %q: %w", tableName, err)
+			}
+			if storedSize < 4 {
+				return fmt.Errorf("table %q has invalid slot size %d", tableName, storedSize)
+			}
+			slotSize = int(storedSize)
+			return nil
+		}
+	}); err != nil {
+		return nil, fmt.Errorf("load layout for table %q from table catalog: %w", tableName, err)
+	}
+
+	var schema record.Schema
+	offsets := make(map[string]int)
+	if err := withCatalogScan(transaction, "fldcat", m.fieldCatalogLayout, func(scan *record.TableScan) error {
+		for {
+			found, err := scan.Next()
+			if err != nil {
+				return fmt.Errorf("scan field catalog: %w", err)
+			}
+			if !found {
+				return nil
+			}
+			name, err := scan.GetString("tblname")
+			if err != nil {
+				return fmt.Errorf("read field owner table name: %w", err)
+			}
+			if name != tableName {
+				continue
+			}
+			fieldName, err := scan.GetString("fldname")
+			if err != nil {
+				return fmt.Errorf("read field name for table %q: %w", tableName, err)
+			}
+			if schema.HasField(fieldName) {
+				return fmt.Errorf("table %q has duplicate field metadata for %q", tableName, fieldName)
+			}
+			storedType, err := scan.GetInt("type")
+			if err != nil {
+				return fmt.Errorf("read type for table %q field %q: %w", tableName, fieldName, err)
+			}
+			fieldType := record.FieldType(storedType)
+			if fieldType != record.IntegerField && fieldType != record.VarcharField {
+				return fmt.Errorf("table %q field %q has invalid type %d", tableName, fieldName, storedType)
+			}
+			storedLength, err := scan.GetInt("length")
+			if err != nil {
+				return fmt.Errorf("read length for table %q field %q: %w", tableName, fieldName, err)
+			}
+			if storedLength < 0 {
+				return fmt.Errorf("table %q field %q has negative length %d", tableName, fieldName, storedLength)
+			}
+			storedOffset, err := scan.GetInt("offset")
+			if err != nil {
+				return fmt.Errorf("read offset for table %q field %q: %w", tableName, fieldName, err)
+			}
+			if storedOffset < 4 || int(storedOffset) >= slotSize {
+				return fmt.Errorf("table %q field %q has offset %d outside slot size %d", tableName, fieldName, storedOffset, slotSize)
+			}
+			schema.AddField(fieldName, fieldType, int(storedLength))
+			offsets[fieldName] = int(storedOffset)
+		}
+	}); err != nil {
+		return nil, fmt.Errorf("load layout for table %q from field catalog: %w", tableName, err)
+	}
+	return record.NewLayoutFromMetadata(&schema, offsets, slotSize), nil
+}
+
 func withCatalogScan(transaction record.TableScanTransaction, tableName string, layout *record.Layout, operation func(*record.TableScan) error) (err error) {
 	scan, err := record.NewTableScan(transaction, tableName, layout)
 	if err != nil {
