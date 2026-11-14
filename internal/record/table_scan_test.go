@@ -826,3 +826,99 @@ func TestTableScanSetStringRequiresACurrentRecord(t *testing.T) {
 		t.Fatalf("SetString() after close = %v with writes %v, want explicit error", err, transaction.stringWrites)
 	}
 }
+
+func TestTableScanInsertInBlockOccupiesTheNextEmptySlot(t *testing.T) {
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{
+			blockSize:  24,
+			readValues: []int32{recordSlotUsed, recordSlotEmpty},
+		},
+		size: 1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 0
+
+	if inserted, err := scan.InsertInBlock(); err != nil || !inserted {
+		t.Fatalf("InsertInBlock() = (%t, %v), want (true, nil)", inserted, err)
+	}
+	wantWrite := integerWrite{block: storage.NewBlockID("student.tbl", 0), offset: 16, value: recordSlotUsed, logUpdate: true}
+	if len(transaction.writes) != 1 || transaction.writes[0] != wantWrite {
+		t.Fatalf("occupied-flag writes = %v, want [%v]", transaction.writes, wantWrite)
+	}
+	if scan.currentSlot != 2 || scan.recordPage.Block().Number() != 0 {
+		t.Fatalf("scan position = page %v slot %d, want block 0 slot 2", scan.recordPage.Block(), scan.currentSlot)
+	}
+}
+
+func TestTableScanInsertInBlockReportsCurrentBlockExhaustion(t *testing.T) {
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16, readValues: []int32{recordSlotUsed}},
+		size:                       1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 0
+
+	if inserted, err := scan.InsertInBlock(); err != nil || inserted {
+		t.Fatalf("InsertInBlock() = (%t, %v), want (false, nil)", inserted, err)
+	}
+	if scan.currentSlot != -1 || scan.recordPage.Block().Number() != 0 || len(transaction.writes) != 0 {
+		t.Fatalf("state after exhaustion: page=%v slot=%d writes=%v", scan.recordPage.Block(), scan.currentSlot, transaction.writes)
+	}
+}
+
+func TestTableScanInsertInBlockPreservesCursorOnSearchOrOccupyFailure(t *testing.T) {
+	searchErr := errors.New("search failed")
+	searchTransaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16, readErr: searchErr},
+		size:                       1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	layout := NewLayout(&schema)
+	searchScan, err := NewTableScan(searchTransaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan(search) error = %v", err)
+	}
+	searchScan.currentSlot = 0
+	if inserted, err := searchScan.InsertInBlock(); inserted || !errors.Is(err, searchErr) || searchScan.currentSlot != 0 {
+		t.Fatalf("InsertInBlock(search failure) = (%t, %v), slot %d", inserted, err, searchScan.currentSlot)
+	}
+
+	occupyErr := errors.New("occupy failed")
+	occupyTransaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16, readValues: []int32{recordSlotEmpty}, writeErr: occupyErr},
+		size:                       1,
+	}
+	occupyScan, err := NewTableScan(occupyTransaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan(occupy) error = %v", err)
+	}
+	occupyScan.currentSlot = 0
+	if inserted, err := occupyScan.InsertInBlock(); inserted || !errors.Is(err, occupyErr) || occupyScan.currentSlot != 0 {
+		t.Fatalf("InsertInBlock(occupy failure) = (%t, %v), slot %d", inserted, err, occupyScan.currentSlot)
+	}
+}
+
+func TestTableScanInsertInBlockRejectsClosedScan(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if inserted, err := scan.InsertInBlock(); inserted || err == nil {
+		t.Fatalf("InsertInBlock() after close = (%t, %v), want explicit error", inserted, err)
+	}
+}

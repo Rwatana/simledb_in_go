@@ -228,3 +228,17 @@ func (s *TableScan) SetString(fieldName, value string) error {
 	}
 	return nil
 }
+
+// InsertInBlock occupies the next empty record slot in the current block.
+func (s *TableScan) InsertInBlock() (bool, error) {
+	if s.recordPage == nil {
+		return false, fmt.Errorf("insert through table scan for %q: no current record page", s.fileName)
+	}
+	block := s.recordPage.Block()
+	next, err := s.recordPage.InsertAfter(s.currentSlot)
+	if err != nil {
+		return false, fmt.Errorf("insert through table scan for %q in block %d after slot %d: %w", s.fileName, block.Number(), s.currentSlot, err)
+	}
+	s.currentSlot = next
+	return next >= 0, nil
+}
