@@ -26,6 +26,7 @@ const (
 type BufferManager interface {
 	BufferPinner
 	FlushAll(transaction buffer.TransactionID) error
+	Available() int
 }
 
 // FileSizer returns logical block counts for database files.
@@ -146,6 +147,11 @@ func (t *Transaction) BlockSize() (int, error) {
 		return 0, fmt.Errorf("get transaction block size: file manager is not configured")
 	}
 	return t.fileManager.BlockSize(), nil
+}
+
+// AvailableBuffers returns the shared buffer manager's current available-frame count.
+func (t *Transaction) AvailableBuffers() int {
+	return t.bufferManager.Available()
 }
 
 // Pin acquires a buffer for block and records it as transaction-local ownership.
