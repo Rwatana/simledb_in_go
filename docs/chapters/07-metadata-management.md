@@ -9,6 +9,7 @@ behavior remains a separate Issue, branch, commit, and stacked Pull Request.
 | --- | --- | --- |
 | `internal/metadata.NewTableCatalogLayout` | `simpledb/metadata/TableMgr.java` constructor (`tcatSchema`, `tcatLayout`) | Physical description of each `tblcat` record |
 | `internal/metadata.NewFieldCatalogLayout` | `simpledb/metadata/TableMgr.java` constructor (`fcatSchema`, `fcatLayout`) | Physical description of each `fldcat` record |
+| `internal/metadata.NewTableManager` | `simpledb/metadata/TableMgr.java` constructor | Retained catalog layouts for table metadata operations |
 
 ## Feature 1: Construct the table catalog layout
 
@@ -56,3 +57,22 @@ The test first failed to compile because `NewFieldCatalogLayout` did not exist.
 
 This maps the `fcatSchema` and `fcatLayout` portion of Java `TableMgr` without introducing the manager's transaction or
 catalog-population side effects prematurely.
+
+## Feature 3: Initialize the table metadata manager
+
+`NewTableManager` constructs and retains both catalog layouts. Later table creation and lookup behaviors can therefore
+share one stable physical description for each catalog instead of rebuilding layouts around individual scans.
+
+Initialization performs no transaction, file, or record I/O. Java combines layout setup with conditional creation of
+catalog tables in one constructor; the Go design separates the deterministic state from persistent side effects so
+failure and cleanup behavior can be introduced and tested independently.
+
+### Test-first record
+
+The test first failed to compile because `NewTableManager` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewTableManagerRetainsCatalogLayouts` | A new manager owns the exact table- and field-catalog schemas, offsets, and slot sizes produced by their focused constructors |
+
+Persistent creation of `tblcat` and `fldcat`, user table metadata insertion, and catalog lookup remain later behaviors.
