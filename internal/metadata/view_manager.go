@@ -30,6 +30,32 @@ func (m *ViewManager) InitializeCatalog(transaction record.TableScanTransaction)
 	return nil
 }
 
+// CreateView stores a named SQL view definition in the view catalog.
+func (m *ViewManager) CreateView(viewName, definition string, transaction record.TableScanTransaction) error {
+	if m.tables == nil {
+		return fmt.Errorf("create view %q: table manager is nil", viewName)
+	}
+	layout, err := m.tables.Layout("viewcat", transaction)
+	if err != nil {
+		return fmt.Errorf("create view %q: load view catalog layout: %w", viewName, err)
+	}
+	if err := withCatalogScan(transaction, "viewcat", layout, func(scan *record.TableScan) error {
+		if err := scan.Insert(); err != nil {
+			return fmt.Errorf("insert view catalog row: %w", err)
+		}
+		if err := scan.SetString("viewname", viewName); err != nil {
+			return fmt.Errorf("store view name: %w", err)
+		}
+		if err := scan.SetString("viewdef", definition); err != nil {
+			return fmt.Errorf("store view definition: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("create view %q: %w", viewName, err)
+	}
+	return nil
+}
+
 // NewViewCatalogSchema constructs the logical schema of the view catalog.
 func NewViewCatalogSchema() *record.Schema {
 	var schema record.Schema

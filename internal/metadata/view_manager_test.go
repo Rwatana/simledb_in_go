@@ -62,3 +62,28 @@ func TestViewManagerInitializeCatalogRegistersViewMetadata(t *testing.T) {
 		t.Fatalf("append calls = %v, want none for catalog metadata registration", transaction.appendCalls)
 	}
 }
+
+func TestViewManagerCreateViewStoresDefinitionInNewViewFile(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewViewManager(tables)
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	transaction.appendCalls = nil
+
+	if err := manager.CreateView("goodstudents", "select sname from student where gradyear=2020", transaction); err != nil {
+		t.Fatalf("CreateView() error = %v", err)
+	}
+
+	viewPage := transaction.pages[storage.NewBlockID("viewcat.tbl", 0)]
+	assertPageInt(t, viewPage, 0, 1)
+	assertPageString(t, viewPage, 4, "goodstudents")
+	assertPageString(t, viewPage, 72, "select sname from student where gradyear=2020")
+	if got, want := transaction.appendCalls, []string{"viewcat.tbl"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("append calls = %v, want %v", got, want)
+	}
+}
