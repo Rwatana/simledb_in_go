@@ -11,7 +11,7 @@ Each observable behavior remains a separate Issue, branch, commit, and stacked P
 | `internal/record.Layout` | `simpledb/record/Layout.java` | Physical field offsets and slot size |
 | `internal/record.RecordPage` | `simpledb/record/RecordPage.java` | Fixed-slot page access |
 | `internal/record.RID` | `simpledb/record/RID.java` | Stable block-and-slot record identity |
-| future table scan | `simpledb/record/TableScan.java` | Multi-block record iteration and updates |
+| `internal/record.TableScan` | `simpledb/record/TableScan.java` | Multi-block record iteration and updates |
 
 ## Feature 1: Register a generic schema field
 
@@ -489,6 +489,24 @@ The test first failed to compile because `RID.String` did not exist.
 
 This maps Java `RID.toString`. Java `RID` and the Go value now have matching public behavior.
 
+## Feature 29: Initialize a scan for an existing table
+
+`NewTableScan` derives the `.tbl` filename, reads its size once, and for a non-empty file creates a `RecordPage` pinned to
+block zero. The cursor begins at slot `-1`, matching the before-first position used by later iteration. Size and pin errors
+retain table context. A zero-size file currently returns an explicit error so its append-and-format path can remain the
+next independent behavior.
+
+### Test-first record
+
+The tests first failed to compile because `NewTableScan` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewTableScanPinsFirstBlockOfExistingTable` | One size lookup and one block-zero pin initialize the before-first cursor |
+| `TestNewTableScanReportsSizeEmptyAndPinFailures` | Size, empty-file, and pin failures return explicit table context |
+
+This maps the existing-file branch of Java `TableScan.TableScan`.
+
 ## Next behavior
 
-Initialize a table scan for an existing table file as the next stacked PR.
+Initialize a table scan by appending and formatting the first block of an empty table as the next stacked PR.
