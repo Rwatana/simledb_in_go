@@ -1094,6 +1094,87 @@ func TestTransactionRejectsSetStringAfterCompletion(t *testing.T) {
 	}
 }
 
+func TestTransactionRecoverInvokesDurableRestartRecovery(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	events := []string{}
+	bufferManager := &recordingBufferPinner{events: &events}
+	logs := &recordingTransactionLog{events: &events}
+	factory := func() (recovery.EncodedRecordIterator, error) {
+		return &transactionRecordIterator{}, nil
+	}
+	tx, err := New(&allocator, &table, bufferManager, logs, factory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	events = nil
+
+	lsn, err := tx.Recover()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lsn != 2 {
+		t.Fatalf("Recover() LSN = %d, want 2", lsn)
+	}
+	wantEvents := []string{"flush buffers", "flush buffers", "append record", "flush log"}
+	if !reflect.DeepEqual(events, wantEvents) {
+		t.Fatalf("events = %v, want %v", events, wantEvents)
+	}
+	if len(bufferManager.flushes) != 2 || bufferManager.flushes[0] != buffer.TransactionID(tx.ID()) || bufferManager.flushes[1] != buffer.TransactionID(tx.ID()) {
+		t.Fatalf("buffer flushes = %v, want transaction %d twice", bufferManager.flushes, tx.ID())
+	}
+	record, err := recovery.DecodeRecord(logs.records[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.Operation() != recovery.OperationCheckpoint {
+		t.Fatalf("recovery marker operation = %d, want CHECKPOINT", record.Operation())
+	}
+	if !reflect.DeepEqual(logs.flushed, []logmanager.LSN{2}) {
+		t.Fatalf("flushed LSNs = %v, want [2]", logs.flushed)
+	}
+}
+
+func TestTransactionRecoverStopsBeforeHistoryWithoutIteratorOrAfterPreflushFailure(t *testing.T) {
+	t.Run("missing iterator", func(t *testing.T) {
+		var allocator IDAllocator
+		var table concurrency.LockTable
+		bufferManager := &recordingBufferPinner{}
+		tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Recover(); err == nil {
+			t.Fatal("Recover() without iterator returned nil error")
+		}
+		if len(bufferManager.flushes) != 0 {
+			t.Fatalf("missing iterator flushed buffers: %v", bufferManager.flushes)
+		}
+	})
+
+	t.Run("preflush failure", func(t *testing.T) {
+		wantErr := errors.New("preflush failed")
+		var allocator IDAllocator
+		var table concurrency.LockTable
+		bufferManager := &recordingBufferPinner{flushErr: wantErr}
+		iteratorCalls := 0
+		factory := func() (recovery.EncodedRecordIterator, error) {
+			iteratorCalls++
+			return &transactionRecordIterator{}, nil
+		}
+		tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{}, factory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Recover(); !errors.Is(err, wantErr) {
+			t.Fatalf("Recover() error = %v, want %v", err, wantErr)
+		}
+		if iteratorCalls != 0 {
+			t.Fatalf("iterator calls after preflush failure = %d, want 0", iteratorCalls)
+		}
+	})
+}
+
 func TestTransactionRollbackInvokesDurabilityForOwnID(t *testing.T) {
 	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
 	var allocator IDAllocator
