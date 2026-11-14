@@ -128,6 +128,21 @@ The test first failed to compile because the type accessor did not exist.
 
 This maps Java `Schema.type` to a Go accessor with explicit presence.
 
+## Feature 8: Read a field's conceptual length
+
+`Schema.LengthOf` delegates to the definition lookup and returns the stored conceptual length plus an existence flag.
+Integer fields retain the generic registration value zero, while varchar fields return their configured character limit.
+
+### Test-first record
+
+The test first failed to compile because the length accessor did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSchemaLengthOfReportsConceptualLength` | Integer and varchar fields return their stored length, while an unknown name is absent |
+
+This maps Java `Schema.length` to a Go accessor with explicit presence.
+
 ## Next behavior
 
-Add conceptual-length access as the next stacked PR.
+Begin physical `Layout` construction as the next stacked PR, starting with one offset-calculation behavior.
