@@ -10,18 +10,29 @@ import (
 )
 
 type recordingRecordTransaction struct {
-	pins           []storage.BlockID
-	pinErr         error
-	reads          []integerRead
-	value          int32
-	readErr        error
-	stringReads    []integerRead
-	stringValue    string
-	stringErr      error
-	writes         []integerWrite
-	writeErr       error
-	stringWrites   []stringWrite
-	stringWriteErr error
+	pins            []storage.BlockID
+	pinErr          error
+	blockSize       int
+	blockSizeErr    error
+	reads           []integerRead
+	value           int32
+	readErr         error
+	stringReads     []integerRead
+	stringValue     string
+	stringErr       error
+	writes          []integerWrite
+	writeErr        error
+	stringWrites    []stringWrite
+	stringWriteErr  error
+	writeOperations []writeOperation
+}
+
+type writeOperation struct {
+	kind      string
+	offset    int32
+	integer   int32
+	text      string
+	logUpdate bool
 }
 
 type integerRead struct {
@@ -48,6 +59,10 @@ func (t *recordingRecordTransaction) Pin(block storage.BlockID) error {
 	return t.pinErr
 }
 
+func (t *recordingRecordTransaction) BlockSize() (int, error) {
+	return t.blockSize, t.blockSizeErr
+}
+
 func (t *recordingRecordTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
 	t.reads = append(t.reads, integerRead{block: block, offset: offset})
 	return t.value, t.readErr
@@ -60,11 +75,13 @@ func (t *recordingRecordTransaction) GetString(block storage.BlockID, offset int
 
 func (t *recordingRecordTransaction) SetInt(block storage.BlockID, offset, value int32, logUpdate bool) error {
 	t.writes = append(t.writes, integerWrite{block: block, offset: offset, value: value, logUpdate: logUpdate})
+	t.writeOperations = append(t.writeOperations, writeOperation{kind: "int", offset: offset, integer: value, logUpdate: logUpdate})
 	return t.writeErr
 }
 
 func (t *recordingRecordTransaction) SetString(block storage.BlockID, offset int32, value string, logUpdate bool) error {
 	t.stringWrites = append(t.stringWrites, stringWrite{block: block, offset: offset, value: value, logUpdate: logUpdate})
+	t.writeOperations = append(t.writeOperations, writeOperation{kind: "string", offset: offset, text: value, logUpdate: logUpdate})
 	return t.stringWriteErr
 }
 
@@ -281,6 +298,86 @@ func TestRecordPageDeleteRejectsInvalidPositionAndWrapsFailures(t *testing.T) {
 	}
 	if err := overflowPage.Delete(2); err == nil {
 		t.Fatal("Delete with overflowing position returned nil error")
+	}
+}
+
+func TestRecordPageFormatInitializesCompleteSlotsWithoutLogging(t *testing.T) {
+	transaction := &recordingRecordTransaction{blockSize: 34}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("code", 1)
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	if err := page.Format(); err != nil {
+		t.Fatalf("Format() error = %v", err)
+	}
+	want := []writeOperation{
+		{kind: "int", offset: 0},
+		{kind: "int", offset: 4},
+		{kind: "string", offset: 8},
+		{kind: "int", offset: 16},
+		{kind: "int", offset: 20},
+		{kind: "string", offset: 24},
+	}
+	if len(transaction.writeOperations) != len(want) {
+		t.Fatalf("Format operations = %v, want %v", transaction.writeOperations, want)
+	}
+	for index := range want {
+		if transaction.writeOperations[index] != want[index] {
+			t.Fatalf("Format operation %d = %v, want %v", index, transaction.writeOperations[index], want[index])
+		}
+	}
+}
+
+func TestRecordPageFormatRejectsInvalidLayoutAndWrapsFailures(t *testing.T) {
+	block := storage.NewBlockID("records.tbl", 3)
+	invalidPage, err := NewRecordPage(&recordingRecordTransaction{blockSize: 32}, block, NewLayoutFromMetadata(&Schema{}, nil, 0))
+	if err != nil {
+		t.Fatalf("NewRecordPage(invalid layout) error = %v", err)
+	}
+	if err := invalidPage.Format(); err == nil {
+		t.Fatal("Format() with zero slot size returned nil error")
+	}
+
+	blockSizeErr := errors.New("block size failed")
+	blockSizePage, err := NewRecordPage(&recordingRecordTransaction{blockSizeErr: blockSizeErr}, block, NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewRecordPage(block size failure) error = %v", err)
+	}
+	if err := blockSizePage.Format(); !errors.Is(err, blockSizeErr) || !strings.Contains(err.Error(), block.String()) {
+		t.Fatalf("Format() block size error = %v, want contextual wrapped failure", err)
+	}
+
+	writeErr := errors.New("format failed")
+	transaction := &recordingRecordTransaction{blockSize: 8, writeErr: writeErr}
+	writePage, err := NewRecordPage(transaction, block, NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewRecordPage(write failure) error = %v", err)
+	}
+	if err := writePage.Format(); !errors.Is(err, writeErr) || !strings.Contains(err.Error(), "slot 0 flag at offset 0") {
+		t.Fatalf("Format() write error = %v, want contextual wrapped failure", err)
+	}
+	if len(transaction.writeOperations) != 1 {
+		t.Fatalf("Format() operations after failure = %v, want one", transaction.writeOperations)
+	}
+
+	stringWriteErr := errors.New("string format failed")
+	stringTransaction := &recordingRecordTransaction{blockSize: 12, stringWriteErr: stringWriteErr}
+	var schema Schema
+	schema.AddVarcharField("code", 1)
+	stringPage, err := NewRecordPage(stringTransaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage(string failure) error = %v", err)
+	}
+	if err := stringPage.Format(); !errors.Is(err, stringWriteErr) || !strings.Contains(err.Error(), "slot 0 field \"code\" at offset 4") {
+		t.Fatalf("Format() string write error = %v, want contextual wrapped failure", err)
+	}
+	if len(stringTransaction.writeOperations) != 2 {
+		t.Fatalf("Format() operations after string failure = %v, want flag and field", stringTransaction.writeOperations)
 	}
 }
 
