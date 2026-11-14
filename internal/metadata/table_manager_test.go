@@ -221,6 +221,54 @@ func TestTableManagerInitializeCatalogsStoresTheirOwnMetadata(t *testing.T) {
 	}
 }
 
+func TestTableManagerLayoutReconstructsStoredPhysicalMetadata(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewTableManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	transaction.pins = nil
+	transaction.unpins = nil
+
+	layout, err := manager.Layout("fldcat", transaction)
+	if err != nil {
+		t.Fatalf("Layout() error = %v", err)
+	}
+	assertSameLayout(t, layout, NewFieldCatalogLayout())
+	wantBlocks := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantBlocks) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantBlocks)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantBlocks) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantBlocks)
+	}
+}
+
+func TestTableManagerLayoutReportsMissingTableAndClosesTableCatalog(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewTableManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	transaction.pins = nil
+	transaction.unpins = nil
+
+	layout, err := manager.Layout("missing", transaction)
+	if layout != nil || err == nil || !strings.Contains(err.Error(), "missing") {
+		t.Fatalf("Layout(missing) = (%v, %v), want contextual absence", layout, err)
+	}
+	wantBlock := storage.NewBlockID("tblcat.tbl", 0)
+	if got, want := transaction.pins, []storage.BlockID{wantBlock}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins = %v, want %v", got, want)
+	}
+	if got, want := transaction.unpins, []storage.BlockID{wantBlock}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unpins = %v, want %v", got, want)
+	}
+}
+
 func assertTableCatalogRow(t *testing.T, page *storage.Page, base int, tableName string, slotSize int) {
 	t.Helper()
 	assertPageInt(t, page, base, 1)
