@@ -384,3 +384,28 @@ exist.
 | `TestStatManagerCalculateTableStatsCountsRecordsAndBlocks` | Nine occupied records spanning two blocks produce `(2 blocks, 9 records)` without mutating cache state |
 | `TestStatManagerCalculateTableStatsPreservesScanFailure` | A table scan failure preserves its cause and table context without returning partial statistics |
 | `TestScanTableStatisticsPreservesRecordIdentifierFailure` | A record-identifier read failure retains the record number and underlying cause |
+
+## Feature 18: Refresh all table statistics
+
+`StatManager.Refresh` reconstructs the `tblcat` layout, walks every registered table name, reconstructs each table's
+layout, and calculates a fresh `StatInfo`. Only after the entire scan succeeds does it replace the cache and reset the
+lookup counter to zero, so a partial refresh cannot discard the previous usable snapshot.
+
+The manager mutex covers the refresh and state commit, preserving Java's synchronized semantics. The outer table-catalog
+scan and every nested layout/table scan close through the existing cleanup boundary with table context.
+
+### Test-first record
+
+The test first failed to compile because `StatManager.Refresh` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestStatManagerRefreshRebuildsEveryRegisteredTable` | Refresh replaces stale cache state with `tblcat`, `fldcat`, and user-table snapshots and resets the call counter |
+| `TestStatManagerRefreshPreservesTableCatalogLayoutFailure` | A table-catalog layout failure preserves the cause and leaves the prior cache and lookup count unchanged |
+| `TestStatManagerRefreshPreservesRegisteredTableScanFailure` | A table-catalog scan failure preserves its cause and prevents partial cache replacement |
+| `TestStatManagerRefreshPreservesRegisteredTableNameFailure` | A registered table-name read failure preserves its cause and table-catalog context |
+| `TestStatManagerRefreshPreservesRegisteredTableLayoutFailure` | A registered table layout failure preserves its cause and leaves the prior cache intact |
+| `TestStatManagerRefreshPreservesTableStatisticsScanFailure` | A table statistics scan failure preserves its cause and stops refresh before cache replacement |
+
+This maps Java `StatMgr.refreshStatistics` while exposing the fallible refresh explicitly instead of hiding it in a
+constructor.
