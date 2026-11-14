@@ -16,6 +16,7 @@ type recordingRecordTransaction struct {
 	blockSizeErr    error
 	reads           []integerRead
 	value           int32
+	readValues      []int32
 	readErr         error
 	stringReads     []integerRead
 	stringValue     string
@@ -65,6 +66,9 @@ func (t *recordingRecordTransaction) BlockSize() (int, error) {
 
 func (t *recordingRecordTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
 	t.reads = append(t.reads, integerRead{block: block, offset: offset})
+	if len(t.readValues) >= len(t.reads) {
+		return t.readValues[len(t.reads)-1], t.readErr
+	}
 	return t.value, t.readErr
 }
 
@@ -378,6 +382,82 @@ func TestRecordPageFormatRejectsInvalidLayoutAndWrapsFailures(t *testing.T) {
 	}
 	if len(stringTransaction.writeOperations) != 2 {
 		t.Fatalf("Format() operations after string failure = %v, want flag and field", stringTransaction.writeOperations)
+	}
+}
+
+func TestRecordPageNextAfterFindsOccupiedSlotWithinCompleteSlots(t *testing.T) {
+	transaction := &recordingRecordTransaction{blockSize: 34, readValues: []int32{recordSlotEmpty, recordSlotEmpty, 1}}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddIntegerField("id")
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	got, err := page.NextAfter(-1)
+	if err != nil || got != 2 {
+		t.Fatalf("NextAfter(-1) = (%d, %v), want (2, nil)", got, err)
+	}
+	wantReads := []integerRead{{block: block, offset: 0}, {block: block, offset: 8}, {block: block, offset: 16}}
+	if len(transaction.reads) != len(wantReads) {
+		t.Fatalf("NextAfter reads = %v, want %v", transaction.reads, wantReads)
+	}
+	for index := range wantReads {
+		if transaction.reads[index] != wantReads[index] {
+			t.Fatalf("NextAfter read %d = %v, want %v", index, transaction.reads[index], wantReads[index])
+		}
+	}
+
+	emptyTransaction := &recordingRecordTransaction{blockSize: 34, readValues: []int32{recordSlotEmpty}}
+	emptyPage, err := NewRecordPage(emptyTransaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage(empty) error = %v", err)
+	}
+	got, err = emptyPage.NextAfter(2)
+	if err != nil || got != -1 {
+		t.Fatalf("NextAfter(2) = (%d, %v), want (-1, nil)", got, err)
+	}
+	if len(emptyTransaction.reads) != 1 || emptyTransaction.reads[0].offset != 24 {
+		t.Fatalf("NextAfter(2) reads = %v, want only complete slot offset 24", emptyTransaction.reads)
+	}
+}
+
+func TestRecordPageNextAfterRejectsInvalidInputAndWrapsFailures(t *testing.T) {
+	block := storage.NewBlockID("records.tbl", 3)
+	invalidPage, err := NewRecordPage(&recordingRecordTransaction{blockSize: 32}, block, NewLayoutFromMetadata(&Schema{}, nil, 0))
+	if err != nil {
+		t.Fatalf("NewRecordPage(invalid layout) error = %v", err)
+	}
+	if _, err := invalidPage.NextAfter(-1); err == nil {
+		t.Fatal("NextAfter() with zero slot size returned nil error")
+	}
+
+	page, err := NewRecordPage(&recordingRecordTransaction{blockSize: 32}, block, NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+	if _, err := page.NextAfter(-2); err == nil {
+		t.Fatal("NextAfter(-2) returned nil error")
+	}
+
+	blockSizeErr := errors.New("block size failed")
+	blockSizePage, err := NewRecordPage(&recordingRecordTransaction{blockSizeErr: blockSizeErr}, block, NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewRecordPage(block size failure) error = %v", err)
+	}
+	if _, err := blockSizePage.NextAfter(-1); !errors.Is(err, blockSizeErr) || !strings.Contains(err.Error(), block.String()) {
+		t.Fatalf("NextAfter() block size error = %v, want contextual wrapped failure", err)
+	}
+
+	readErr := errors.New("flag read failed")
+	readTransaction := &recordingRecordTransaction{blockSize: 8, readErr: readErr}
+	readPage, err := NewRecordPage(readTransaction, block, NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewRecordPage(read failure) error = %v", err)
+	}
+	if _, err := readPage.NextAfter(-1); !errors.Is(err, readErr) || !strings.Contains(err.Error(), "slot 0 flag at offset 0") {
+		t.Fatalf("NextAfter() read error = %v, want contextual wrapped failure", err)
 	}
 }
 
