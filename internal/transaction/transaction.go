@@ -28,6 +28,11 @@ type BufferManager interface {
 	FlushAll(transaction buffer.TransactionID) error
 }
 
+// FileSizer returns logical block counts for database files.
+type FileSizer interface {
+	Length(fileName string) (int, error)
+}
+
 // Transaction owns the resources and identity of one database transaction.
 type Transaction struct {
 	id            recovery.TransactionID
@@ -36,6 +41,7 @@ type Transaction struct {
 	bufferManager BufferManager
 	logs          recovery.DurableLog
 	iterator      recovery.EncodedRecordIteratorFactory
+	fileSizer     FileSizer
 	state         transactionState
 }
 
@@ -63,9 +69,38 @@ func New(allocator *IDAllocator, lockTable *concurrency.LockTable, bufferManager
 	}, nil
 }
 
+// NewWithFileSizer creates a transaction that can read serialized file lengths.
+func NewWithFileSizer(allocator *IDAllocator, lockTable *concurrency.LockTable, fileSizer FileSizer, bufferManager BufferManager, logs recovery.DurableLog, iterator ...recovery.EncodedRecordIteratorFactory) (*Transaction, error) {
+	if fileSizer == nil {
+		return nil, fmt.Errorf("create transaction with file sizer: file sizer must not be nil")
+	}
+	transaction, err := New(allocator, lockTable, bufferManager, logs, iterator...)
+	if err != nil {
+		return nil, err
+	}
+	transaction.fileSizer = fileSizer
+	return transaction, nil
+}
+
 // ID returns the transaction's canonical recovery identifier.
 func (t *Transaction) ID() recovery.TransactionID {
 	return t.id
+}
+
+// Size returns the logical block count while retaining a shared lock on the file's EOF sentinel.
+func (t *Transaction) Size(fileName string) (int, error) {
+	if t.fileSizer == nil {
+		return 0, fmt.Errorf("get transaction file size for %q: file sizer is not configured", fileName)
+	}
+	eof := storage.NewBlockID(fileName, -1)
+	if err := t.locks.LockShared(eof); err != nil {
+		return 0, fmt.Errorf("get transaction file size for %q: acquire EOF shared lock: %w", fileName, err)
+	}
+	length, err := t.fileSizer.Length(fileName)
+	if err != nil {
+		return 0, fmt.Errorf("get transaction file size for %q: %w", fileName, err)
+	}
+	return length, nil
 }
 
 // Pin acquires a buffer for block and records it as transaction-local ownership.
