@@ -178,6 +178,24 @@ The test first failed to compile because the slot-size accessor did not exist.
 
 This maps Java `Layout.slotSize` without exposing mutable layout state.
 
+## Feature 11: Expose the layout's logical schema
+
+`Layout.Schema` returns the schema retained during construction so record and metadata code can inspect field order and
+definitions through the schema's existing APIs. Access does not recalculate physical offsets or slot size.
+
+As in Java `Layout.schema`, callers must treat the associated schema as stable after layout construction. Adding fields
+later would not retroactively change the already-calculated physical layout.
+
+### Test-first record
+
+The test first failed to compile because the schema accessor did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLayoutExposesAssociatedSchema` | The layout returns its construction schema with the same field declarations |
+
+This maps Java `Layout.schema` directly while documenting the mutation boundary explicitly.
+
 ## Next behavior
 
-Expose the layout schema as the next stacked PR.
+Construct a layout from catalog-provided offsets and slot size as the next stacked PR.

@@ -37,3 +37,17 @@ func TestLayoutSlotSizeIncludesFlagAndEncodedFields(t *testing.T) {
 		t.Fatalf("empty SlotSize() = %d, want %d", got, want)
 	}
 }
+
+func TestLayoutExposesAssociatedSchema(t *testing.T) {
+	var schema Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 20)
+
+	layout := NewLayout(&schema)
+	if got := layout.Schema(); got != &schema {
+		t.Fatalf("Schema() = %p, want original %p", got, &schema)
+	}
+	if !layout.Schema().HasField("name") {
+		t.Fatal("Schema() does not expose the associated declarations")
+	}
+}
