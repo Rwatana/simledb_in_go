@@ -784,3 +784,20 @@ func TestRecordPageInsertAfterPropagatesSearchAndOccupyFailures(t *testing.T) {
 		t.Fatalf("InsertAfter occupy writes = %v", occupyTransaction.writes)
 	}
 }
+
+func TestRecordPageBlockReturnsRetainedIdentityWithoutTransactionAccess(t *testing.T) {
+	transaction := &recordingRecordTransaction{}
+	want := storage.NewBlockID("records.tbl", 7)
+	page, err := NewRecordPage(transaction, want, NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	got := page.Block()
+	if got != want {
+		t.Fatalf("Block() = %v, want %v", got, want)
+	}
+	if len(transaction.pins) != 1 || len(transaction.reads) != 0 || len(transaction.stringReads) != 0 || len(transaction.writeOperations) != 0 {
+		t.Fatalf("Block() transaction access: pins=%v reads=%v stringReads=%v writes=%v", transaction.pins, transaction.reads, transaction.stringReads, transaction.writeOperations)
+	}
+}

@@ -190,6 +190,11 @@ func (p *RecordPage) InsertAfter(slot int) (int, error) {
 	return candidate, nil
 }
 
+// Block returns the block addressed by the record page.
+func (p *RecordPage) Block() storage.BlockID {
+	return p.block
+}
+
 func (p *RecordPage) searchAfter(slot int, target int32, description string) (int, error) {
 	if slot < -1 {
 		return -1, fmt.Errorf("find %s record in block %v: starting slot %d is before -1", description, p.block, slot)
