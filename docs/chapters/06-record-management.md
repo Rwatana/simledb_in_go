@@ -301,6 +301,23 @@ The tests first failed to compile because `RecordPage.SetString` did not exist.
 
 This maps Java `RecordPage.setString` with explicit range and error handling.
 
+## Feature 18: Delete a record slot
+
+`RecordPage.Delete` calculates the slot's leading occupancy-flag position and performs one logged integer write of zero.
+It does not clear field payload bytes; subsequent scans ignore the slot because its flag is empty. Signed 32-bit offset
+overflow stops before transaction access, and write failures retain block, slot, and position context.
+
+### Test-first record
+
+The tests first failed to compile because `RecordPage.Delete` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageDeleteWritesEmptyFlagWithLogging` | Deletion writes one logged zero at the selected slot's flag position |
+| `TestRecordPageDeleteRejectsInvalidPositionAndWrapsFailures` | Offset overflow prevents access, while transaction failure retains physical context |
+
+This maps Java `RecordPage.delete` and its private `setFlag(slot, EMPTY)` behavior.
+
 ## Next behavior
 
-Delete one record slot by writing its occupancy flag as the next stacked PR.
+Format a new record block without logging as the next stacked PR.
