@@ -243,6 +243,47 @@ func TestRecordPageSetStringRejectsInvalidPositionAndWrapsFailures(t *testing.T)
 	}
 }
 
+func TestRecordPageDeleteWritesEmptyFlagWithLogging(t *testing.T) {
+	transaction := &recordingRecordTransaction{}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddIntegerField("id")
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	if err := page.Delete(2); err != nil {
+		t.Fatalf("Delete(2) error = %v", err)
+	}
+	want := integerWrite{block: block, offset: 16, value: 0, logUpdate: true}
+	if len(transaction.writes) != 1 || transaction.writes[0] != want {
+		t.Fatalf("Delete calls = %v, want [%v]", transaction.writes, want)
+	}
+}
+
+func TestRecordPageDeleteRejectsInvalidPositionAndWrapsFailures(t *testing.T) {
+	writeErr := errors.New("delete failed")
+	transaction := &recordingRecordTransaction{writeErr: writeErr}
+	block := storage.NewBlockID("records.tbl", 3)
+	page, err := NewRecordPage(transaction, block, NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+	if err := page.Delete(2); !errors.Is(err, writeErr) || !strings.Contains(err.Error(), "offset 8") {
+		t.Fatalf("Delete write error = %v, want contextual wrapped failure", err)
+	}
+
+	overflow := NewLayoutFromMetadata(&Schema{}, nil, math.MaxInt32)
+	overflowPage, err := NewRecordPage(&recordingRecordTransaction{}, block, overflow)
+	if err != nil {
+		t.Fatalf("NewRecordPage(overflow) error = %v", err)
+	}
+	if err := overflowPage.Delete(2); err == nil {
+		t.Fatal("Delete with overflowing position returned nil error")
+	}
+}
+
 func TestNewRecordPagePinsTargetBlock(t *testing.T) {
 	transaction := &recordingRecordTransaction{}
 	block := storage.NewBlockID("records.tbl", 3)
