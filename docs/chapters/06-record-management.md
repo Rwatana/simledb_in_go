@@ -8,8 +8,9 @@ Each observable behavior remains a separate Issue, branch, commit, and stacked P
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/record.Schema` | `simpledb/record/Schema.java` | Ordered logical field declarations |
-| future `Layout` | `simpledb/record/Layout.java` | Physical field offsets and slot size |
-| future record page | `simpledb/record/RecordPage.java` | Fixed-slot page access |
+| `internal/record.Layout` | `simpledb/record/Layout.java` | Physical field offsets and slot size |
+| `internal/record.RecordPage` | `simpledb/record/RecordPage.java` | Fixed-slot page access |
+| `internal/record.RID` | `simpledb/record/RID.java` | Stable block-and-slot record identity |
 | future table scan | `simpledb/record/TableScan.java` | Multi-block record iteration and updates |
 
 ## Feature 1: Register a generic schema field
@@ -428,6 +429,21 @@ The test first failed to compile because `RecordPage.Block` did not exist.
 
 This maps Java `RecordPage.block`.
 
+## Feature 25: Expose a record identifier block number
+
+`RID` is a small Go value containing private block and slot coordinates. `NewRID` constructs both coordinates, while
+`BlockNumber` exposes exactly the retained block number without allowing callers to mutate identifier state directly.
+
+### Test-first record
+
+The test first failed to compile because `NewRID` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRIDBlockNumberReturnsConstructedValue` | A constructed RID returns its exact block number |
+
+This maps Java `RID.RID` and `RID.blockNumber`; slot access remains a separate behavior.
+
 ## Next behavior
 
-Release the record page's retained block pin as the next stacked PR.
+Expose the record identifier's slot number as the next stacked PR.
