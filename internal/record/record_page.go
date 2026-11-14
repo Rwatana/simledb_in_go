@@ -10,6 +10,7 @@ import (
 type RecordTransaction interface {
 	Pin(storage.BlockID) error
 	GetInt(storage.BlockID, int) (int32, error)
+	GetString(storage.BlockID, int) (string, error)
 }
 
 // RecordPage addresses fixed-size record slots within one pinned block.
@@ -37,6 +38,20 @@ func (p *RecordPage) GetInt(slot int, fieldName string) (int32, error) {
 	value, err := p.transaction.GetInt(p.block, position)
 	if err != nil {
 		return 0, fmt.Errorf("read integer from block %v slot %d field %q at offset %d: %w", p.block, slot, fieldName, position, err)
+	}
+	return value, nil
+}
+
+// GetString reads a string field from slot.
+func (p *RecordPage) GetString(slot int, fieldName string) (string, error) {
+	fieldOffset, ok := p.layout.Offset(fieldName)
+	if !ok {
+		return "", fmt.Errorf("read string from block %v slot %d: field %q is not in layout", p.block, slot, fieldName)
+	}
+	position := slot*p.layout.SlotSize() + fieldOffset
+	value, err := p.transaction.GetString(p.block, position)
+	if err != nil {
+		return "", fmt.Errorf("read string from block %v slot %d field %q at offset %d: %w", p.block, slot, fieldName, position, err)
 	}
 	return value, nil
 }
