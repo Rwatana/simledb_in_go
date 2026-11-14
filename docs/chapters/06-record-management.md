@@ -284,6 +284,23 @@ The tests first failed to compile because `RecordPage.SetInt` did not exist.
 
 This maps Java `RecordPage.setInt`; the explicit range guard prevents Go `int` to `int32` truncation.
 
+## Feature 17: Write a string field in a record slot
+
+`RecordPage.SetString` calculates the slot-relative field position and performs exactly one logged transaction string
+write. UTF-8 values pass through unchanged. Unknown fields and signed 32-bit offset overflow stop before transaction
+access; write failures retain the complete physical record context.
+
+### Test-first record
+
+The tests first failed to compile because `RecordPage.SetString` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageSetStringWritesUTF8AtCalculatedPositionWithLogging` | One logged write receives the retained block, calculated position, and unchanged UTF-8 value |
+| `TestRecordPageSetStringRejectsInvalidPositionAndWrapsFailures` | Unknown fields and offset overflow prevent writes, while transaction failures retain context |
+
+This maps Java `RecordPage.setString` with explicit range and error handling.
+
 ## Next behavior
 
-Write one string field in a specified record slot as the next stacked PR.
+Delete one record slot by writing its occupancy flag as the next stacked PR.
