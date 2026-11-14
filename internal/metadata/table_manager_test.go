@@ -68,21 +68,29 @@ func (t *catalogTransaction) Size(fileName string) (int, error) {
 			return 0, t.sizeErr
 		}
 	}
-	if _, ok := t.pages[storage.NewBlockID(fileName, 0)]; !ok {
-		return 0, nil
+	size := 0
+	for {
+		if _, ok := t.pages[storage.NewBlockID(fileName, size)]; !ok {
+			return size, nil
+		}
+		size++
 	}
-	return 1, nil
 }
 
 func (t *catalogTransaction) Append(fileName string) (storage.BlockID, error) {
 	t.appendCalls = append(t.appendCalls, fileName)
-	block := storage.NewBlockID(fileName, 0)
-	page, err := storage.NewPage(t.blockSize)
-	if err != nil {
-		return storage.BlockID{}, err
+	for blockNumber := 0; ; blockNumber++ {
+		block := storage.NewBlockID(fileName, blockNumber)
+		if _, exists := t.pages[block]; exists {
+			continue
+		}
+		page, err := storage.NewPage(t.blockSize)
+		if err != nil {
+			return storage.BlockID{}, err
+		}
+		t.pages[block] = page
+		return block, nil
 	}
-	t.pages[block] = page
-	return block, nil
 }
 
 func (t *catalogTransaction) Pin(block storage.BlockID) error {
