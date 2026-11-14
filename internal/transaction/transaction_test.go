@@ -33,9 +33,11 @@ type transactionRecordIterator struct {
 }
 
 type recordingFileSizer struct {
-	lengths map[string]int
-	err     error
-	names   []string
+	lengths     map[string]int
+	err         error
+	names       []string
+	appendErr   error
+	appendNames []string
 }
 
 func (s *recordingFileSizer) Length(fileName string) (int, error) {
@@ -44,6 +46,16 @@ func (s *recordingFileSizer) Length(fileName string) (int, error) {
 		return 0, s.err
 	}
 	return s.lengths[fileName], nil
+}
+
+func (s *recordingFileSizer) Append(fileName string) (storage.BlockID, error) {
+	s.appendNames = append(s.appendNames, fileName)
+	if s.appendErr != nil {
+		return storage.BlockID{}, s.appendErr
+	}
+	block := storage.NewBlockID(fileName, s.lengths[fileName])
+	s.lengths[fileName]++
+	return block, nil
 }
 
 func (i *transactionRecordIterator) Next() ([]byte, bool, error) {
@@ -1233,6 +1245,50 @@ func TestTransactionSizeReturnsFileLengthFailure(t *testing.T) {
 	}
 	if _, err := tx.Size("tbl"); !errors.Is(err, wantErr) {
 		t.Fatalf("Size() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestTransactionAppendUpgradesAndReusesEOFExclusiveLock(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	files := &recordingFileSizer{lengths: map[string]int{"tbl": 7}}
+	tx, err := NewWithFileManager(&allocator, &table, files, &recordingBufferPinner{}, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Size("tbl"); err != nil {
+		t.Fatal(err)
+	}
+
+	for wantNumber := 7; wantNumber <= 8; wantNumber++ {
+		block, err := tx.Append("tbl")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if block != storage.NewBlockID("tbl", wantNumber) {
+			t.Fatalf("Append() = %v, want block %d", block, wantNumber)
+		}
+	}
+	if !reflect.DeepEqual(files.appendNames, []string{"tbl", "tbl"}) {
+		t.Fatalf("Append() files = %v, want [tbl tbl]", files.appendNames)
+	}
+	eof := storage.NewBlockID("tbl", -1)
+	if err := table.LockShared(eof); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("shared EOF acquisition while transaction retains exclusive lock error = %v, want ErrLockConflict", err)
+	}
+}
+
+func TestTransactionAppendReturnsFileFailure(t *testing.T) {
+	wantErr := errors.New("append failed")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	files := &recordingFileSizer{lengths: map[string]int{}, appendErr: wantErr}
+	tx, err := NewWithFileManager(&allocator, &table, files, &recordingBufferPinner{}, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Append("tbl"); !errors.Is(err, wantErr) {
+		t.Fatalf("Append() error = %v, want %v", err, wantErr)
 	}
 }
 
