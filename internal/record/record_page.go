@@ -175,6 +175,21 @@ func (p *RecordPage) NextEmptyAfter(slot int) (int, error) {
 	return p.searchAfter(slot, recordSlotEmpty, "empty")
 }
 
+// InsertAfter occupies and returns the next empty slot after slot.
+func (p *RecordPage) InsertAfter(slot int) (int, error) {
+	candidate, err := p.NextEmptyAfter(slot)
+	if err != nil {
+		return -1, fmt.Errorf("insert record in block %v after slot %d: find empty slot: %w", p.block, slot, err)
+	}
+	if candidate < 0 {
+		return -1, nil
+	}
+	if err := p.Occupy(candidate); err != nil {
+		return -1, fmt.Errorf("insert record in block %v after slot %d: occupy slot %d: %w", p.block, slot, candidate, err)
+	}
+	return candidate, nil
+}
+
 func (p *RecordPage) searchAfter(slot int, target int32, description string) (int, error) {
 	if slot < -1 {
 		return -1, fmt.Errorf("find %s record in block %v: starting slot %d is before -1", description, p.block, slot)

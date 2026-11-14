@@ -395,6 +395,24 @@ The tests first failed to compile because `RecordPage.Occupy` did not exist.
 This maps Java `RecordPage.setFlag(slot, USED)`. The explicit Go operation keeps reservation separate from empty-slot
 selection so each stacked PR has one observable behavior.
 
+## Feature 23: Insert into the next empty record slot
+
+`RecordPage.InsertAfter` composes the two independently tested operations: it selects the next empty complete slot, then
+marks that slot used with one logged flag write. Exhaustion returns `-1` without a write. Search and reservation failures
+also return `-1`, retaining both the composition step and the underlying physical context.
+
+### Test-first record
+
+The tests first failed to compile because `RecordPage.InsertAfter` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageInsertAfterOccupiesNextEmptySlot` | The first empty slot is selected, marked used, and returned |
+| `TestRecordPageInsertAfterReturnsNoSlotWithoutWriting` | A full page returns `-1` without modifying flags |
+| `TestRecordPageInsertAfterPropagatesSearchAndOccupyFailures` | Search and reservation failures do not report successful insertion |
+
+This maps Java `RecordPage.insertAfter`. The Go implementation makes its selection and mutation composition explicit.
+
 ## Next behavior
 
-Compose empty-slot selection and occupation into record insertion as the next stacked PR.
+Expose the record page's block identity as the next stacked PR.
