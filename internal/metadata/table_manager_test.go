@@ -34,6 +34,10 @@ func newCatalogTransaction(t *testing.T, blockSize int) *catalogTransaction {
 	return &catalogTransaction{pages: pages, blockSize: blockSize}
 }
 
+func newEmptyCatalogTransaction(blockSize int) *catalogTransaction {
+	return &catalogTransaction{pages: make(map[storage.BlockID]*storage.Page), blockSize: blockSize}
+}
+
 func (t *catalogTransaction) Size(fileName string) (int, error) {
 	if _, ok := t.pages[storage.NewBlockID(fileName, 0)]; !ok {
 		return 0, nil
@@ -43,7 +47,19 @@ func (t *catalogTransaction) Size(fileName string) (int, error) {
 
 func (t *catalogTransaction) Append(fileName string) (storage.BlockID, error) {
 	t.appendCalls = append(t.appendCalls, fileName)
-	return storage.BlockID{}, fmt.Errorf("unexpected append of %q", fileName)
+	blockNumber := 0
+	for {
+		block := storage.NewBlockID(fileName, blockNumber)
+		if _, exists := t.pages[block]; !exists {
+			page, err := storage.NewPage(t.blockSize)
+			if err != nil {
+				return storage.BlockID{}, err
+			}
+			t.pages[block] = page
+			return block, nil
+		}
+		blockNumber++
+	}
 }
 
 func (t *catalogTransaction) Pin(block storage.BlockID) error {
@@ -175,6 +191,41 @@ func TestTableManagerCreateTablePreservesOperationAndCloseFailures(t *testing.T)
 	if got, want := transaction.unpins, []storage.BlockID{storage.NewBlockID("tblcat.tbl", 0)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unpins = %v, want %v", got, want)
 	}
+}
+
+func TestTableManagerInitializeCatalogsStoresTheirOwnMetadata(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewTableManager()
+
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	assertTableCatalogRow(t, tablePage, 0, "tblcat", NewTableCatalogLayout().SlotSize())
+	assertTableCatalogRow(t, tablePage, 76, "fldcat", NewFieldCatalogLayout().SlotSize())
+	assertPageInt(t, tablePage, 152, 0)
+
+	fieldPage := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)]
+	assertFieldCatalogRow(t, fieldPage, 0, "tblcat", "tblname", record.VarcharField, MaxNameLength, 4)
+	assertFieldCatalogRow(t, fieldPage, 152, "tblcat", "slotsize", record.IntegerField, 0, 72)
+	assertFieldCatalogRow(t, fieldPage, 304, "fldcat", "tblname", record.VarcharField, MaxNameLength, 4)
+	assertFieldCatalogRow(t, fieldPage, 456, "fldcat", "fldname", record.VarcharField, MaxNameLength, 72)
+	assertFieldCatalogRow(t, fieldPage, 608, "fldcat", "type", record.IntegerField, 0, 140)
+	assertFieldCatalogRow(t, fieldPage, 760, "fldcat", "length", record.IntegerField, 0, 144)
+	assertFieldCatalogRow(t, fieldPage, 912, "fldcat", "offset", record.IntegerField, 0, 148)
+	assertPageInt(t, fieldPage, 1064, 0)
+
+	if got, want := transaction.appendCalls, []string{"tblcat.tbl", "fldcat.tbl"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("append calls = %v, want %v", got, want)
+	}
+}
+
+func assertTableCatalogRow(t *testing.T, page *storage.Page, base int, tableName string, slotSize int) {
+	t.Helper()
+	assertPageInt(t, page, base, 1)
+	assertPageString(t, page, base+4, tableName)
+	assertPageInt(t, page, base+72, int32(slotSize))
 }
 
 func assertFieldCatalogRow(t *testing.T, page *storage.Page, base int, tableName, fieldName string, fieldType record.FieldType, length, offset int) {
