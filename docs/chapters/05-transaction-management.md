@@ -1769,9 +1769,31 @@ order, returned durable LSN, CHECKPOINT identity, missing iterator, and pre-scan
 
 Go keeps restart recovery as composable functions and adds only the Java-facing orchestration boundary here.
 
+## Feature 82: Read file size under an EOF shared lock
+
+`Transaction.Size` represents a file's end as `BlockID(fileName, -1)`, retains a transaction-local shared lock on that
+sentinel, and then asks an injected `FileSizer` for the logical block count. This matches Java `Transaction.size` while
+keeping the Go dependency limited to the single `Length` operation required now.
+
+`NewWithFileSizer` preserves the existing constructor for transactions that do not need file metadata. Repeated size
+reads call the file manager again but reuse the same transaction-local shared hold, so they do not inflate the global
+holder count.
+
+### Test-first record
+
+The tests first failed to compile because the file-size constructor and operation did not exist. They cover the returned
+length, EOF sentinel contention, repeated-lock reuse, and file-manager error propagation.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionSizeReadsLengthUnderReusableEOFSharedLock` | File length reads retain and reuse one shared EOF lock |
+| `TestTransactionSizeReturnsFileLengthFailure` | File length failures retain file context and preserve the lock ordering |
+
+The negative block number is a lock namespace value only; it is never passed to physical file I/O.
+
 ## Next behavior
 
-Continue with Chapter 5 by adding transactional file-size and append operations in separate behaviors.
+Continue with Chapter 5 by adding transactional file append under an exclusive EOF lock.
 
 ## Sources
 

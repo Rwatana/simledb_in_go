@@ -32,6 +32,20 @@ type transactionRecordIterator struct {
 	index   int
 }
 
+type recordingFileSizer struct {
+	lengths map[string]int
+	err     error
+	names   []string
+}
+
+func (s *recordingFileSizer) Length(fileName string) (int, error) {
+	s.names = append(s.names, fileName)
+	if s.err != nil {
+		return 0, s.err
+	}
+	return s.lengths[fileName], nil
+}
+
 func (i *transactionRecordIterator) Next() ([]byte, bool, error) {
 	if i.index >= len(i.records) {
 		return nil, false, nil
@@ -1173,6 +1187,53 @@ func TestTransactionRecoverStopsBeforeHistoryWithoutIteratorOrAfterPreflushFailu
 			t.Fatalf("iterator calls after preflush failure = %d, want 0", iteratorCalls)
 		}
 	})
+}
+
+func TestTransactionSizeReadsLengthUnderReusableEOFSharedLock(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	sizer := &recordingFileSizer{lengths: map[string]int{"tbl": 7}}
+	eof := storage.NewBlockID("tbl", -1)
+	if err := table.LockShared(eof); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := NewWithFileSizer(&allocator, &table, sizer, &recordingBufferPinner{}, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for attempt := 0; attempt < 2; attempt++ {
+		got, err := tx.Size("tbl")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != 7 {
+			t.Fatalf("Size() = %d, want 7", got)
+		}
+	}
+	if !reflect.DeepEqual(sizer.names, []string{"tbl", "tbl"}) {
+		t.Fatalf("Length() files = %v, want [tbl tbl]", sizer.names)
+	}
+	if err := table.LockExclusive(eof); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("exclusive EOF acquisition with competing shared hold error = %v, want ErrLockConflict", err)
+	}
+	table.Unlock(eof)
+	if err := table.LockExclusive(eof); err != nil {
+		t.Fatalf("repeated Size acquired more than one transaction shared hold: %v", err)
+	}
+}
+
+func TestTransactionSizeReturnsFileLengthFailure(t *testing.T) {
+	wantErr := errors.New("length failed")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := NewWithFileSizer(&allocator, &table, &recordingFileSizer{err: wantErr}, &recordingBufferPinner{}, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Size("tbl"); !errors.Is(err, wantErr) {
+		t.Fatalf("Size() error = %v, want %v", err, wantErr)
+	}
 }
 
 func TestTransactionRollbackInvokesDurabilityForOwnID(t *testing.T) {
