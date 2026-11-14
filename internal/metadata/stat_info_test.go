@@ -34,3 +34,24 @@ func TestStatInfoRecordsOutputReturnsObservedRecords(t *testing.T) {
 		t.Fatalf("empty RecordsOutput() = %d, want 0", got)
 	}
 }
+
+func TestStatInfoDistinctValuesUsesBookEstimate(t *testing.T) {
+	tests := []struct {
+		records int
+		want    int
+	}{
+		{records: 0, want: 1},
+		{records: 2, want: 1},
+		{records: 3, want: 2},
+		{records: 23, want: 8},
+	}
+	for _, test := range tests {
+		stats := NewStatInfo(7, test.records)
+		if got := stats.DistinctValues("sid"); got != test.want {
+			t.Fatalf("DistinctValues(sid) with %d records = %d, want %d", test.records, got, test.want)
+		}
+		if got := stats.DistinctValues("other"); got != test.want {
+			t.Fatalf("DistinctValues(other) with %d records = %d, want %d", test.records, got, test.want)
+		}
+	}
+}
