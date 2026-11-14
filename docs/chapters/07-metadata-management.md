@@ -76,3 +76,28 @@ The test first failed to compile because `NewTableManager` did not exist.
 | `TestNewTableManagerRetainsCatalogLayouts` | A new manager owns the exact table- and field-catalog schemas, offsets, and slot sizes produced by their focused constructors |
 
 Persistent creation of `tblcat` and `fldcat`, user table metadata insertion, and catalog lookup remain later behaviors.
+
+## Feature 4: Store table metadata in the catalogs
+
+`TableManager.CreateTable` derives a physical layout from the caller's schema, inserts one `tblcat` row containing the
+table name and slot size, then inserts one `fldcat` row for each field in declaration order. Each field row stores the
+table name, field name, logical type, conceptual length, and derived physical offset, matching Java
+`TableMgr.createTable`.
+
+The Go implementation opens and closes the two catalog scans independently. Every write and close failure receives
+catalog, table, and field context; if an operation and cleanup both fail, `errors.Join` preserves both causes. Integer
+metadata is range-checked before conversion to the catalogs' four-byte representation. A nil schema is rejected before
+any catalog I/O.
+
+This behavior assumes the catalog tables already exist. New-database catalog creation, duplicate-name policy, and DDL
+rollback remain separate concerns.
+
+### Test-first record
+
+After the in-memory catalog transaction was in place, the test failed to compile because `TableManager.CreateTable` did
+not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableManagerCreateTableStoresCatalogRows` | One table row and declaration-ordered field rows retain the schema's logical and derived physical metadata, and both scans close |
+| `TestTableManagerCreateTablePreservesOperationAndCloseFailures` | A catalog write failure still closes its scan, preserves both causes when cleanup also fails, and stops before the next catalog |
