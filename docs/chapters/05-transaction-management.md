@@ -1706,9 +1706,28 @@ Both cases initially returned `ErrBufferNotPinned` because string reads had no l
 
 String and integer reads now share the same explicit completed-transaction boundary.
 
+## Feature 79: Reject integer writes after transaction completion
+
+`Transaction.SetInt` now checks active lifecycle state before buffer lookup, exclusive-lock acquisition, optional recovery
+logging, or page mutation. Both logged and no-log writes return `ErrTransactionCompleted` after COMMIT or ROLLBACK, so
+undo-capable and recovery-internal call paths cannot accidentally reopen a terminal transaction.
+
+The completed-state guard leaves retained pins unchanged and keeps `Unpin` callable for cleanup retry.
+
+### Test-first record
+
+Commit and rollback completion were combined with both logging modes. The tests also assert missing-pin error precedence,
+no new exclusive lock, and no additional recovery record. All four cases initially returned `ErrBufferNotPinned`.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRejectsSetIntAfterCompletion` | Completed transactions reject logged and no-log integer writes before side effects |
+
+This adds the write-side lifecycle boundary without changing active transaction write semantics.
+
 ## Next behavior
 
-Continue with Chapter 5 by rejecting integer writes after transaction completion, then string writes separately.
+Continue with Chapter 5 by rejecting string writes after transaction completion.
 
 ## Sources
 

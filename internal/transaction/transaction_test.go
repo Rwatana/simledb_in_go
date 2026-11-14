@@ -853,6 +853,55 @@ func TestTransactionSetIntLogFailurePreservesPageAndMetadata(t *testing.T) {
 	}
 }
 
+func TestTransactionRejectsSetIntAfterCompletion(t *testing.T) {
+	completion := []struct {
+		name     string
+		complete func(*Transaction) error
+	}{
+		{name: "commit", complete: func(tx *Transaction) error { _, err := tx.Commit(); return err }},
+		{name: "rollback", complete: func(tx *Transaction) error { _, err := tx.Rollback(); return err }},
+	}
+	for _, completed := range completion {
+		for _, logUpdate := range []bool{false, true} {
+			name := completed.name + "/no-log"
+			if logUpdate {
+				name = completed.name + "/logged"
+			}
+			t.Run(name, func(t *testing.T) {
+				var allocator IDAllocator
+				var table concurrency.LockTable
+				bufferManager := &recordingBufferPinner{}
+				logs := &recordingTransactionLog{}
+				start := recovery.EncodeStartRecord(1)
+				factory := func() (recovery.EncodedRecordIterator, error) {
+					return &transactionRecordIterator{records: [][]byte{start}}, nil
+				}
+				tx, err := New(&allocator, &table, bufferManager, logs, factory)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := completed.complete(tx); err != nil {
+					t.Fatal(err)
+				}
+				block := storage.NewBlockID("tbl", 1)
+				if err := table.LockShared(block); err != nil {
+					t.Fatal(err)
+				}
+				recordsBefore := len(logs.records)
+				if err := tx.SetInt(block, 0, 42, logUpdate); !errors.Is(err, ErrTransactionCompleted) {
+					t.Fatalf("SetInt() error = %v, want ErrTransactionCompleted", err)
+				}
+				if len(logs.records) != recordsBefore {
+					t.Fatalf("SetInt() appended %d records after completion", len(logs.records)-recordsBefore)
+				}
+				if err := table.LockExclusive(block); err != nil {
+					t.Fatalf("completed SetInt acquired an exclusive lock: %v", err)
+				}
+			})
+		}
+	}
+}
+
 func TestTransactionSetStringWithoutLoggingUpdatesPinnedPageExclusively(t *testing.T) {
 	bufferManager, _, block := newTransactionStringBlock(t, 8, "old")
 	var allocator IDAllocator
