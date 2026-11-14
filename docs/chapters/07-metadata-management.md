@@ -101,3 +101,23 @@ not exist.
 | --- | --- |
 | `TestTableManagerCreateTableStoresCatalogRows` | One table row and declaration-ordered field rows retain the schema's logical and derived physical metadata, and both scans close |
 | `TestTableManagerCreateTablePreservesOperationAndCloseFailures` | A catalog write failure still closes its scan, preserves both causes when cleanup also fails, and stops before the next catalog |
+
+## Feature 5: Initialize new database catalogs
+
+`TableManager.InitializeCatalogs` registers `tblcat` and `fldcat` using the same `CreateTable` path as every later user
+table. On an empty database, the existing table-scan initialization appends, pins, and formats each first catalog block;
+the catalog layouts then describe themselves through two table rows and seven field rows.
+
+The operation stops after the first failed catalog registration and adds bootstrap context without hiding the underlying
+scan, write, or cleanup error. Detecting whether the database is new remains composition-root policy rather than state
+inside the metadata manager.
+
+### Test-first record
+
+The test first failed to compile because `TableManager.InitializeCatalogs` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableManagerInitializeCatalogsStoresTheirOwnMetadata` | Empty catalog files are appended and formatted once, then store complete self-describing table and field rows in declaration order |
+
+This maps the `isNew` branch of Java `TableMgr` while making bootstrap an explicit, separately testable Go operation.
