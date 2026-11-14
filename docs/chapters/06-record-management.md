@@ -459,6 +459,21 @@ The test first failed to compile because `RID.Slot` did not exist.
 
 This maps Java `RID.slot`.
 
+## Feature 27: Compare record identifiers
+
+`RID.Equal` compares both private coordinates and returns true only for the same block number and slot. Its typed `RID`
+parameter avoids Java's unchecked cast from `Object` while preserving value semantics.
+
+### Test-first record
+
+The test first failed to compile because `RID.Equal` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRIDEqualComparesBothCoordinates` | Equality requires matching block and slot coordinates |
+
+This maps Java `RID.equals` with a type-safe Go signature.
+
 ## Next behavior
 
-Compare record identifiers by both coordinates as the next stacked PR.
+Format a record identifier as text as the next stacked PR.

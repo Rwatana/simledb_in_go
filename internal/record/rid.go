@@ -20,3 +20,8 @@ func (r RID) BlockNumber() int {
 func (r RID) Slot() int {
 	return r.slot
 }
+
+// Equal reports whether r and other identify the same record slot.
+func (r RID) Equal(other RID) bool {
+	return r.blockNumber == other.blockNumber && r.slot == other.slot
+}
