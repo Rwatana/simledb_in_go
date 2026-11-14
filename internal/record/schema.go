@@ -33,6 +33,11 @@ func (s *Schema) AddField(name string, fieldType FieldType, length int) {
 	s.definitions[name] = FieldDefinition{Type: fieldType, Length: length}
 }
 
+// AddIntegerField registers a four-byte integer field with conceptual length zero.
+func (s *Schema) AddIntegerField(name string) {
+	s.AddField(name, IntegerField, 0)
+}
+
 // Fields returns field names in declaration order.
 func (s *Schema) Fields() []string {
 	return append([]string(nil), s.fields...)

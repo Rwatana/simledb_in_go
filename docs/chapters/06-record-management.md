@@ -36,6 +36,21 @@ The first test failed to compile because the record package, `Schema`, and field
 - Schema field lists are returned as copies, preventing callers from mutating declaration order out of band.
 - Missing field lookup is explicit through a boolean result.
 
+## Feature 2: Register an integer field
+
+`Schema.AddIntegerField` delegates to generic registration with `IntegerField` and conceptual length zero. It preserves
+the same declaration-order semantics when mixed with fields registered through `AddField`.
+
+### Test-first record
+
+The test first failed to compile because the integer convenience method did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSchemaAddIntegerFieldUsesIntegerMetadata` | Integer convenience registration records integer type, zero length, and declaration order |
+
+This maps Java `Schema.addIntField` to a Go name that spells out `Integer` while keeping one metadata path.
+
 ## Next behavior
 
-Add integer-field convenience registration, then varchar-field convenience registration in separate stacked PRs.
+Add varchar-field convenience registration as the next stacked PR.
