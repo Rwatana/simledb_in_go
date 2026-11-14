@@ -16,6 +16,8 @@ type recordingTableTransaction struct {
 	appendCalls []string
 	appendBlock storage.BlockID
 	appendErr   error
+	unpinCalls  []storage.BlockID
+	unpinErr    error
 }
 
 func (t *recordingTableTransaction) Size(fileName string) (int, error) {
@@ -26,6 +28,11 @@ func (t *recordingTableTransaction) Size(fileName string) (int, error) {
 func (t *recordingTableTransaction) Append(fileName string) (storage.BlockID, error) {
 	t.appendCalls = append(t.appendCalls, fileName)
 	return t.appendBlock, t.appendErr
+}
+
+func (t *recordingTableTransaction) Unpin(block storage.BlockID) error {
+	t.unpinCalls = append(t.unpinCalls, block)
+	return t.unpinErr
 }
 
 func TestNewTableScanPinsFirstBlockOfExistingTable(t *testing.T) {
@@ -128,5 +135,55 @@ func TestNewTableScanReportsEmptyTableAppendPinAndFormatFailures(t *testing.T) {
 	}
 	if scan, err := NewTableScan(formatTransaction, "student", NewLayout(&Schema{})); scan != nil || !errors.Is(err, formatErr) || len(formatTransaction.writes) != 1 {
 		t.Fatalf("NewTableScan(format failure) = (%v, %v), writes %v", scan, err, formatTransaction.writes)
+	}
+}
+
+func TestTableScanCloseUnpinsCurrentBlockOnce(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	wantBlock := storage.NewBlockID("student.tbl", 0)
+	if len(transaction.unpinCalls) != 1 || transaction.unpinCalls[0] != wantBlock {
+		t.Fatalf("Unpin calls = %v, want [%v]", transaction.unpinCalls, wantBlock)
+	}
+	if scan.recordPage != nil {
+		t.Fatal("Close() retained record page after successful unpin")
+	}
+	if err := scan.Close(); err != nil || len(transaction.unpinCalls) != 1 {
+		t.Fatalf("second Close() = %v with calls %v, want idempotent success", err, transaction.unpinCalls)
+	}
+}
+
+func TestTableScanCloseRetainsPageForUnpinRetry(t *testing.T) {
+	unpinErr := errors.New("unpin failed")
+	transaction := &recordingTableTransaction{size: 1, unpinErr: unpinErr}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	if err := scan.Close(); !errors.Is(err, unpinErr) || !strings.Contains(err.Error(), "student.tbl") {
+		t.Fatalf("Close() error = %v, want contextual wrapped failure", err)
+	}
+	if scan.recordPage == nil {
+		t.Fatal("Close() cleared record page after failed unpin")
+	}
+	transaction.unpinErr = nil
+	if err := scan.Close(); err != nil || len(transaction.unpinCalls) != 2 || scan.recordPage != nil {
+		t.Fatalf("retry Close() = %v, calls %v, page %v", err, transaction.unpinCalls, scan.recordPage)
+	}
+}
+
+func TestTableScanCloseWithoutCurrentPageDoesNothing(t *testing.T) {
+	transaction := &recordingTableTransaction{}
+	scan := &TableScan{transaction: transaction, fileName: "student.tbl"}
+	if err := scan.Close(); err != nil || len(transaction.unpinCalls) != 0 {
+		t.Fatalf("Close() = %v with calls %v, want no-op success", err, transaction.unpinCalls)
 	}
 }
