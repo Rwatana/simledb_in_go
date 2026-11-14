@@ -116,3 +116,21 @@ func (s *TableScan) AtLastBlock() (bool, error) {
 	}
 	return block.Number() == size-1, nil
 }
+
+// MoveToNextBlock moves the scan to the next numbered table block.
+func (s *TableScan) MoveToNextBlock() error {
+	if s.recordPage == nil {
+		return fmt.Errorf("move table scan for %q to next block: no current record page", s.fileName)
+	}
+	nextBlock := storage.NewBlockID(s.fileName, s.recordPage.Block().Number()+1)
+	if err := s.Close(); err != nil {
+		return fmt.Errorf("move table scan for %q to block %d: close current page: %w", s.fileName, nextBlock.Number(), err)
+	}
+	page, err := NewRecordPage(s.transaction, nextBlock, s.layout)
+	if err != nil {
+		return fmt.Errorf("move table scan for %q to block %d: %w", s.fileName, nextBlock.Number(), err)
+	}
+	s.recordPage = page
+	s.currentSlot = -1
+	return nil
+}

@@ -422,3 +422,109 @@ func TestTableScanAtLastBlockRejectsUnavailableStateAndWrapsSizeFailure(t *testi
 		t.Fatalf("AtLastBlock() after close = (%t, %v), size calls %v", last, err, transaction.sizeCalls)
 	}
 }
+
+func TestTableScanMoveToNextBlockReleasesCurrentPageAndResetsCursor(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 3}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 2
+
+	if err := scan.MoveToNextBlock(); err != nil {
+		t.Fatalf("MoveToNextBlock() error = %v", err)
+	}
+	blockZero := storage.NewBlockID("student.tbl", 0)
+	blockOne := storage.NewBlockID("student.tbl", 1)
+	if len(transaction.unpinCalls) != 1 || transaction.unpinCalls[0] != blockZero {
+		t.Fatalf("Unpin calls = %v, want [%v]", transaction.unpinCalls, blockZero)
+	}
+	if len(transaction.pins) != 2 || transaction.pins[1] != blockOne {
+		t.Fatalf("Pin calls = %v, want initial block zero then block one", transaction.pins)
+	}
+	if scan.recordPage == nil || scan.recordPage.Block() != blockOne || scan.currentSlot != -1 {
+		t.Fatalf("scan state after MoveToNextBlock = %+v, want block one before first slot", scan)
+	}
+}
+
+func TestTableScanMoveToNextBlockStopsOnCloseFailure(t *testing.T) {
+	unpinErr := errors.New("unpin failed")
+	transaction := &recordingTableTransaction{size: 3, unpinErr: unpinErr}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 2
+
+	if err := scan.MoveToNextBlock(); !errors.Is(err, unpinErr) {
+		t.Fatalf("MoveToNextBlock() error = %v, want close failure", err)
+	}
+	if len(transaction.pins) != 1 || scan.recordPage == nil || scan.recordPage.Block().Number() != 0 || scan.currentSlot != 2 {
+		t.Fatalf("state after close failure: pins=%v page=%v slot=%d", transaction.pins, scan.recordPage, scan.currentSlot)
+	}
+}
+
+func TestTableScanMoveToNextBlockReportsPinFailureAfterClose(t *testing.T) {
+	pinErr := errors.New("next pin failed")
+	transaction := &recordingTableTransaction{size: 3}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.currentSlot = 2
+	transaction.pinErr = pinErr
+
+	if err := scan.MoveToNextBlock(); !errors.Is(err, pinErr) || !strings.Contains(err.Error(), "block 1") {
+		t.Fatalf("MoveToNextBlock() error = %v, want contextual next-block pin failure", err)
+	}
+	blockOne := storage.NewBlockID("student.tbl", 1)
+	if scan.recordPage != nil || scan.currentSlot != 2 || len(transaction.unpinCalls) != 1 || len(transaction.pins) != 2 || transaction.pins[1] != blockOne {
+		t.Fatalf("state after pin failure: page=%v slot=%d unpins=%v pins=%v", scan.recordPage, scan.currentSlot, transaction.unpinCalls, transaction.pins)
+	}
+}
+
+func TestTableScanMoveToNextBlockRejectsClosedScan(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	pinCount := len(transaction.pins)
+	if err := scan.MoveToNextBlock(); err == nil || len(transaction.pins) != pinCount {
+		t.Fatalf("MoveToNextBlock() on closed scan = %v with pins %v, want explicit error without pin", err, transaction.pins)
+	}
+}
+
+func TestTableScanNextReportsNextBlockPinFailure(t *testing.T) {
+	pinErr := errors.New("next block pin failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16, value: recordSlotEmpty},
+		size:                       2,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	transaction.pinErr = pinErr
+
+	found, err := scan.Next()
+	if found || !errors.Is(err, pinErr) {
+		t.Fatalf("Next() = (%t, %v), want wrapped next-block pin failure", found, err)
+	}
+	for _, want := range []string{"student.tbl", "continue after block 0", "block 1"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Next() error = %q, want context %q", err, want)
+		}
+	}
+	if scan.recordPage != nil || scan.currentSlot != -1 {
+		t.Errorf("scan state after next-block pin failure: page=%v slot=%d", scan.recordPage, scan.currentSlot)
+	}
+	if len(transaction.unpinCalls) != 1 || transaction.unpinCalls[0].Number() != 0 {
+		t.Errorf("unpin calls = %v, want the exhausted block zero", transaction.unpinCalls)
+	}
+}
