@@ -10,6 +10,7 @@ import (
 type TableScanTransaction interface {
 	RecordTransaction
 	Size(string) (int, error)
+	Append(string) (storage.BlockID, error)
 }
 
 // TableScan traverses fixed-layout records across a table file.
@@ -28,13 +29,26 @@ func NewTableScan(transaction TableScanTransaction, tableName string, layout *La
 	if err != nil {
 		return nil, fmt.Errorf("initialize table scan for %q: read size of %q: %w", tableName, fileName, err)
 	}
-	if size <= 0 {
-		return nil, fmt.Errorf("initialize table scan for %q: table file %q is empty", tableName, fileName)
+	if size < 0 {
+		return nil, fmt.Errorf("initialize table scan for %q: table file %q has negative size %d", tableName, fileName, size)
 	}
 	block := storage.NewBlockID(fileName, 0)
+	format := false
+	if size == 0 {
+		block, err = transaction.Append(fileName)
+		if err != nil {
+			return nil, fmt.Errorf("initialize table scan for %q: append first block to %q: %w", tableName, fileName, err)
+		}
+		format = true
+	}
 	page, err := NewRecordPage(transaction, block, layout)
 	if err != nil {
 		return nil, fmt.Errorf("initialize table scan for %q at first block: %w", tableName, err)
+	}
+	if format {
+		if err := page.Format(); err != nil {
+			return nil, fmt.Errorf("initialize table scan for %q: format first block %v: %w", tableName, block, err)
+		}
 	}
 	return &TableScan{
 		transaction: transaction,
