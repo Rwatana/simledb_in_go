@@ -72,6 +72,12 @@ func (s *Schema) TypeOf(name string) (FieldType, bool) {
 	return definition.Type, ok
 }
 
+// LengthOf returns the conceptual length registered for name.
+func (s *Schema) LengthOf(name string) (int, bool) {
+	definition, ok := s.Field(name)
+	return definition.Length, ok
+}
+
 // Fields returns field names in declaration order.
 func (s *Schema) Fields() []string {
 	return append([]string(nil), s.fields...)
