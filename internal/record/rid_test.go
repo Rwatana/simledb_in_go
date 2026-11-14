@@ -28,3 +28,12 @@ func TestRIDEqualComparesBothCoordinates(t *testing.T) {
 		t.Fatal("Equal() = true for different slots")
 	}
 }
+
+func TestRIDStringFormatsCoordinatePair(t *testing.T) {
+	if got := NewRID(7, 3).String(); got != "[7, 3]" {
+		t.Fatalf("String() = %q, want %q", got, "[7, 3]")
+	}
+	if got := NewRID(-1, -2).String(); got != "[-1, -2]" {
+		t.Fatalf("String() = %q, want %q", got, "[-1, -2]")
+	}
+}
