@@ -280,3 +280,36 @@ The test first failed to compile because `ViewManager.ViewDefinition` did not ex
 
 Go uses an explicit `(string, bool, error)` result instead of Java's nullable string, separating absence from failures.
 Java `ViewMgr`'s public behavior column is now complete.
+
+## Feature 12: Initialize table statistics
+
+`NewStatInfo` retains the observed block and record counts that later planner estimates consume. Zero and positive counts
+are preserved exactly, and the fields remain private so callers cannot mutate a shared statistics snapshot.
+
+Initialization performs no transaction, catalog, or table I/O. The accessors and the book's deliberately simple
+distinct-value guess remain separate observable behaviors.
+
+### Test-first record
+
+The test first failed to compile because `NewStatInfo` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewStatInfoRetainsObservedCounts` | Initialization preserves supplied non-empty and empty block/record observations exactly |
+
+This maps Java `StatInfo(int, int)` to a Go value with package-private immutable state.
+
+## Feature 13: Report estimated table blocks accessed
+
+`StatInfo.BlocksAccessed` returns the stored observed block count unchanged. It preserves zero for an empty observation
+and performs no mutation or I/O.
+
+### Test-first record
+
+The test first failed to compile because `StatInfo.BlocksAccessed` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestStatInfoBlocksAccessedReturnsObservedBlocks` | Positive and zero observed block counts are returned exactly |
+
+This maps Java `StatInfo.blocksAccessed` directly.
