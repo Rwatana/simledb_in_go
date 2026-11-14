@@ -10,16 +10,18 @@ import (
 )
 
 type recordingRecordTransaction struct {
-	pins        []storage.BlockID
-	pinErr      error
-	reads       []integerRead
-	value       int32
-	readErr     error
-	stringReads []integerRead
-	stringValue string
-	stringErr   error
-	writes      []integerWrite
-	writeErr    error
+	pins           []storage.BlockID
+	pinErr         error
+	reads          []integerRead
+	value          int32
+	readErr        error
+	stringReads    []integerRead
+	stringValue    string
+	stringErr      error
+	writes         []integerWrite
+	writeErr       error
+	stringWrites   []stringWrite
+	stringWriteErr error
 }
 
 type integerRead struct {
@@ -31,6 +33,13 @@ type integerWrite struct {
 	block     storage.BlockID
 	offset    int32
 	value     int32
+	logUpdate bool
+}
+
+type stringWrite struct {
+	block     storage.BlockID
+	offset    int32
+	value     string
 	logUpdate bool
 }
 
@@ -52,6 +61,11 @@ func (t *recordingRecordTransaction) GetString(block storage.BlockID, offset int
 func (t *recordingRecordTransaction) SetInt(block storage.BlockID, offset, value int32, logUpdate bool) error {
 	t.writes = append(t.writes, integerWrite{block: block, offset: offset, value: value, logUpdate: logUpdate})
 	return t.writeErr
+}
+
+func (t *recordingRecordTransaction) SetString(block storage.BlockID, offset int32, value string, logUpdate bool) error {
+	t.stringWrites = append(t.stringWrites, stringWrite{block: block, offset: offset, value: value, logUpdate: logUpdate})
+	return t.stringWriteErr
 }
 
 func TestRecordPageGetIntReadsCalculatedFieldPosition(t *testing.T) {
@@ -179,6 +193,53 @@ func TestRecordPageSetIntRejectsInvalidPositionAndWrapsFailures(t *testing.T) {
 	}
 	if err := overflowPage.SetInt(1, "id", 1); err == nil {
 		t.Fatal("SetInt with overflowing position returned nil error")
+	}
+}
+
+func TestRecordPageSetStringWritesUTF8AtCalculatedPositionWithLogging(t *testing.T) {
+	transaction := &recordingRecordTransaction{}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddVarcharField("name", 20)
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	if err := page.SetString(2, "name", "東京"); err != nil {
+		t.Fatalf("SetString(2, name) error = %v", err)
+	}
+	want := stringWrite{block: block, offset: 180, value: "東京", logUpdate: true}
+	if len(transaction.stringWrites) != 1 || transaction.stringWrites[0] != want {
+		t.Fatalf("SetString calls = %v, want [%v]", transaction.stringWrites, want)
+	}
+}
+
+func TestRecordPageSetStringRejectsInvalidPositionAndWrapsFailures(t *testing.T) {
+	writeErr := errors.New("string write failed")
+	transaction := &recordingRecordTransaction{stringWriteErr: writeErr}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddVarcharField("name", 20)
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	if err := page.SetString(1, "missing", "x"); err == nil || len(transaction.stringWrites) != 0 {
+		t.Fatalf("SetString(missing) = %v with writes %v, want lookup failure", err, transaction.stringWrites)
+	}
+	if err := page.SetString(1, "name", "x"); !errors.Is(err, writeErr) || !strings.Contains(err.Error(), "offset 92") {
+		t.Fatalf("SetString write error = %v, want contextual wrapped failure", err)
+	}
+
+	overflow := NewLayoutFromMetadata(&schema, map[string]int{"name": math.MaxInt32}, 1)
+	overflowPage, err := NewRecordPage(&recordingRecordTransaction{}, block, overflow)
+	if err != nil {
+		t.Fatalf("NewRecordPage(overflow) error = %v", err)
+	}
+	if err := overflowPage.SetString(1, "name", "x"); err == nil {
+		t.Fatal("SetString with overflowing position returned nil error")
 	}
 }
 
