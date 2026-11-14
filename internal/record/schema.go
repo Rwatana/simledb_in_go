@@ -53,6 +53,13 @@ func (s *Schema) AddFrom(name string, source *Schema) bool {
 	return true
 }
 
+// AddAllFrom copies every field from source in declaration order.
+func (s *Schema) AddAllFrom(source *Schema) {
+	for _, name := range source.Fields() {
+		s.AddFrom(name, source)
+	}
+}
+
 // Fields returns field names in declaration order.
 func (s *Schema) Fields() []string {
 	return append([]string(nil), s.fields...)
