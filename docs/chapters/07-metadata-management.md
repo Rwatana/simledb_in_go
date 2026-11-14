@@ -362,3 +362,22 @@ The test first failed to compile because `StatManager.Refresh` did not exist.
 
 This maps Java `StatMgr.refreshStatistics` while exposing the fallible refresh explicitly instead of hiding it in a
 constructor.
+
+## Feature 19: Cache statistics on first lookup
+
+`StatManager.Statistics` increments the lookup counter and returns an existing table snapshot when present. On a cache
+miss it scans exactly that table with the caller-supplied layout, installs the completed `StatInfo`, and returns the same
+pointer that future lookups reuse. A failed scan retains table context and never installs a partial result.
+
+The manager mutex covers both the cache decision and first calculation, so concurrent first lookups cannot publish
+competing snapshots. Automatic periodic refresh remains a separate policy behavior.
+
+### Test-first record
+
+The test first failed to compile because `StatManager.Statistics` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestStatManagerStatisticsCachesFirstLookup` | The first lookup calculates one-row statistics, while a later lookup after another insert returns the same cached snapshot and increments the call counter |
+
+This maps the cache-hit and cache-miss portion of Java `StatMgr.getStatInfo`; the Go method returns explicit I/O errors.
