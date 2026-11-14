@@ -121,3 +121,25 @@ The test first failed to compile because `TableManager.InitializeCatalogs` did n
 | `TestTableManagerInitializeCatalogsStoresTheirOwnMetadata` | Empty catalog files are appended and formatted once, then store complete self-describing table and field rows in declaration order |
 
 This maps the `isNew` branch of Java `TableMgr` while making bootstrap an explicit, separately testable Go operation.
+
+## Feature 6: Reconstruct a table layout from the catalogs
+
+`TableManager.Layout` locates the requested table's stored slot size in `tblcat`, then walks `fldcat` in record order to
+rebuild the schema and offset map. It returns `record.NewLayoutFromMetadata`, preserving catalog offsets and slot width
+instead of recalculating them from today's encoding rules. This maps Java `TableMgr.getLayout`.
+
+The Go API reports an absent table explicitly instead of returning a layout with Java's `-1` sentinel size. It also
+rejects slot sizes smaller than the occupancy flag, unknown field types, negative lengths, duplicate fields, and offsets
+outside the stored slot. Both catalog scans use the shared cleanup boundary, so close failures remain visible.
+
+An empty-schema table is valid: it has a four-byte slot and no matching `fldcat` rows. Layout caching remains outside
+this behavior.
+
+### Test-first record
+
+The tests first failed to compile because `TableManager.Layout` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableManagerLayoutReconstructsStoredPhysicalMetadata` | Stored catalog order, types, lengths, offsets, and slot size reconstruct the field-catalog layout and both scans close |
+| `TestTableManagerLayoutReportsMissingTableAndClosesTableCatalog` | An absent table returns contextual failure after closing `tblcat` without opening `fldcat` |
