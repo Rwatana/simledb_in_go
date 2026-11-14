@@ -180,3 +180,22 @@ The test first failed to compile because `NewViewManager` did not exist.
 
 The Go constructor intentionally accepts only the dependency it can initialize without failure. Registering `viewcat`
 remains the next explicit behavior.
+
+## Feature 9: Register the view catalog
+
+`ViewManager.InitializeCatalog` registers `viewcat` through its retained `TableManager` and the focused view catalog
+schema. This reuses the existing table and field catalog encoding, scan cleanup, and error handling instead of teaching
+the view manager how those catalogs are stored.
+
+The method is an explicit new-database operation rather than Java's `isNew` constructor branch. A missing table manager
+is rejected before transaction access, and registration failures gain view-bootstrap context.
+
+### Test-first record
+
+The test first failed to compile because `ViewManager.InitializeCatalog` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestViewManagerInitializeCatalogRegistersViewMetadata` | The existing catalogs gain one `viewcat` table row and two ordered field rows without appending unrelated files |
+
+Creating and reading individual view definitions remain separate behaviors.

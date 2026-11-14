@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/record"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 func TestNewViewCatalogSchemaDescribesStoredViewDefinitions(t *testing.T) {
@@ -36,5 +37,28 @@ func TestNewViewManagerRetainsTableManager(t *testing.T) {
 	}
 	if manager.tables != tables {
 		t.Fatalf("table manager = %p, want %p", manager.tables, tables)
+	}
+}
+
+func TestViewManagerInitializeCatalogRegistersViewMetadata(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	transaction.appendCalls = nil
+	manager := NewViewManager(tables)
+
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	assertTableCatalogRow(t, tablePage, 152, "viewcat", record.NewLayout(NewViewCatalogSchema()).SlotSize())
+	fieldPage := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)]
+	assertFieldCatalogRow(t, fieldPage, 1064, "viewcat", "viewname", record.VarcharField, MaxNameLength, 4)
+	assertFieldCatalogRow(t, fieldPage, 1216, "viewcat", "viewdef", record.VarcharField, MaxViewDefinitionLength, 72)
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none for catalog metadata registration", transaction.appendCalls)
 	}
 }
