@@ -1233,3 +1233,44 @@ func TestTableScanDeleteRequiresACurrentRecord(t *testing.T) {
 		t.Fatalf("Delete() after close = %v with writes %v, want explicit error", err, transaction.writes)
 	}
 }
+
+func TestTableScanGetRIDReturnsTheCurrentCoordinatesWithoutTransactionAccess(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 3}
+	layout := NewLayout(&Schema{})
+	scan, err := NewTableScan(transaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	scan.recordPage = &RecordPage{transaction: transaction, block: storage.NewBlockID("student.tbl", 2), layout: layout}
+	scan.currentSlot = 3
+	pinCount := len(transaction.pins)
+	sizeCount := len(transaction.sizeCalls)
+
+	rid, err := scan.GetRID()
+	if err != nil || !rid.Equal(NewRID(2, 3)) {
+		t.Fatalf("GetRID() = (%v, %v), want ([2, 3], nil)", rid, err)
+	}
+	if len(transaction.pins) != pinCount || len(transaction.sizeCalls) != sizeCount || len(transaction.reads) != 0 {
+		t.Fatalf("GetRID transaction access: pins=%v sizes=%v reads=%v", transaction.pins, transaction.sizeCalls, transaction.reads)
+	}
+	if scan.recordPage.Block().Number() != 2 || scan.currentSlot != 3 {
+		t.Fatalf("scan state changed: page=%v slot=%d", scan.recordPage.Block(), scan.currentSlot)
+	}
+}
+
+func TestTableScanGetRIDRequiresACurrentRecord(t *testing.T) {
+	transaction := &recordingTableTransaction{size: 1}
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if _, err := scan.GetRID(); err == nil {
+		t.Fatal("GetRID() before first succeeded, want explicit error")
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if _, err := scan.GetRID(); err == nil {
+		t.Fatal("GetRID() after close succeeded, want explicit error")
+	}
+}
