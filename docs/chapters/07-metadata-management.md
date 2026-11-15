@@ -381,3 +381,22 @@ The test first failed to compile because `StatManager.Statistics` did not exist.
 | `TestStatManagerStatisticsCachesFirstLookup` | The first lookup calculates one-row statistics, while a later lookup after another insert returns the same cached snapshot and increments the call counter |
 
 This maps the cache-hit and cache-miss portion of Java `StatMgr.getStatInfo`; the Go method returns explicit I/O errors.
+
+## Feature 20: Refresh statistics after one hundred lookups
+
+`StatManager.Statistics` now triggers a full refresh when the incremented lookup counter exceeds one hundred. The 101st
+lookup therefore rebuilds every registered table snapshot before selecting the requested entry, and the successful
+refresh resets the counter to zero. The first one hundred lookups continue to use the existing cache.
+
+The public `Refresh` method and threshold path share `refreshLocked`: callers acquire the manager mutex exactly once,
+avoiding recursive locking while preserving the same atomic cache replacement and failure behavior.
+
+### Test-first record
+
+The test first returned the deliberately stale 99-record snapshot on lookup 101 instead of refreshing it.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestStatManagerStatisticsRefreshesOnHundredFirstLookup` | Lookup 101 replaces the stale cache with all registered table snapshots, returns the fresh two-row table estimate, and resets the counter |
+
+This completes the refresh-threshold portion of Java `StatMgr.getStatInfo`.
