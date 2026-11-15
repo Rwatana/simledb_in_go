@@ -400,3 +400,24 @@ The test first returned the deliberately stale 99-record snapshot on lookup 101 
 | `TestStatManagerStatisticsRefreshesOnHundredFirstLookup` | Lookup 101 replaces the stale cache with all registered table snapshots, returns the fresh two-row table estimate, and resets the counter |
 
 This completes the refresh-threshold portion of Java `StatMgr.getStatInfo`.
+
+## Feature 21: Initialize index metadata
+
+`NewIndexInfo` retains an index's name, indexed field, table schema, transaction, and table statistics. It also constructs
+the physical index-record layout in book order: integer `block`, integer `id`, then `dataval` with the indexed table
+field's exact logical type and varchar length.
+
+Initialization validates the dependencies and field name instead of allowing a later nil dereference. The concrete
+`HashIndex`/`BTreeIndex` opening behavior remains deferred to Chapters 12–13; Chapter 7 needs only metadata and cost
+descriptions, so no future index interface or implementation is introduced here.
+
+### Test-first record
+
+The test first failed to compile because `NewIndexInfo` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewIndexInfoBuildsIndexRecordLayout` | Integer and varchar indexed fields produce `[block, id, dataval]` layouts while retaining the supplied metadata dependencies |
+| `TestNewIndexInfoRejectsInvalidMetadata` | Nil dependencies and a missing indexed field return contextual initialization errors |
+
+This maps Java `IndexInfo` construction and `createIdxLayout` while making invalid metadata an explicit Go error.
