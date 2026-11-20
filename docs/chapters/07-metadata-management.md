@@ -469,3 +469,23 @@ The test first failed to compile because `NewIndexInfo` did not exist.
 | `TestNewIndexInfoRejectsInvalidMetadata` | Nil dependencies and a missing indexed field return contextual initialization errors |
 
 This maps Java `IndexInfo` construction and `createIdxLayout` while making invalid metadata an explicit Go error.
+
+## Feature 22: Estimate index block accesses
+
+`IndexInfo.BlocksAccessed` divides the transaction block size by the index-record slot size to estimate records per
+block, divides the table cardinality by that value to estimate total index blocks, and finally divides by the book's 100
+static-hash buckets. Each division deliberately uses integer truncation, matching Java `IndexInfo.blocksAccessed` and
+`HashIndex.searchCost` exactly.
+
+Only the cost formula lives in metadata. Opening or traversing a concrete hash index remains deferred to Chapter 12.
+Unlike Java's unchecked division, the Go method returns contextual errors when block size is unavailable or one index
+record cannot fit in a block.
+
+### Test-first record
+
+The tests first failed to compile because `IndexInfo.BlocksAccessed` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestIndexInfoBlocksAccessedEstimatesStaticHashBucketCost` | 25,000 integer index records in 400-byte blocks estimate ten block accesses after records-per-block and 100-bucket division |
+| `TestIndexInfoBlocksAccessedRejectsUnavailableOrTooSmallBlocks` | Block-size failures and undersized blocks return contextual errors instead of panicking |

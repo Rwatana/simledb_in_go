@@ -6,6 +6,8 @@ import (
 	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
+const staticHashBucketCount = 100
+
 // IndexInfo describes one index and the physical layout of its records.
 type IndexInfo struct {
 	indexName   string
@@ -43,4 +45,18 @@ func NewIndexInfo(indexName, fieldName string, tableSchema *record.Schema, trans
 		stats:       stats,
 		indexLayout: record.NewLayout(&indexSchema),
 	}, nil
+}
+
+// BlocksAccessed estimates the blocks visited while traversing one static-hash bucket.
+func (i *IndexInfo) BlocksAccessed() (int, error) {
+	blockSize, err := i.transaction.BlockSize()
+	if err != nil {
+		return 0, fmt.Errorf("estimate block accesses for index %q: read block size: %w", i.indexName, err)
+	}
+	recordsPerBlock := blockSize / i.indexLayout.SlotSize()
+	if recordsPerBlock < 1 {
+		return 0, fmt.Errorf("estimate block accesses for index %q: index record size %d does not fit block size %d", i.indexName, i.indexLayout.SlotSize(), blockSize)
+	}
+	indexBlocks := i.stats.RecordsOutput() / recordsPerBlock
+	return indexBlocks / staticHashBucketCount, nil
 }
