@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -38,6 +39,58 @@ func TestNewIndexInfoBuildsIndexRecordLayout(t *testing.T) {
 			}
 			if length, ok := info.indexLayout.Schema().LengthOf("dataval"); !ok || length != test.wantLength {
 				t.Fatalf("dataval length = (%d, %t), want (%d, true)", length, ok, test.wantLength)
+			}
+		})
+	}
+}
+
+func TestIndexInfoBlocksAccessedEstimatesStaticHashBucketCost(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(400)
+	var tableSchema record.Schema
+	tableSchema.AddIntegerField("key")
+	info, err := NewIndexInfo("key_idx", "key", &tableSchema, transaction, NewStatInfo(999, 25_000))
+	if err != nil {
+		t.Fatalf("NewIndexInfo() error = %v", err)
+	}
+	cost, err := info.BlocksAccessed()
+	if err != nil {
+		t.Fatalf("BlocksAccessed() error = %v", err)
+	}
+	if cost != 10 {
+		t.Fatalf("BlocksAccessed() = %d, want 10", cost)
+	}
+}
+
+type failingBlockSizeTransaction struct {
+	*catalogTransaction
+	err error
+}
+
+func (t *failingBlockSizeTransaction) BlockSize() (int, error) {
+	return 0, t.err
+}
+
+func TestIndexInfoBlocksAccessedRejectsUnavailableOrTooSmallBlocks(t *testing.T) {
+	var tableSchema record.Schema
+	tableSchema.AddVarcharField("key", 24)
+	blockSizeErr := errors.New("block size unavailable")
+	tests := []struct {
+		name        string
+		transaction record.TableScanTransaction
+		want        string
+	}{
+		{name: "unavailable", transaction: &failingBlockSizeTransaction{catalogTransaction: newEmptyCatalogTransaction(400), err: blockSizeErr}, want: "block size unavailable"},
+		{name: "too small", transaction: newEmptyCatalogTransaction(8), want: "does not fit"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			info, err := NewIndexInfo("key_idx", "key", &tableSchema, test.transaction, NewStatInfo(1, 1))
+			if err != nil {
+				t.Fatalf("NewIndexInfo() error = %v", err)
+			}
+			_, err = info.BlocksAccessed()
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("BlocksAccessed() error = %v, want containing %q", err, test.want)
 			}
 		})
 	}
