@@ -60,3 +60,8 @@ func (i *IndexInfo) BlocksAccessed() (int, error) {
 	indexBlocks := i.stats.RecordsOutput() / recordsPerBlock
 	return indexBlocks / staticHashBucketCount, nil
 }
+
+// RecordsOutput estimates the table records matching one indexed search key.
+func (i *IndexInfo) RecordsOutput() int {
+	return i.stats.RecordsOutput() / i.stats.DistinctValues(i.fieldName)
+}

@@ -441,3 +441,20 @@ The tests first failed to compile because `IndexInfo.BlocksAccessed` did not exi
 | --- | --- |
 | `TestIndexInfoBlocksAccessedEstimatesStaticHashBucketCost` | 25,000 integer index records in 400-byte blocks estimate ten block accesses after records-per-block and 100-bucket division |
 | `TestIndexInfoBlocksAccessedRejectsUnavailableOrTooSmallBlocks` | Block-size failures and undersized blocks return contextual errors instead of panicking |
+
+## Feature 23: Estimate indexed records output
+
+`IndexInfo.RecordsOutput` divides the underlying table cardinality by `StatInfo`'s distinct-value estimate for the
+indexed field. Both operations use the same immutable statistics snapshot retained at initialization, and integer
+division deliberately truncates like Java `IndexInfo.recordsOutput`.
+
+The `StatInfo.DistinctValues` estimate is always at least one, so this calculation requires no exceptional zero-divisor
+path and performs no transaction or index I/O.
+
+### Test-first record
+
+The test first failed to compile because `IndexInfo.RecordsOutput` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestIndexInfoRecordsOutputEstimatesRowsPerSearchKey` | Twelve table rows and five estimated distinct indexed values produce two matching rows after integer division |

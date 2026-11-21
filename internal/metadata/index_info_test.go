@@ -96,6 +96,19 @@ func TestIndexInfoBlocksAccessedRejectsUnavailableOrTooSmallBlocks(t *testing.T)
 	}
 }
 
+func TestIndexInfoRecordsOutputEstimatesRowsPerSearchKey(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(400)
+	var tableSchema record.Schema
+	tableSchema.AddIntegerField("key")
+	info, err := NewIndexInfo("key_idx", "key", &tableSchema, transaction, NewStatInfo(3, 12))
+	if err != nil {
+		t.Fatalf("NewIndexInfo() error = %v", err)
+	}
+	if got := info.RecordsOutput(); got != 2 {
+		t.Fatalf("RecordsOutput() = %d, want 2", got)
+	}
+}
+
 func TestNewIndexInfoRejectsInvalidMetadata(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(400)
 	stats := NewStatInfo(3, 12)
