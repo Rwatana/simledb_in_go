@@ -458,3 +458,19 @@ The test first failed to compile because `IndexInfo.RecordsOutput` did not exist
 | Test | Observable behavior |
 | --- | --- |
 | `TestIndexInfoRecordsOutputEstimatesRowsPerSearchKey` | Twelve table rows and five estimated distinct indexed values produce two matching rows after integer division |
+
+## Feature 24: Estimate distinct values through an index
+
+`IndexInfo.DistinctValues` returns one for the indexed field because an index scan positioned on a search key fixes that
+field's output value. For every other requested field it delegates to the retained table statistics estimate, matching
+Java `IndexInfo.distinctValues` and its intentionally coarse `StatInfo` model.
+
+This estimate is deterministic and performs no transaction, catalog, or index I/O.
+
+### Test-first record
+
+The test first failed to compile because `IndexInfo.DistinctValues` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestIndexInfoDistinctValuesFixesIndexedSearchKey` | The indexed field reports one distinct output value while another field retains the table estimate of five |
