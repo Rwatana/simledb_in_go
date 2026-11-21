@@ -474,3 +474,21 @@ The test first failed to compile because `IndexInfo.DistinctValues` did not exis
 | Test | Observable behavior |
 | --- | --- |
 | `TestIndexInfoDistinctValuesFixesIndexedSearchKey` | The indexed field reports one distinct output value while another field retains the table estimate of five |
+
+## Feature 25: Construct the index catalog schema
+
+`NewIndexCatalogSchema` declares the three strings persisted for each index registration in book order: `indexname`,
+`tablename`, then `fieldname`. Every field uses the table catalog's shared `MaxNameLength`, preserving the Java
+`IndexMgr` constructor's logical schema without coupling schema construction to database startup.
+
+This behavior performs no catalog, transaction, or concrete index I/O. Registering `idxcat`, retaining manager
+dependencies, and storing index rows remain separate observable behaviors so the stacked changes stay independently
+testable.
+
+### Test-first record
+
+The test first failed to compile because `NewIndexCatalogSchema` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewIndexCatalogSchemaDescribesStoredIndexRegistrations` | The index catalog exposes three ordered varchar fields, each with `MaxNameLength` |
