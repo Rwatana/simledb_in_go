@@ -109,6 +109,23 @@ func TestIndexInfoRecordsOutputEstimatesRowsPerSearchKey(t *testing.T) {
 	}
 }
 
+func TestIndexInfoDistinctValuesFixesIndexedSearchKey(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(400)
+	var tableSchema record.Schema
+	tableSchema.AddIntegerField("key")
+	tableSchema.AddVarcharField("name", 20)
+	info, err := NewIndexInfo("key_idx", "key", &tableSchema, transaction, NewStatInfo(3, 12))
+	if err != nil {
+		t.Fatalf("NewIndexInfo() error = %v", err)
+	}
+	if got := info.DistinctValues("key"); got != 1 {
+		t.Fatalf("DistinctValues(indexed field) = %d, want 1", got)
+	}
+	if got := info.DistinctValues("name"); got != 5 {
+		t.Fatalf("DistinctValues(other field) = %d, want 5", got)
+	}
+}
+
 func TestNewIndexInfoRejectsInvalidMetadata(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(400)
 	stats := NewStatInfo(3, 12)
