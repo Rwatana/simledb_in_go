@@ -278,6 +278,30 @@ func TestMetadataManagerViewDefinitionLooksUpStoredAndMissingViews(t *testing.T)
 	}
 }
 
+func TestMetadataManagerViewDefinitionPreservesCatalogReadError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	wantErr := errors.New("table catalog size unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+
+	definition, found, err := manager.ViewDefinition("seniors", transaction)
+	if definition != "" || found {
+		t.Fatalf("ViewDefinition() = (%q, %v), want empty and not found on catalog failure", definition, found)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("ViewDefinition() error = %v, want wrapped size cause", err)
+	}
+	for _, context := range []string{`look up view "seniors" through metadata manager`, "load view catalog layout"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("ViewDefinition() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestMetadataManagerCreateIndexStoresRegistrationThroughFacade(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	manager := NewMetadataManager()

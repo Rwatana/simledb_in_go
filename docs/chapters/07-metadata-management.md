@@ -741,6 +741,7 @@ The test first failed to compile because `MetadataManager.ViewDefinition` did no
 | Test | Observable behavior |
 | --- | --- |
 | `TestMetadataManagerViewDefinitionLooksUpStoredAndMissingViews` | Lookup returns the exact stored SQL for `seniors` and an explicit non-error absence result for an unknown view |
+| `TestMetadataManagerViewDefinitionPreservesCatalogReadError` | A failed view-catalog layout lookup returns an empty not-found result and preserves the requested-view facade context and cause |
 
 ## Feature 36: Create an index through the metadata facade
 
