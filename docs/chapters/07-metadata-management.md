@@ -611,6 +611,7 @@ The test first failed to compile because `IndexManager.CreateIndex` did not exis
 | `TestIndexManagerCreateIndexPreservesCatalogLayoutError` | An index-catalog layout read failure preserves the index name and cause and stops before inserting a registration |
 | `TestIndexManagerCreateIndexPreservesIndexNameWriteError` | Failure storing the index-name field preserves the cause and both index-specific and field-stage context |
 | `TestIndexManagerCreateIndexPreservesTableNameWriteError` | Failure storing the indexed table-name field preserves the cause and table-name field-stage context |
+| `TestIndexManagerCreateIndexPreservesFieldNameWriteError` | Failure storing the indexed field-name field preserves the cause and field-name write context |
 
 The coverage audit confirms that a nil table metadata manager is rejected at the public operation boundary without
 opening a catalog scan or touching the transaction.

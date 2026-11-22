@@ -229,6 +229,32 @@ func TestIndexManagerCreateIndexPreservesTableNameWriteError(t *testing.T) {
 	}
 }
 
+func TestIndexManagerCreateIndexPreservesFieldNameWriteError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	wantErr := errors.New("indexed field name write unavailable")
+	transaction.setStringCalls = 0
+	transaction.setStringErr = wantErr
+	transaction.setStringErrAfter = 3
+
+	err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("CreateIndex() error = %v, want wrapped field-name write cause", err)
+	}
+	for _, context := range []string{"idx_student_major", "store indexed field name", `field "fieldname"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("CreateIndex() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()
