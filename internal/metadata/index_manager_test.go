@@ -255,6 +255,35 @@ func TestIndexManagerCreateIndexPreservesFieldNameWriteError(t *testing.T) {
 	}
 }
 
+func TestIndexManagerCreateIndexPreservesCatalogRowInsertError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateIndex("idx_student_first", "student", "sid", transaction); err != nil {
+		t.Fatalf("CreateIndex(first) error = %v", err)
+	}
+	wantErr := errors.New("next index catalog slot unavailable")
+	transaction.setIntErr = wantErr
+	transaction.setIntOffset = int32(record.NewLayout(NewIndexCatalogSchema()).SlotSize())
+	transaction.setIntErrAfter = 1
+
+	err := manager.CreateIndex("idx_student_second", "student", "majorid", transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("CreateIndex(second) error = %v, want wrapped slot-insertion cause", err)
+	}
+	for _, context := range []string{"idx_student_second", "insert index catalog row"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("CreateIndex(second) error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()

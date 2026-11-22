@@ -3,8 +3,8 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint for PR #615, the full-module statement coverage is **95.2%** (rounded to one
-decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 91.9%, query
+At the 2026-11-23 checkpoint for PR #617, the full-module statement coverage is **95.2%** (rounded to one
+decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 92.1%, query
 100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 91.3%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
 both catalog-initialization failure paths, table- and field-catalog row insertion, field-catalog table-name,
@@ -50,6 +50,8 @@ Index registration also verifies that a failure storing the first catalog name i
 The next index-catalog field write now has an independent failure-path test. It confirms that a table-name write failure preserves the original cause and `tablename` stage context; `IndexManager.CreateIndex` is now 88.2% covered, metadata coverage is 91.6%, and full-module coverage remains 95.1%.
 
 The final index-catalog name write now has a focused error-path check. The cause, requested index, and `fieldname` stage are preserved; `IndexManager.CreateIndex` is now 94.1% covered, metadata coverage is 91.9%, and full-module coverage is 95.2%.
+
+Index-catalog row insertion failure is now tested by failing the next slot-occupancy write after one successful registration. The test verifies no false success and preserves the cause and index-specific insertion context; `IndexManager.CreateIndex` is now 100.0% covered, metadata coverage is 92.1%, and full-module coverage is 95.2%.
 
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
