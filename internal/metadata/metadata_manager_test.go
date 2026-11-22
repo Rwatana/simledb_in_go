@@ -195,3 +195,40 @@ func TestMetadataManagerIndexInfoLooksUpRegisteredAndUnindexedTables(t *testing.
 		t.Fatalf("IndexInfo(course) = (%v, %v), want initialized empty map", missing, err)
 	}
 }
+
+func TestMetadataManagerStatisticsReturnsSharedManagerSnapshot(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	if err := manager.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+	layout := record.NewLayout(&schema)
+	scan, err := record.NewTableScan(transaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	for sid := int32(1); sid <= 2; sid++ {
+		if err := scan.Insert(); err != nil {
+			t.Fatalf("Insert(%d) error = %v", sid, err)
+		}
+		if err := scan.SetInt("sid", sid); err != nil {
+			t.Fatalf("SetInt(%d) error = %v", sid, err)
+		}
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	stats, err := manager.Statistics("student", layout, transaction)
+	if err != nil {
+		t.Fatalf("Statistics() error = %v", err)
+	}
+	if stats.RecordsOutput() != 2 || manager.stats.stats["student"] != stats {
+		t.Fatalf("statistics = %p (%d records), want shared cached two-record snapshot", stats, stats.RecordsOutput())
+	}
+}
