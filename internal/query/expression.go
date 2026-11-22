@@ -47,6 +47,18 @@ func (expression Expression) Evaluate(scan ValueScan) (Constant, error) {
 	return Constant{}, fmt.Errorf("evaluate expression: no literal or field reference")
 }
 
+// String renders a literal as its constant text or a field reference as its exact name.
+// The zero value renders as "<unset-expression>".
+func (expression Expression) String() string {
+	if expression.hasConstant {
+		return expression.constant.String()
+	}
+	if expression.hasField {
+		return expression.fieldName
+	}
+	return "<unset-expression>"
+}
+
 // AppliesTo reports whether this expression's referenced field is present in schema.
 // Literal expressions apply to every schema. An unset expression or nil schema does not apply.
 func (expression Expression) AppliesTo(schema *record.Schema) bool {

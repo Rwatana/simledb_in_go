@@ -57,6 +57,29 @@ func TestZeroValueExpressionHasNoFieldName(t *testing.T) {
 	}
 }
 
+func TestExpressionString(t *testing.T) {
+	tests := []struct {
+		name       string
+		expression Expression
+		want       string
+	}{
+		{name: "integer literal", expression: NewConstantExpression(NewIntConstant(-12)), want: "-12"},
+		{name: "string literal has no quotes", expression: NewConstantExpression(NewStringConstant("Ada")), want: "Ada"},
+		{name: "empty string literal", expression: NewConstantExpression(NewStringConstant("")), want: ""},
+		{name: "field reference", expression: NewFieldExpression("student name"), want: "student name"},
+		{name: "empty field name", expression: NewFieldExpression(""), want: ""},
+		{name: "unset expression", expression: Expression{}, want: "<unset-expression>"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.expression.String(); got != test.want {
+				t.Fatalf("String() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
 func TestEvaluateLiteralExpressionDoesNotReadScan(t *testing.T) {
 	want := NewIntConstant(7)
 	scan := &valueScanStub{}
