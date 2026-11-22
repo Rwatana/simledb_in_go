@@ -75,3 +75,11 @@ func (m *MetadataManager) ViewDefinition(viewName string, transaction record.Tab
 	}
 	return definition, found, nil
 }
+
+// CreateIndex stores an index registration through the metadata facade.
+func (m *MetadataManager) CreateIndex(indexName, tableName, fieldName string, transaction record.TableScanTransaction) error {
+	if err := m.indexes.CreateIndex(indexName, tableName, fieldName, transaction); err != nil {
+		return fmt.Errorf("create index %q through metadata manager: %w", indexName, err)
+	}
+	return nil
+}

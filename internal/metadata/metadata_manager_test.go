@@ -300,3 +300,45 @@ func TestMetadataManagerViewDefinitionPreservesCatalogReadError(t *testing.T) {
 		}
 	}
 }
+
+func TestMetadataManagerCreateIndexStoresRegistrationThroughFacade(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	schema.AddIntegerField("majorid")
+	if err := manager.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+
+	if err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+
+	indexes, err := manager.indexes.IndexInfo("student", transaction)
+	if err != nil {
+		t.Fatalf("index manager IndexInfo(student) error = %v", err)
+	}
+	info := indexes["majorid"]
+	if len(indexes) != 1 || info == nil || info.indexName != "idx_student_major" {
+		t.Fatalf("student indexes = %v, want idx_student_major on majorid", indexes)
+	}
+}
+
+func TestMetadataManagerCreateIndexPreservesMissingTableManagerError(t *testing.T) {
+	manager := NewMetadataManager()
+	manager.indexes.tables = nil
+
+	err := manager.CreateIndex("idx_student_major", "student", "majorid", nil)
+	if err == nil {
+		t.Fatal("CreateIndex() error = nil, want missing table-manager error")
+	}
+	for _, context := range []string{`create index "idx_student_major" through metadata manager`, "table manager is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateIndex() error = %q, want context %q", err, context)
+		}
+	}
+}
