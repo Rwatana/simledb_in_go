@@ -618,3 +618,21 @@ The test first failed to compile because `IndexManager.IndexInfo` did not exist.
 | `TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable` | Lookup returns only the requested table's two indexes, keyed by field, and returns an empty map for an unindexed table |
 | `TestIndexManagerIndexInfoRejectsMissingStatisticsManager` | Lookup reports table and dependency context before attempting any catalog transaction |
 | `TestIndexManagerIndexInfoRejectsMissingTableManager` | Lookup returns table-specific dependency context before catalog or statistics access |
+
+## Feature 30: Initialize the metadata facade
+
+`NewMetadataManager` constructs the Chapter 7 facade's table, view, statistics, and index managers. The view and
+statistics managers share the same table manager, while the index manager shares both that table manager and the same
+statistics cache. Construction performs no catalog or transaction I/O.
+
+This retains Java `MetadataMgr`'s dependency graph while moving its new-database startup work into a separate behavior.
+The Go managers are instance fields rather than Java's static fields, so independent database instances cannot overwrite
+each other's metadata state.
+
+### Test-first record
+
+The test first failed to compile because `NewMetadataManager` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewMetadataManagerWiresSharedDependencies` | The facade creates all four managers and shares the table and statistics dependencies by identity |
