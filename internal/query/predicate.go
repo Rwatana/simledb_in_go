@@ -36,6 +36,28 @@ func (predicate Predicate) SelectSubPredicate(schema *record.Schema) (Predicate,
 	return selected, true
 }
 
+// JoinSubPredicate returns the terms that apply to the schemas' union but not to either schema alone.
+func (predicate Predicate) JoinSubPredicate(first, second *record.Schema) (Predicate, bool) {
+	union := &record.Schema{}
+	if first != nil {
+		union.AddAllFrom(first)
+	}
+	if second != nil {
+		union.AddAllFrom(second)
+	}
+
+	selected := Predicate{}
+	for _, term := range predicate.terms {
+		if !term.AppliesTo(first) && !term.AppliesTo(second) && term.AppliesTo(union) {
+			selected.terms = append(selected.terms, term)
+		}
+	}
+	if len(selected.terms) == 0 {
+		return Predicate{}, false
+	}
+	return selected, true
+}
+
 // IsSatisfied reports whether every term in the predicate is satisfied by scan.
 func (predicate Predicate) IsSatisfied(scan ValueScan) (bool, error) {
 	for _, term := range predicate.terms {
