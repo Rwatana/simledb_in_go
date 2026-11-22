@@ -61,3 +61,13 @@ and carries no SQL quoting or escaping.
 
 `TestConstantString` first failed because the method was undefined. It verifies the minimum integer,
 zero, non-ASCII text, the empty string, and the unset representation.
+
+## Feature 6: Hash a query constant deterministically
+
+`Constant.HashCode` maps to Java `Constant.hashCode`. An integer returns its signed 32-bit value. For strings,
+each UTF-16 code unit contributes to the Java multiply-by-31 recurrence with signed 32-bit wraparound. This
+gives the later hash index a repeatable result across database sessions. Go range decoding supplies replacement
+runes for malformed UTF-8. An unset constant reports that no hash is available.
+
+`TestConstantHashCode` first failed because the method was undefined. It covers an integer, an empty string,
+ASCII, a BMP character, a supplementary character, signed overflow, malformed UTF-8, and the unset value.
