@@ -1695,6 +1695,10 @@ ok github.com/Rwatana/simledb_in_go/internal/buffer
 | --- | --- |
 | `TestPinExistingBufferUpdatesAvailabilityOnlyOnFirstPin` | 初回0→1、反復pin、missingのno mutation |
 | `TestPinExistingBufferConcurrentCallsKeepEveryPinAndOneTransition` | 並行pin countとavailableの単一遷移 |
+| `TestManagerPinRepinsCachedBufferAfterFinalUnpin` | cached frameをfinal unpin後にrepinした際、同じframeとavailable countの0→1遷移を確認 |
+
+全module coverageの監査で、Java cache-hit経路のこのtransitionだけが未実行と分かった。新testは正しい既存実装を
+通過し、回帰時に同じframeの再利用とavailable countの二重・未反映を検出する。
 
 ## Javaソースリーディング
 

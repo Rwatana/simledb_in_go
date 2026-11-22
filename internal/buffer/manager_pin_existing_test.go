@@ -54,6 +54,42 @@ func TestPinExistingBufferUpdatesAvailabilityOnlyOnFirstPin(t *testing.T) {
 	}
 }
 
+func TestManagerPinRepinsCachedBufferAfterFinalUnpin(t *testing.T) {
+	t.Parallel()
+
+	files, logs := newManagerDependencies(t, 32)
+	manager, err := NewManager(files, logs, 2)
+	if err != nil {
+		t.Fatalf("NewManager() error = %v", err)
+	}
+	block, _ := appendDataBlock(t, files, 1)
+
+	first, err := manager.Pin(block)
+	if err != nil {
+		t.Fatalf("first Pin() error = %v", err)
+	}
+	if err := manager.Unpin(first); err != nil {
+		t.Fatalf("Unpin() error = %v", err)
+	}
+	if got := manager.Available(); got != 2 {
+		t.Fatalf("Available() after final unpin = %d, want 2", got)
+	}
+
+	repinned, err := manager.Pin(block)
+	if err != nil {
+		t.Fatalf("repin cached block error = %v", err)
+	}
+	if repinned != first {
+		t.Errorf("repinned frame = %p, want cached frame %p", repinned, first)
+	}
+	if got := repinned.PinCount(); got != 1 {
+		t.Errorf("PinCount() after repin = %d, want 1", got)
+	}
+	if got := manager.Available(); got != 1 {
+		t.Errorf("Available() after repin = %d, want 1", got)
+	}
+}
+
 func TestPinExistingBufferConcurrentCallsKeepEveryPinAndOneTransition(t *testing.T) {
 	t.Parallel()
 
