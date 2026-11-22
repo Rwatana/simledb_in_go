@@ -608,6 +608,7 @@ The test first failed to compile because `IndexManager.CreateIndex` did not exis
 | --- | --- |
 | `TestIndexManagerCreateIndexStoresRegistrationInNewIndexCatalogFile` | Creating an index appends the first `idxcat` block and stores all three names in one occupied row |
 | `TestIndexManagerCreateIndexRejectsMissingTableManager` | Registration returns index-specific dependency context before accessing the transaction |
+| `TestIndexManagerCreateIndexPreservesCatalogLayoutError` | An index-catalog layout read failure preserves the index name and cause and stops before inserting a registration |
 
 The coverage audit confirms that a nil table metadata manager is rejected at the public operation boundary without
 opening a catalog scan or touching the transaction.
