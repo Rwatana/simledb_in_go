@@ -188,6 +188,7 @@ The tests first failed to compile because `TableManager.Layout` did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestTableManagerLayoutReconstructsStoredPhysicalMetadata` | Stored catalog order, types, lengths, offsets, and slot size reconstruct the field-catalog layout and both scans close |
+| `TestTableManagerLayoutPreservesRegisteredTableNameReadFailure` | A tblcat table-name read error keeps context, closes the table catalog, and stops before fldcat |
 | `TestTableManagerLayoutPreservesTableCatalogScanFailure` | A tblcat occupancy read failure keeps scan context, closes the table catalog, and stops before fldcat |
 | `TestTableManagerLayoutReportsMissingTableAndClosesTableCatalog` | An absent table returns contextual failure after closing `tblcat` without opening `fldcat` |
 

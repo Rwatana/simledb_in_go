@@ -33,6 +33,8 @@ type catalogTransaction struct {
 	setIntCalls       int
 	getIntErr         error
 	getIntOffset      int
+	getStringErr      error
+	getStringOffset   int
 	unpinErr          error
 }
 
@@ -111,6 +113,9 @@ func (t *catalogTransaction) GetInt(block storage.BlockID, offset int) (int32, e
 }
 
 func (t *catalogTransaction) GetString(block storage.BlockID, offset int) (string, error) {
+	if t.getStringErr != nil && offset == t.getStringOffset {
+		return "", t.getStringErr
+	}
 	value, err := t.pages[block].GetBytes(offset)
 	return string(value), err
 }
@@ -764,6 +769,40 @@ func TestTableManagerLayoutPreservesTableCatalogScanFailure(t *testing.T) {
 		t.Fatalf("Layout() = (%v, %v), want table-catalog scan cause", layout, err)
 	}
 	for _, context := range []string{"student", "table catalog", "scan table catalog"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("Layout() error = %q, want context %q", err, context)
+		}
+	}
+	wantBlock := storage.NewBlockID("tblcat.tbl", 0)
+	if got, want := transaction.pins, []storage.BlockID{wantBlock}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins = %v, want %v", got, want)
+	}
+	if got, want := transaction.unpins, []storage.BlockID{wantBlock}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unpins = %v, want %v", got, want)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+}
+
+func TestTableManagerLayoutPreservesRegisteredTableNameReadFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	readErr := errors.New("registered table name read failed")
+	transaction.getStringErr = readErr
+	transaction.getStringOffset = 4
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	if err := tablePage.SetInt(0, 1); err != nil {
+		t.Fatalf("mark tblcat row occupied: %v", err)
+	}
+	if err := tablePage.SetBytes(4, []byte("student")); err != nil {
+		t.Fatalf("store tblcat table name: %v", err)
+	}
+
+	layout, err := NewTableManager().Layout("student", transaction)
+	if layout != nil || !errors.Is(err, readErr) {
+		t.Fatalf("Layout() = (%v, %v), want registered-name read cause", layout, err)
+	}
+	for _, context := range []string{"student", "table catalog", "read registered table name"} {
 		if !strings.Contains(err.Error(), context) {
 			t.Fatalf("Layout() error = %q, want context %q", err, context)
 		}
