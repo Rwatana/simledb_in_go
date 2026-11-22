@@ -43,3 +43,12 @@ and never matches. This gives callers a defined result for an input the Java con
 
 `TestConstantEqual` first failed to compile because the method was absent. It covers equal and unequal values
 of each kind, mixed kinds, and unset values in both operand positions.
+
+## Feature 4: Order query constants of the same kind
+
+`Constant.Compare` maps to Java `Constant.compareTo`. It compares signed integers directly, which avoids overflow
+at the limits of `int32`. Strings use Go's lexicographic byte order. Java uses UTF-16 code units, so some
+supplementary characters sort differently. Mixed kinds and unset values return `(0, false)`.
+
+`TestConstantCompare` first failed because the method was undefined. It verifies integer limits, string prefixes,
+equality, reversed operands, and incomparable values.
