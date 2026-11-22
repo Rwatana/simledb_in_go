@@ -104,6 +104,10 @@ not exist.
 | --- | --- |
 | `TestTableManagerCreateTableStoresCatalogRows` | One table row and declaration-ordered field rows retain the schema's logical and derived physical metadata, and both scans close |
 | `TestTableManagerCreateTablePreservesOperationAndCloseFailures` | A catalog write failure still closes its scan, preserves both causes when cleanup also fails, and stops before the next catalog |
+| `TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess` | A nil schema returns table-specific context before a nil transaction can be touched |
+
+The full-module coverage audit found the existing nil-schema guard was not exercised. The focused test records this
+already-supported rejection and confirms it happens before catalog I/O; it does not change table-creation behavior.
 
 ## Feature 5: Initialize new database catalogs
 

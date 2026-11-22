@@ -173,6 +173,19 @@ func TestTableManagerCreateTableStoresCatalogRows(t *testing.T) {
 	}
 }
 
+func TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess(t *testing.T) {
+	manager := NewTableManager()
+	err := manager.CreateTable("student", nil, nil)
+	if err == nil {
+		t.Fatal("CreateTable() error = nil, want nil-schema error")
+	}
+	for _, context := range []string{"student", "schema is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestTableManagerCreateTablePreservesOperationAndCloseFailures(t *testing.T) {
 	transaction := newCatalogTransaction(t, 512)
 	writeErr := errors.New("write failed")
