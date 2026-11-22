@@ -11,6 +11,15 @@ func NewPredicateWithTerm(term Term) Predicate {
 	return Predicate{terms: []Term{term}}
 }
 
+// ConjoinWith returns a predicate containing this predicate's terms followed by other's terms.
+// Neither input predicate is modified.
+func (predicate Predicate) ConjoinWith(other Predicate) Predicate {
+	terms := make([]Term, 0, len(predicate.terms)+len(other.terms))
+	terms = append(terms, predicate.terms...)
+	terms = append(terms, other.terms...)
+	return Predicate{terms: terms}
+}
+
 // IsSatisfied reports whether every term in the predicate is satisfied by scan.
 func (predicate Predicate) IsSatisfied(scan ValueScan) (bool, error) {
 	for _, term := range predicate.terms {
