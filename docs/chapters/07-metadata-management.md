@@ -605,6 +605,10 @@ The test first failed to compile because `IndexManager.CreateIndex` did not exis
 | Test | Observable behavior |
 | --- | --- |
 | `TestIndexManagerCreateIndexStoresRegistrationInNewIndexCatalogFile` | Creating an index appends the first `idxcat` block and stores all three names in one occupied row |
+| `TestIndexManagerCreateIndexRejectsMissingTableManager` | Registration returns index-specific dependency context before accessing the transaction |
+
+The coverage audit confirms that a nil table metadata manager is rejected at the public operation boundary without
+opening a catalog scan or touching the transaction.
 
 ## Feature 29: Look up index metadata by table
 

@@ -90,6 +90,20 @@ func TestIndexManagerIndexInfoRejectsMissingStatisticsManager(t *testing.T) {
 	}
 }
 
+func TestIndexManagerCreateIndexRejectsMissingTableManager(t *testing.T) {
+	manager := NewIndexManager(nil, nil)
+
+	err := manager.CreateIndex("idx_student_sid", "student", "sid", nil)
+	if err == nil {
+		t.Fatal("CreateIndex() error = nil, want missing table manager error")
+	}
+	for _, context := range []string{"idx_student_sid", "table manager is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("CreateIndex() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestIndexManagerCreateIndexStoresRegistrationInNewIndexCatalogFile(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()
