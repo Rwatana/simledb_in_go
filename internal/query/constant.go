@@ -3,6 +3,7 @@ package query
 import (
 	"cmp"
 	"strconv"
+	"unicode/utf16"
 )
 
 type constantKind uint8
@@ -77,5 +78,28 @@ func (constant Constant) String() string {
 		return constant.str
 	default:
 		return "<unset>"
+	}
+}
+
+// HashCode returns the deterministic signed 32-bit hash of an initialized constant.
+// It uses Java's UTF-16 hash for strings, decoding malformed UTF-8 as replacement runes.
+func (constant Constant) HashCode() (int32, bool) {
+	switch constant.kind {
+	case intConstantKind:
+		return constant.integer, true
+	case stringConstantKind:
+		var hash int32
+		for _, r := range constant.str {
+			if r <= 0xffff {
+				hash = 31*hash + int32(r)
+			} else {
+				high, low := utf16.EncodeRune(r)
+				hash = 31*hash + int32(high)
+				hash = 31*hash + int32(low)
+			}
+		}
+		return hash, true
+	default:
+		return 0, false
 	}
 }
