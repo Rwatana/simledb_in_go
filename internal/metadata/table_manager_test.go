@@ -474,6 +474,41 @@ func TestTableManagerCreateTablePreservesFieldCatalogTableNameWriteFailure(t *te
 	}
 }
 
+func TestTableManagerCreateTablePreservesFieldCatalogFieldNameWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("field catalog field-name write failed")
+	transaction.setStringErr = writeErr
+	transaction.setStringErrAfter = 3
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want fldcat field-name write cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `store field name "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if transaction.setStringCalls != 3 {
+		t.Fatalf("string writes = %d, want stop at the field name write", transaction.setStringCalls)
+	}
+	if got, err := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)].GetInt(0); err != nil || got != 1 {
+		t.Fatalf("fldcat occupancy = (%d, %v), want the inserted row marked used", got, err)
+	}
+}
+
 func TestTableManagerCreateTablePreservesTableSlotSizeWriteFailure(t *testing.T) {
 	transaction := newCatalogTransaction(t, 512)
 	writeErr := errors.New("integer metadata write failed")
