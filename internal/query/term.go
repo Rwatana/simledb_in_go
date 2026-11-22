@@ -59,3 +59,8 @@ func (term Term) EquatesWithField(fieldName string) (string, bool) {
 func (term Term) AppliesTo(schema *record.Schema) bool {
 	return term.lhs.AppliesTo(schema) && term.rhs.AppliesTo(schema)
 }
+
+// String renders the term's left and right expressions separated by an equals sign.
+func (term Term) String() string {
+	return term.lhs.String() + "=" + term.rhs.String()
+}
