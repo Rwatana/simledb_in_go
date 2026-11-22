@@ -71,3 +71,29 @@ func TestIndexManagerInitializeCatalogRejectsMissingTableManager(t *testing.T) {
 		t.Fatal("InitializeCatalog() error = nil, want missing table manager")
 	}
 }
+
+func TestIndexManagerCreateIndexStoresRegistrationInNewIndexCatalogFile(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	transaction.appendCalls = nil
+
+	if err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+
+	indexPage := transaction.pages[storage.NewBlockID("idxcat.tbl", 0)]
+	assertPageInt(t, indexPage, 0, 1)
+	assertPageString(t, indexPage, 4, "idx_student_major")
+	assertPageString(t, indexPage, 72, "student")
+	assertPageString(t, indexPage, 140, "majorid")
+	if got, want := transaction.appendCalls, []string{"idxcat.tbl"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("append calls = %v, want %v", got, want)
+	}
+}

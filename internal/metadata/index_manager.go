@@ -31,6 +31,35 @@ func (m *IndexManager) InitializeCatalog(transaction record.TableScanTransaction
 	return nil
 }
 
+// CreateIndex stores an index registration in the index catalog.
+func (m *IndexManager) CreateIndex(indexName, tableName, fieldName string, transaction record.TableScanTransaction) error {
+	if m.tables == nil {
+		return fmt.Errorf("create index %q: table manager is nil", indexName)
+	}
+	layout, err := m.tables.Layout("idxcat", transaction)
+	if err != nil {
+		return fmt.Errorf("create index %q: load index catalog layout: %w", indexName, err)
+	}
+	if err := withCatalogScan(transaction, "idxcat", layout, func(scan *record.TableScan) error {
+		if err := scan.Insert(); err != nil {
+			return fmt.Errorf("insert index catalog row: %w", err)
+		}
+		if err := scan.SetString("indexname", indexName); err != nil {
+			return fmt.Errorf("store index name: %w", err)
+		}
+		if err := scan.SetString("tablename", tableName); err != nil {
+			return fmt.Errorf("store indexed table name: %w", err)
+		}
+		if err := scan.SetString("fieldname", fieldName); err != nil {
+			return fmt.Errorf("store indexed field name: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("create index %q: %w", indexName, err)
+	}
+	return nil
+}
+
 // NewIndexCatalogSchema constructs the logical schema of the index catalog.
 func NewIndexCatalogSchema() *record.Schema {
 	var schema record.Schema

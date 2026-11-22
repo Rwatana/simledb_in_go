@@ -527,3 +527,20 @@ The tests first failed to compile because `IndexManager.InitializeCatalog` did n
 | --- | --- |
 | `TestIndexManagerInitializeCatalogRegistersIndexMetadata` | Registration stores the `idxcat` table row and its three ordered field rows without appending an index data block |
 | `TestIndexManagerInitializeCatalogRejectsMissingTableManager` | Registration reports a missing table-manager dependency instead of panicking |
+
+## Feature 28: Store an index registration
+
+`IndexManager.CreateIndex` reconstructs the `idxcat` layout through `TableManager`, inserts one catalog row, and writes
+the supplied index, table, and field names. The shared catalog-scan boundary closes the scan on both success and failure,
+and each read/write stage adds index-specific context to returned errors.
+
+Like Java `IndexMgr.createIndex`, this operation records metadata only. It does not build, open, or traverse a concrete
+hash or B-tree index; those physical structures remain Chapter 12 and Chapter 13 concerns.
+
+### Test-first record
+
+The test first failed to compile because `IndexManager.CreateIndex` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestIndexManagerCreateIndexStoresRegistrationInNewIndexCatalogFile` | Creating an index appends the first `idxcat` block and stores all three names in one occupied row |
