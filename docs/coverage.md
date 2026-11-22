@@ -3,8 +3,8 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint for PR #599, the full-module statement coverage is **94.6%** (rounded to one
-decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 89.0%, query
+At the 2026-11-23 checkpoint for PR #601, the full-module statement coverage is **94.7%** (rounded to one
+decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 89.2%, query
 100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 91.3%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
 both catalog-initialization failure paths, table- and field-catalog row insertion, field-catalog table-name,
@@ -34,6 +34,8 @@ A separate view-catalog bootstrap test fails the table-catalog lookup after the 
 The index-catalog bootstrap error path is now covered as well: after tblcat, fldcat, and viewcat registration succeeds, an injected layout-size failure retains index-stage context and leaves the index catalog unregistered. `MetadataManager.InitializeCatalogs` is now 100.0% covered; metadata coverage is 88.7%, and full-module coverage is 94.6%.
 
 The metadata facade's nil-schema table-creation validation path is covered without requiring a transaction. `MetadataManager.CreateTable` is now 100.0% covered; metadata coverage is 89.0%, while the full-module total remains 94.6%.
+
+The metadata facade's index-registration dependency error is now covered as well. A missing table manager returns index-specific context before a transaction can be accessed, and `MetadataManager.CreateIndex` is now 100.0% covered. Metadata coverage is 89.2%; the full module is 94.7%.
 
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests

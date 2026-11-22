@@ -281,6 +281,21 @@ func TestMetadataManagerCreateIndexStoresRegistrationThroughFacade(t *testing.T)
 	}
 }
 
+func TestMetadataManagerCreateIndexPreservesMissingTableManagerError(t *testing.T) {
+	manager := NewMetadataManager()
+	manager.indexes.tables = nil
+
+	err := manager.CreateIndex("idx_student_major", "student", "majorid", nil)
+	if err == nil {
+		t.Fatal("CreateIndex() error = nil, want missing table-manager error")
+	}
+	for _, context := range []string{`create index "idx_student_major" through metadata manager`, "table manager is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateIndex() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestMetadataManagerIndexInfoLooksUpRegisteredAndUnindexedTables(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	manager := NewMetadataManager()

@@ -757,6 +757,7 @@ The test first failed to compile because `MetadataManager.CreateIndex` did not e
 | Test | Observable behavior |
 | --- | --- |
 | `TestMetadataManagerCreateIndexStoresRegistrationThroughFacade` | Creating `idx_student_major` through the facade produces exactly one `majorid` registration visible to the shared index manager |
+| `TestMetadataManagerCreateIndexPreservesMissingTableManagerError` | A missing table-manager dependency returns the requested index name and facade context before transaction access |
 
 ## Feature 37: Look up indexes through the metadata facade
 
