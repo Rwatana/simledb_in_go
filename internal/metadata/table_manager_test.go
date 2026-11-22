@@ -1103,6 +1103,70 @@ func TestTableManagerLayoutPreservesFieldTypeReadFailure(t *testing.T) {
 	}
 }
 
+func TestTableManagerLayoutRejectsInvalidFieldType(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	manager := NewTableManager()
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	if err := tablePage.SetInt(0, 1); err != nil {
+		t.Fatalf("mark tblcat row occupied: %v", err)
+	}
+	if err := tablePage.SetBytes(4, []byte("student")); err != nil {
+		t.Fatalf("store tblcat table name: %v", err)
+	}
+	slotSizeOffset, _ := manager.tableCatalogLayout.Offset("slotsize")
+	if err := tablePage.SetInt(slotSizeOffset, 128); err != nil {
+		t.Fatalf("store tblcat slot size: %v", err)
+	}
+	fieldPage := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)]
+	fieldLayout := manager.fieldCatalogLayout
+	tblNameOffset, _ := fieldLayout.Offset("tblname")
+	fldNameOffset, _ := fieldLayout.Offset("fldname")
+	typeOffset, _ := fieldLayout.Offset("type")
+	lengthOffset, _ := fieldLayout.Offset("length")
+	offsetOffset, _ := fieldLayout.Offset("offset")
+	if err := fieldPage.SetInt(0, 1); err != nil {
+		t.Fatalf("mark fldcat row occupied: %v", err)
+	}
+	if err := fieldPage.SetBytes(tblNameOffset, []byte("student")); err != nil {
+		t.Fatalf("store fldcat owner: %v", err)
+	}
+	if err := fieldPage.SetBytes(fldNameOffset, []byte("sid")); err != nil {
+		t.Fatalf("store fldcat field name: %v", err)
+	}
+	if err := fieldPage.SetInt(typeOffset, 99); err != nil {
+		t.Fatalf("store invalid fldcat type: %v", err)
+	}
+	if err := fieldPage.SetInt(lengthOffset, 0); err != nil {
+		t.Fatalf("store fldcat length: %v", err)
+	}
+	if err := fieldPage.SetInt(offsetOffset, 4); err != nil {
+		t.Fatalf("store fldcat offset: %v", err)
+	}
+
+	layout, err := manager.Layout("student", transaction)
+	if layout != nil || err == nil {
+		t.Fatalf("Layout() = (%v, %v), want invalid-field-type error", layout, err)
+	}
+	for _, context := range []string{"student", "sid", "invalid type 99"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("Layout() error = %q, want context %q", err, context)
+		}
+	}
+	wantBlocks := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if got, want := transaction.pins, wantBlocks; !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins = %v, want %v", got, want)
+	}
+	if got, want := transaction.unpins, wantBlocks; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unpins = %v, want %v", got, want)
+	}
+	if got, want := transaction.getIntCalls, 4; got != want {
+		t.Fatalf("integer reads = %d, want %d", got, want)
+	}
+}
+
 func TestTableManagerLayoutPreservesTableCatalogSlotSizeReadFailure(t *testing.T) {
 	transaction := newCatalogTransaction(t, 512)
 	readErr := errors.New("table catalog slot-size read failed")
