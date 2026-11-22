@@ -706,6 +706,7 @@ The test first failed to compile because `MetadataManager.Layout` did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestMetadataManagerLayoutReconstructsTableThroughFacade` | Lookup returns the stored field order and exact slot size for a table created through the facade |
+| `TestMetadataManagerLayoutPreservesCatalogReadError` | A failed catalog size read returns no layout and retains the requested table, facade, and cause context |
 
 ## Feature 34: Create a view through the metadata facade
 

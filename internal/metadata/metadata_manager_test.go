@@ -193,6 +193,30 @@ func TestMetadataManagerLayoutReconstructsTableThroughFacade(t *testing.T) {
 	}
 }
 
+func TestMetadataManagerLayoutPreservesCatalogReadError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	wantErr := errors.New("table catalog size unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+
+	layout, err := manager.Layout("student", transaction)
+	if layout != nil {
+		t.Fatalf("Layout() layout = %v, want nil on catalog failure", layout)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Layout() error = %v, want wrapped size cause", err)
+	}
+	for _, context := range []string{`look up layout for table "student" through metadata manager`, "read size"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("Layout() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestMetadataManagerCreateViewStoresDefinitionThroughFacade(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	manager := NewMetadataManager()
