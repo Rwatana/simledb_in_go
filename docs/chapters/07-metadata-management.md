@@ -136,8 +136,10 @@ The test first failed to compile because `TableManager.InitializeCatalogs` did n
 | Test | Observable behavior |
 | --- | --- |
 | `TestTableManagerInitializeCatalogsStoresTheirOwnMetadata` | Empty catalog files are appended and formatted once, then store complete self-describing table and field rows in declaration order |
+| `TestTableManagerInitializeCatalogsPreservesTableCatalogFailure` | Failure opening the first catalog scan preserves its cause and stops bootstrap before any catalog side effect |
 
 This maps the `isNew` branch of Java `TableMgr` while making bootstrap an explicit, separately testable Go operation.
+The coverage audit also verifies the table-catalog failure branch occurs before block append, pin, or unpin.
 
 ## Feature 6: Reconstruct a table layout from the catalogs
 
