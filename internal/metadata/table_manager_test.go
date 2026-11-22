@@ -21,6 +21,8 @@ type catalogTransaction struct {
 	appendCalls  []string
 	sizeErr      error
 	sizeErrFile  string
+	sizeErrAfter int
+	sizeErrCalls int
 	setStringErr error
 	unpinErr     error
 }
@@ -44,7 +46,10 @@ func newEmptyCatalogTransaction(blockSize int) *catalogTransaction {
 
 func (t *catalogTransaction) Size(fileName string) (int, error) {
 	if t.sizeErr != nil && (t.sizeErrFile == "" || t.sizeErrFile == fileName) {
-		return 0, t.sizeErr
+		t.sizeErrCalls++
+		if t.sizeErrAfter == 0 || t.sizeErrCalls == t.sizeErrAfter {
+			return 0, t.sizeErr
+		}
 	}
 	size := 0
 	for {
@@ -339,6 +344,31 @@ func TestTableManagerInitializeCatalogsPreservesTableCatalogFailure(t *testing.T
 	}
 	if len(transaction.appendCalls) != 0 || len(transaction.pins) != 0 || len(transaction.unpins) != 0 {
 		t.Fatalf("catalog side effects = append %v, pins %v, unpins %v; want none", transaction.appendCalls, transaction.pins, transaction.unpins)
+	}
+}
+
+func TestTableManagerInitializeCatalogsPreservesFieldCatalogFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	sizeErr := errors.New("field catalog registration size failed")
+	transaction.sizeErr = sizeErr
+	transaction.sizeErrFile = "tblcat.tbl"
+	transaction.sizeErrAfter = 2
+
+	err := NewTableManager().InitializeCatalogs(transaction)
+	if !errors.Is(err, sizeErr) {
+		t.Fatalf("InitializeCatalogs() error = %v, want size cause", err)
+	}
+	for _, context := range []string{"initialize field catalog", "fldcat", "table catalog", "open catalog scan", "read size"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("InitializeCatalogs() error = %q, want context %q", err, context)
+		}
+	}
+
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	assertPageString(t, tablePage, 4, "tblcat")
+	assertPageInt(t, tablePage, 76, 0)
+	if got, want := transaction.appendCalls, []string{"tblcat.tbl", "fldcat.tbl"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("append calls = %v, want %v", got, want)
 	}
 }
 
