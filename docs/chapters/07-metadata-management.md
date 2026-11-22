@@ -455,8 +455,12 @@ The test first returned the deliberately stale 99-record snapshot on lookup 101 
 | Test | Observable behavior |
 | --- | --- |
 | `TestStatManagerStatisticsRefreshesOnHundredFirstLookup` | Lookup 101 replaces the stale cache with all registered table snapshots, returns the fresh two-row table estimate, and resets the counter |
+| `TestStatManagerStatisticsPreservesRefreshFailureOnHundredFirstLookup` | Lookup 101 preserves refresh context, returns no snapshot, increments the attempted lookup count, and does not cache statistics when the table manager is unavailable |
 
 This completes the refresh-threshold portion of Java `StatMgr.getStatInfo`.
+The coverage audit also exercises the existing failure branch when the threshold-triggered refresh cannot load the table
+catalog. `Statistics` reports both lookup and refresh context without caching a partial result; no production behavior
+changed.
 
 ## Feature 21: Initialize index metadata
 

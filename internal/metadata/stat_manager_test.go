@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/record"
@@ -192,5 +193,29 @@ func TestStatManagerStatisticsRefreshesOnHundredFirstLookup(t *testing.T) {
 	}
 	if len(manager.stats) != 3 || manager.stats["student"] != stats {
 		t.Fatalf("cache = %v, want refreshed tblcat, fldcat, and student snapshots", manager.stats)
+	}
+}
+
+func TestStatManagerStatisticsPreservesRefreshFailureOnHundredFirstLookup(t *testing.T) {
+	manager := NewStatManager(nil)
+	manager.calls = 100
+
+	stats, err := manager.Statistics("student", nil, nil)
+	if stats != nil {
+		t.Fatalf("Statistics() stats = %v, want nil when refresh fails", stats)
+	}
+	if err == nil {
+		t.Fatal("Statistics() error = nil, want refresh failure")
+	}
+	for _, context := range []string{"look up statistics for table \"student\"", "refresh cache", "table manager is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Statistics() error = %q, want context %q", err, context)
+		}
+	}
+	if manager.calls != 101 {
+		t.Errorf("lookup calls = %d, want 101 after failed refresh", manager.calls)
+	}
+	if len(manager.stats) != 0 {
+		t.Errorf("statistics cache = %v, want no result cached after failed refresh", manager.stats)
 	}
 }
