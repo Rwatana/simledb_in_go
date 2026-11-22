@@ -1,7 +1,9 @@
 package metadata
 
 import (
+	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/record"
@@ -116,6 +118,30 @@ func TestMetadataManagerCreateViewStoresDefinitionThroughFacade(t *testing.T) {
 	definition, found, err := manager.views.ViewDefinition("seniors", transaction)
 	if err != nil || !found || definition != "select sid from student where gradyear=2020" {
 		t.Fatalf("view manager lookup = (%q, %v, %v), want stored definition", definition, found, err)
+	}
+}
+
+func TestMetadataManagerCreateViewPreservesLayoutError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	wantErr := errors.New("table catalog size unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+
+	err := manager.CreateView("seniors", "select sid from student", transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("CreateView() error = %v, want wrapped size cause", err)
+	}
+	for _, context := range []string{`create view "seniors" through metadata manager`, "load view catalog layout"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateView() error = %q, want context %q", err, context)
+		}
+	}
+	if len(transaction.appendCalls) != 2 {
+		t.Fatalf("catalog append calls = %v, want only initialized table and field catalogs", transaction.appendCalls)
 	}
 }
 

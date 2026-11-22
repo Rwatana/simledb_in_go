@@ -718,6 +718,7 @@ The test first failed to compile because `MetadataManager.CreateView` did not ex
 | Test | Observable behavior |
 | --- | --- |
 | `TestMetadataManagerCreateViewStoresDefinitionThroughFacade` | Creating `seniors` through the facade stores the exact SQL definition that the shared view manager reads back |
+| `TestMetadataManagerCreateViewPreservesLayoutError` | A view-catalog layout failure preserves its cause and requested-view context through the facade, without appending a view row |
 
 ## Feature 35: Look up a view through the metadata facade
 
