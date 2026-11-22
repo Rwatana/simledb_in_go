@@ -14,30 +14,33 @@ import (
 )
 
 type catalogTransaction struct {
-	pages             map[storage.BlockID]*storage.Page
-	blockSize         int
-	pins              []storage.BlockID
-	unpins            []storage.BlockID
-	appendCalls       []string
-	sizeErr           error
-	sizeErrFile       string
-	sizeErrAfter      int
-	sizeErrCalls      int
-	setStringErr      error
-	setStringErrAfter int
-	setStringCalls    int
-	setIntErr         error
-	setIntOffset      int32
-	setIntErrAfter    int
-	setIntOffsetCalls int
-	setIntCalls       int
-	getIntErr         error
-	getIntOffset      int
-	getIntErrAfter    int
-	getIntOffsetCalls int
-	getStringErr      error
-	getStringOffset   int
-	unpinErr          error
+	pages                map[storage.BlockID]*storage.Page
+	blockSize            int
+	pins                 []storage.BlockID
+	unpins               []storage.BlockID
+	appendCalls          []string
+	sizeErr              error
+	sizeErrFile          string
+	sizeErrAfter         int
+	sizeErrCalls         int
+	setStringErr         error
+	setStringErrAfter    int
+	setStringCalls       int
+	setIntErr            error
+	setIntOffset         int32
+	setIntErrAfter       int
+	setIntOffsetCalls    int
+	setIntCalls          int
+	getIntErr            error
+	getIntOffset         int
+	getIntErrAfter       int
+	getIntOffsetCalls    int
+	getStringErr         error
+	getStringOffset      int
+	getStringErrAfter    int
+	getStringOffsetCalls int
+	getStringCalls       int
+	unpinErr             error
 }
 
 func newCatalogTransaction(t *testing.T, blockSize int) *catalogTransaction {
@@ -118,8 +121,12 @@ func (t *catalogTransaction) GetInt(block storage.BlockID, offset int) (int32, e
 }
 
 func (t *catalogTransaction) GetString(block storage.BlockID, offset int) (string, error) {
+	t.getStringCalls++
 	if t.getStringErr != nil && offset == t.getStringOffset {
-		return "", t.getStringErr
+		t.getStringOffsetCalls++
+		if t.getStringErrAfter == 0 || t.getStringOffsetCalls == t.getStringErrAfter {
+			return "", t.getStringErr
+		}
 	}
 	value, err := t.pages[block].GetBytes(offset)
 	return string(value), err
@@ -864,6 +871,53 @@ func TestTableManagerLayoutPreservesRegisteredTableNameReadFailure(t *testing.T)
 	}
 	if len(transaction.appendCalls) != 0 {
 		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+}
+
+func TestTableManagerLayoutPreservesFieldOwnerTableNameReadFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	manager := NewTableManager()
+	slotSizeOffset, _ := manager.tableCatalogLayout.Offset("slotsize")
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	if err := tablePage.SetInt(0, 1); err != nil {
+		t.Fatalf("mark tblcat row occupied: %v", err)
+	}
+	if err := tablePage.SetBytes(4, []byte("student")); err != nil {
+		t.Fatalf("store tblcat table name: %v", err)
+	}
+	if err := tablePage.SetInt(slotSizeOffset, 128); err != nil {
+		t.Fatalf("store tblcat slot size: %v", err)
+	}
+	fieldPage := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)]
+	if err := fieldPage.SetInt(0, 1); err != nil {
+		t.Fatalf("mark fldcat row occupied: %v", err)
+	}
+	readErr := errors.New("field owner table-name read failed")
+	transaction.getStringErr = readErr
+	transaction.getStringOffset = 4
+	transaction.getStringErrAfter = 2
+
+	layout, err := manager.Layout("student", transaction)
+	if layout != nil || !errors.Is(err, readErr) {
+		t.Fatalf("Layout() = (%v, %v), want field-owner read cause", layout, err)
+	}
+	for _, context := range []string{"student", "field catalog", "read field owner table name"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("Layout() error = %q, want context %q", err, context)
+		}
+	}
+	wantBlocks := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if got, want := transaction.pins, wantBlocks; !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins = %v, want %v", got, want)
+	}
+	if got, want := transaction.unpins, wantBlocks; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unpins = %v, want %v", got, want)
+	}
+	if got, want := transaction.getStringCalls, 2; got != want {
+		t.Fatalf("string reads = %d, want %d", got, want)
 	}
 }
 
