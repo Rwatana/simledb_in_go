@@ -198,6 +198,24 @@ func TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess(t *testi
 	}
 }
 
+func TestTableManagerCreateTableRejectsUnencodableSlotSizeBeforeTransactionAccess(t *testing.T) {
+	if strconv.IntSize < 64 {
+		t.Skip("int cannot represent a schema whose slot size exceeds int32 on this platform")
+	}
+	var schema record.Schema
+	schema.AddVarcharField("oversized", math.MaxInt32)
+
+	err := NewTableManager().CreateTable("oversized", &schema, nil)
+	if err == nil {
+		t.Fatal("CreateTable() error = nil, want slot-size range error")
+	}
+	for _, context := range []string{"oversized", "slot size", "exceeds int32 range"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestTableManagerCreateTableReportsCloseFailureAfterSuccessfulTableWrite(t *testing.T) {
 	transaction := newCatalogTransaction(t, 512)
 	closeErr := errors.New("catalog unpin failed")

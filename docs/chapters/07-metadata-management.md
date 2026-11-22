@@ -105,6 +105,7 @@ not exist.
 | `TestTableManagerCreateTableStoresCatalogRows` | One table row and declaration-ordered field rows retain the schema's logical and derived physical metadata, and both scans close |
 | `TestTableManagerCreateTablePreservesOperationAndCloseFailures` | A catalog write failure still closes its scan, preserves both causes when cleanup also fails, and stops before the next catalog |
 | `TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess` | A nil schema returns table-specific context before a nil transaction can be touched |
+| `TestTableManagerCreateTableRejectsUnencodableSlotSizeBeforeTransactionAccess` | An oversized schema returns the catalog's signed-32-bit range error before touching a nil transaction |
 | `TestTableManagerCreateTableReportsCloseFailureAfterSuccessfulTableWrite` | A successful catalog write still reports a scan-close failure and prevents the next catalog from opening |
 | `TestTableManagerCreateTablePreservesCatalogScanOpenFailure` | A catalog file-size error retains its cause and open-scan context before any pin or write |
 | `TestMetadataIntegerPreservesInt32Bounds` | The smallest and largest signed 32-bit values remain representable in catalog metadata |
