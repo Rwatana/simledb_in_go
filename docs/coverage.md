@@ -3,8 +3,8 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint for PR #609, the full-module statement coverage is **95.0%** (rounded to one
-decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 90.8%, query
+At the 2026-11-23 checkpoint for PR #611, the full-module statement coverage is **95.1%** (rounded to one
+decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 91.3%, query
 100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 91.3%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
 both catalog-initialization failure paths, table- and field-catalog row insertion, field-catalog table-name,
@@ -44,6 +44,8 @@ The facade view-definition lookup failure is covered by injecting a table-catalo
 The facade index lookup error is covered by injecting a table-catalog size failure after initialization. The test verifies a nil result, table-specific context at both index-manager and facade layers, and preservation of the original cause. `MetadataManager.IndexInfo` is now 100.0% covered; metadata coverage is 90.6% and full-module coverage is 94.9%.
 
 The index registration path now also covers failure while loading the `idxcat` layout. The regression test verifies index-specific layout context, the original cause, and that no registration row is appended. `IndexManager.CreateIndex` is now 70.6% covered; metadata coverage is 90.8% and full-module coverage is 95.0%.
+
+Index registration also verifies that a failure storing the first catalog name is wrapped with the index name and field-stage context. `IndexManager.CreateIndex` is now 82.4% covered; metadata coverage is 91.3% and full-module coverage is 95.1%.
 
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
