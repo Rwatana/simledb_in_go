@@ -92,3 +92,12 @@ func (m *MetadataManager) IndexInfo(tableName string, transaction record.TableSc
 	}
 	return indexes, nil
 }
+
+// Statistics returns a table's statistics through the metadata facade.
+func (m *MetadataManager) Statistics(tableName string, layout *record.Layout, transaction record.TableScanTransaction) (*StatInfo, error) {
+	stats, err := m.stats.Statistics(tableName, layout, transaction)
+	if err != nil {
+		return nil, fmt.Errorf("look up statistics for table %q through metadata manager: %w", tableName, err)
+	}
+	return stats, nil
+}

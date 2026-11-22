@@ -761,3 +761,21 @@ The test first failed to compile because `MetadataManager.IndexInfo` did not exi
 | --- | --- |
 | `TestMetadataManagerIndexInfoLooksUpRegisteredAndUnindexedTables` | Lookup returns the stored `majorid` index for `student` and a non-nil empty map for an unindexed table |
 | `TestMetadataManagerIndexInfoPreservesCatalogReadError` | A failed index-catalog layout lookup returns no index map and preserves the requested table, facade context, and original cause |
+
+## Feature 38: Look up statistics through the metadata facade
+
+`MetadataManager.Statistics` delegates the table name, caller-supplied layout, and transaction to the shared statistics
+manager. It returns that manager's cached or newly calculated `StatInfo` pointer unchanged, preserving the single cache
+shared with index metadata. Calculation and refresh failures gain the requested table name plus facade context.
+
+This maps Java `MetadataMgr.getStatInfo` and completes the public Chapter 7 facade behavior without introducing a second
+statistics cache.
+
+### Test-first record
+
+The test first failed to compile because `MetadataManager.Statistics` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestMetadataManagerStatisticsReturnsSharedManagerSnapshot` | Facade lookup reports two stored records and returns the exact snapshot installed in the shared statistics manager cache |
+| `TestMetadataManagerStatisticsPreservesRefreshFailure` | A failed refresh returns no partial snapshot, preserves refresh and facade context, counts the lookup, and leaves the cache empty |

@@ -396,3 +396,69 @@ func TestMetadataManagerIndexInfoPreservesCatalogReadError(t *testing.T) {
 		}
 	}
 }
+
+func TestMetadataManagerStatisticsReturnsSharedManagerSnapshot(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	if err := manager.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+	layout := record.NewLayout(&schema)
+	scan, err := record.NewTableScan(transaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	for sid := int32(1); sid <= 2; sid++ {
+		if err := scan.Insert(); err != nil {
+			t.Fatalf("Insert(%d) error = %v", sid, err)
+		}
+		if err := scan.SetInt("sid", sid); err != nil {
+			t.Fatalf("SetInt(%d) error = %v", sid, err)
+		}
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	stats, err := manager.Statistics("student", layout, transaction)
+	if err != nil {
+		t.Fatalf("Statistics() error = %v", err)
+	}
+	if stats.RecordsOutput() != 2 || manager.stats.stats["student"] != stats {
+		t.Fatalf("statistics = %p (%d records), want shared cached two-record snapshot", stats, stats.RecordsOutput())
+	}
+}
+
+func TestMetadataManagerStatisticsPreservesRefreshFailure(t *testing.T) {
+	statsManager := NewStatManager(nil)
+	statsManager.calls = 100
+	manager := &MetadataManager{stats: statsManager}
+
+	stats, err := manager.Statistics("student", nil, nil)
+	if stats != nil {
+		t.Errorf("Statistics() stats = %v, want nil on refresh failure", stats)
+	}
+	if err == nil {
+		t.Fatal("Statistics() error = nil, want wrapped refresh failure")
+	}
+	for _, context := range []string{
+		`look up statistics for table "student" through metadata manager`,
+		"refresh table statistics",
+		"table manager is nil",
+	} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Statistics() error = %q, want context %q", err, context)
+		}
+	}
+	if statsManager.calls != 101 {
+		t.Errorf("statistics lookup calls = %d, want 101", statsManager.calls)
+	}
+	if len(statsManager.stats) != 0 {
+		t.Errorf("statistics cache = %v, want empty cache after refresh failure", statsManager.stats)
+	}
+}
