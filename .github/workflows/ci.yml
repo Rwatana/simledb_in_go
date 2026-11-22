@@ -137,9 +137,19 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Test
+      - name: Test and measure statement coverage
         if: steps.module.outputs.exists == 'true'
-        run: go test ./...
+        run: go test ./... -coverprofile=coverage.out
+
+      - name: Report statement coverage
+        if: steps.module.outputs.exists == 'true'
+        run: |
+          coverage=$(go tool cover -func=coverage.out | awk '$1 == "total:" { print $3 }')
+          if [[ -z "$coverage" ]]; then
+            echo "Could not read total statement coverage from coverage.out."
+            exit 1
+          fi
+          echo "Go statement coverage: **$coverage**" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Vet
         if: steps.module.outputs.exists == 'true'
