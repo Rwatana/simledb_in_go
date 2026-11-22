@@ -14,19 +14,21 @@ import (
 )
 
 type catalogTransaction struct {
-	pages        map[storage.BlockID]*storage.Page
-	blockSize    int
-	pins         []storage.BlockID
-	unpins       []storage.BlockID
-	appendCalls  []string
-	sizeErr      error
-	sizeErrFile  string
-	sizeErrAfter int
-	sizeErrCalls int
-	setStringErr error
-	setIntErr    error
-	setIntOffset int32
-	unpinErr     error
+	pages             map[storage.BlockID]*storage.Page
+	blockSize         int
+	pins              []storage.BlockID
+	unpins            []storage.BlockID
+	appendCalls       []string
+	sizeErr           error
+	sizeErrFile       string
+	sizeErrAfter      int
+	sizeErrCalls      int
+	setStringErr      error
+	setIntErr         error
+	setIntOffset      int32
+	setIntErrAfter    int
+	setIntOffsetCalls int
+	unpinErr          error
 }
 
 func newCatalogTransaction(t *testing.T, blockSize int) *catalogTransaction {
@@ -107,7 +109,10 @@ func (t *catalogTransaction) GetString(block storage.BlockID, offset int) (strin
 
 func (t *catalogTransaction) SetInt(block storage.BlockID, offset int32, value int32, _ bool) error {
 	if t.setIntErr != nil && offset == t.setIntOffset {
-		return t.setIntErr
+		t.setIntOffsetCalls++
+		if t.setIntErrAfter == 0 || t.setIntOffsetCalls == t.setIntErrAfter {
+			return t.setIntErr
+		}
 	}
 	return t.pages[block].SetInt(int(offset), value)
 }
@@ -390,6 +395,42 @@ func TestTableManagerCreateTablePreservesTableCatalogInsertFailure(t *testing.T)
 	}
 	if len(transaction.appendCalls) != 0 {
 		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+}
+
+func TestTableManagerCreateTablePreservesFieldCatalogInsertFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	insertErr := errors.New("field catalog row insert failed")
+	transaction.setIntErr = insertErr
+	transaction.setIntOffset = 0
+	transaction.setIntErrAfter = 2
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, insertErr) {
+		t.Fatalf("CreateTable() error = %v, want field catalog insert cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `insert field catalog row for "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+	if got, err := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)].GetInt(0); err != nil || got != 0 {
+		t.Fatalf("fldcat occupancy = (%d, %v), want (0, nil)", got, err)
 	}
 }
 
