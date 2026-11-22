@@ -99,6 +99,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | `TestNewManagerLoadsExistingTailWithoutAppending` | reopen時にtailをloadしblockを増やさない |
 | `TestNewManagerRejectsInvalidInitialization` | boundaryを格納できないblock sizeとinvalid pathを拒否する |
 | `TestNewManagerRejectsBlockSizeOutsideBoundaryCapacity` | 64-bitで4-byte boundaryを超えるblock sizeを早期拒否しfileを作らない |
+| `TestNewManagerRejectsNilFileManager` | nil FileManagerをfile-specific errorで拒否する |
 
 ## Javaソースリーディング
 

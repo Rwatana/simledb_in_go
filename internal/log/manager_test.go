@@ -134,3 +134,15 @@ func TestNewManagerRejectsBlockSizeOutsideBoundaryCapacity(t *testing.T) {
 		t.Errorf("oversized log file stat error = %v, want no file created", statErr)
 	}
 }
+
+func TestNewManagerRejectsNilFileManager(t *testing.T) {
+	t.Parallel()
+
+	manager, err := logmanager.NewManager(nil, "simpledb.log")
+	if manager != nil {
+		t.Errorf("NewManager() manager = %v, want nil", manager)
+	}
+	if err == nil || !strings.Contains(err.Error(), `"simpledb.log"`) || !strings.Contains(err.Error(), "file manager must not be nil") {
+		t.Errorf("NewManager() error = %v, want file-specific nil dependency context", err)
+	}
+}
