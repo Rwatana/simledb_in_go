@@ -921,6 +921,56 @@ func TestTableManagerLayoutPreservesFieldOwnerTableNameReadFailure(t *testing.T)
 	}
 }
 
+func TestTableManagerLayoutPreservesFieldNameReadFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	manager := NewTableManager()
+	fldNameOffset, _ := manager.fieldCatalogLayout.Offset("fldname")
+	slotSizeOffset, _ := manager.tableCatalogLayout.Offset("slotsize")
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	if err := tablePage.SetInt(0, 1); err != nil {
+		t.Fatalf("mark tblcat row occupied: %v", err)
+	}
+	if err := tablePage.SetBytes(4, []byte("student")); err != nil {
+		t.Fatalf("store tblcat table name: %v", err)
+	}
+	if err := tablePage.SetInt(slotSizeOffset, 128); err != nil {
+		t.Fatalf("store tblcat slot size: %v", err)
+	}
+	fieldPage := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)]
+	if err := fieldPage.SetInt(0, 1); err != nil {
+		t.Fatalf("mark fldcat row occupied: %v", err)
+	}
+	if err := fieldPage.SetBytes(4, []byte("student")); err != nil {
+		t.Fatalf("store fldcat owner table name: %v", err)
+	}
+	readErr := errors.New("field catalog name read failed")
+	transaction.getStringErr = readErr
+	transaction.getStringOffset = fldNameOffset
+
+	layout, err := manager.Layout("student", transaction)
+	if layout != nil || !errors.Is(err, readErr) {
+		t.Fatalf("Layout() = (%v, %v), want field-name read cause", layout, err)
+	}
+	for _, context := range []string{"student", "field catalog", "read field name"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("Layout() error = %q, want context %q", err, context)
+		}
+	}
+	wantBlocks := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if got, want := transaction.pins, wantBlocks; !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins = %v, want %v", got, want)
+	}
+	if got, want := transaction.unpins, wantBlocks; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unpins = %v, want %v", got, want)
+	}
+	if got, want := transaction.getStringCalls, 3; got != want {
+		t.Fatalf("string reads = %d, want %d", got, want)
+	}
+}
+
 func TestTableManagerLayoutPreservesTableCatalogSlotSizeReadFailure(t *testing.T) {
 	transaction := newCatalogTransaction(t, 512)
 	readErr := errors.New("table catalog slot-size read failed")
