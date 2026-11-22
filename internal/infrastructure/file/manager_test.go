@@ -270,6 +270,29 @@ func TestManagerWritePreservesBlockOpenFailure(t *testing.T) {
 	}
 }
 
+func TestManagerLengthPreservesStatFailure(t *testing.T) {
+	t.Parallel()
+
+	const fileName = "loop.tbl"
+	directory := filepath.Join(t.TempDir(), "database")
+	manager := newManager(t, directory, 16)
+	path := filepath.Join(directory, fileName)
+	if err := os.Symlink(fileName, path); err != nil {
+		t.Fatalf("Symlink(%q, %q) error = %v", fileName, path, err)
+	}
+
+	length, err := manager.Length(fileName)
+	if length != 0 {
+		t.Errorf("Length(%q) = %d, want zero on stat failure", fileName, length)
+	}
+	if err == nil || !errors.Is(err, syscall.ELOOP) {
+		t.Fatalf("Length(%q) error = %v, want an ELOOP cause", fileName, err)
+	}
+	if !strings.Contains(err.Error(), fileName) {
+		t.Errorf("Length(%q) error = %q, want filename context", fileName, err)
+	}
+}
+
 func TestManagerAppendsZeroFilledBlocksAndReportsLength(t *testing.T) {
 	t.Parallel()
 
