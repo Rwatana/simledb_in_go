@@ -709,6 +709,14 @@ ok github.com/Rwatana/simledb_in_go/internal/buffer
 | --- | --- |
 | `TestNewCreatesAnUnassignedZeroFilledFrame` | capacity、zero-fill、unassigned Block、contents access |
 | `TestNewRejectsNilDependencies` | FileManager/LogManager dependency validation |
+| `TestNewRejectsZeroSizedFileManager` | zero-value FileManagerからinvalid zero-capacity Pageを作らない |
+| `TestNewWithPageFactoryPreservesPageCreationError` | Page allocation failureのerror causeとconstructor context |
+
+#### Regression check
+
+`TestNewRejectsZeroSizedFileManager`は実装前に、zero-value FileManagerとvalidなLogManagerを組み合わせて追加した。
+Redでは`buffer.New`がcapacity 0のPageを持つBufferとnil errorを返し、constructorが無効な依存を受け入れていることを確認した。
+block size 0を明示的に拒否するようにし、positive block sizeとPage factory errorの経路もそれぞれ検証した。
 
 ## Javaソースリーディング
 
@@ -716,16 +724,17 @@ ok github.com/Rwatana/simledb_in_go/internal/buffer
 
 | Java | Go | 判断 |
 | --- | --- | --- |
-| `new Page(fm.blockSize())` | `storage.NewPage(files.BlockSize())` | file blockと同じfixed capacityを使う |
+| `new Page(fm.blockSize())` | `storage.NewPage(files.BlockSize())` | positiveなfile blockと同じfixed capacityを使う |
 | `BlockId blk = null` | optional `*storage.BlockID` | unassigned stateをzero-value BlockIDと混同しない |
 | `contents()` | `Contents()` | 上位layerがPageを更新できるmutable reference |
 | `block()`がnullable | `(BlockID, bool)` | nilをpublic APIへ漏らさない |
-| constructor dependency無検査 | nil error | setup failureを早く明示する |
+| constructor dependency無検査 | nil/invalid block size error | setup failureを早く明示する |
 
 ## Clean Architecture上の判断
 
 BufferはPageとBlockIDというstorage valueを所有し、外側のFileManager/LogManagerを後続のI/O use case用に
-参照する。初期化PRでは依存を保存するだけでI/Oを行わず、frame stateとallocation policyを分離する。
+参照する。初期化ではI/Oを行わず、zero-value FileManagerが報告するblock size 0を拒否して
+zero-capacity frameを作らない。Page factory errorはinternal seamで注入し、causeとcontextの伝播を検証する。
 
 ## 意図的に含めなかったもの
 

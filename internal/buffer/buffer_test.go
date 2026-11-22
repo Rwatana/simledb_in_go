@@ -3,6 +3,7 @@ package buffer_test
 import (
 	"bytes"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	buffer "github.com/Rwatana/simledb_in_go/internal/buffer"
@@ -66,4 +67,22 @@ func newDependencies(t *testing.T, blockSize int) (*storagefile.Manager, *logman
 		t.Fatalf("log.NewManager() error = %v", err)
 	}
 	return files, logs
+}
+
+func TestNewRejectsZeroSizedFileManager(t *testing.T) {
+	t.Parallel()
+
+	files := &storagefile.Manager{}
+	_, logs := newDependencies(t, 32)
+
+	frame, err := buffer.New(files, logs)
+	if err == nil {
+		t.Fatalf("buffer.New() = (%v, nil), want invalid block-size error", frame)
+	}
+	if frame != nil {
+		t.Errorf("buffer.New() frame = %v, want nil on invalid block size", frame)
+	}
+	if !strings.Contains(err.Error(), "block size") {
+		t.Errorf("buffer.New() error = %v, want block-size context", err)
+	}
 }

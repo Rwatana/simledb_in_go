@@ -27,13 +27,21 @@ type Buffer struct {
 
 // New returns a zero-filled Buffer that is not assigned to a disk block.
 func New(files *storagefile.Manager, logs *logmanager.Manager) (*Buffer, error) {
+	return newWithPageFactory(files, logs, storage.NewPage)
+}
+
+func newWithPageFactory(files *storagefile.Manager, logs *logmanager.Manager, newPage func(int) (*storage.Page, error)) (*Buffer, error) {
 	if files == nil {
 		return nil, fmt.Errorf("create buffer: file manager must not be nil")
 	}
 	if logs == nil {
 		return nil, fmt.Errorf("create buffer: log manager must not be nil")
 	}
-	contents, err := storage.NewPage(files.BlockSize())
+	blockSize := files.BlockSize()
+	if blockSize <= 0 {
+		return nil, fmt.Errorf("create buffer: file manager block size %d must be positive", blockSize)
+	}
+	contents, err := newPage(blockSize)
 	if err != nil {
 		return nil, fmt.Errorf("create buffer contents: %w", err)
 	}
