@@ -509,3 +509,21 @@ The test first failed to compile because `NewIndexManager` did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestNewIndexManagerRetainsMetadataDependencies` | Construction preserves the supplied table and statistics manager identities without requiring a transaction |
+
+## Feature 27: Register the index catalog
+
+`IndexManager.InitializeCatalog` registers `idxcat` through the retained table manager and the independently tested
+`NewIndexCatalogSchema`. `TableManager.CreateTable` persists one table-catalog row plus the `indexname`, `tablename`,
+and `fieldname` field rows in schema order, without opening or modifying any concrete index.
+
+This maps the new-database branch of Java `IndexMgr` while keeping startup policy outside the manager constructor. A
+missing table manager and catalog failures return contextual errors rather than producing a later nil dereference.
+
+### Test-first record
+
+The tests first failed to compile because `IndexManager.InitializeCatalog` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestIndexManagerInitializeCatalogRegistersIndexMetadata` | Registration stores the `idxcat` table row and its three ordered field rows without appending an index data block |
+| `TestIndexManagerInitializeCatalogRejectsMissingTableManager` | Registration reports a missing table-manager dependency instead of panicking |
