@@ -3,7 +3,9 @@ package metadata
 import (
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -183,6 +185,35 @@ func TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess(t *testi
 		if !strings.Contains(err.Error(), context) {
 			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
 		}
+	}
+}
+
+func TestMetadataIntegerPreservesInt32Bounds(t *testing.T) {
+	for _, value := range []int{math.MinInt32, math.MaxInt32} {
+		got, err := metadataInteger("slot size", value)
+		if err != nil || got != int32(value) {
+			t.Errorf("metadataInteger(%d) = (%d, %v), want (%d, nil)", value, got, err, int32(value))
+		}
+	}
+}
+
+func TestMetadataIntegerRejectsValuesOutsideInt32(t *testing.T) {
+	if strconv.IntSize < 64 {
+		t.Skip("int cannot represent values outside the int32 range on this platform")
+	}
+
+	below := int(int64(math.MinInt32) - 1)
+	above := int(int64(math.MaxInt32) + 1)
+	for _, value := range []int{below, above} {
+		t.Run(strconv.Itoa(value), func(t *testing.T) {
+			got, err := metadataInteger("slot size", value)
+			if got != 0 || err == nil {
+				t.Fatalf("metadataInteger(%d) = (%d, %v), want (0, range error)", value, got, err)
+			}
+			if want := fmt.Sprintf("slot size %d exceeds int32 range", value); err.Error() != want {
+				t.Fatalf("metadataInteger(%d) error = %q, want %q", value, err, want)
+			}
+		})
 	}
 }
 
