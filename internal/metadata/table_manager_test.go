@@ -476,6 +476,43 @@ func TestTableManagerCreateTablePreservesFieldCatalogTableNameWriteFailure(t *te
 	}
 }
 
+func TestTableManagerCreateTablePreservesFieldCatalogLengthWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("field catalog length write failed")
+	manager := NewTableManager()
+	lengthOffset, _ := manager.fieldCatalogLayout.Offset("length")
+	transaction.setIntErr = writeErr
+	transaction.setIntOffset = int32(lengthOffset)
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := manager.CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want fldcat length write cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `store field length for "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if transaction.setIntCalls != 5 {
+		t.Fatalf("integer writes = %d, want stop at the field-length write", transaction.setIntCalls)
+	}
+	if transaction.setStringCalls != 3 {
+		t.Fatalf("string writes = %d, want table name, field table name, and field name", transaction.setStringCalls)
+	}
+}
+
 func TestTableManagerCreateTablePreservesFieldCatalogTypeWriteFailure(t *testing.T) {
 	transaction := newCatalogTransaction(t, 512)
 	writeErr := errors.New("field catalog type write failed")
