@@ -154,3 +154,12 @@ and unset expressions safely produce false for field-bearing or unset terms, whi
 
 `TestTermAppliesToSchema` first failed because `AppliesTo` was undefined. It covers two present fields, a missing field
 on either side, field/literal and literal/literal terms, nil schemas, empty field names, and an unset expression.
+
+## Feature 15: Format query expressions as text
+
+`Expression.String` maps to Java `Expression.toString`. It delegates literal rendering to `Constant.String` and returns
+field names unchanged. The Go zero value renders as `<unset-expression>` as a diagnostic for an expression form that
+Java's constructors do not create. Rendering does not perform scan or schema access and does not quote SQL text.
+
+`TestExpressionString` first failed because `Expression.String` was undefined. It covers integer and string literals,
+empty text, field names, and the unset placeholder.
