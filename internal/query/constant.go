@@ -1,6 +1,9 @@
 package query
 
-import "cmp"
+import (
+	"cmp"
+	"strconv"
+)
 
 type constantKind uint8
 
@@ -61,5 +64,18 @@ func (constant Constant) Compare(other Constant) (int, bool) {
 		return cmp.Compare(constant.str, other.str), true
 	default:
 		return 0, false
+	}
+}
+
+// String renders the constant as decimal text or as its original string.
+// An unset constant renders as "<unset>".
+func (constant Constant) String() string {
+	switch constant.kind {
+	case intConstantKind:
+		return strconv.FormatInt(int64(constant.integer), 10)
+	case stringConstantKind:
+		return constant.str
+	default:
+		return "<unset>"
 	}
 }
