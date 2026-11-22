@@ -1133,6 +1133,7 @@ first. The initial build failed because `LockExclusive` and the local exclusive 
 | Test | Observable behavior |
 | --- | --- |
 | `TestManagerUpgradesTransactionLockToExclusiveOnce` | A transaction establishes and upgrades one block exactly once while retaining a different shared block |
+| `TestManagerPreservesSharedLockAfterExclusiveUpgradeFailure` | A failed global upgrade returns its error and preserves the transaction's existing shared mode |
 
 This maps to Java `ConcurrencyMgr.xLock`: obtain shared ownership if necessary, upgrade through the global table, then
 replace the local `S` marker with `X`. Go keeps error propagation explicit and does not update local ownership after a

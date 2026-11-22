@@ -22,6 +22,20 @@ func (t *failingSharedWaitTable) WaitShared(block storage.BlockID) error {
 func (t *failingSharedWaitTable) WaitExclusive(storage.BlockID) error { return nil }
 func (t *failingSharedWaitTable) Unlock(storage.BlockID)              {}
 
+type failingExclusiveWaitTable struct {
+	err   error
+	block storage.BlockID
+	calls int
+}
+
+func (t *failingExclusiveWaitTable) WaitShared(storage.BlockID) error { return nil }
+func (t *failingExclusiveWaitTable) WaitExclusive(block storage.BlockID) error {
+	t.calls++
+	t.block = block
+	return t.err
+}
+func (t *failingExclusiveWaitTable) Unlock(storage.BlockID) {}
+
 func TestManagerReusesTransactionSharedLock(t *testing.T) {
 	var table LockTable
 	manager := NewManager(&table)
@@ -66,6 +80,23 @@ func TestManagerDoesNotRecordSharedLockAfterTableFailure(t *testing.T) {
 	}
 	if table.calls != 1 || table.block != block {
 		t.Fatalf("WaitShared() calls/block = %d/%v, want 1/%v", table.calls, table.block, block)
+	}
+}
+
+func TestManagerPreservesSharedLockAfterExclusiveUpgradeFailure(t *testing.T) {
+	wantErr := errors.New("exclusive upgrade unavailable")
+	table := &failingExclusiveWaitTable{err: wantErr}
+	manager := &Manager{table: table, locks: make(map[storage.BlockID]lockMode)}
+	block := storage.NewBlockID("tbl", 8)
+
+	if err := manager.LockExclusive(block); !errors.Is(err, wantErr) {
+		t.Fatalf("LockExclusive() error = %v, want %v", err, wantErr)
+	}
+	if got := manager.locks[block]; got != sharedLock {
+		t.Fatalf("transaction-local lock = %v, want shared after failed upgrade", got)
+	}
+	if table.calls != 1 || table.block != block {
+		t.Fatalf("WaitExclusive() calls/block = %d/%v, want 1/%v", table.calls, table.block, block)
 	}
 }
 

@@ -3,8 +3,8 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint for PR #581, the full-module statement coverage is **94.1%** (rounded to one
-decimal place). Package coverage is buffer 100.0%, concurrency 93.8%, file 96.9%, log 82.4%, metadata 86.9%, query
+At the 2026-11-23 checkpoint for PR #583, the full-module statement coverage is **94.2%** (rounded to one
+decimal place). Package coverage is buffer 100.0%, concurrency 94.7%, file 96.9%, log 82.4%, metadata 86.9%, query
 100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 91.3%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
 both catalog-initialization failure paths, table- and field-catalog row insertion, field-catalog table-name,
@@ -16,10 +16,11 @@ The audit also found and fixed a real metadata integrity defect: negative varcha
 catalog row is written. Remaining
 uncovered statements are being inspected by package and behavior rather than hidden behind a premature gate.
 
-The transaction lock-manager test also injects a shared-wait error through its narrow internal table interface and
-verifies the error is returned without recording failed local ownership; the public constructor still accepts the
-concrete `*LockTable`. `Manager.LockShared` is now fully covered, while the overall module remains at 94.1% and the
-remaining concurrency paths are being handled as separate observable behaviors.
+The transaction lock-manager tests inject shared-wait and exclusive-upgrade errors through its narrow internal table
+interface. They verify failed shared acquisition is not recorded, and a failed upgrade preserves only shared local
+ownership; the public constructor still accepts the concrete `*LockTable`. `Manager.LockShared` is fully covered and
+`Manager.LockExclusive` is 87.5% covered; the overall module is 94.2% while remaining concurrency paths are handled as
+separate observable behaviors.
 
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
