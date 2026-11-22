@@ -39,3 +39,9 @@ func (constant Constant) AsString() (string, bool) {
 	}
 	return constant.str, true
 }
+
+// Equal reports whether both constants hold the same value of the same kind.
+// An unset constant never matches.
+func (constant Constant) Equal(other Constant) bool {
+	return constant.kind != 0 && constant == other
+}
