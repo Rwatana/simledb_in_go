@@ -89,8 +89,8 @@ table name, field name, logical type, conceptual length, and derived physical of
 
 The Go implementation opens and closes the two catalog scans independently. Every write and close failure receives
 catalog, table, and field context; if an operation and cleanup both fail, `errors.Join` preserves both causes. Integer
-metadata is range-checked before conversion to the catalogs' four-byte representation. A nil schema is rejected before
-any catalog I/O.
+metadata is range-checked before conversion to the catalogs' four-byte representation. Nil schemas and negative varchar
+lengths are rejected before any catalog I/O, preventing malformed metadata from leaving a partially written table row.
 
 This behavior assumes the catalog tables already exist. New-database catalog creation, duplicate-name policy, and DDL
 rollback remain separate concerns.
@@ -106,6 +106,8 @@ not exist.
 | `TestTableManagerCreateTablePreservesOperationAndCloseFailures` | A catalog write failure still closes its scan, preserves both causes when cleanup also fails, and stops before the next catalog |
 | `TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess` | A nil schema returns table-specific context before a nil transaction can be touched |
 | `TestTableManagerCreateTableRejectsUnencodableSlotSizeBeforeTransactionAccess` | An oversized schema returns the catalog's signed-32-bit range error before touching a nil transaction |
+| `TestTableManagerCreateTableRejectsOutOfRangeFieldLengthBeforeTransactionAccess` | An unencodable varchar length returns field-specific range context before touching a nil transaction |
+| `TestTableManagerCreateTableRejectsInvalidFieldMetadataBeforeCatalogWrites` | A negative varchar length returns contextual validation before any catalog scan or table row is written |
 | `TestTableManagerCreateTableReportsCloseFailureAfterSuccessfulTableWrite` | A successful catalog write still reports a scan-close failure and prevents the next catalog from opening |
 | `TestTableManagerCreateTablePreservesCatalogScanOpenFailure` | A catalog file-size error retains its cause and open-scan context before any pin or write |
 | `TestMetadataIntegerPreservesInt32Bounds` | The smallest and largest signed 32-bit values remain representable in catalog metadata |
