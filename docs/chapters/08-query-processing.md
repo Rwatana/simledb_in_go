@@ -180,3 +180,12 @@ needed for this case. Evaluation returns true without consulting the scan and th
 
 `TestEmptyPredicateIsTrueWithoutScanAccess` first failed because `Predicate` did not exist. It verifies true for both
 nil and instrumented scans and confirms that no value lookup occurs.
+
+## Feature 18: Evaluate a single-term predicate
+
+`NewPredicateWithTerm` maps to Java `Predicate(Term)`. `Predicate.IsSatisfied` delegates to the sole contained term and
+returns its boolean result or scan error unchanged. The predicate retains slice-backed storage for the later
+conjunction behavior; its zero value remains the empty true predicate from the prior feature.
+
+The tests first failed because the constructor did not exist. They cover a satisfied field comparison, an unsatisfied
+literal comparison, scan lookup order, and unchanged term error propagation.
