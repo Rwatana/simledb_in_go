@@ -1,5 +1,7 @@
 package query
 
+import "github.com/Rwatana/simledb_in_go/internal/record"
+
 // Term compares two expressions for equality.
 type Term struct {
 	lhs Expression
@@ -51,4 +53,9 @@ func (term Term) EquatesWithField(fieldName string) (string, bool) {
 		return lhsField, true
 	}
 	return "", false
+}
+
+// AppliesTo reports whether both expressions in this term apply to schema.
+func (term Term) AppliesTo(schema *record.Schema) bool {
+	return term.lhs.AppliesTo(schema) && term.rhs.AppliesTo(schema)
 }

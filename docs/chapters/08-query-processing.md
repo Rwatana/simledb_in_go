@@ -144,3 +144,12 @@ return `("", false)`.
 
 `TestTermEquatesWithField` first failed because the method was undefined. It covers both operand orders, an empty
 field name, and non-matching terms.
+
+## Feature 14: Check whether a query term applies to a schema
+
+`Term.AppliesTo` maps to Java `Term.appliesTo(Schema)`. A term applies only when both expressions apply, reusing
+`Expression.AppliesTo` for literal and field-reference behavior. The Go method accepts `*record.Schema`; nil schemas
+and unset expressions safely produce false for field-bearing or unset terms, while a literal-to-literal term applies.
+
+`TestTermAppliesToSchema` first failed because `AppliesTo` was undefined. It covers two present fields, a missing field
+on either side, field/literal and literal/literal terms, nil schemas, empty field names, and an unset expression.
