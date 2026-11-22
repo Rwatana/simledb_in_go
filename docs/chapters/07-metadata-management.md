@@ -194,6 +194,7 @@ The tests first failed to compile because `TableManager.Layout` did not exist.
 | `TestTableManagerLayoutRejectsDuplicateFieldMetadata` | Repeated field names in valid rows are rejected with table/field context and both scans close |
 | `TestTableManagerLayoutPreservesFieldTypeReadFailure` | A type read error retains its cause and field context, closes both scans, and stops before length/offset reads |
 | `TestTableManagerLayoutRejectsInvalidFieldType` | An unsupported stored type returns table/field context, closes both scans, and stops before length/offset reads |
+| `TestTableManagerLayoutPreservesFieldLengthReadFailure` | A length read error retains cause/context, closes both scans, and stops before the offset read |
 | `TestTableManagerLayoutPreservesRegisteredTableNameReadFailure` | A tblcat table-name read error keeps context, closes the table catalog, and stops before fldcat |
 | `TestTableManagerLayoutPreservesTableCatalogScanFailure` | A tblcat occupancy read failure keeps scan context, closes the table catalog, and stops before fldcat |
 | `TestTableManagerLayoutPreservesTableCatalogSlotSizeReadFailure` | A matching tblcat slot-size read error keeps context, closes the table catalog, and stops before fldcat |
