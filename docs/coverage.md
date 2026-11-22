@@ -3,11 +3,12 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint after PR #488, the full-module statement coverage is **91.6%** (rounded to one
-decimal place). Package coverage is buffer 99.1%, concurrency 92.9%, file 85.3%, log 78.2%, metadata 79.3%, query
+At the 2026-11-23 checkpoint after PR #490, the full-module statement coverage is **91.7%** (rounded to one
+decimal place). Package coverage is buffer 99.1%, concurrency 92.9%, file 85.3%, log 78.2%, metadata 79.5%, query
 100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 90.8%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
-both catalog-initialization failure paths, oversized table-layout rejection, and out-of-range field-length rejection.
+both catalog-initialization failure paths, table slot-size write failure, oversized table-layout rejection, and
+out-of-range field-length rejection.
 The audit also found and fixed a real metadata integrity defect: negative varchar lengths are now rejected before any
 catalog row is written. Remaining
 uncovered statements are being inspected by package and behavior rather than hidden behind a premature gate.

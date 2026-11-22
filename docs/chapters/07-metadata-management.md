@@ -104,6 +104,7 @@ not exist.
 | --- | --- |
 | `TestTableManagerCreateTableStoresCatalogRows` | One table row and declaration-ordered field rows retain the schema's logical and derived physical metadata, and both scans close |
 | `TestTableManagerCreateTablePreservesOperationAndCloseFailures` | A catalog write failure still closes its scan, preserves both causes when cleanup also fails, and stops before the next catalog |
+| `TestTableManagerCreateTablePreservesTableSlotSizeWriteFailure` | A slot-size write error retains its cause and context, closes the table scan, and stops before the field catalog |
 | `TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess` | A nil schema returns table-specific context before a nil transaction can be touched |
 | `TestTableManagerCreateTableRejectsUnencodableSlotSizeBeforeTransactionAccess` | An oversized schema returns the catalog's signed-32-bit range error before touching a nil transaction |
 | `TestTableManagerCreateTableRejectsOutOfRangeFieldLengthBeforeTransactionAccess` | An unencodable varchar length returns field-specific range context before touching a nil transaction |

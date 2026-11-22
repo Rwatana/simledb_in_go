@@ -24,6 +24,8 @@ type catalogTransaction struct {
 	sizeErrAfter int
 	sizeErrCalls int
 	setStringErr error
+	setIntErr    error
+	setIntOffset int32
 	unpinErr     error
 }
 
@@ -104,6 +106,9 @@ func (t *catalogTransaction) GetString(block storage.BlockID, offset int) (strin
 }
 
 func (t *catalogTransaction) SetInt(block storage.BlockID, offset int32, value int32, _ bool) error {
+	if t.setIntErr != nil && offset == t.setIntOffset {
+		return t.setIntErr
+	}
 	return t.pages[block].SetInt(int(offset), value)
 }
 
@@ -358,6 +363,31 @@ func TestTableManagerCreateTablePreservesOperationAndCloseFailures(t *testing.T)
 	}
 	if got, want := transaction.unpins, []storage.BlockID{storage.NewBlockID("tblcat.tbl", 0)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("unpins = %v, want %v", got, want)
+	}
+}
+
+func TestTableManagerCreateTablePreservesTableSlotSizeWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("integer metadata write failed")
+	transaction.setIntErr = writeErr
+	transaction.setIntOffset = 72
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want slot-size write cause", err)
+	}
+	for _, context := range []string{"student", "table catalog", "store table slot size"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	if got, want := transaction.pins, []storage.BlockID{storage.NewBlockID("tblcat.tbl", 0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins = %v, want %v", got, want)
+	}
+	if !reflect.DeepEqual(transaction.unpins, transaction.pins) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, transaction.pins)
 	}
 }
 
