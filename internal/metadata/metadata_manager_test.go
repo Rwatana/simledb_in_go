@@ -76,3 +76,28 @@ func TestMetadataManagerCreateTableStoresSchemaThroughFacade(t *testing.T) {
 		t.Fatalf("student fields = %v, want %v", got, want)
 	}
 }
+
+func TestMetadataManagerLayoutReconstructsTableThroughFacade(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	schema.AddVarcharField("sname", 20)
+	if err := manager.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+
+	layout, err := manager.Layout("student", transaction)
+	if err != nil {
+		t.Fatalf("Layout() error = %v", err)
+	}
+	if got, want := layout.Schema().Fields(), []string{"sid", "sname"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("fields = %v, want %v", got, want)
+	}
+	if got, want := layout.SlotSize(), record.NewLayout(&schema).SlotSize(); got != want {
+		t.Fatalf("slot size = %d, want %d", got, want)
+	}
+}
