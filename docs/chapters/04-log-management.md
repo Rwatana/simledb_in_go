@@ -626,6 +626,10 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | --- | --- |
 | `TestIteratorFlushesTheCurrentTailBeforeSnapshot` | saved LSN、disk/current Page一致、iterator作成成功 |
 | `TestIteratorTraversesPreviousBlocksNewestToOldest` | current blockもflushされた状態でcross-block orderを維持 |
+| `TestIteratorRejectsInvalidCurrentBlockBoundary` | current snapshotのboundaryが範囲外ならblock contextを返し、disk tailは未変更 |
+
+coverage auditでは、初期tail pageのboundaryをmemory上で破損させ、`blockBoundary`の現current block検証も確認する。
+recordがなくsaved LSNも0のため不要なflushを行わず、エラー時にiteratorを返さない。
 
 ## Javaソースリーディング
 

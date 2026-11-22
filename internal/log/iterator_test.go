@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -84,5 +85,37 @@ func TestIteratorSnapshotsReturnedRecordsAndEmptyTail(t *testing.T) {
 	}
 	if !bytes.Equal(second, want) {
 		t.Errorf("second iterator record = %v, want independent copy %v", second, want)
+	}
+}
+
+func TestIteratorRejectsInvalidCurrentBlockBoundary(t *testing.T) {
+	manager, files := newLogManager(t, 64)
+	if err := manager.page.SetInt(0, 3); err != nil {
+		t.Fatalf("SetInt(boundary) error = %v", err)
+	}
+
+	iterator, err := manager.Iterator()
+	if iterator != nil {
+		t.Errorf("Iterator() = %v, want nil when the current boundary is invalid", iterator)
+	}
+	if err == nil {
+		t.Fatal("Iterator() error = nil, want invalid boundary error")
+	}
+	for _, context := range []string{manager.block.String(), "boundary 3", "[4, 64]"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Iterator() error = %q, want context %q", err, context)
+		}
+	}
+
+	disk, err := files.Read(manager.block)
+	if err != nil {
+		t.Fatalf("Read(current block) error = %v", err)
+	}
+	diskBoundary, err := disk.GetInt(0)
+	if err != nil {
+		t.Fatalf("GetInt(disk boundary) error = %v", err)
+	}
+	if diskBoundary != 64 {
+		t.Errorf("disk boundary = %d, want unchanged initial boundary 64", diskBoundary)
 	}
 }

@@ -3,8 +3,8 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint for PR #571, the full-module statement coverage is **93.9%** (rounded to one
-decimal place). Package coverage is buffer 100.0%, concurrency 92.9%, file 96.9%, log 81.5%, metadata 86.1%, query
+At the 2026-11-23 checkpoint for PR #573, the full-module statement coverage is **93.9%** (rounded to one
+decimal place). Package coverage is buffer 100.0%, concurrency 92.9%, file 96.9%, log 82.4%, metadata 86.1%, query
 100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 91.3%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
 both catalog-initialization failure paths, table- and field-catalog row insertion, field-catalog table-name,
@@ -16,7 +16,9 @@ The audit also found and fixed a real metadata integrity defect: negative varcha
 catalog row is written. Remaining
 uncovered statements are being inspected by package and behavior rather than hidden behind a premature gate.
 
-The CI step reports coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
+The current-block iterator boundary test also covers the error returned when an in-memory log-page boundary is outside
+the valid range, while confirming no iterator is returned and the durable tail is unchanged. The CI step reports
+coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
 
 For a local full-module measurement, run:
