@@ -178,7 +178,11 @@ func (m *Manager) blocksForSize(fileName string, size int64) (int, error) {
 		return 0, fmt.Errorf("database file %q size %d is not a multiple of block size %d", fileName, size, m.blockSize)
 	}
 	blocks := size / int64(m.blockSize)
-	if blocks > int64(math.MaxInt) {
+	return blockCountToInt(fileName, blocks, int64(math.MaxInt))
+}
+
+func blockCountToInt(fileName string, blocks, maxInt int64) (int, error) {
+	if blocks > maxInt {
 		return 0, fmt.Errorf("database file %q has %d blocks, exceeding platform int capacity", fileName, blocks)
 	}
 	return int(blocks), nil

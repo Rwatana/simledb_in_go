@@ -356,10 +356,12 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | `TestManagerWritePreservesBlockOpenFailure` | block fileがdirectoryの場合のopen error cause/contextを保ち、directoryを残す |
 | `TestManagerWritePreservesFIFOWriteFailure` | Unix FIFOへの位置指定write失敗で`ESPIPE`、block/offset、byte数を保持する |
 | `TestManagerRejectsInvalidBlockAccess` | 負数、overflow、size不一致、`io.EOF`を伴う15/16 byteのshort read、path traversalのerror |
+| `TestBlockCountToIntEnforcesPlatformLimit` | 32-bit相当のint上限でblock countを受理・拒否する境界 |
 | `TestNewPageFromBytesCopiesContents` | diskから渡されたsliceをPage内部と共有しない |
 
 `os.File.ReadAt`と`WriteAt`は、それぞれ短い読み書きに対してerrorを返す。partial blockは`io.EOF`を、FIFOへの位置指定writeは`ESPIPE`を返すため、そのerrorとbyte数を保持する。
 errorがnilの後に短いcountを再検査するfallbackは、これらの具体APIでは到達しないため置かない。
+file size由来のblock countは`int`へ変換する前にplatform上限を検査する。32-bit相当の上限も小さな整数で直接試し、巨大なfileやallocationに依存しない。
 
 ## Javaソースリーディング
 
