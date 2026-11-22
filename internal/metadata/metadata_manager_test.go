@@ -166,3 +166,52 @@ func TestMetadataManagerCreateTablePreservesNilSchemaError(t *testing.T) {
 		}
 	}
 }
+
+func TestMetadataManagerLayoutReconstructsTableThroughFacade(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	schema.AddVarcharField("sname", 20)
+	if err := manager.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+
+	layout, err := manager.Layout("student", transaction)
+	if err != nil {
+		t.Fatalf("Layout() error = %v", err)
+	}
+	if got, want := layout.Schema().Fields(), []string{"sid", "sname"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("fields = %v, want %v", got, want)
+	}
+	if got, want := layout.SlotSize(), record.NewLayout(&schema).SlotSize(); got != want {
+		t.Fatalf("slot size = %d, want %d", got, want)
+	}
+}
+
+func TestMetadataManagerLayoutPreservesCatalogReadError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	wantErr := errors.New("table catalog size unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+
+	layout, err := manager.Layout("student", transaction)
+	if layout != nil {
+		t.Fatalf("Layout() layout = %v, want nil on catalog failure", layout)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Layout() error = %v, want wrapped size cause", err)
+	}
+	for _, context := range []string{`look up layout for table "student" through metadata manager`, "read size"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("Layout() error = %q, want context %q", err, context)
+		}
+	}
+}

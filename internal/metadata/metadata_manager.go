@@ -49,3 +49,12 @@ func (m *MetadataManager) CreateTable(tableName string, schema *record.Schema, t
 	}
 	return nil
 }
+
+// Layout reconstructs a table's physical layout through the metadata facade.
+func (m *MetadataManager) Layout(tableName string, transaction record.TableScanTransaction) (*record.Layout, error) {
+	layout, err := m.tables.Layout(tableName, transaction)
+	if err != nil {
+		return nil, fmt.Errorf("look up layout for table %q through metadata manager: %w", tableName, err)
+	}
+	return layout, nil
+}
