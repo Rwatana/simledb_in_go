@@ -25,3 +25,12 @@ The test first failed to compile because `NewIntConstant` and the typed accessor
 | Test | Observable behavior |
 | --- | --- |
 | `TestNewIntConstantRetainsOnlyIntegerValue` | An integer constant returns its exact `int32` value and reports that no string representation is stored |
+
+## Feature 2: Initialize a string query constant
+
+`NewStringConstant` and `AsString` map to Java `Constant(String)` and `asString`. The kind tag distinguishes a stored
+empty string from an unavailable string value. `AsString` returns the supplied string unchanged, and `AsInt` returns
+`(0, false)` for a string constant.
+
+`TestNewStringConstantRetainsOnlyStringValue` first failed because the constructor was undefined. It verifies
+both a non-ASCII string and the empty string through the typed accessors.
