@@ -58,3 +58,11 @@ func (m *MetadataManager) Layout(tableName string, transaction record.TableScanT
 	}
 	return layout, nil
 }
+
+// CreateView stores a view definition through the metadata facade.
+func (m *MetadataManager) CreateView(viewName, definition string, transaction record.TableScanTransaction) error {
+	if err := m.views.CreateView(viewName, definition, transaction); err != nil {
+		return fmt.Errorf("create view %q through metadata manager: %w", viewName, err)
+	}
+	return nil
+}

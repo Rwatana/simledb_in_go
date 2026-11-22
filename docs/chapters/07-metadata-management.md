@@ -691,3 +691,20 @@ The test first failed to compile because `MetadataManager.Layout` did not exist.
 | --- | --- |
 | `TestMetadataManagerLayoutReconstructsTableThroughFacade` | Lookup returns the stored field order and exact slot size for a table created through the facade |
 | `TestMetadataManagerLayoutPreservesCatalogReadError` | A failed catalog size read returns no layout and retains the requested table, facade, and cause context |
+
+## Feature 34: Create a view through the metadata facade
+
+`MetadataManager.CreateView` delegates the supplied view name, SQL definition, and transaction to the shared view
+manager. The existing `ViewManager` remains the single owner of `viewcat` layout lookup, row insertion, field writes,
+and scan cleanup; the facade adds the requested view name to any returned error.
+
+This maps Java `MetadataMgr.createView` without duplicating view-catalog behavior in the facade.
+
+### Test-first record
+
+The test first failed to compile because `MetadataManager.CreateView` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestMetadataManagerCreateViewStoresDefinitionThroughFacade` | Creating `seniors` through the facade stores the exact SQL definition that the shared view manager reads back |
+| `TestMetadataManagerCreateViewPreservesLayoutError` | A view-catalog layout failure preserves its cause and requested-view context through the facade, without appending a view row |
