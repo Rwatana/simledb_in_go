@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
@@ -35,6 +36,18 @@ func TestNewManagerCreatesDatabaseDirectory(t *testing.T) {
 		if _, err := storagefile.NewManager(filepath.Join(t.TempDir(), "invalid"), blockSize); err == nil {
 			t.Errorf("NewManager() with block size %d error = nil, want an invalid size error", blockSize)
 		}
+	}
+}
+
+func TestNewManagerRejectsAnEmptyDatabaseDirectory(t *testing.T) {
+	t.Parallel()
+
+	manager, err := storagefile.NewManager("", 32)
+	if manager != nil {
+		t.Fatalf("NewManager(\"\", 32) manager = %v, want nil", manager)
+	}
+	if err == nil || !strings.Contains(err.Error(), "database directory must not be empty") {
+		t.Fatalf("NewManager(\"\", 32) error = %v, want an empty-directory error", err)
 	}
 }
 
