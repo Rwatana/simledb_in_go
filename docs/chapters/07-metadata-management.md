@@ -540,3 +540,20 @@ The test first failed to compile because `NewIndexCatalogSchema` did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestNewIndexCatalogSchemaDescribesStoredIndexRegistrations` | The index catalog exposes three ordered varchar fields, each with `MaxNameLength` |
+
+## Feature 26: Initialize the index metadata manager
+
+`NewIndexManager` retains the table and statistics managers that later index-catalog operations need. Construction is
+deterministic and performs no catalog, transaction, or concrete index I/O. This separates the Java `IndexMgr`
+constructor's dependency wiring from its new-database registration and existing-catalog layout lookup.
+
+The manager keeps the concrete Chapter 7 metadata dependencies because they already provide the exact catalog and
+statistics behaviors needed; introducing interfaces before a second implementation exists would add no useful boundary.
+
+### Test-first record
+
+The test first failed to compile because `NewIndexManager` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewIndexManagerRetainsMetadataDependencies` | Construction preserves the supplied table and statistics manager identities without requiring a transaction |
