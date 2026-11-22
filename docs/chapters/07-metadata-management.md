@@ -628,6 +628,7 @@ The test first failed to compile because `IndexManager.IndexInfo` did not exist.
 | --- | --- |
 | `TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable` | Lookup returns only the requested table's two indexes, keyed by field, and returns an empty map for an unindexed table |
 | `TestIndexManagerIndexInfoRejectsMissingStatisticsManager` | Lookup reports table and dependency context before attempting any catalog transaction |
+| `TestIndexManagerIndexInfoRejectsMissingTableManager` | Lookup returns table-specific dependency context before catalog or statistics access |
 
 The coverage audit confirms that a configured table manager cannot compensate for a missing statistics manager: the
 lookup fails explicitly before catalog access rather than dereferencing the dependency later.
