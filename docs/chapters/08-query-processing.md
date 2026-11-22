@@ -135,3 +135,13 @@ absent expression. A field mismatch, two fields, two literals, or an unset expre
 
 `TestTermEquatesWithConstant` first failed because the method was undefined. It covers both operand orders, the empty
 field name, a present zero-value literal, and non-matching term forms.
+
+## Feature 13: Match a term field to another field
+
+`Term.EquatesWithField` maps to Java `Term.equatesWithField`. It returns the opposite field when the requested field
+is one side of a field-to-field equality, without depending on operand order. The Go presence result distinguishes an
+explicit empty field name from an absent expression. Literal comparisons, field mismatches, and unset expressions
+return `("", false)`.
+
+`TestTermEquatesWithField` first failed because the method was undefined. It covers both operand orders, an empty
+field name, and non-matching terms.

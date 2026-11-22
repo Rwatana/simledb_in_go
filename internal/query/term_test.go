@@ -155,3 +155,64 @@ func TestTermEquatesWithConstant(t *testing.T) {
 		})
 	}
 }
+
+func TestTermEquatesWithField(t *testing.T) {
+	tests := []struct {
+		name      string
+		term      Term
+		fieldName string
+		want      string
+		wantOK    bool
+	}{
+		{
+			name:      "requested field on left",
+			term:      NewTerm(NewFieldExpression("age"), NewFieldExpression("birth_year")),
+			fieldName: "age",
+			want:      "birth_year",
+			wantOK:    true,
+		},
+		{
+			name:      "requested field on right",
+			term:      NewTerm(NewFieldExpression("birth_year"), NewFieldExpression("age")),
+			fieldName: "age",
+			want:      "birth_year",
+			wantOK:    true,
+		},
+		{
+			name:      "explicit empty field name",
+			term:      NewTerm(NewFieldExpression(""), NewFieldExpression("other")),
+			fieldName: "",
+			want:      "other",
+			wantOK:    true,
+		},
+		{
+			name:      "different field",
+			term:      NewTerm(NewFieldExpression("name"), NewFieldExpression("age")),
+			fieldName: "height",
+		},
+		{
+			name:      "field and literal",
+			term:      NewTerm(NewFieldExpression("age"), NewConstantExpression(NewIntConstant(1))),
+			fieldName: "age",
+		},
+		{
+			name:      "two literals",
+			term:      NewTerm(NewConstantExpression(NewIntConstant(1)), NewConstantExpression(NewIntConstant(1))),
+			fieldName: "age",
+		},
+		{
+			name:      "unset expression",
+			term:      NewTerm(Expression{}, NewFieldExpression("age")),
+			fieldName: "age",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := test.term.EquatesWithField(test.fieldName)
+			if got != test.want || ok != test.wantOK {
+				t.Fatalf("EquatesWithField(%q) = (%q, %v), want (%q, %v)", test.fieldName, got, ok, test.want, test.wantOK)
+			}
+		})
+	}
+}

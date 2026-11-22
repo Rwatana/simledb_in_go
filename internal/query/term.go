@@ -39,3 +39,16 @@ func (term Term) EquatesWithConstant(fieldName string) (Constant, bool) {
 	}
 	return Constant{}, false
 }
+
+// EquatesWithField returns the other field name when this term compares fieldName with another field.
+func (term Term) EquatesWithField(fieldName string) (string, bool) {
+	lhsField, lhsIsField := term.lhs.AsFieldName()
+	rhsField, rhsIsField := term.rhs.AsFieldName()
+	if lhsIsField && lhsField == fieldName && rhsIsField {
+		return rhsField, true
+	}
+	if rhsIsField && rhsField == fieldName && lhsIsField {
+		return lhsField, true
+	}
+	return "", false
+}
