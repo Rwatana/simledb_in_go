@@ -239,3 +239,11 @@ distinguishes a present empty field name from no match.
 
 `TestPredicateEquatesWithField` first failed because the predicate method was undefined. It covers first-match order,
 an explicitly empty opposite name, absent and empty-predicate results, and source immutability.
+
+## Feature 24: Format predicates as text
+
+`Predicate.String` maps to Java `Predicate.toString`. It renders each term with `Term.String`, preserving term order,
+and joins them with ` and `. An empty predicate, including the zero value, renders as an empty string.
+
+`TestPredicateString` first failed because `Predicate.String` was undefined. It covers empty, single-term, and
+multi-term output and verifies that formatting leaves the predicate unchanged.
