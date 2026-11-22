@@ -107,6 +107,7 @@ not exist.
 | `TestTableManagerCreateTablePreservesFieldCatalogInsertFailure` | A fldcat row insertion error retains its cause and context, closes both scans, and leaves the field slot unused |
 | `TestTableManagerCreateTablePreservesFieldCatalogFieldNameWriteFailure` | A fldcat field-name write error retains field-specific context, closes both scans, and stops before later metadata writes |
 | `TestTableManagerCreateTablePreservesFieldCatalogLengthWriteFailure` | A fldcat length write error retains field-specific context, closes both scans, and stops before the offset write |
+| `TestTableManagerCreateTablePreservesFieldCatalogOffsetWriteFailure` | A fldcat offset write error retains field-specific context, closes both scans, and stops before later field rows |
 | `TestTableManagerCreateTablePreservesFieldCatalogTableNameWriteFailure` | A fldcat table-name write error retains field-specific context, closes both scans, and stops before later field metadata writes |
 | `TestTableManagerCreateTablePreservesFieldCatalogTypeWriteFailure` | A fldcat type write error retains field-specific context, closes both scans, and stops before length and offset writes |
 | `TestTableManagerCreateTablePreservesTableCatalogInsertFailure` | A tblcat row insertion error retains its cause and context, closes the table scan, and stops before fldcat |
@@ -138,6 +139,8 @@ The field-type write test counts transaction integer writes and verifies the cat
 offset writes while preserving both scan cleanups.
 The field-length write test confirms the type was stored first, then verifies error context, scan cleanup, and that the
 later offset write is skipped.
+The field-offset write test uses two schema fields and confirms a failure on the first field prevents writes to the
+second field while both catalog scans still close.
 The same audit exposed the signed integer range guard. Boundary and out-of-range tests now cover `metadataInteger`
 without changing the values stored for valid metadata.
 
