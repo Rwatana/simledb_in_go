@@ -220,3 +220,12 @@ literal terms are excluded because they already apply to each input independentl
 `TestPredicateJoinSubPredicate` first failed because `JoinSubPredicate` was undefined. It covers cross-schema terms,
 terms applying to only one input or neither, duplicate ordering, source/schema immutability, empty results, and nil
 schemas.
+
+## Feature 22: Find constants implied by a predicate
+
+`Predicate.EquatesWithConstant` maps to Java `Predicate.equatesWithConstant(String)`. It searches terms in order and
+returns the first matching constant, delegating term shape and operand order to `Term.EquatesWithConstant`. The Go
+boolean result distinguishes an absent match from a present zero-value `Constant`.
+
+`TestPredicateEquatesWithConstant` first failed because the predicate method was undefined. It checks first-match
+ordering, a present zero-value constant, a missing field, an empty predicate, and that lookup leaves terms unchanged.
