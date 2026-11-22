@@ -189,3 +189,13 @@ conjunction behavior; its zero value remains the empty true predicate from the p
 
 The tests first failed because the constructor did not exist. They cover a satisfied field comparison, an unsatisfied
 literal comparison, scan lookup order, and unchanged term error propagation.
+
+## Feature 19: Conjoin query predicates
+
+`Predicate.ConjoinWith` maps to Java `Predicate.conjoinWith(Predicate)`. It returns a value whose terms are the
+receiver's terms followed by the other predicate's terms, preserving order and duplicates. Unlike Java's mutating
+method, the Go method leaves both inputs unchanged and allocates independent term storage.
+
+`TestPredicateConjoinWithConcatenatesTermsAndPreservesInputs` first failed because `ConjoinWith` was undefined. It
+checks ordered duplicate preservation, evaluation of all included terms, empty operands, and that changing the result
+does not change either input.
