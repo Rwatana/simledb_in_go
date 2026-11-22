@@ -138,3 +138,30 @@ func TestMetadataManagerViewDefinitionLooksUpStoredAndMissingViews(t *testing.T)
 		t.Fatalf("ViewDefinition(missing) = (%q, %v, %v), want (\"\", false, nil)", definition, found, err)
 	}
 }
+
+func TestMetadataManagerCreateIndexStoresRegistrationThroughFacade(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	schema.AddIntegerField("majorid")
+	if err := manager.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+
+	if err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+
+	indexes, err := manager.indexes.IndexInfo("student", transaction)
+	if err != nil {
+		t.Fatalf("index manager IndexInfo(student) error = %v", err)
+	}
+	info := indexes["majorid"]
+	if len(indexes) != 1 || info == nil || info.indexName != "idx_student_major" {
+		t.Fatalf("student indexes = %v, want idx_student_major on majorid", indexes)
+	}
+}
