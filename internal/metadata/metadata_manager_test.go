@@ -101,3 +101,20 @@ func TestMetadataManagerLayoutReconstructsTableThroughFacade(t *testing.T) {
 		t.Fatalf("slot size = %d, want %d", got, want)
 	}
 }
+
+func TestMetadataManagerCreateViewStoresDefinitionThroughFacade(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+
+	if err := manager.CreateView("seniors", "select sid from student where gradyear=2020", transaction); err != nil {
+		t.Fatalf("CreateView() error = %v", err)
+	}
+
+	definition, found, err := manager.views.ViewDefinition("seniors", transaction)
+	if err != nil || !found || definition != "select sid from student where gradyear=2020" {
+		t.Fatalf("view manager lookup = (%q, %v, %v), want stored definition", definition, found, err)
+	}
+}
