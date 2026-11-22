@@ -162,3 +162,12 @@ Java's constructors do not create. Rendering does not perform scan or schema acc
 
 `TestExpressionString` first failed because `Expression.String` was undefined. It covers integer and string literals,
 empty text, field names, and the unset placeholder.
+
+## Feature 16: Format query terms as text
+
+`Term.String` maps to Java `Term.toString`. It concatenates the left expression, `=`, and the right expression by
+using `Expression.String`. This preserves operand order and keeps literal rendering shared with the expression
+behavior; it does not add SQL quoting. A zero-value side uses the stable expression placeholder.
+
+`TestTermString` first failed because `Term.String` was undefined. It covers field/literal order, unquoted strings,
+field/field terms, empty text, and a term with an unset expression.
