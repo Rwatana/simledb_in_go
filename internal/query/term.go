@@ -23,3 +23,19 @@ func (term Term) IsSatisfied(scan ValueScan) (bool, error) {
 	}
 	return lhs.Equal(rhs), nil
 }
+
+// EquatesWithConstant returns the literal compared with fieldName, if this term has that form.
+func (term Term) EquatesWithConstant(fieldName string) (Constant, bool) {
+	lhsField, lhsIsField := term.lhs.AsFieldName()
+	rhsField, rhsIsField := term.rhs.AsFieldName()
+	lhsConstant, lhsIsConstant := term.lhs.AsConstant()
+	rhsConstant, rhsIsConstant := term.rhs.AsConstant()
+
+	if lhsIsField && lhsField == fieldName && rhsIsConstant {
+		return rhsConstant, true
+	}
+	if rhsIsField && rhsField == fieldName && lhsIsConstant {
+		return lhsConstant, true
+	}
+	return Constant{}, false
+}

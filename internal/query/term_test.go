@@ -85,3 +85,73 @@ func TestTermSatisfiedReturnsRightEvaluationError(t *testing.T) {
 		t.Fatalf("GetVal calls = %v, want %v", scan.calls, want)
 	}
 }
+
+func TestTermEquatesWithConstant(t *testing.T) {
+	integer := NewIntConstant(7)
+	zeroValueConstant := Constant{}
+	tests := []struct {
+		name      string
+		term      Term
+		fieldName string
+		want      Constant
+		wantOK    bool
+	}{
+		{
+			name:      "field on left",
+			term:      NewTerm(NewFieldExpression("age"), NewConstantExpression(integer)),
+			fieldName: "age",
+			want:      integer,
+			wantOK:    true,
+		},
+		{
+			name:      "field on right",
+			term:      NewTerm(NewConstantExpression(integer), NewFieldExpression("age")),
+			fieldName: "age",
+			want:      integer,
+			wantOK:    true,
+		},
+		{
+			name:      "explicit empty field name",
+			term:      NewTerm(NewFieldExpression(""), NewConstantExpression(integer)),
+			fieldName: "",
+			want:      integer,
+			wantOK:    true,
+		},
+		{
+			name:      "literal zero-value constant is present",
+			term:      NewTerm(NewFieldExpression("age"), NewConstantExpression(zeroValueConstant)),
+			fieldName: "age",
+			want:      zeroValueConstant,
+			wantOK:    true,
+		},
+		{
+			name:      "different field",
+			term:      NewTerm(NewFieldExpression("name"), NewConstantExpression(integer)),
+			fieldName: "age",
+		},
+		{
+			name:      "two fields",
+			term:      NewTerm(NewFieldExpression("age"), NewFieldExpression("name")),
+			fieldName: "age",
+		},
+		{
+			name:      "two literals",
+			term:      NewTerm(NewConstantExpression(integer), NewConstantExpression(integer)),
+			fieldName: "age",
+		},
+		{
+			name:      "unset left expression",
+			term:      NewTerm(Expression{}, NewConstantExpression(integer)),
+			fieldName: "age",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := test.term.EquatesWithConstant(test.fieldName)
+			if got != test.want || ok != test.wantOK {
+				t.Fatalf("EquatesWithConstant(%q) = (%v, %v), want (%v, %v)", test.fieldName, got, ok, test.want, test.wantOK)
+			}
+		})
+	}
+}
