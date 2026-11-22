@@ -156,6 +156,18 @@ func TestMetadataManagerCreateTableStoresSchemaThroughFacade(t *testing.T) {
 	}
 }
 
+func TestMetadataManagerCreateTablePreservesNilSchemaError(t *testing.T) {
+	err := NewMetadataManager().CreateTable("student", nil, nil)
+	if err == nil {
+		t.Fatal("CreateTable() error = nil, want nil-schema validation error")
+	}
+	for _, context := range []string{`create table "student" through metadata manager`, "schema is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestMetadataManagerLayoutReconstructsTableThroughFacade(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	manager := NewMetadataManager()

@@ -689,6 +689,7 @@ The test first failed to compile because `MetadataManager.CreateTable` did not e
 | Test | Observable behavior |
 | --- | --- |
 | `TestMetadataManagerCreateTableStoresSchemaThroughFacade` | Creating `student` through the facade persists an ordered integer/varchar schema that the table manager can reconstruct |
+| `TestMetadataManagerCreateTablePreservesNilSchemaError` | A nil schema returns table-specific facade context before a nil transaction can be touched |
 
 ## Feature 33: Look up a table layout through the metadata facade
 
