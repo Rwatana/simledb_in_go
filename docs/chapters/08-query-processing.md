@@ -52,3 +52,12 @@ supplementary characters sort differently. Mixed kinds and unset values return `
 
 `TestConstantCompare` first failed because the method was undefined. It verifies integer limits, string prefixes,
 equality, reversed operands, and incomparable values.
+
+## Feature 5: Format a query constant as text
+
+`Constant.String` maps to Java `Constant.toString`. It produces decimal text for integers and the original,
+unquoted text for strings. The Go zero value renders as `<unset>` for diagnostics. The output is for display
+and carries no SQL quoting or escaping.
+
+`TestConstantString` first failed because the method was undefined. It verifies the minimum integer,
+zero, non-ASCII text, the empty string, and the unset representation.
