@@ -2,7 +2,12 @@ package log_test
 
 import (
 	"bytes"
+	"errors"
+	"math"
+	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
@@ -102,4 +107,30 @@ func newFileManager(t *testing.T, blockSize int) *storagefile.Manager {
 		t.Fatalf("file.NewManager() error = %v", err)
 	}
 	return files
+}
+
+func TestNewManagerRejectsBlockSizeOutsideBoundaryCapacity(t *testing.T) {
+	t.Parallel()
+
+	tooLarge := int64(math.MaxInt32) + 1
+	if strconv.IntSize <= 32 {
+		t.Skip("block size cannot exceed the four-byte boundary on 32-bit platforms")
+	}
+	blockSize := int(tooLarge)
+	directory := filepath.Join(t.TempDir(), "database")
+	files, err := storagefile.NewManager(directory, blockSize)
+	if err != nil {
+		t.Fatalf("file.NewManager() error = %v", err)
+	}
+
+	manager, err := logmanager.NewManager(files, "oversized.log")
+	if manager != nil {
+		t.Errorf("NewManager() manager = %v, want nil", manager)
+	}
+	if err == nil || !strings.Contains(err.Error(), "oversized.log") || !strings.Contains(err.Error(), "four-byte boundary capacity") {
+		t.Fatalf("NewManager() error = %v, want file-specific boundary-capacity error", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(directory, "oversized.log")); !errors.Is(statErr, os.ErrNotExist) {
+		t.Errorf("oversized log file stat error = %v, want no file created", statErr)
+	}
 }
