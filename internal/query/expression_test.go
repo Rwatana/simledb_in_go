@@ -120,6 +120,17 @@ func TestEvaluateFieldExpressionRejectsNilScan(t *testing.T) {
 	}
 }
 
+func TestEvaluateUnsetExpressionReturnsErrorWithoutScan(t *testing.T) {
+	scan := &valueScanStub{}
+	_, err := (Expression{}).Evaluate(scan)
+	if err == nil || err.Error() != "evaluate expression: no literal or field reference" {
+		t.Fatalf("Evaluate() error = %v, want contextual unset-expression error", err)
+	}
+	if scan.calls != 0 {
+		t.Fatalf("GetVal calls = %d, want 0 for an unset expression", scan.calls)
+	}
+}
+
 func TestExpressionAppliesToSchema(t *testing.T) {
 	var empty record.Schema
 	var nilSchema *record.Schema

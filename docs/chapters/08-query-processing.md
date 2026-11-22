@@ -104,7 +104,9 @@ a field expression with a nil scan return contextual errors.
 The tests first failed because `Evaluate` and `ValueScan` did not exist. They verify literal short-circuiting,
 one field lookup, unchanged lookup-error propagation, and the contextual error returned for a field expression with a
 nil scan. The nil-scan guard already existed; a full-module coverage audit found that this error branch had never been
-executed, so the audit adds a focused regression test without changing production behavior.
+executed, so the audit adds a focused regression test without changing production behavior. A second focused test now
+verifies the existing contextual error for an unset expression and confirms it does not consult the scan; this closes
+the other uncovered `Evaluate` return path found by that audit.
 
 ## Feature 10: Check expression applicability to a schema
 
