@@ -3,8 +3,8 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint for PR #587, the full-module statement coverage is **94.3%** (rounded to one
-decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 87.1%, query
+At the 2026-11-23 checkpoint for PR #589, the full-module statement coverage is **94.3%** (rounded to one
+decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 87.4%, query
 100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 91.3%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
 both catalog-initialization failure paths, table- and field-catalog row insertion, field-catalog table-name,
@@ -22,6 +22,8 @@ ownership; the public constructor still accepts the concrete `*LockTable`. `Mana
 verifies the original unpin/close error and view-specific context are preserved. The overall module is 94.3% while
 remaining paths are handled as separate observable behaviors. An exclusive request whose prerequisite shared acquisition
 fails returns the cause without creating local ownership.
+
+A focused view metadata test also covers the error returned when loading the table-catalog layout fails during view creation, preserving the cause and view-name context. Metadata coverage is 87.4%; the full module remains at 94.3%.
 
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests

@@ -110,6 +110,31 @@ func TestViewManagerCreateViewStoresDefinitionInNewViewFile(t *testing.T) {
 	}
 }
 
+func TestViewManagerCreateViewWrapsCatalogLayoutFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	views := NewViewManager(tables)
+	if err := views.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	wantErr := errors.New("table catalog size unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+
+	err := views.CreateView("seniors", "select sid from student", transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("CreateView() error = %v, want wrapped size cause", err)
+	}
+	for _, context := range []string{"seniors", "load view catalog layout"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateView() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestViewManagerViewDefinitionFindsMatchAndReportsAbsence(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()

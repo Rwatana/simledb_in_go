@@ -276,6 +276,7 @@ The test first failed to compile because `ViewManager.CreateView` did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestViewManagerCreateViewStoresDefinitionInNewViewFile` | A first view creates one formatted `viewcat` block and stores its name and SQL definition in the first occupied slot |
+| `TestViewManagerCreateViewWrapsCatalogLayoutFailure` | A failed view-catalog layout lookup returns the cause with view-name and layout context |
 
 This maps Java `ViewMgr.createView` while adding explicit layout, scan, and cleanup error propagation.
 
