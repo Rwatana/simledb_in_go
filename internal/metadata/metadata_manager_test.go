@@ -374,6 +374,30 @@ func TestMetadataManagerIndexInfoLooksUpRegisteredAndUnindexedTables(t *testing.
 	}
 }
 
+func TestMetadataManagerIndexInfoPreservesCatalogReadError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	wantErr := errors.New("index catalog size unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil on catalog failure", indexes)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("IndexInfo() error = %v, want wrapped size cause", err)
+	}
+	for _, context := range []string{`look up indexes for table "student" through metadata manager`, `look up indexes for table "student"`, "load index catalog layout", "read size"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestMetadataManagerStatisticsReturnsSharedManagerSnapshot(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	manager := NewMetadataManager()

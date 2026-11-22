@@ -776,6 +776,7 @@ The test first failed to compile because `MetadataManager.IndexInfo` did not exi
 | Test | Observable behavior |
 | --- | --- |
 | `TestMetadataManagerIndexInfoLooksUpRegisteredAndUnindexedTables` | Lookup returns the stored `majorid` index for `student` and a non-nil empty map for an unindexed table |
+| `TestMetadataManagerIndexInfoPreservesCatalogReadError` | A failed index-catalog layout lookup returns no index map and preserves the requested table, facade context, and original cause |
 
 ## Feature 38: Look up statistics through the metadata facade
 
