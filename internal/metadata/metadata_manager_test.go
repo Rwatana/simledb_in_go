@@ -56,6 +56,26 @@ func TestMetadataManagerInitializeCatalogsRegistersCompleteCatalogSet(t *testing
 	}
 }
 
+func TestMetadataManagerInitializeCatalogsPreservesTableCatalogFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	wantErr := errors.New("table catalog size unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+
+	err := NewMetadataManager().InitializeCatalogs(transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("InitializeCatalogs() error = %v, want wrapped size cause", err)
+	}
+	for _, context := range []string{"initialize metadata catalogs", "table catalogs"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("InitializeCatalogs() error = %q, want context %q", err, context)
+		}
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("catalog append calls = %v, want none before table-catalog initialization failure", transaction.appendCalls)
+	}
+}
+
 func TestMetadataManagerCreateTableStoresSchemaThroughFacade(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	manager := NewMetadataManager()
