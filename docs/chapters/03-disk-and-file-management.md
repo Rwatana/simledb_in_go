@@ -241,12 +241,19 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | `TestPageStoresLengthPrefixedBytes` | 空やNULを含むpayloadをlength prefix付きで保存する |
 | `TestPageGetBytesRejectsTruncatedLengthPrefix` | prefix全体がPageに収まらない場合にoffset付きerrorを返す |
 | `TestPageGetBytesRejectsNegativeLength` | 負のlength prefixをpayload allocation前に拒否する |
+| `TestValidateByteSequenceLengthRejectsUnencodableLength` | int32 length prefixへ格納できないpayload長を拒否する |
+| `TestValidateByteSequenceLengthAcceptsLargestEncodableLength` | 最大の正のint32 lengthを受け入れる |
+| `TestPageSetBytesRejectsUnencodableLengthWithoutAllocation` | 巨大なpayloadを確保せず上限超過時のerrorを確認する |
+| `TestPageSetBytesRejectsMismatchedEncodedLength` | 内部helperがpayloadとprefix長の不一致を拒否する |
 | `TestPageRejectsOutOfBoundsAccess` | encoded rangeがcapacityを越える操作をerrorにする |
 | `TestPageSnapshotDoesNotExposeMutableMemory` | snapshotから内部memoryを書き換えられない |
 
 全module coverageの監査で、`GetBytes`自身から`GetInt`失敗をcontext付きで返す経路が未実行と分かった。このtestは
 3-byte Pageで4-byte prefixを読ませ、既存のguardを確認する。
 負のprefixをrejectする独立guardも未実行だったため、4-byteの`-1` prefixを使うtestを追加した。
+最後に`SetBytes`のsigned int32上限を超えるlengthのguardも未実行だった。2 GiB超のsliceを確保したり、
+不正なslice headerを作ることなく境界を確認できるよう、privateなlength検査へ分離し、上限値と最初の
+超過値を直接testする。`SetBytes`の公開encodingとerrorは変更しない。
 
 ## Javaソースリーディング
 

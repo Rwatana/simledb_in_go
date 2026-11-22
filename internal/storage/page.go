@@ -74,15 +74,29 @@ func (p *Page) GetBytes(offset int) ([]byte, error) {
 
 // SetBytes stores value at offset after a four-byte length prefix.
 func (p *Page) SetBytes(offset int, value []byte) error {
-	if len(value) > math.MaxInt32 {
-		return fmt.Errorf("set bytes at offset %d: length %d exceeds four-byte signed prefix", offset, len(value))
+	return p.setBytesWithLength(offset, value, int64(len(value)))
+}
+
+func (p *Page) setBytesWithLength(offset int, value []byte, length int64) error {
+	if err := validateByteSequenceLength(offset, length); err != nil {
+		return err
+	}
+	if length != int64(len(value)) {
+		return fmt.Errorf("set bytes at offset %d: encoded length %d does not match payload length %d", offset, length, len(value))
 	}
 	destination, err := p.bytesAt(offset, encodedIntSize+len(value))
 	if err != nil {
 		return fmt.Errorf("set bytes at offset %d with length %d: %w", offset, len(value), err)
 	}
-	binary.BigEndian.PutUint32(destination[:encodedIntSize], uint32(len(value)))
+	binary.BigEndian.PutUint32(destination[:encodedIntSize], uint32(length))
 	copy(destination[encodedIntSize:], value)
+	return nil
+}
+
+func validateByteSequenceLength(offset int, length int64) error {
+	if length > math.MaxInt32 {
+		return fmt.Errorf("set bytes at offset %d: length %d exceeds four-byte signed prefix", offset, length)
+	}
 	return nil
 }
 

@@ -3,10 +3,14 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-22 Chapter 8 predicate checkpoint, the full-module baseline was **90.7%**. The CI step reports coverage
-without enforcing a threshold while the repository is below 100%. The uncovered statements are being audited and tested
-in focused changes. Add a required 100% threshold only after the complete suite measures 100.0%; otherwise CI would be
-permanently red before the target is met.
+At the 2026-11-23 checkpoint after PR #469, the full-module statement coverage is **91.1%** (rounded to one
+decimal place). Package coverage is buffer 99.1%, concurrency 92.9%, file 85.3%, log 78.2%, metadata 76.3%, query
+100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 90.8%. Recent focused tests closed the existing
+`Expression.Evaluate`, `Page.GetBytes`, and `Page.SetBytes` paths; the remaining uncovered statements are being
+inspected by package and behavior rather than hidden behind a premature gate.
+
+The CI step reports coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
+threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
 
 For a local full-module measurement, run:
 
