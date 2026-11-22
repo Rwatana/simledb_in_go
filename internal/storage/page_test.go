@@ -3,6 +3,7 @@ package storage_test
 import (
 	"bytes"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/storage"
@@ -96,6 +97,19 @@ func TestPageStoresLengthPrefixedBytes(t *testing.T) {
 				t.Errorf("GetBytes(%d) aliases page memory: got %v, want %v", tt.offset, again, tt.value)
 			}
 		}
+	}
+}
+
+func TestPageGetBytesRejectsTruncatedLengthPrefix(t *testing.T) {
+	t.Parallel()
+
+	page := newPage(t, 3)
+	got, err := page.GetBytes(0)
+	if err == nil || got != nil {
+		t.Fatalf("GetBytes(0) = (%v, %v), want (nil, error)", got, err)
+	}
+	if !strings.Contains(err.Error(), "get bytes at offset 0:") {
+		t.Errorf("GetBytes(0) error = %q, want contextual offset", err)
 	}
 }
 
