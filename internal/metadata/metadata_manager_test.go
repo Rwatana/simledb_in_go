@@ -3,6 +3,8 @@ package metadata
 import (
 	"reflect"
 	"testing"
+
+	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
 func TestNewMetadataManagerWiresSharedDependencies(t *testing.T) {
@@ -49,5 +51,28 @@ func TestMetadataManagerInitializeCatalogsRegistersCompleteCatalogSet(t *testing
 	}
 	if got, want := transaction.appendCalls, []string{"tblcat.tbl", "fldcat.tbl"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("append calls = %v, want %v", got, want)
+	}
+}
+
+func TestMetadataManagerCreateTableStoresSchemaThroughFacade(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	schema.AddVarcharField("sname", 20)
+
+	if err := manager.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+
+	layout, err := manager.tables.Layout("student", transaction)
+	if err != nil {
+		t.Fatalf("table manager Layout(student) error = %v", err)
+	}
+	if got, want := layout.Schema().Fields(), []string{"sid", "sname"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("student fields = %v, want %v", got, want)
 	}
 }

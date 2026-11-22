@@ -597,3 +597,20 @@ The test first failed to compile because `MetadataManager.InitializeCatalogs` di
 | Test | Observable behavior |
 | --- | --- |
 | `TestMetadataManagerInitializeCatalogsRegistersCompleteCatalogSet` | Startup makes the table, field, view, and index catalog layouts reconstructable while appending only the two physical self-describing catalog files |
+
+## Feature 32: Create a table through the metadata facade
+
+`MetadataManager.CreateTable` delegates the supplied name, logical schema, and transaction to the facade's shared table
+manager. The resulting table and field catalog rows remain reconstructable by the same manager, while any catalog error
+is wrapped with the requested table name and facade context.
+
+This is the Go facade counterpart of Java `MetadataMgr.createTable`; it adds no second catalog-write path or duplicate
+schema calculation.
+
+### Test-first record
+
+The test first failed to compile because `MetadataManager.CreateTable` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestMetadataManagerCreateTableStoresSchemaThroughFacade` | Creating `student` through the facade persists an ordered integer/varchar schema that the table manager can reconstruct |
