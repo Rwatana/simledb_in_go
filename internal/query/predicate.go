@@ -68,6 +68,16 @@ func (predicate Predicate) EquatesWithConstant(fieldName string) (Constant, bool
 	return Constant{}, false
 }
 
+// EquatesWithField returns the first opposite field implied by fieldName, if any term provides one.
+func (predicate Predicate) EquatesWithField(fieldName string) (string, bool) {
+	for _, term := range predicate.terms {
+		if other, ok := term.EquatesWithField(fieldName); ok {
+			return other, true
+		}
+	}
+	return "", false
+}
+
 // IsSatisfied reports whether every term in the predicate is satisfied by scan.
 func (predicate Predicate) IsSatisfied(scan ValueScan) (bool, error) {
 	for _, term := range predicate.terms {
