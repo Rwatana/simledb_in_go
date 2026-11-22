@@ -358,6 +358,9 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | `TestManagerRejectsInvalidBlockAccess` | 負数、overflow、size不一致、`io.EOF`を伴う15/16 byteのshort read、path traversalのerror |
 | `TestNewPageFromBytesCopiesContents` | diskから渡されたsliceをPage内部と共有しない |
 
+`os.File.ReadAt`と`WriteAt`は、それぞれ短い読み書きに対してerrorを返す。partial blockは`io.EOF`を、FIFOへの位置指定writeは`ESPIPE`を返すため、そのerrorとbyte数を保持する。
+errorがnilの後に短いcountを再検査するfallbackは、これらの具体APIでは到達しないため置かない。
+
 ## Javaソースリーディング
 
 対象は`simpledb.file.FileMgr`のconstructor、`read`、`write`、`getFile`である。

@@ -148,9 +148,6 @@ func (m *Manager) Write(block storage.BlockID, page *storage.Page) error {
 	if err != nil {
 		return fmt.Errorf("write block %v at byte offset %d: wrote %d of %d bytes: %w", block, offset, written, len(contents), err)
 	}
-	if written != len(contents) {
-		return fmt.Errorf("write block %v at byte offset %d: wrote %d of %d bytes", block, offset, written, len(contents))
-	}
 	if err := file.Sync(); err != nil {
 		return fmt.Errorf("write block %v: sync %q: %w", block, path, err)
 	}
