@@ -83,6 +83,23 @@ func TestManagerDoesNotRecordSharedLockAfterTableFailure(t *testing.T) {
 	}
 }
 
+func TestManagerDoesNotRecordLockWhenExclusivePrerequisiteFails(t *testing.T) {
+	wantErr := errors.New("shared prerequisite unavailable")
+	table := &failingSharedWaitTable{err: wantErr}
+	manager := &Manager{table: table, locks: make(map[storage.BlockID]lockMode)}
+	block := storage.NewBlockID("tbl", 9)
+
+	if err := manager.LockExclusive(block); !errors.Is(err, wantErr) {
+		t.Fatalf("LockExclusive() error = %v, want %v", err, wantErr)
+	}
+	if _, ok := manager.locks[block]; ok {
+		t.Fatalf("transaction-local locks = %v, want failed block absent", manager.locks)
+	}
+	if table.calls != 1 || table.block != block {
+		t.Fatalf("WaitShared() calls/block = %d/%v, want 1/%v", table.calls, table.block, block)
+	}
+}
+
 func TestManagerPreservesSharedLockAfterExclusiveUpgradeFailure(t *testing.T) {
 	wantErr := errors.New("exclusive upgrade unavailable")
 	table := &failingExclusiveWaitTable{err: wantErr}
