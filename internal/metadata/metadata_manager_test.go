@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/record"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 func TestNewMetadataManagerWiresSharedDependencies(t *testing.T) {
@@ -74,6 +75,33 @@ func TestMetadataManagerInitializeCatalogsPreservesTableCatalogFailure(t *testin
 	if len(transaction.appendCalls) != 0 {
 		t.Fatalf("catalog append calls = %v, want none before table-catalog initialization failure", transaction.appendCalls)
 	}
+}
+
+func TestMetadataManagerInitializeCatalogsPreservesViewCatalogFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	wantErr := errors.New("view catalog table size unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+	transaction.sizeErrAfter = 3
+
+	err := NewMetadataManager().InitializeCatalogs(transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("InitializeCatalogs() error = %v, want wrapped view-catalog cause", err)
+	}
+	for _, context := range []string{"initialize metadata catalogs", "view catalog", "initialize view catalog"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("InitializeCatalogs() error = %q, want context %q", err, context)
+		}
+	}
+	if got, want := transaction.appendCalls, []string{"tblcat.tbl", "fldcat.tbl"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("catalog append calls = %v, want only the table and field catalog bootstrap", got)
+	}
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	assertPageInt(t, tablePage, 0, 1)
+	assertPageString(t, tablePage, 4, "tblcat")
+	assertPageInt(t, tablePage, 76, 1)
+	assertPageString(t, tablePage, 80, "fldcat")
+	assertPageInt(t, tablePage, 152, 0)
 }
 
 func TestMetadataManagerCreateTableStoresSchemaThroughFacade(t *testing.T) {

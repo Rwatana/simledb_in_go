@@ -3,8 +3,8 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint for PR #593, the full-module statement coverage is **94.4%** (rounded to one
-decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 87.9%, query
+At the 2026-11-23 checkpoint for PR #595, the full-module statement coverage is **94.5%** (rounded to one
+decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 88.2%, query
 100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 91.3%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
 both catalog-initialization failure paths, table- and field-catalog row insertion, field-catalog table-name,
@@ -28,6 +28,8 @@ A focused view metadata test also covers the error returned when loading the tab
 The metadata facade regression test also verifies that a view-catalog layout failure is wrapped with the requested view and facade context, and that no view row is appended after the failure. `MetadataManager.CreateView` is now 100.0% covered; metadata coverage is 87.7%, and full-module coverage is 94.4%.
 
 A table-catalog initialization failure test confirms that the metadata facade preserves the underlying size error and stops bootstrap before appending any catalog block. `MetadataManager.InitializeCatalogs` coverage is now 71.4%; metadata coverage is 87.9%, while the full module remains at 94.4%.
+
+A separate view-catalog bootstrap test fails the table-catalog lookup after the self-describing table and field catalogs are initialized. It verifies facade context, original-cause preservation, and that index-catalog registration is skipped. `MetadataManager.InitializeCatalogs` now has 85.7% function coverage; metadata coverage is 88.2%, and full-module coverage is 94.5%.
 
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
