@@ -1287,6 +1287,7 @@ were tested first. The initial build failed because `New` did not accept a log o
 | --- | --- |
 | `TestNewInitializesIsolatedTransactionLocalState` | Each successful construction appends one START carrying the same ID exposed by the transaction |
 | `TestNewReturnsNoTransactionWhenStartAppendFails` | START append failure returns its cause and no transaction instance |
+| `TestNewRejectsMultipleRecoveryIteratorFactories` | Rejects two optional factories before allocating transaction state or appending START |
 
 This maps to Java `RecoveryMgr` construction invoked from the `Transaction` constructor. Go makes the fallible side effect
 part of the constructor result instead of relying on an unchecked exception. START flush remains intentionally absent.

@@ -1575,3 +1575,17 @@ func newTransactionStringBlock(t *testing.T, offset int, value string) (*buffer.
 	}
 	return bufferManager, logs, block
 }
+
+func TestNewRejectsMultipleRecoveryIteratorFactories(t *testing.T) {
+	t.Parallel()
+
+	var factory recovery.EncodedRecordIteratorFactory
+	transaction, err := New(nil, nil, nil, nil, factory, factory)
+	if transaction != nil {
+		t.Errorf("New() transaction = %v, want nil", transaction)
+	}
+	const want = "create transaction: expected at most one recovery iterator factory, got 2"
+	if err == nil || err.Error() != want {
+		t.Errorf("New() error = %v, want %q", err, want)
+	}
+}
