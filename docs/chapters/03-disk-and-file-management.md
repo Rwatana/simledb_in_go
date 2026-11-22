@@ -446,6 +446,7 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | Test | 説明する振る舞い |
 | --- | --- |
 | `TestManagerAppendsZeroFilledBlocksAndReportsLength` | missing file、連続番号、zero fill、既存block保持、length |
+| `TestManagerAppendPreservesBlockOpenFailure` | block fileがdirectoryの場合のopen error cause/contextを保ち、directoryを残す |
 | `TestManagerRejectsPartialBlockFiles` | partial blockとpath traversalを拒否しfile sizeを変えない |
 
 ## Javaソースリーディング

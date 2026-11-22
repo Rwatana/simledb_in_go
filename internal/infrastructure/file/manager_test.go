@@ -211,6 +211,36 @@ func TestManagerWriteRejectsNilPageBeforeCreatingFile(t *testing.T) {
 	}
 }
 
+func TestManagerAppendPreservesBlockOpenFailure(t *testing.T) {
+	t.Parallel()
+
+	const fileName = "student.tbl"
+	directory := filepath.Join(t.TempDir(), "database")
+	manager := newManager(t, directory, 16)
+	target := filepath.Join(directory, fileName)
+	if err := os.Mkdir(target, 0o700); err != nil {
+		t.Fatalf("Mkdir(%q) error = %v", target, err)
+	}
+
+	block, err := manager.Append(fileName)
+	if block != (storage.BlockID{}) {
+		t.Errorf("Append(%q) block = %v, want zero BlockID", fileName, block)
+	}
+	if err == nil || !errors.Is(err, syscall.EISDIR) {
+		t.Fatalf("Append(%q) error = %v, want an EISDIR cause", fileName, err)
+	}
+	if !strings.Contains(err.Error(), fileName) {
+		t.Errorf("Append(%q) error = %q, want filename context", fileName, err)
+	}
+	info, statErr := os.Stat(target)
+	if statErr != nil {
+		t.Fatalf("Stat(%q) error = %v, want the original directory to remain", target, statErr)
+	}
+	if !info.IsDir() {
+		t.Errorf("%q is not a directory after failed append", target)
+	}
+}
+
 func TestManagerAppendsZeroFilledBlocksAndReportsLength(t *testing.T) {
 	t.Parallel()
 
