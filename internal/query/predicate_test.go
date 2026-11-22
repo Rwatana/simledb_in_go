@@ -97,3 +97,36 @@ func TestPredicateConjoinWithConcatenatesTermsAndPreservesInputs(t *testing.T) {
 		t.Fatalf("left.ConjoinWith(empty) terms = %v, want %v", got.terms, left.terms)
 	}
 }
+
+func TestPredicateSelectSubPredicate(t *testing.T) {
+	termA := NewTerm(NewFieldExpression("a"), NewConstantExpression(NewIntConstant(1)))
+	termAB := NewTerm(NewFieldExpression("a"), NewFieldExpression("b"))
+	literalTerm := NewTerm(NewConstantExpression(NewIntConstant(1)), NewConstantExpression(NewIntConstant(1)))
+	predicate := Predicate{terms: []Term{termA, termAB, literalTerm, termA}}
+
+	selected, ok := predicate.SelectSubPredicate(schemaWithFields("a"))
+	if !ok {
+		t.Fatal("SelectSubPredicate(schemaWithFields(\"a\")) returned no predicate, want matches")
+	}
+	if want := []Term{termA, literalTerm, termA}; !reflect.DeepEqual(selected.terms, want) {
+		t.Fatalf("selected terms = %v, want %v", selected.terms, want)
+	}
+	if want := []Term{termA, termAB, literalTerm, termA}; !reflect.DeepEqual(predicate.terms, want) {
+		t.Fatalf("source terms = %v, want unchanged %v", predicate.terms, want)
+	}
+
+	noMatch, ok := NewPredicateWithTerm(termAB).SelectSubPredicate(schemaWithFields("a"))
+	if ok || len(noMatch.terms) != 0 {
+		t.Fatalf("no-match selection = (%v, %v), want (empty predicate, false)", noMatch.terms, ok)
+	}
+
+	selectedLiteral, ok := NewPredicateWithTerm(literalTerm).SelectSubPredicate(nil)
+	if !ok || !reflect.DeepEqual(selectedLiteral.terms, []Term{literalTerm}) {
+		t.Fatalf("literal selection for nil schema = (%v, %v), want one matching term", selectedLiteral.terms, ok)
+	}
+
+	var empty Predicate
+	if selectedEmpty, ok := empty.SelectSubPredicate(schemaWithFields("a")); ok || len(selectedEmpty.terms) != 0 {
+		t.Fatalf("empty predicate selection = (%v, %v), want (empty predicate, false)", selectedEmpty.terms, ok)
+	}
+}

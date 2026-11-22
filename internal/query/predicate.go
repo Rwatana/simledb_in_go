@@ -1,5 +1,7 @@
 package query
 
+import "github.com/Rwatana/simledb_in_go/internal/record"
+
 // Predicate represents a conjunction of query terms.
 // Its zero value is an empty conjunction that is always satisfied.
 type Predicate struct {
@@ -18,6 +20,20 @@ func (predicate Predicate) ConjoinWith(other Predicate) Predicate {
 	terms = append(terms, predicate.terms...)
 	terms = append(terms, other.terms...)
 	return Predicate{terms: terms}
+}
+
+// SelectSubPredicate returns the terms that apply to schema and whether any terms matched.
+func (predicate Predicate) SelectSubPredicate(schema *record.Schema) (Predicate, bool) {
+	selected := Predicate{}
+	for _, term := range predicate.terms {
+		if term.AppliesTo(schema) {
+			selected.terms = append(selected.terms, term)
+		}
+	}
+	if len(selected.terms) == 0 {
+		return Predicate{}, false
+	}
+	return selected, true
 }
 
 // IsSatisfied reports whether every term in the predicate is satisfied by scan.
