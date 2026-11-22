@@ -19,6 +19,7 @@ type catalogTransaction struct {
 	pins         []storage.BlockID
 	unpins       []storage.BlockID
 	appendCalls  []string
+	sizeErr      error
 	setStringErr error
 	unpinErr     error
 }
@@ -41,6 +42,9 @@ func newEmptyCatalogTransaction(blockSize int) *catalogTransaction {
 }
 
 func (t *catalogTransaction) Size(fileName string) (int, error) {
+	if t.sizeErr != nil {
+		return 0, t.sizeErr
+	}
 	size := 0
 	for {
 		if _, ok := t.pages[storage.NewBlockID(fileName, size)]; !ok {
@@ -208,6 +212,29 @@ func TestTableManagerCreateTableReportsCloseFailureAfterSuccessfulTableWrite(t *
 	}
 	if len(transaction.pins) != 1 || transaction.pins[0] != storage.NewBlockID("tblcat.tbl", 0) {
 		t.Fatalf("pins = %v, want only the table catalog", transaction.pins)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+}
+
+func TestTableManagerCreateTablePreservesCatalogScanOpenFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	sizeErr := errors.New("catalog size failed")
+	transaction.sizeErr = sizeErr
+	var schema record.Schema
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, sizeErr) {
+		t.Fatalf("CreateTable() error = %v, want size cause", err)
+	}
+	for _, context := range []string{"student", "table catalog", "open catalog scan", "read size"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	if len(transaction.pins) != 0 || len(transaction.unpins) != 0 {
+		t.Fatalf("pins/unpins = %v/%v, want none for an unopened scan", transaction.pins, transaction.unpins)
 	}
 	if len(transaction.appendCalls) != 0 {
 		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
