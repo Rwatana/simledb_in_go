@@ -83,3 +83,12 @@ func (m *MetadataManager) CreateIndex(indexName, tableName, fieldName string, tr
 	}
 	return nil
 }
+
+// IndexInfo returns a table's registered indexes through the metadata facade.
+func (m *MetadataManager) IndexInfo(tableName string, transaction record.TableScanTransaction) (map[string]*IndexInfo, error) {
+	indexes, err := m.indexes.IndexInfo(tableName, transaction)
+	if err != nil {
+		return nil, fmt.Errorf("look up indexes for table %q through metadata manager: %w", tableName, err)
+	}
+	return indexes, nil
+}
