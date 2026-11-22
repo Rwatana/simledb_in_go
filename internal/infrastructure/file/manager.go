@@ -89,9 +89,6 @@ func (m *Manager) Append(fileName string) (storage.BlockID, error) {
 	if err != nil {
 		return storage.BlockID{}, fmt.Errorf("append block %d to %q: wrote %d of %d bytes: %w", blockNumber, fileName, written, len(zeroBlock), err)
 	}
-	if written != len(zeroBlock) {
-		return storage.BlockID{}, fmt.Errorf("append block %d to %q: wrote %d of %d bytes", blockNumber, fileName, written, len(zeroBlock))
-	}
 	if err := file.Sync(); err != nil {
 		return storage.BlockID{}, fmt.Errorf("append block %d to %q: sync %q: %w", blockNumber, fileName, path, err)
 	}
