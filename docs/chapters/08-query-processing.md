@@ -8,6 +8,7 @@ dependency order. Each observable behavior remains a separate Issue, branch, com
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/query.Constant` | `simpledb/query/Constant.java` | Typed values read, compared, and written by query scans |
+| `internal/query.Expression` | `simpledb/query/Expression.java` | Literal values and field references used by relational operators |
 
 ## Feature 1: Initialize an integer query constant
 
@@ -71,3 +72,13 @@ runes for malformed UTF-8. An unset constant reports that no hash is available.
 
 `TestConstantHashCode` first failed because the method was undefined. It covers an integer, an empty string,
 ASCII, a BMP character, a supplementary character, signed overflow, malformed UTF-8, and the unset value.
+
+## Feature 7: Construct a literal query expression
+
+`NewConstantExpression` and `AsConstant` implement the literal constructor and accessor from Java `Expression(Constant)`
+and `asConstant`. A separate presence bit preserves the difference between an expression containing a value and a
+zero-value expression. `IsFieldName` is false for this literal form. Field references and evaluation against a scan
+remain separate behaviors.
+
+`TestLiteralExpressionReturnsItsConstant` initially failed because the constructor and type did not exist.
+`TestZeroValueExpressionHasNoConstant` checks the absent-literal result.
