@@ -971,6 +971,69 @@ func TestTableManagerLayoutPreservesFieldNameReadFailure(t *testing.T) {
 	}
 }
 
+func TestTableManagerLayoutRejectsDuplicateFieldMetadata(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	manager := NewTableManager()
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	if err := tablePage.SetInt(0, 1); err != nil {
+		t.Fatalf("mark tblcat row occupied: %v", err)
+	}
+	if err := tablePage.SetBytes(4, []byte("student")); err != nil {
+		t.Fatalf("store tblcat table name: %v", err)
+	}
+	slotSizeOffset, _ := manager.tableCatalogLayout.Offset("slotsize")
+	if err := tablePage.SetInt(slotSizeOffset, 128); err != nil {
+		t.Fatalf("store tblcat slot size: %v", err)
+	}
+	fieldPage := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)]
+	fieldSlotSize := manager.fieldCatalogLayout.SlotSize()
+	tblNameOffset, _ := manager.fieldCatalogLayout.Offset("tblname")
+	fldNameOffset, _ := manager.fieldCatalogLayout.Offset("fldname")
+	typeOffset, _ := manager.fieldCatalogLayout.Offset("type")
+	lengthOffset, _ := manager.fieldCatalogLayout.Offset("length")
+	offsetOffset, _ := manager.fieldCatalogLayout.Offset("offset")
+	for _, base := range []int{0, fieldSlotSize} {
+		if err := fieldPage.SetInt(base, 1); err != nil {
+			t.Fatalf("mark fldcat row at %d occupied: %v", base, err)
+		}
+		if err := fieldPage.SetBytes(base+tblNameOffset, []byte("student")); err != nil {
+			t.Fatalf("store fldcat owner at %d: %v", base, err)
+		}
+		if err := fieldPage.SetBytes(base+fldNameOffset, []byte("sid")); err != nil {
+			t.Fatalf("store fldcat field name at %d: %v", base, err)
+		}
+		if err := fieldPage.SetInt(base+typeOffset, int32(record.IntegerField)); err != nil {
+			t.Fatalf("store fldcat type at %d: %v", base, err)
+		}
+		if err := fieldPage.SetInt(base+lengthOffset, 0); err != nil {
+			t.Fatalf("store fldcat length at %d: %v", base, err)
+		}
+		if err := fieldPage.SetInt(base+offsetOffset, 4); err != nil {
+			t.Fatalf("store fldcat offset at %d: %v", base, err)
+		}
+	}
+
+	layout, err := manager.Layout("student", transaction)
+	if layout != nil || err == nil {
+		t.Fatalf("Layout() = (%v, %v), want duplicate-field error", layout, err)
+	}
+	for _, context := range []string{"student", "duplicate field metadata", "sid"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("Layout() error = %q, want context %q", err, context)
+		}
+	}
+	wantBlocks := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if got, want := transaction.pins, wantBlocks; !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins = %v, want %v", got, want)
+	}
+	if got, want := transaction.unpins, wantBlocks; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unpins = %v, want %v", got, want)
+	}
+}
+
 func TestTableManagerLayoutPreservesTableCatalogSlotSizeReadFailure(t *testing.T) {
 	transaction := newCatalogTransaction(t, 512)
 	readErr := errors.New("table catalog slot-size read failed")
