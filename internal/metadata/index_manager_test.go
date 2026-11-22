@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/record"
@@ -69,6 +70,23 @@ func TestIndexManagerInitializeCatalogRejectsMissingTableManager(t *testing.T) {
 	manager := NewIndexManager(nil, nil)
 	if err := manager.InitializeCatalog(newEmptyCatalogTransaction(2048)); err == nil {
 		t.Fatal("InitializeCatalog() error = nil, want missing table manager")
+	}
+}
+
+func TestIndexManagerIndexInfoRejectsMissingStatisticsManager(t *testing.T) {
+	manager := NewIndexManager(NewTableManager(), nil)
+
+	indexes, err := manager.IndexInfo("student", nil)
+	if indexes != nil {
+		t.Errorf("IndexInfo() indexes = %v, want nil when statistics manager is missing", indexes)
+	}
+	if err == nil {
+		t.Fatal("IndexInfo() error = nil, want missing statistics manager error")
+	}
+	for _, context := range []string{"student", "statistics manager is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
 	}
 }
 
