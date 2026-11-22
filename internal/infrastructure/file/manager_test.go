@@ -241,6 +241,35 @@ func TestManagerAppendPreservesBlockOpenFailure(t *testing.T) {
 	}
 }
 
+func TestManagerWritePreservesBlockOpenFailure(t *testing.T) {
+	t.Parallel()
+
+	const blockSize = 16
+	directory := filepath.Join(t.TempDir(), "database")
+	manager := newManager(t, directory, blockSize)
+	block := storage.NewBlockID("student.tbl", 0)
+	target := filepath.Join(directory, block.FileName())
+	if err := os.Mkdir(target, 0o700); err != nil {
+		t.Fatalf("Mkdir(%q) error = %v", target, err)
+	}
+	page := newStoragePage(t, blockSize)
+
+	err := manager.Write(block, page)
+	if err == nil || !errors.Is(err, syscall.EISDIR) {
+		t.Fatalf("Write(%v, page) error = %v, want an EISDIR cause", block, err)
+	}
+	if !strings.Contains(err.Error(), block.String()) {
+		t.Errorf("Write(%v, page) error = %q, want block context", block, err)
+	}
+	info, statErr := os.Stat(target)
+	if statErr != nil {
+		t.Fatalf("Stat(%q) error = %v, want the original directory to remain", target, statErr)
+	}
+	if !info.IsDir() {
+		t.Errorf("%q is not a directory after failed write", target)
+	}
+}
+
 func TestManagerAppendsZeroFilledBlocksAndReportsLength(t *testing.T) {
 	t.Parallel()
 
