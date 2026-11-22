@@ -10,6 +10,7 @@ dependency order. Each observable behavior remains a separate Issue, branch, com
 | `internal/query.Constant` | `simpledb/query/Constant.java` | Typed values read, compared, and written by query scans |
 | `internal/query.Expression` | `simpledb/query/Expression.java` | Literal values and field references used by relational operators |
 | `internal/query.Term` | `simpledb/query/Term.java` | Equality between two expressions |
+| `internal/query.Scan` | `simpledb/query/Scan.java` | Shared traversal, field access, and cleanup contract |
 
 ## Feature 1: Initialize an integer query constant
 
@@ -250,3 +251,14 @@ and joins them with ` and `. An empty predicate, including the zero value, rende
 
 `TestPredicateString` first failed because `Predicate.String` was undefined. It covers empty, single-term, and
 multi-term output and verifies that formatting leaves the predicate unchanged.
+
+## Feature 25: Define the query scan contract
+
+`Scan` maps to Java's `simpledb.query.Scan` interface and combines before-first positioning, forward iteration,
+typed integer/string reads, `ValueScan.GetVal`, field membership, and close. File-backed Go operations return errors
+so query operators can propagate I/O and transaction failures without relying on Java runtime exceptions. The
+interface is declared in the consumer package; record scans can satisfy it without importing the query package.
+
+`TestScanContractProvidesTraversalAndValueOperations` first failed to compile because `query.Scan` did not exist.
+The test uses a representative implementation to exercise every method through the interface. Concrete table-scan
+adaptation and relational operators remain separate behaviors.
