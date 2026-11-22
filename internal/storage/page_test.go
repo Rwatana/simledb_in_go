@@ -113,6 +113,22 @@ func TestPageGetBytesRejectsTruncatedLengthPrefix(t *testing.T) {
 	}
 }
 
+func TestPageGetBytesRejectsNegativeLength(t *testing.T) {
+	t.Parallel()
+
+	page := newPage(t, 4)
+	if err := page.SetInt(0, -1); err != nil {
+		t.Fatalf("SetInt() error = %v", err)
+	}
+	got, err := page.GetBytes(0)
+	if err == nil || got != nil {
+		t.Fatalf("GetBytes(0) = (%v, %v), want (nil, error)", got, err)
+	}
+	if !strings.Contains(err.Error(), "negative length -1") {
+		t.Errorf("GetBytes(0) error = %q, want negative-length context", err)
+	}
+}
+
 func TestPageRejectsOutOfBoundsAccess(t *testing.T) {
 	t.Parallel()
 

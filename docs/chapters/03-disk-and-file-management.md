@@ -240,11 +240,13 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | `TestPageStoresFourByteIntegers` | 符号付きint32をbig-endianでround-tripする |
 | `TestPageStoresLengthPrefixedBytes` | 空やNULを含むpayloadをlength prefix付きで保存する |
 | `TestPageGetBytesRejectsTruncatedLengthPrefix` | prefix全体がPageに収まらない場合にoffset付きerrorを返す |
+| `TestPageGetBytesRejectsNegativeLength` | 負のlength prefixをpayload allocation前に拒否する |
 | `TestPageRejectsOutOfBoundsAccess` | encoded rangeがcapacityを越える操作をerrorにする |
 | `TestPageSnapshotDoesNotExposeMutableMemory` | snapshotから内部memoryを書き換えられない |
 
 全module coverageの監査で、`GetBytes`自身から`GetInt`失敗をcontext付きで返す経路が未実行と分かった。このtestは
 3-byte Pageで4-byte prefixを読ませ、既存のguardを確認する。
+負のprefixをrejectする独立guardも未実行だったため、4-byteの`-1` prefixを使うtestを追加した。
 
 ## Javaソースリーディング
 
