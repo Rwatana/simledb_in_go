@@ -191,6 +191,7 @@ The tests first failed to compile because `TableManager.Layout` did not exist.
 | `TestTableManagerLayoutPreservesRegisteredTableNameReadFailure` | A tblcat table-name read error keeps context, closes the table catalog, and stops before fldcat |
 | `TestTableManagerLayoutPreservesTableCatalogScanFailure` | A tblcat occupancy read failure keeps scan context, closes the table catalog, and stops before fldcat |
 | `TestTableManagerLayoutPreservesTableCatalogSlotSizeReadFailure` | A matching tblcat slot-size read error keeps context, closes the table catalog, and stops before fldcat |
+| `TestTableManagerLayoutRejectsInvalidTableCatalogSlotSize` | A matching tblcat row with a slot smaller than the occupancy flag returns contextual validation and closes tblcat without opening fldcat |
 | `TestTableManagerLayoutReportsMissingTableAndClosesTableCatalog` | An absent table returns contextual failure after closing `tblcat` without opening `fldcat` |
 
 ## Feature 7: Construct the view catalog schema
