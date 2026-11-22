@@ -256,3 +256,47 @@ func TestMetadataManagerCreateViewPreservesLayoutError(t *testing.T) {
 		t.Fatalf("catalog append calls = %v, want only initialized table and field catalogs", transaction.appendCalls)
 	}
 }
+
+func TestMetadataManagerViewDefinitionLooksUpStoredAndMissingViews(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	if err := manager.CreateView("seniors", "select sid from student where gradyear=2020", transaction); err != nil {
+		t.Fatalf("CreateView() error = %v", err)
+	}
+
+	definition, found, err := manager.ViewDefinition("seniors", transaction)
+	if err != nil || !found || definition != "select sid from student where gradyear=2020" {
+		t.Fatalf("ViewDefinition(seniors) = (%q, %v, %v), want stored definition", definition, found, err)
+	}
+	definition, found, err = manager.ViewDefinition("missing", transaction)
+	if err != nil || found || definition != "" {
+		t.Fatalf("ViewDefinition(missing) = (%q, %v, %v), want (\"\", false, nil)", definition, found, err)
+	}
+}
+
+func TestMetadataManagerViewDefinitionPreservesCatalogReadError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	wantErr := errors.New("table catalog size unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+
+	definition, found, err := manager.ViewDefinition("seniors", transaction)
+	if definition != "" || found {
+		t.Fatalf("ViewDefinition() = (%q, %v), want empty and not found on catalog failure", definition, found)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("ViewDefinition() error = %v, want wrapped size cause", err)
+	}
+	for _, context := range []string{`look up view "seniors" through metadata manager`, "load view catalog layout"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("ViewDefinition() error = %q, want context %q", err, context)
+		}
+	}
+}
