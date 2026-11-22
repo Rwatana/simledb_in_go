@@ -366,6 +366,33 @@ func TestTableManagerCreateTablePreservesOperationAndCloseFailures(t *testing.T)
 	}
 }
 
+func TestTableManagerCreateTablePreservesTableCatalogInsertFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	insertErr := errors.New("table catalog row insert failed")
+	transaction.setIntErr = insertErr
+	transaction.setIntOffset = 0
+	var schema record.Schema
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, insertErr) {
+		t.Fatalf("CreateTable() error = %v, want table catalog insert cause", err)
+	}
+	for _, context := range []string{"student", "table catalog", "insert table catalog row"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	if got, want := transaction.pins, []storage.BlockID{storage.NewBlockID("tblcat.tbl", 0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins = %v, want %v", got, want)
+	}
+	if !reflect.DeepEqual(transaction.unpins, transaction.pins) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, transaction.pins)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+}
+
 func TestTableManagerCreateTablePreservesTableSlotSizeWriteFailure(t *testing.T) {
 	transaction := newCatalogTransaction(t, 512)
 	writeErr := errors.New("integer metadata write failed")
