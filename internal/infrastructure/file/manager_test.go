@@ -194,6 +194,23 @@ func TestManagerRejectsInvalidBlockAccess(t *testing.T) {
 	}
 }
 
+func TestManagerWriteRejectsNilPageBeforeCreatingFile(t *testing.T) {
+	t.Parallel()
+
+	const blockSize = 16
+	directory := filepath.Join(t.TempDir(), "database")
+	manager := newManager(t, directory, blockSize)
+	block := storage.NewBlockID("student.tbl", 0)
+
+	err := manager.Write(block, nil)
+	if err == nil || !strings.Contains(err.Error(), "page must not be nil") || !strings.Contains(err.Error(), block.String()) {
+		t.Fatalf("Write(%v, nil) error = %v, want block-specific nil-page error", block, err)
+	}
+	if _, statErr := os.Stat(filepath.Join(directory, block.FileName())); !os.IsNotExist(statErr) {
+		t.Fatalf("target file stat error = %v, want file to remain absent", statErr)
+	}
+}
+
 func TestManagerAppendsZeroFilledBlocksAndReportsLength(t *testing.T) {
 	t.Parallel()
 
