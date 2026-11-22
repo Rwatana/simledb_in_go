@@ -92,3 +92,13 @@ behaviors.
 
 `TestFieldExpressionReturnsItsName` initially failed because the field constructor and accessor did not exist.
 `TestZeroValueExpressionHasNoFieldName` checks the absent field result.
+
+## Feature 9: Evaluate query expressions against a scan
+
+`Expression.Evaluate` maps to Java `Expression.evaluate`. A literal returns its value without scan access. A field
+reference asks the minimal `ValueScan` boundary for exactly that field and preserves lookup errors. The consumer
+defines this small interface, so query expressions do not depend on a concrete record scan. An unset expression and
+a field expression with a nil scan return contextual errors.
+
+The tests first failed because `Evaluate` and `ValueScan` did not exist. They verify literal short-circuiting,
+one field lookup, and unchanged lookup-error propagation.
