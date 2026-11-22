@@ -1,7 +1,9 @@
 package metadata
 
 import (
+	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/record"
@@ -60,6 +62,26 @@ func TestViewManagerInitializeCatalogRegistersViewMetadata(t *testing.T) {
 	assertFieldCatalogRow(t, fieldPage, 1216, "viewcat", "viewdef", record.VarcharField, MaxViewDefinitionLength, 72)
 	if len(transaction.appendCalls) != 0 {
 		t.Fatalf("append calls = %v, want none for catalog metadata registration", transaction.appendCalls)
+	}
+}
+
+func TestViewManagerInitializeCatalogWrapsCatalogCloseFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	closeErr := errors.New("catalog unpin failed")
+	transaction.unpinErr = closeErr
+
+	err := NewViewManager(tables).InitializeCatalog(transaction)
+	if !errors.Is(err, closeErr) {
+		t.Fatalf("InitializeCatalog() error = %v, want wrapped close cause", err)
+	}
+	for _, context := range []string{"initialize view catalog", "close catalog scan"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("InitializeCatalog() error = %q, want context %q", err, context)
+		}
 	}
 }
 
