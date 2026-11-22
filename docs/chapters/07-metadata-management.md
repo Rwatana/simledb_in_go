@@ -671,6 +671,7 @@ The test first failed to compile because `MetadataManager.InitializeCatalogs` di
 | `TestMetadataManagerInitializeCatalogsRegistersCompleteCatalogSet` | Startup makes the table, field, view, and index catalog layouts reconstructable while appending only the two physical self-describing catalog files |
 | `TestMetadataManagerInitializeCatalogsPreservesTableCatalogFailure` | Failure loading the initial table catalog preserves its cause and facade-stage context before any catalog block is appended |
 | `TestMetadataManagerInitializeCatalogsPreservesViewCatalogFailure` | A view-catalog registration failure preserves its cause and facade-stage context after table catalogs initialize, without registering the later index catalog |
+| `TestMetadataManagerInitializeCatalogsPreservesIndexCatalogFailure` | An index-catalog registration failure preserves its cause and facade-stage context while retaining completed table, field, and view catalog metadata |
 
 ## Feature 32: Create a table through the metadata facade
 
