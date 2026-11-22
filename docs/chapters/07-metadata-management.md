@@ -105,11 +105,14 @@ not exist.
 | `TestTableManagerCreateTableStoresCatalogRows` | One table row and declaration-ordered field rows retain the schema's logical and derived physical metadata, and both scans close |
 | `TestTableManagerCreateTablePreservesOperationAndCloseFailures` | A catalog write failure still closes its scan, preserves both causes when cleanup also fails, and stops before the next catalog |
 | `TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess` | A nil schema returns table-specific context before a nil transaction can be touched |
+| `TestTableManagerCreateTableReportsCloseFailureAfterSuccessfulTableWrite` | A successful catalog write still reports a scan-close failure and prevents the next catalog from opening |
 | `TestMetadataIntegerPreservesInt32Bounds` | The smallest and largest signed 32-bit values remain representable in catalog metadata |
 | `TestMetadataIntegerRejectsValuesOutsideInt32` | Values immediately outside the signed 32-bit range return zero and a contextual range error |
 
 The full-module coverage audit found the existing nil-schema guard was not exercised. The focused test records this
 already-supported rejection and confirms it happens before catalog I/O; it does not change table-creation behavior.
+The close-failure coverage case distinguishes cleanup failure after a successful write from the existing combined
+write-and-close failure case. It verifies the field catalog is not touched after the first scan fails to close.
 The same audit exposed the signed integer range guard. Boundary and out-of-range tests now cover `metadataInteger`
 without changing the values stored for valid metadata.
 

@@ -188,6 +188,32 @@ func TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess(t *testi
 	}
 }
 
+func TestTableManagerCreateTableReportsCloseFailureAfterSuccessfulTableWrite(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	closeErr := errors.New("catalog unpin failed")
+	transaction.unpinErr = closeErr
+	var schema record.Schema
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, closeErr) {
+		t.Fatalf("CreateTable() error = %v, want close cause", err)
+	}
+	for _, context := range []string{"student", "table catalog", "close catalog scan"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	if got, want := transaction.unpins, []storage.BlockID{storage.NewBlockID("tblcat.tbl", 0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unpins = %v, want %v", got, want)
+	}
+	if len(transaction.pins) != 1 || transaction.pins[0] != storage.NewBlockID("tblcat.tbl", 0) {
+		t.Fatalf("pins = %v, want only the table catalog", transaction.pins)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+}
+
 func TestMetadataIntegerPreservesInt32Bounds(t *testing.T) {
 	for _, value := range []int{math.MinInt32, math.MaxInt32} {
 		got, err := metadataInteger("slot size", value)
