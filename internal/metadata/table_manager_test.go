@@ -30,6 +30,7 @@ type catalogTransaction struct {
 	setIntOffset      int32
 	setIntErrAfter    int
 	setIntOffsetCalls int
+	setIntCalls       int
 	unpinErr          error
 }
 
@@ -110,6 +111,7 @@ func (t *catalogTransaction) GetString(block storage.BlockID, offset int) (strin
 }
 
 func (t *catalogTransaction) SetInt(block storage.BlockID, offset int32, value int32, _ bool) error {
+	t.setIntCalls++
 	if t.setIntErr != nil && offset == t.setIntOffset {
 		t.setIntOffsetCalls++
 		if t.setIntErrAfter == 0 || t.setIntOffsetCalls == t.setIntErrAfter {
@@ -471,6 +473,43 @@ func TestTableManagerCreateTablePreservesFieldCatalogTableNameWriteFailure(t *te
 	}
 	if got, err := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)].GetInt(0); err != nil || got != 1 {
 		t.Fatalf("fldcat occupancy = (%d, %v), want the inserted row marked used", got, err)
+	}
+}
+
+func TestTableManagerCreateTablePreservesFieldCatalogTypeWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("field catalog type write failed")
+	manager := NewTableManager()
+	typeOffset, _ := manager.fieldCatalogLayout.Offset("type")
+	transaction.setIntErr = writeErr
+	transaction.setIntOffset = int32(typeOffset)
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := manager.CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want fldcat type write cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `store field type for "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if transaction.setIntCalls != 4 {
+		t.Fatalf("integer writes = %d, want stop at the field-type write", transaction.setIntCalls)
+	}
+	if transaction.setStringCalls != 3 {
+		t.Fatalf("string writes = %d, want table name, field table name, and field name", transaction.setStringCalls)
 	}
 }
 

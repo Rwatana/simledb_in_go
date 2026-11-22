@@ -107,6 +107,7 @@ not exist.
 | `TestTableManagerCreateTablePreservesFieldCatalogInsertFailure` | A fldcat row insertion error retains its cause and context, closes both scans, and leaves the field slot unused |
 | `TestTableManagerCreateTablePreservesFieldCatalogFieldNameWriteFailure` | A fldcat field-name write error retains field-specific context, closes both scans, and stops before later metadata writes |
 | `TestTableManagerCreateTablePreservesFieldCatalogTableNameWriteFailure` | A fldcat table-name write error retains field-specific context, closes both scans, and stops before later field metadata writes |
+| `TestTableManagerCreateTablePreservesFieldCatalogTypeWriteFailure` | A fldcat type write error retains field-specific context, closes both scans, and stops before length and offset writes |
 | `TestTableManagerCreateTablePreservesTableCatalogInsertFailure` | A tblcat row insertion error retains its cause and context, closes the table scan, and stops before fldcat |
 | `TestTableManagerCreateTablePreservesTableSlotSizeWriteFailure` | A slot-size write error retains its cause and context, closes the table scan, and stops before the field catalog |
 | `TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess` | A nil schema returns table-specific context before a nil transaction can be touched |
@@ -132,6 +133,8 @@ The field-catalog table-name write test exercises failure after the row has been
 catalog scans close and the later field-name and integer metadata writes are skipped.
 The field-name write test targets the following write in that row and confirms type, length, and offset writes do
 not follow the injected failure.
+The field-type write test counts transaction integer writes and verifies the catalog store exits before length and
+offset writes while preserving both scan cleanups.
 The same audit exposed the signed integer range guard. Boundary and out-of-range tests now cover `metadataInteger`
 without changing the values stored for valid metadata.
 
