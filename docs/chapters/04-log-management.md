@@ -100,6 +100,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | `TestNewManagerRejectsInvalidInitialization` | boundaryを格納できないblock sizeとinvalid pathを拒否する |
 | `TestNewManagerRejectsBlockSizeOutsideBoundaryCapacity` | 64-bitで4-byte boundaryを超えるblock sizeを早期拒否しfileを作らない |
 | `TestNewManagerRejectsNilFileManager` | nil FileManagerをfile-specific errorで拒否する |
+| `TestNewManagerRejectsInvalidPersistedTailBoundary` | 保存済みboundaryが最低値未満またはblock size超過なら拒否する |
 
 ## Javaソースリーディング
 

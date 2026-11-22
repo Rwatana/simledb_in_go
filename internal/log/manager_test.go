@@ -146,3 +146,41 @@ func TestNewManagerRejectsNilFileManager(t *testing.T) {
 		t.Errorf("NewManager() error = %v, want file-specific nil dependency context", err)
 	}
 }
+
+func TestNewManagerRejectsInvalidPersistedTailBoundary(t *testing.T) {
+	t.Parallel()
+
+	const blockSize = 32
+	for _, boundary := range []int32{3, blockSize + 1} {
+		boundary := boundary
+		t.Run(strconv.FormatInt(int64(boundary), 10), func(t *testing.T) {
+			t.Parallel()
+
+			files := newFileManager(t, blockSize)
+			const logFile = "simpledb.log"
+			if _, err := logmanager.NewManager(files, logFile); err != nil {
+				t.Fatalf("initial NewManager() error = %v", err)
+			}
+			block := storage.NewBlockID(logFile, 0)
+			page, err := files.Read(block)
+			if err != nil {
+				t.Fatalf("files.Read() error = %v", err)
+			}
+			if err := page.SetInt(0, boundary); err != nil {
+				t.Fatalf("Page.SetInt() error = %v", err)
+			}
+			if err := files.Write(block, page); err != nil {
+				t.Fatalf("files.Write() error = %v", err)
+			}
+
+			manager, err := logmanager.NewManager(files, logFile)
+			if manager != nil {
+				t.Errorf("NewManager() manager = %v, want nil for invalid tail boundary", manager)
+			}
+			want := "tail boundary " + strconv.FormatInt(int64(boundary), 10) + " outside [4, 32]"
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("NewManager() error = %v, want %q context", err, want)
+			}
+		})
+	}
+}
