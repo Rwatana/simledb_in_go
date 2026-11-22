@@ -33,6 +33,7 @@ type catalogTransaction struct {
 	setIntCalls          int
 	getIntErr            error
 	getIntOffset         int
+	getIntErrFile        string
 	getIntErrAfter       int
 	getIntOffsetCalls    int
 	getIntCalls          int
@@ -113,7 +114,7 @@ func (t *catalogTransaction) BlockSize() (int, error) {
 
 func (t *catalogTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
 	t.getIntCalls++
-	if t.getIntErr != nil && offset == t.getIntOffset {
+	if t.getIntErr != nil && offset == t.getIntOffset && (t.getIntErrFile == "" || block.FileName() == t.getIntErrFile) {
 		t.getIntOffsetCalls++
 		if t.getIntErrAfter == 0 || t.getIntOffsetCalls == t.getIntErrAfter {
 			return 0, t.getIntErr

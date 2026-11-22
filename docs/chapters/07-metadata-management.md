@@ -748,6 +748,13 @@ The test first failed to compile because `MetadataManager.ViewDefinition` did no
 | `TestMetadataManagerViewDefinitionLooksUpStoredAndMissingViews` | Lookup returns the exact stored SQL for `seniors` and an explicit non-error absence result for an unknown view |
 | `TestMetadataManagerViewDefinitionPreservesCatalogReadError` | A failed view-catalog layout lookup returns an empty not-found result and preserves the requested-view facade context and cause |
 
+## Coverage follow-up: index catalog scan errors
+
+The focused coverage test for `IndexManager.IndexInfo` injects a read failure only for the occupancy flag in
+`idxcat.tbl`. The lookup returns no partial map and retains the original cause plus table and catalog-scan context.
+The transaction fake filters this injected error by file name so catalog-layout reconstruction can complete first.
+This is a test-only improvement; the production error behavior is unchanged.
+
 ## Feature 36: Create an index through the metadata facade
 
 `MetadataManager.CreateIndex` delegates the index, table, and field names plus the transaction to the shared index

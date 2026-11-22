@@ -284,6 +284,35 @@ func TestIndexManagerCreateIndexPreservesCatalogRowInsertError(t *testing.T) {
 	}
 }
 
+func TestIndexManagerIndexInfoPreservesCatalogAdvanceError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	wantErr := errors.New("index catalog slot unavailable")
+	transaction.getIntErr = wantErr
+	transaction.getIntOffset = 0
+	transaction.getIntErrFile = "idxcat.tbl"
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil after catalog scan failure", indexes)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("IndexInfo() error = %v, want wrapped catalog scan cause", err)
+	}
+	for _, context := range []string{"student", "scan index catalog", "idxcat.tbl"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()
