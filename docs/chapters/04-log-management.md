@@ -1462,6 +1462,10 @@ ok github.com/Rwatana/simledb_in_go/internal/buffer
 | --- | --- |
 | `TestNewManagerCreatesAFixedSizePoolOfFreshFrames` | capacity、available、distinct frame、fresh state |
 | `TestNewManagerRejectsInvalidCapacityOrDependencies` | positive capacityとnon-nil dependency |
+| `TestNewManagerWrapsFrameConstructionFailure` | 最初のframe生成失敗でmanagerを返さずindexとcauseを保持 |
+
+zero-value FileManagerがinvalid block sizeを返すと、最初の`Buffer.New`が失敗する。この状態を使い、
+pool初期化がpartial managerを公開せず、frame indexと下位causeを維持する既存error pathをcoverage testで確認する。
 
 ## Javaソースリーディング
 

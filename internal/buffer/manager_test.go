@@ -3,6 +3,7 @@ package buffer
 import (
 	"bytes"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
@@ -87,4 +88,22 @@ func newManagerDependencies(t *testing.T, blockSize int) (*storagefile.Manager, 
 		t.Fatalf("log.NewManager() error = %v", err)
 	}
 	return files, logs
+}
+
+func TestNewManagerWrapsFrameConstructionFailure(t *testing.T) {
+	t.Parallel()
+
+	files := &storagefile.Manager{}
+	_, logs := newManagerDependencies(t, 32)
+
+	manager, err := NewManager(files, logs, 2)
+	if manager != nil {
+		t.Errorf("NewManager() manager = %v, want nil when frame construction fails", manager)
+	}
+	if err == nil {
+		t.Fatal("NewManager() error = nil, want the first frame construction failure")
+	}
+	if !strings.Contains(err.Error(), "frame 0") || !strings.Contains(err.Error(), "block size 0") {
+		t.Errorf("NewManager() error = %v, want frame index and invalid block-size context", err)
+	}
 }
