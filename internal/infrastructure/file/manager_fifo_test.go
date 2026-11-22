@@ -47,3 +47,36 @@ func TestManagerAppendPreservesFIFOWriteFailure(t *testing.T) {
 		t.Errorf("%q has mode %v, want a named pipe", target, info.Mode())
 	}
 }
+
+func TestManagerWritePreservesFIFOWriteFailure(t *testing.T) {
+	t.Parallel()
+
+	const (
+		blockSize = 16
+		block     = "student.tbl"
+	)
+	directory := filepath.Join(t.TempDir(), "database")
+	manager := newManager(t, directory, blockSize)
+	target := filepath.Join(directory, block)
+	if err := syscall.Mkfifo(target, 0o600); err != nil {
+		t.Fatalf("Mkfifo(%q) error = %v", target, err)
+	}
+
+	blockID := storage.NewBlockID(block, 0)
+	err := manager.Write(blockID, newStoragePage(t, blockSize))
+	if err == nil || !errors.Is(err, syscall.ESPIPE) {
+		t.Fatalf("Write(%v) error = %v, want a positioned-write ESPIPE cause", blockID, err)
+	}
+	for _, context := range []string{blockID.String(), "byte offset 0", "wrote 0 of 16 bytes"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Write(%v) error = %q, want context %q", blockID, err, context)
+		}
+	}
+	info, statErr := os.Stat(target)
+	if statErr != nil {
+		t.Fatalf("Stat(%q) error = %v, want the FIFO to remain", target, statErr)
+	}
+	if info.Mode()&os.ModeNamedPipe == 0 {
+		t.Errorf("%q has mode %v, want a named pipe", target, info.Mode())
+	}
+}
