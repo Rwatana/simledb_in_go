@@ -191,6 +191,7 @@ The tests first failed to compile because `TableManager.Layout` did not exist.
 | `TestTableManagerLayoutPreservesFieldCatalogScanFailure` | A fldcat occupancy read error retains scan context and cause, closes both catalogs, and does not append a catalog block |
 | `TestTableManagerLayoutPreservesFieldNameReadFailure` | A matching fldcat field-name read error keeps its cause and context, closes both scans, and stops before type metadata |
 | `TestTableManagerLayoutPreservesFieldOwnerTableNameReadFailure` | A fldcat table-owner read error keeps its context, closes both catalog scans, and stops before reading field metadata |
+| `TestTableManagerLayoutPreservesFieldOffsetReadFailure` | An offset read error retains cause/context and closes both scans after earlier metadata reads succeed |
 | `TestTableManagerLayoutRejectsDuplicateFieldMetadata` | Repeated field names in valid rows are rejected with table/field context and both scans close |
 | `TestTableManagerLayoutPreservesFieldTypeReadFailure` | A type read error retains its cause and field context, closes both scans, and stops before length/offset reads |
 | `TestTableManagerLayoutRejectsInvalidFieldType` | An unsupported stored type returns table/field context, closes both scans, and stops before length/offset reads |
