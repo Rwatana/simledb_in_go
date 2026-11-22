@@ -113,6 +113,13 @@ func TestEvaluateFieldExpressionReturnsScanError(t *testing.T) {
 	}
 }
 
+func TestEvaluateFieldExpressionRejectsNilScan(t *testing.T) {
+	_, err := NewFieldExpression("name").Evaluate(nil)
+	if err == nil || err.Error() != `evaluate field "name": nil scan` {
+		t.Fatalf("Evaluate() error = %v, want contextual nil-scan error", err)
+	}
+}
+
 func TestExpressionAppliesToSchema(t *testing.T) {
 	var empty record.Schema
 	var nilSchema *record.Schema

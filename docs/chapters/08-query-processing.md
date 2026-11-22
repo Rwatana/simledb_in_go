@@ -102,7 +102,9 @@ defines this small interface, so query expressions do not depend on a concrete r
 a field expression with a nil scan return contextual errors.
 
 The tests first failed because `Evaluate` and `ValueScan` did not exist. They verify literal short-circuiting,
-one field lookup, and unchanged lookup-error propagation.
+one field lookup, unchanged lookup-error propagation, and the contextual error returned for a field expression with a
+nil scan. The nil-scan guard already existed; a full-module coverage audit found that this error branch had never been
+executed, so the audit adds a focused regression test without changing production behavior.
 
 ## Feature 10: Check expression applicability to a schema
 
