@@ -9,9 +9,15 @@ const (
 	exclusiveLock
 )
 
+type transactionLockTable interface {
+	WaitShared(storage.BlockID) error
+	WaitExclusive(storage.BlockID) error
+	Unlock(storage.BlockID)
+}
+
 // Manager tracks the block locks held by one transaction.
 type Manager struct {
-	table *LockTable
+	table transactionLockTable
 	locks map[storage.BlockID]lockMode
 }
 

@@ -1100,7 +1100,8 @@ Go accepts the duration explicitly so tests and future transaction policy do not
 `Manager` represents the lock state of one transaction and receives the shared `LockTable` as a constructor dependency.
 Its local map records blocks already held by that transaction. `LockShared` asks the table to acquire only when the
 block is absent locally, so a repeated request remains one global shared hold. Different blocks are acquired and
-recorded independently.
+recorded independently. Internally, the manager depends on the narrow lock-table behavior it consumes, allowing a
+fallible acquisition to be tested without changing the public constructor or production table.
 
 ### Test-first record
 
@@ -1110,10 +1111,12 @@ failed because `Manager`, `NewManager`, and the local shared mode did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestManagerReusesTransactionSharedLock` | One transaction's repeated shared request reuses its existing global hold while a different block is acquired independently |
+| `TestManagerDoesNotRecordSharedLockAfterTableFailure` | A table acquisition error is returned and the failed block is not recorded as locally held |
 
 This maps to Java `ConcurrencyMgr.sLock` and its per-instance `locks` map. Go injects the table rather than hiding it in
-a static field, which keeps the global coordination boundary explicit and independently testable. Exclusive upgrade and
-release remain separate behaviors.
+a static field, which keeps the global coordination boundary explicit and independently testable. The internal
+interface also permits a focused failure fake for the manager's existing error propagation path. Exclusive upgrade
+and release remain separate behaviors.
 
 ## Feature 50: Upgrade a transaction-local lock to exclusive
 
