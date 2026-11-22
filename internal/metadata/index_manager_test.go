@@ -97,3 +97,56 @@ func TestIndexManagerCreateIndexStoresRegistrationInNewIndexCatalogFile(t *testi
 		t.Fatalf("append calls = %v, want %v", got, want)
 	}
 }
+
+func TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var studentSchema record.Schema
+	studentSchema.AddIntegerField("sid")
+	studentSchema.AddIntegerField("majorid")
+	if err := tables.CreateTable("student", &studentSchema, transaction); err != nil {
+		t.Fatalf("CreateTable(student) error = %v", err)
+	}
+	stats := NewStatManager(tables)
+	manager := NewIndexManager(tables, stats)
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	for _, registration := range [][3]string{
+		{"idx_student_id", "student", "sid"},
+		{"idx_department_name", "department", "dname"},
+		{"idx_student_major", "student", "majorid"},
+	} {
+		if err := manager.CreateIndex(registration[0], registration[1], registration[2], transaction); err != nil {
+			t.Fatalf("CreateIndex(%s) error = %v", registration[0], err)
+		}
+	}
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if err != nil {
+		t.Fatalf("IndexInfo(student) error = %v", err)
+	}
+	if len(indexes) != 2 {
+		t.Fatalf("student indexes = %v, want two entries", indexes)
+	}
+	for fieldName, indexName := range map[string]string{
+		"sid":     "idx_student_id",
+		"majorid": "idx_student_major",
+	} {
+		info := indexes[fieldName]
+		if info == nil || info.indexName != indexName || info.fieldName != fieldName {
+			t.Fatalf("index %s = %#v, want %s on %s", fieldName, info, indexName, fieldName)
+		}
+		if info.transaction != transaction || info.stats == nil {
+			t.Fatalf("index %s dependencies = (%v, %v), want transaction and statistics", fieldName, info.transaction, info.stats)
+		}
+	}
+
+	missing, err := manager.IndexInfo("course", transaction)
+	if err != nil || len(missing) != 0 {
+		t.Fatalf("IndexInfo(course) = (%v, %v), want empty map and nil error", missing, err)
+	}
+}

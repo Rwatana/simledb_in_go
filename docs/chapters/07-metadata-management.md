@@ -544,3 +544,21 @@ The test first failed to compile because `IndexManager.CreateIndex` did not exis
 | Test | Observable behavior |
 | --- | --- |
 | `TestIndexManagerCreateIndexStoresRegistrationInNewIndexCatalogFile` | Creating an index appends the first `idxcat` block and stores all three names in one occupied row |
+
+## Feature 29: Look up index metadata by table
+
+`IndexManager.IndexInfo` scans `idxcat`, filters registrations by their stored table name, and returns `IndexInfo`
+values keyed by indexed field name. Each match reconstructs the target table layout, obtains its cached or freshly
+calculated statistics, and builds the Chapter 7 cost metadata without opening a concrete index.
+
+The result is an initialized empty map when no registration matches. Missing dependencies and every catalog, layout,
+statistics, metadata-construction, and cleanup failure receive table or field context. Duplicate field registrations
+retain Java `IndexMgr.getIndexInfo` map semantics: the later catalog row replaces the earlier value for that key.
+
+### Test-first record
+
+The test first failed to compile because `IndexManager.IndexInfo` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable` | Lookup returns only the requested table's two indexes, keyed by field, and returns an empty map for an unindexed table |
