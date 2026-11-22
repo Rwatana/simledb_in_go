@@ -125,3 +125,13 @@ fails, the right side is not evaluated.
 
 The tests first failed because `NewTerm` was undefined. They cover equal and unequal literal values, mixed value kinds,
 left-to-right field lookup, and propagation of either evaluation error without evaluating later expressions.
+
+## Feature 12: Match a term field to a constant
+
+`Term.EquatesWithConstant` maps to Java `Term.equatesWithConstant`. It returns the literal when exactly one side
+references the requested field and the other side is a literal, regardless of operand order. Go uses the expression's
+presence result for constants, so even a literal containing the zero-value `Constant` remains distinguishable from an
+absent expression. A field mismatch, two fields, two literals, or an unset expression returns `(Constant{}, false)`.
+
+`TestTermEquatesWithConstant` first failed because the method was undefined. It covers both operand orders, the empty
+field name, a present zero-value literal, and non-matching term forms.
