@@ -102,3 +102,14 @@ a field expression with a nil scan return contextual errors.
 
 The tests first failed because `Evaluate` and `ValueScan` did not exist. They verify literal short-circuiting,
 one field lookup, and unchanged lookup-error propagation.
+
+## Feature 10: Check expression applicability to a schema
+
+`Expression.AppliesTo` maps to Java `Expression.appliesTo(Schema)`. A literal is independent of the schema and always
+applies. A field reference delegates membership to `record.Schema.HasField`. Go returns `false` for an unset
+expression or a nil schema rather than allowing a nil dereference; a literal still applies when the schema is nil.
+The method takes the existing `*record.Schema` type because the query layer already relies on record values and this
+operation needs precisely its membership behavior.
+
+`TestExpressionAppliesToSchema` first failed to compile because `AppliesTo` was undefined. It verifies literal,
+present and absent field, empty-name field, nil-schema, and zero-value expression cases.
