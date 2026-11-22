@@ -3,6 +3,7 @@ package file_test
 import (
 	"bytes"
 	"errors"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -184,8 +185,18 @@ func TestManagerRejectsInvalidBlockAccess(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(directory, "short.tbl"), make([]byte, blockSize-1), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
-	if _, err := manager.Read(storage.NewBlockID("short.tbl", 0)); err == nil {
+	shortBlock := storage.NewBlockID("short.tbl", 0)
+	if _, err := manager.Read(shortBlock); err == nil {
 		t.Error("Read() short block error = nil, want a short read error")
+	} else {
+		if !errors.Is(err, io.EOF) {
+			t.Errorf("Read() short block error = %v, want wrapped io.EOF", err)
+		}
+		for _, context := range []string{shortBlock.String(), "byte offset 0", "read 15 of 16 bytes"} {
+			if !strings.Contains(err.Error(), context) {
+				t.Errorf("Read() short block error = %q, want context %q", err, context)
+			}
+		}
 	}
 
 	overflow := storage.NewBlockID("student.tbl", math.MaxInt)

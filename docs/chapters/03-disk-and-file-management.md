@@ -354,7 +354,7 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | `TestManagerWritesAndReadsBlocks` | 複数blockのoffset、round-trip、Page間の非aliasing |
 | `TestManagerWriteRejectsNilPageBeforeCreatingFile` | nil Pageを書き込む要求をI/O前に拒否し、対象fileを作らない |
 | `TestManagerWritePreservesBlockOpenFailure` | block fileがdirectoryの場合のopen error cause/contextを保ち、directoryを残す |
-| `TestManagerRejectsInvalidBlockAccess` | 負数、overflow、size不一致、short read、path traversalのerror |
+| `TestManagerRejectsInvalidBlockAccess` | 負数、overflow、size不一致、`io.EOF`を伴う15/16 byteのshort read、path traversalのerror |
 | `TestNewPageFromBytesCopiesContents` | diskから渡されたsliceをPage内部と共有しない |
 
 ## Javaソースリーディング

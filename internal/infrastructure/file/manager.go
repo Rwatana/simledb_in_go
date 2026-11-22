@@ -118,9 +118,6 @@ func (m *Manager) Read(block storage.BlockID) (*storage.Page, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read block %v at byte offset %d: read %d of %d bytes: %w", block, offset, read, m.blockSize, err)
 	}
-	if read != m.blockSize {
-		return nil, fmt.Errorf("read block %v at byte offset %d: read %d of %d bytes", block, offset, read, m.blockSize)
-	}
 	return storage.NewPageFromBytes(contents), nil
 }
 
