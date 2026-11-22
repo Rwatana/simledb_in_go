@@ -38,10 +38,39 @@ func (m *TableManager) CreateTable(tableName string, schema *record.Schema, tran
 	if schema == nil {
 		return fmt.Errorf("create table metadata for %q: schema is nil", tableName)
 	}
+	type fieldCatalogMetadata struct {
+		name      string
+		fieldType record.FieldType
+		length    int32
+		offset    int32
+	}
+	fieldNames := schema.Fields()
+	catalogFields := make([]fieldCatalogMetadata, 0, len(fieldNames))
+	for _, fieldName := range fieldNames {
+		fieldType, _ := schema.TypeOf(fieldName)
+		fieldLength, _ := schema.LengthOf(fieldName)
+		if fieldLength < 0 {
+			return fmt.Errorf("create table metadata for %q: field %q: field length %d is negative", tableName, fieldName, fieldLength)
+		}
+		length, err := metadataInteger("field length", fieldLength)
+		if err != nil {
+			return fmt.Errorf("create table metadata for %q: field %q: %w", tableName, fieldName, err)
+		}
+		catalogFields = append(catalogFields, fieldCatalogMetadata{
+			name:      fieldName,
+			fieldType: fieldType,
+			length:    length,
+		})
+	}
 	layout := record.NewLayout(schema)
 	slotSize, err := metadataInteger("slot size", layout.SlotSize())
 	if err != nil {
 		return fmt.Errorf("create table metadata for %q: %w", tableName, err)
+	}
+	// Nonnegative field widths and the checked slot size bound every offset to int32.
+	for index := range catalogFields {
+		fieldOffset, _ := layout.Offset(catalogFields[index].name)
+		catalogFields[index].offset = int32(fieldOffset)
 	}
 
 	if err := withCatalogScan(transaction, "tblcat", m.tableCatalogLayout, func(scan *record.TableScan) error {
@@ -60,36 +89,24 @@ func (m *TableManager) CreateTable(tableName string, schema *record.Schema, tran
 	}
 
 	if err := withCatalogScan(transaction, "fldcat", m.fieldCatalogLayout, func(scan *record.TableScan) error {
-		for _, fieldName := range schema.Fields() {
-			fieldType, _ := schema.TypeOf(fieldName)
-			fieldLength, _ := schema.LengthOf(fieldName)
-			fieldOffset, _ := layout.Offset(fieldName)
-			length, err := metadataInteger("field length", fieldLength)
-			if err != nil {
-				return fmt.Errorf("field %q: %w", fieldName, err)
-			}
-			offset, err := metadataInteger("field offset", fieldOffset)
-			if err != nil {
-				return fmt.Errorf("field %q: %w", fieldName, err)
-			}
-
+		for _, field := range catalogFields {
 			if err := scan.Insert(); err != nil {
-				return fmt.Errorf("insert field catalog row for %q: %w", fieldName, err)
+				return fmt.Errorf("insert field catalog row for %q: %w", field.name, err)
 			}
 			if err := scan.SetString("tblname", tableName); err != nil {
-				return fmt.Errorf("store table name for field %q: %w", fieldName, err)
+				return fmt.Errorf("store table name for field %q: %w", field.name, err)
 			}
-			if err := scan.SetString("fldname", fieldName); err != nil {
-				return fmt.Errorf("store field name %q: %w", fieldName, err)
+			if err := scan.SetString("fldname", field.name); err != nil {
+				return fmt.Errorf("store field name %q: %w", field.name, err)
 			}
-			if err := scan.SetInt("type", int32(fieldType)); err != nil {
-				return fmt.Errorf("store field type for %q: %w", fieldName, err)
+			if err := scan.SetInt("type", int32(field.fieldType)); err != nil {
+				return fmt.Errorf("store field type for %q: %w", field.name, err)
 			}
-			if err := scan.SetInt("length", length); err != nil {
-				return fmt.Errorf("store field length for %q: %w", fieldName, err)
+			if err := scan.SetInt("length", field.length); err != nil {
+				return fmt.Errorf("store field length for %q: %w", field.name, err)
 			}
-			if err := scan.SetInt("offset", offset); err != nil {
-				return fmt.Errorf("store field offset for %q: %w", fieldName, err)
+			if err := scan.SetInt("offset", field.offset); err != nil {
+				return fmt.Errorf("store field offset for %q: %w", field.name, err)
 			}
 		}
 		return nil

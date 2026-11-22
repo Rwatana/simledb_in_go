@@ -203,7 +203,8 @@ func TestTableManagerCreateTableRejectsUnencodableSlotSizeBeforeTransactionAcces
 		t.Skip("int cannot represent a schema whose slot size exceeds int32 on this platform")
 	}
 	var schema record.Schema
-	schema.AddVarcharField("oversized", math.MaxInt32)
+	schema.AddVarcharField("first", math.MaxInt32/2)
+	schema.AddVarcharField("second", math.MaxInt32/2)
 
 	err := NewTableManager().CreateTable("oversized", &schema, nil)
 	if err == nil {
@@ -214,6 +215,49 @@ func TestTableManagerCreateTableRejectsUnencodableSlotSizeBeforeTransactionAcces
 			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
 		}
 	}
+}
+
+func TestTableManagerCreateTableRejectsOutOfRangeFieldLengthBeforeTransactionAccess(t *testing.T) {
+	if strconv.IntSize < 64 {
+		t.Skip("int cannot represent field lengths above int32 on this platform")
+	}
+	fieldLength := int64(math.MaxInt32) + 1
+	var schema record.Schema
+	schema.AddVarcharField("oversized", int(fieldLength))
+
+	err := NewTableManager().CreateTable("oversized_field", &schema, nil)
+	if err == nil {
+		t.Fatal("CreateTable() error = nil, want field-length range error")
+	}
+	for _, context := range []string{"oversized_field", "oversized", "field length", "exceeds int32 range"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestTableManagerCreateTableRejectsInvalidFieldMetadataBeforeCatalogWrites(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	var schema record.Schema
+	schema.AddVarcharField("badname", -1)
+
+	err := NewTableManager().CreateTable("invalid_table", &schema, transaction)
+	if err == nil {
+		t.Fatal("CreateTable() error = nil, want invalid field-length error")
+	}
+	for _, context := range []string{"invalid_table", "badname", "field length"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	if len(transaction.pins) != 0 || len(transaction.unpins) != 0 {
+		t.Fatalf("pins/unpins = %v/%v, want no catalog scans", transaction.pins, transaction.unpins)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+	assertPageInt(t, transaction.pages[storage.NewBlockID("tblcat.tbl", 0)], 0, 0)
+	assertPageInt(t, transaction.pages[storage.NewBlockID("fldcat.tbl", 0)], 0, 0)
 }
 
 func TestTableManagerCreateTableReportsCloseFailureAfterSuccessfulTableWrite(t *testing.T) {
