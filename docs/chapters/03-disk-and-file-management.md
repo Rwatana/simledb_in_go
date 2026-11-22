@@ -350,6 +350,7 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | --- | --- |
 | `TestNewManagerCreatesDatabaseDirectory` | directory作成とblock size contract |
 | `TestNewManagerRejectsAnEmptyDatabaseDirectory` | 空のdatabase directoryをfilesystemへ触れる前に拒否する |
+| `TestNewManagerPreservesDatabaseDirectoryCreationFailure` | directory作成失敗時に元の原因とpath contextを保ち、既存ファイルを変更しない |
 | `TestManagerWritesAndReadsBlocks` | 複数blockのoffset、round-trip、Page間の非aliasing |
 | `TestManagerRejectsInvalidBlockAccess` | 負数、overflow、size不一致、short read、path traversalのerror |
 | `TestNewPageFromBytesCopiesContents` | diskから渡されたsliceをPage内部と共有しない |

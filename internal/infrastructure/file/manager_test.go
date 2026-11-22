@@ -2,10 +2,12 @@ package file_test
 
 import (
 	"bytes"
+	"errors"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
@@ -48,6 +50,33 @@ func TestNewManagerRejectsAnEmptyDatabaseDirectory(t *testing.T) {
 	}
 	if err == nil || !strings.Contains(err.Error(), "database directory must not be empty") {
 		t.Fatalf("NewManager(\"\", 32) error = %v, want an empty-directory error", err)
+	}
+}
+
+func TestNewManagerPreservesDatabaseDirectoryCreationFailure(t *testing.T) {
+	t.Parallel()
+
+	parent := filepath.Join(t.TempDir(), "not-a-directory")
+	parentContents := []byte("keep this file unchanged")
+	if err := os.WriteFile(parent, parentContents, 0o600); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", parent, err)
+	}
+
+	directory := filepath.Join(parent, "database")
+	manager, err := storagefile.NewManager(directory, 32)
+	if manager != nil {
+		t.Fatalf("NewManager(%q, 32) manager = %v, want nil", directory, manager)
+	}
+	if err == nil || !errors.Is(err, syscall.ENOTDIR) {
+		t.Fatalf("NewManager(%q, 32) error = %v, want an ENOTDIR cause", directory, err)
+	}
+	if !strings.Contains(err.Error(), directory) {
+		t.Errorf("NewManager() error = %q, want directory context %q", err, directory)
+	}
+	if got, readErr := os.ReadFile(parent); readErr != nil {
+		t.Fatalf("ReadFile(%q) error = %v", parent, readErr)
+	} else if !bytes.Equal(got, parentContents) {
+		t.Errorf("parent file contents = %q, want unchanged %q", got, parentContents)
 	}
 }
 
