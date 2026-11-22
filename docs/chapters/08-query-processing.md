@@ -209,3 +209,14 @@ a nil schema according to the expression behavior.
 
 `TestPredicateSelectSubPredicate` first failed because `SelectSubPredicate` was undefined. It checks partial filtering,
 ordering, duplicates, source immutability, no-match and empty predicates, and literal matching with a nil schema.
+
+## Feature 21: Select join predicate terms across schemas
+
+`Predicate.JoinSubPredicate` maps to Java `Predicate.joinSubPred(Schema, Schema)`. It selects terms that apply to the
+union of both schemas while applying to neither input alone. The Go method preserves order and duplicates and returns
+an explicit boolean instead of Java's `null` for an empty selection. Nil schema pointers are treated as empty schemas;
+literal terms are excluded because they already apply to each input independently.
+
+`TestPredicateJoinSubPredicate` first failed because `JoinSubPredicate` was undefined. It covers cross-schema terms,
+terms applying to only one input or neither, duplicate ordering, source/schema immutability, empty results, and nil
+schemas.
