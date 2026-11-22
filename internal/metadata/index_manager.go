@@ -60,6 +60,63 @@ func (m *IndexManager) CreateIndex(indexName, tableName, fieldName string, trans
 	return nil
 }
 
+// IndexInfo returns the registered indexes for tableName, keyed by indexed field name.
+func (m *IndexManager) IndexInfo(tableName string, transaction record.TableScanTransaction) (map[string]*IndexInfo, error) {
+	if m.tables == nil {
+		return nil, fmt.Errorf("look up indexes for table %q: table manager is nil", tableName)
+	}
+	if m.stats == nil {
+		return nil, fmt.Errorf("look up indexes for table %q: statistics manager is nil", tableName)
+	}
+	catalogLayout, err := m.tables.Layout("idxcat", transaction)
+	if err != nil {
+		return nil, fmt.Errorf("look up indexes for table %q: load index catalog layout: %w", tableName, err)
+	}
+	indexes := make(map[string]*IndexInfo)
+	if err := withCatalogScan(transaction, "idxcat", catalogLayout, func(scan *record.TableScan) error {
+		for {
+			found, err := scan.Next()
+			if err != nil {
+				return fmt.Errorf("scan index catalog: %w", err)
+			}
+			if !found {
+				return nil
+			}
+			registeredTable, err := scan.GetString("tablename")
+			if err != nil {
+				return fmt.Errorf("read indexed table name: %w", err)
+			}
+			if registeredTable != tableName {
+				continue
+			}
+			indexName, err := scan.GetString("indexname")
+			if err != nil {
+				return fmt.Errorf("read index name for table %q: %w", tableName, err)
+			}
+			fieldName, err := scan.GetString("fieldname")
+			if err != nil {
+				return fmt.Errorf("read indexed field for table %q: %w", tableName, err)
+			}
+			tableLayout, err := m.tables.Layout(tableName, transaction)
+			if err != nil {
+				return fmt.Errorf("load layout for indexed table %q: %w", tableName, err)
+			}
+			tableStats, err := m.stats.Statistics(tableName, tableLayout, transaction)
+			if err != nil {
+				return fmt.Errorf("load statistics for indexed table %q: %w", tableName, err)
+			}
+			info, err := NewIndexInfo(indexName, fieldName, tableLayout.Schema(), transaction, tableStats)
+			if err != nil {
+				return fmt.Errorf("build index metadata for field %q: %w", fieldName, err)
+			}
+			indexes[fieldName] = info
+		}
+	}); err != nil {
+		return nil, fmt.Errorf("look up indexes for table %q: %w", tableName, err)
+	}
+	return indexes, nil
+}
+
 // NewIndexCatalogSchema constructs the logical schema of the index catalog.
 func NewIndexCatalogSchema() *record.Schema {
 	var schema record.Schema

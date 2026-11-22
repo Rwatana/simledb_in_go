@@ -247,3 +247,322 @@ func TestIndexManagerCreateIndexPreservesCatalogRowInsertError(t *testing.T) {
 		}
 	}
 }
+
+func TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var studentSchema record.Schema
+	studentSchema.AddIntegerField("sid")
+	studentSchema.AddIntegerField("majorid")
+	if err := tables.CreateTable("student", &studentSchema, transaction); err != nil {
+		t.Fatalf("CreateTable(student) error = %v", err)
+	}
+	stats := NewStatManager(tables)
+	manager := NewIndexManager(tables, stats)
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	for _, registration := range [][3]string{
+		{"idx_student_id", "student", "sid"},
+		{"idx_department_name", "department", "dname"},
+		{"idx_student_major", "student", "majorid"},
+	} {
+		if err := manager.CreateIndex(registration[0], registration[1], registration[2], transaction); err != nil {
+			t.Fatalf("CreateIndex(%s) error = %v", registration[0], err)
+		}
+	}
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if err != nil {
+		t.Fatalf("IndexInfo(student) error = %v", err)
+	}
+	if len(indexes) != 2 {
+		t.Fatalf("student indexes = %v, want two entries", indexes)
+	}
+	for fieldName, indexName := range map[string]string{
+		"sid":     "idx_student_id",
+		"majorid": "idx_student_major",
+	} {
+		info := indexes[fieldName]
+		if info == nil || info.indexName != indexName || info.fieldName != fieldName {
+			t.Fatalf("index %s = %#v, want %s on %s", fieldName, info, indexName, fieldName)
+		}
+		if info.transaction != transaction || info.stats == nil {
+			t.Fatalf("index %s dependencies = (%v, %v), want transaction and statistics", fieldName, info.transaction, info.stats)
+		}
+	}
+
+	missing, err := manager.IndexInfo("course", transaction)
+	if err != nil || len(missing) != 0 {
+		t.Fatalf("IndexInfo(course) = (%v, %v), want empty map and nil error", missing, err)
+	}
+}
+
+func TestIndexManagerIndexInfoRejectsMissingStatisticsManager(t *testing.T) {
+	manager := NewIndexManager(NewTableManager(), nil)
+
+	indexes, err := manager.IndexInfo("student", nil)
+	if indexes != nil {
+		t.Errorf("IndexInfo() indexes = %v, want nil when statistics manager is missing", indexes)
+	}
+	if err == nil {
+		t.Fatal("IndexInfo() error = nil, want missing statistics manager error")
+	}
+	for _, context := range []string{"student", "statistics manager is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestIndexManagerIndexInfoRejectsMissingTableManager(t *testing.T) {
+	manager := NewIndexManager(nil, NewStatManager(nil))
+
+	indexes, err := manager.IndexInfo("student", nil)
+	if indexes != nil {
+		t.Errorf("IndexInfo() indexes = %v, want nil when table manager is missing", indexes)
+	}
+	if err == nil {
+		t.Fatal("IndexInfo() error = nil, want missing table manager error")
+	}
+	for _, context := range []string{"student", "table manager is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestIndexManagerIndexInfoPreservesCatalogAdvanceError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	wantErr := errors.New("index catalog slot unavailable")
+	transaction.getIntErr = wantErr
+	transaction.getIntOffset = 0
+	transaction.getIntErrFile = "idxcat.tbl"
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil after catalog scan failure", indexes)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("IndexInfo() error = %v, want wrapped catalog scan cause", err)
+	}
+	for _, context := range []string{"student", "scan index catalog", "idxcat.tbl"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestIndexManagerIndexInfoPreservesIndexedTableNameReadError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+	wantErr := errors.New("indexed table name unavailable")
+	transaction.getStringErr = wantErr
+	transaction.getStringOffset, _ = record.NewLayout(NewIndexCatalogSchema()).Offset("tablename")
+	transaction.getStringErrFile = "idxcat.tbl"
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil after catalog field read failure", indexes)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("IndexInfo() error = %v, want wrapped table-name read cause", err)
+	}
+	for _, context := range []string{"student", "idxcat.tbl", "read indexed table name", "tablename"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestIndexManagerIndexInfoPreservesIndexNameReadError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+	wantErr := errors.New("index name unavailable")
+	transaction.getStringErr = wantErr
+	transaction.getStringOffset, _ = record.NewLayout(NewIndexCatalogSchema()).Offset("indexname")
+	transaction.getStringErrFile = "idxcat.tbl"
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil after catalog field read failure", indexes)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("IndexInfo() error = %v, want wrapped index-name read cause", err)
+	}
+	for _, context := range []string{"student", "idxcat.tbl", "read index name", "indexname"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestIndexManagerIndexInfoPreservesFieldNameReadError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+	wantErr := errors.New("indexed field name unavailable")
+	transaction.getStringErr = wantErr
+	transaction.getStringOffset, _ = record.NewLayout(NewIndexCatalogSchema()).Offset("fieldname")
+	transaction.getStringErrFile = "idxcat.tbl"
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil after catalog field read failure", indexes)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("IndexInfo() error = %v, want wrapped field-name read cause", err)
+	}
+	for _, context := range []string{"student", "idxcat.tbl", "read indexed field", "fieldname"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestIndexManagerIndexInfoPreservesIndexedTableLayoutError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("majorid")
+	if err := tables.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+	wantErr := errors.New("indexed table catalog unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+	transaction.sizeErrAfter = 2
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil after table layout failure", indexes)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("IndexInfo() error = %v, want wrapped table layout cause", err)
+	}
+	for _, context := range []string{"student", "load layout for indexed table"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestIndexManagerIndexInfoPreservesIndexedTableStatisticsError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("majorid")
+	if err := tables.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+	wantErr := errors.New("indexed table file unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "student.tbl"
+	transaction.sizeErrAfter = 1
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil after statistics failure", indexes)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("IndexInfo() error = %v, want wrapped statistics cause", err)
+	}
+	for _, context := range []string{"student", "load statistics for indexed table", "calculate statistics for table"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestIndexManagerIndexInfoRejectsUnregisteredIndexedField(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	if err := tables.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateIndex("idx_student_missing", "student", "missing", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil for an unregistered field", indexes)
+	}
+	if err == nil {
+		t.Fatal("IndexInfo() error = nil, want missing indexed field error")
+	}
+	for _, context := range []string{"idx_student_missing", "build index metadata for field", "field \"missing\" does not exist"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
