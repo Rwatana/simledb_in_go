@@ -24,6 +24,8 @@ type catalogTransaction struct {
 	sizeErrAfter      int
 	sizeErrCalls      int
 	setStringErr      error
+	setStringErrAfter int
+	setStringCalls    int
 	setIntErr         error
 	setIntOffset      int32
 	setIntErrAfter    int
@@ -118,8 +120,11 @@ func (t *catalogTransaction) SetInt(block storage.BlockID, offset int32, value i
 }
 
 func (t *catalogTransaction) SetString(block storage.BlockID, offset int32, value string, logUpdate bool) error {
-	if logUpdate && t.setStringErr != nil {
-		return t.setStringErr
+	if logUpdate {
+		t.setStringCalls++
+		if t.setStringErr != nil && (t.setStringErrAfter == 0 || t.setStringCalls == t.setStringErrAfter) {
+			return t.setStringErr
+		}
 	}
 	return t.pages[block].SetBytes(int(offset), []byte(value))
 }
@@ -431,6 +436,41 @@ func TestTableManagerCreateTablePreservesFieldCatalogInsertFailure(t *testing.T)
 	}
 	if got, err := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)].GetInt(0); err != nil || got != 0 {
 		t.Fatalf("fldcat occupancy = (%d, %v), want (0, nil)", got, err)
+	}
+}
+
+func TestTableManagerCreateTablePreservesFieldCatalogTableNameWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("field catalog table-name write failed")
+	transaction.setStringErr = writeErr
+	transaction.setStringErrAfter = 2
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want fldcat table-name write cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `store table name for field "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if transaction.setStringCalls != 2 {
+		t.Fatalf("string writes = %d, want stop at the field table-name write", transaction.setStringCalls)
+	}
+	if got, err := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)].GetInt(0); err != nil || got != 1 {
+		t.Fatalf("fldcat occupancy = (%d, %v), want the inserted row marked used", got, err)
 	}
 }
 

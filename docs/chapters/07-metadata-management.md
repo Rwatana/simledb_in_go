@@ -105,6 +105,7 @@ not exist.
 | `TestTableManagerCreateTableStoresCatalogRows` | One table row and declaration-ordered field rows retain the schema's logical and derived physical metadata, and both scans close |
 | `TestTableManagerCreateTablePreservesOperationAndCloseFailures` | A catalog write failure still closes its scan, preserves both causes when cleanup also fails, and stops before the next catalog |
 | `TestTableManagerCreateTablePreservesFieldCatalogInsertFailure` | A fldcat row insertion error retains its cause and context, closes both scans, and leaves the field slot unused |
+| `TestTableManagerCreateTablePreservesFieldCatalogTableNameWriteFailure` | A fldcat table-name write error retains field-specific context, closes both scans, and stops before later field metadata writes |
 | `TestTableManagerCreateTablePreservesTableCatalogInsertFailure` | A tblcat row insertion error retains its cause and context, closes the table scan, and stops before fldcat |
 | `TestTableManagerCreateTablePreservesTableSlotSizeWriteFailure` | A slot-size write error retains its cause and context, closes the table scan, and stops before the field catalog |
 | `TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess` | A nil schema returns table-specific context before a nil transaction can be touched |
@@ -126,6 +127,8 @@ The coverage audit also exercises failure to mark the initial `tblcat` slot as o
 row-insertion context and closes the table scan without opening `fldcat`.
 The corresponding `fldcat` insertion failure occurs after the tblcat row has succeeded. Its regression test verifies
 both scans close and the failed field slot remains unoccupied, before any field metadata is written.
+The field-catalog table-name write test exercises failure after the row has been marked occupied; it confirms both
+catalog scans close and the later field-name and integer metadata writes are skipped.
 The same audit exposed the signed integer range guard. Boundary and out-of-range tests now cover `metadataInteger`
 without changing the values stored for valid metadata.
 
