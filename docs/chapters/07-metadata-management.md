@@ -197,6 +197,7 @@ The tests first failed to compile because `TableManager.Layout` did not exist.
 | `TestTableManagerLayoutRejectsInvalidFieldType` | An unsupported stored type returns table/field context, closes both scans, and stops before length/offset reads |
 | `TestTableManagerLayoutPreservesFieldLengthReadFailure` | A length read error retains cause/context, closes both scans, and stops before the offset read |
 | `TestTableManagerLayoutRejectsNegativeFieldLength` | A negative varchar length is rejected with table/field context, closes both scans, and stops before the offset read |
+| `TestTableManagerLayoutRejectsFieldOffsetsOutsideStoredSlot` | Offsets below the payload boundary and at the stored slot boundary are rejected with table/field context, and both catalog scans close |
 | `TestTableManagerLayoutPreservesRegisteredTableNameReadFailure` | A tblcat table-name read error keeps context, closes the table catalog, and stops before fldcat |
 | `TestTableManagerLayoutPreservesTableCatalogScanFailure` | A tblcat occupancy read failure keeps scan context, closes the table catalog, and stops before fldcat |
 | `TestTableManagerLayoutPreservesTableCatalogSlotSizeReadFailure` | A matching tblcat slot-size read error keeps context, closes the table catalog, and stops before fldcat |
