@@ -626,6 +626,37 @@ func TestTransactionGetIntReturnsMissingPinAndPageFailures(t *testing.T) {
 	}
 }
 
+func TestTransactionGetIntPreservesSharedLockFailure(t *testing.T) {
+	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	wantErr := concurrency.ErrLockConflict
+	locks := &recordingTransactionLockManager{sharedErr: wantErr}
+	tx.locks = locks
+
+	value, err := tx.GetInt(block, 64)
+	if value != 0 {
+		t.Errorf("GetInt() value = %d, want zero after lock failure", value)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("GetInt() error = %v, want lock conflict", err)
+	}
+	wantContext := "get integer from transaction buffer " + block.String() + " at offset 64: acquire shared lock"
+	if err == nil || !strings.Contains(err.Error(), wantContext) {
+		t.Errorf("GetInt() error = %v, want context %q", err, wantContext)
+	}
+	if locks.sharedCalls != 1 {
+		t.Errorf("shared lock calls = %d, want 1", locks.sharedCalls)
+	}
+}
+
 func TestTransactionRejectsGetIntAfterCompletion(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -1434,6 +1434,7 @@ were tested first. The initial build failed because `Transaction.GetInt` did not
 | --- | --- |
 | `TestTransactionGetIntReadsPinnedPageAndReusesSharedLock` | Two reads return the stored integer while retaining exactly one transaction-local shared hold |
 | `TestTransactionGetIntReturnsMissingPinAndPageFailures` | Missing ownership is distinguishable and invalid offsets preserve the page error |
+| `TestTransactionGetIntPreservesSharedLockFailure` | A shared-lock failure preserves its cause and prevents reading the page |
 
 This maps to Java `Transaction.getInt`; string decoding remains a separate behavior and PR.
 
