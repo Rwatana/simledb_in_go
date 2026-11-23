@@ -1,4 +1,4 @@
-name: Pull request policy
+name: Issue reference
 
 on:
   pull_request:
@@ -12,37 +12,18 @@ permissions:
   contents: read
 
 jobs:
-  metadata:
+  issue-reference:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Validate Pull Request title, branch, and issue reference
+      - name: Validate Pull Request issue reference
         env:
           HEAD_REF: ${{ github.head_ref }}
           PR_BODY: ${{ github.event.pull_request.body }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          valid_prefix=false
-          while IFS= read -r prefix; do
-            if [[ "$PR_TITLE" == "[$prefix] "* ]]; then
-              valid_prefix=true
-              break
-            fi
-          done < <(sed -n 's/^  - //p' hack/prefix.yml)
-
-          if [[ "$valid_prefix" != "true" ]]; then
-            echo "Invalid Pull Request title: $PR_TITLE"
-            echo "Use one of the prefixes defined in hack/prefix.yml."
-            exit 1
-          fi
-
           if [[ "$HEAD_REF" =~ ^feature/#([0-9]+)_[a-z0-9]+(_[a-z0-9]+)*$ ]]; then
             issue_number="${BASH_REMATCH[1]}"
           else
-            echo "Invalid branch name: $HEAD_REF"
-            echo "Expected: feature/#<issue-number>_<snake_case_description>"
+            echo "Cannot verify issue reference for invalid branch name: $HEAD_REF"
             exit 1
           fi
 
