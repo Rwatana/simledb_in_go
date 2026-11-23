@@ -74,7 +74,7 @@
 
 ## 次の一歩
 
-Chapter 9のparsingを終え、Chapter 10 PlanningのQueryPlanner、UpdatePlanner契約、BasicQueryPlannerによるテーブル・ビューSELECT計画、BetterQueryPlannerによるブロックアクセス見積もりに基づく結合順序の選択、BasicUpdatePlannerによるDELETE・UPDATE・INSERT・CREATE TABLE・CREATE VIEW・CREATE INDEX、TablePlan/SelectPlan/ProductPlan/ProjectPlanを追加しています。Chapter 11 Indexingでは、値/RIDベースの索引走査契約、100個の静的hash bucketへのJava互換キー割当、静的hash indexの探索コスト見積もり、HashIndexの初期化、スキャン解放、キーbucketへの位置決め、衝突を除外する一致エントリー走査、現在の索引行からのRID取得を実装しています。
+Chapter 9のparsingを終え、Chapter 10 PlanningのQueryPlanner、UpdatePlanner契約、BasicQueryPlannerによるテーブル・ビューSELECT計画、BetterQueryPlannerによるブロックアクセス見積もりに基づく結合順序の選択、BasicUpdatePlannerによるDELETE・UPDATE・INSERT・CREATE TABLE・CREATE VIEW・CREATE INDEX、TablePlan/SelectPlan/ProductPlan/ProjectPlanを追加しています。Chapter 11 Indexingでは、値/RIDベースの索引走査契約、100個の静的hash bucketへのJava互換キー割当、静的hash indexの探索コスト見積もり、HashIndexの初期化、スキャン解放、キーbucketへの位置決め、衝突を除外する一致エントリー走査、現在の索引行からのRID取得、hash bucketへのエントリー挿入を実装しています。
 
 ## 参照元
 

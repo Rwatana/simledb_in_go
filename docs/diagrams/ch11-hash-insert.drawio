@@ -1,0 +1,22 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ch11-hash-insert" name="Static hash-index entry insertion">
+    <mxGraphModel dx="1200" dy="760" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="760" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 11 / Feature 9: Insert a hash-index entry" style="text;html=1;align=center;fontSize=24;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="180" y="25" width="840" height="50" as="geometry"/></mxCell>
+        <mxCell id="input" value="dataValue + dataRID&#xa;query.Constant + record.RID" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="50" y="130" width="300" height="105" as="geometry"/></mxCell>
+        <mxCell id="validate" value="Validate before changing scan state&#xa;layout fields: block, id, dataval&#xa;RID fits signed 32-bit storage&#xa;value type matches dataval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=16;" vertex="1" parent="1"><mxGeometry x="430" y="115" width="390" height="135" as="geometry"/></mxCell>
+        <mxCell id="position" value="BeforeFirst(dataValue)&#xa;close prior scan&#xa;hash key and open bucket table" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="430" y="315" width="390" height="120" as="geometry"/></mxCell>
+        <mxCell id="write" value="TableScan.Insert()&#xa;write block, id, and dataval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=17;" vertex="1" parent="1"><mxGeometry x="430" y="510" width="390" height="100" as="geometry"/></mxCell>
+        <mxCell id="active" value="HashIndex.scan remains open&#xa;caller can continue or call Close()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1"><mxGeometry x="850" y="510" width="300" height="100" as="geometry"/></mxCell>
+        <mxCell id="error" value="Contextual error&#xa;preserve the underlying cause" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;" vertex="1" parent="1"><mxGeometry x="50" y="470" width="300" height="100" as="geometry"/></mxCell>
+        <mxCell id="e1" value="entry" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="input" target="validate"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="valid" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="validate" target="position"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="bucket scan" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="position" target="write"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="inserted record" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="write" target="active"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="validation / open / write failure" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="validate" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="scan / field failure" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="write" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

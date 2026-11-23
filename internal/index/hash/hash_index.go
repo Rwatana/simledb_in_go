@@ -2,6 +2,7 @@ package hash
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/Rwatana/simledb_in_go/internal/query"
@@ -144,6 +145,84 @@ func (index *HashIndex) GetDataRID() (record.RID, error) {
 		return record.RID{}, fmt.Errorf("read data RID from hash index %q: read slot id: %w", index.indexName, err)
 	}
 	return record.NewRID(int(blockNumber), int(slot)), nil
+}
+
+// Insert adds one data value and record identifier to the corresponding hash bucket.
+func (index *HashIndex) Insert(dataValue query.Constant, dataRID record.RID) error {
+	if index == nil {
+		return fmt.Errorf("insert into nil hash index")
+	}
+	if index.transaction == nil {
+		return fmt.Errorf("insert into hash index %q: transaction is nil", index.indexName)
+	}
+	if index.layout == nil {
+		return fmt.Errorf("insert into hash index %q: record layout is nil", index.indexName)
+	}
+	if index.layout.SlotSize() <= 0 {
+		return fmt.Errorf("insert into hash index %q: record slot size %d must be positive", index.indexName, index.layout.SlotSize())
+	}
+	schema := index.layout.Schema()
+	if schema == nil {
+		return fmt.Errorf("insert into hash index %q: record layout schema is nil", index.indexName)
+	}
+	for _, fieldName := range []string{"block", "id"} {
+		fieldType, ok := schema.TypeOf(fieldName)
+		if !ok {
+			return fmt.Errorf("insert into hash index %q: record layout has no %q field", index.indexName, fieldName)
+		}
+		if fieldType != record.IntegerField {
+			return fmt.Errorf("insert into hash index %q: %q field has non-integer type %d", index.indexName, fieldName, fieldType)
+		}
+		if _, ok := index.layout.Offset(fieldName); !ok {
+			return fmt.Errorf("insert into hash index %q: record layout has no offset for %q", index.indexName, fieldName)
+		}
+	}
+	datavalType, ok := schema.TypeOf("dataval")
+	if !ok {
+		return fmt.Errorf("insert into hash index %q: record layout has no dataval field", index.indexName)
+	}
+	if _, ok := index.layout.Offset("dataval"); !ok {
+		return fmt.Errorf("insert into hash index %q: record layout has no offset for dataval", index.indexName)
+	}
+	if datavalType != record.IntegerField && datavalType != record.VarcharField {
+		return fmt.Errorf("insert into hash index %q: dataval field has unsupported type %d", index.indexName, datavalType)
+	}
+	integerValue, isInteger := dataValue.AsInt()
+	stringValue, isString := dataValue.AsString()
+	if !isInteger && !isString {
+		return fmt.Errorf("insert into hash index %q: data value is unset", index.indexName)
+	}
+	if datavalType == record.IntegerField && !isInteger || datavalType == record.VarcharField && !isString {
+		return fmt.Errorf("insert into hash index %q: data value type does not match dataval field", index.indexName)
+	}
+	if int64(dataRID.BlockNumber()) < math.MinInt32 || int64(dataRID.BlockNumber()) > math.MaxInt32 {
+		return fmt.Errorf("insert into hash index %q: RID block number %d exceeds signed 32-bit storage", index.indexName, dataRID.BlockNumber())
+	}
+	if int64(dataRID.Slot()) < math.MinInt32 || int64(dataRID.Slot()) > math.MaxInt32 {
+		return fmt.Errorf("insert into hash index %q: RID slot %d exceeds signed 32-bit storage", index.indexName, dataRID.Slot())
+	}
+	if err := index.BeforeFirst(dataValue); err != nil {
+		return fmt.Errorf("insert into hash index %q: position bucket: %w", index.indexName, err)
+	}
+	if err := index.scan.Insert(); err != nil {
+		return fmt.Errorf("insert into hash index %q bucket record: %w", index.indexName, err)
+	}
+	if err := index.scan.SetInt("block", int32(dataRID.BlockNumber())); err != nil {
+		return fmt.Errorf("insert into hash index %q: write RID block: %w", index.indexName, err)
+	}
+	if err := index.scan.SetInt("id", int32(dataRID.Slot())); err != nil {
+		return fmt.Errorf("insert into hash index %q: write RID slot: %w", index.indexName, err)
+	}
+	if datavalType == record.IntegerField {
+		if err := index.scan.SetInt("dataval", integerValue); err != nil {
+			return fmt.Errorf("insert into hash index %q: write integer dataval: %w", index.indexName, err)
+		}
+		return nil
+	}
+	if err := index.scan.SetString("dataval", stringValue); err != nil {
+		return fmt.Errorf("insert into hash index %q: write varchar dataval: %w", index.indexName, err)
+	}
+	return nil
 }
 
 // Close releases the current bucket scan and clears it after successful release.
