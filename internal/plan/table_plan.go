@@ -54,3 +54,11 @@ func (p *TablePlan) BlocksAccessed() int {
 	}
 	return p.statistics.BlocksAccessed()
 }
+
+// RecordsOutput estimates the number of rows produced by scanning the table.
+func (p *TablePlan) RecordsOutput() int {
+	if p == nil || p.statistics == nil {
+		return 0
+	}
+	return p.statistics.RecordsOutput()
+}

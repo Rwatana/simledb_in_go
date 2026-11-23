@@ -73,7 +73,7 @@
 
 ## 次の一歩
 
-Chapter 9のparsingを終え、Chapter 10 PlanningのPlan contract、table-plan schema、scan opening、block-access estimateを追加しています。
+Chapter 9のparsingを終え、Chapter 10 PlanningのPlan contract、table-plan schema、scan opening、block-accessとoutput-row estimatesを追加しています。
 
 ## 参照元
 
