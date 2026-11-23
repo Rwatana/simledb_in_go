@@ -223,6 +223,31 @@ func (parser *Parser) ParseUpdate() (ModifyData, error) {
 	return NewModifyData(tableName, targetField, newValue, predicate), nil
 }
 
+// ParseCreateView reads a CREATE VIEW name and its SELECT query definition.
+func (parser *Parser) ParseCreateView() (CreateViewData, error) {
+	if parser == nil {
+		return CreateViewData{}, fmt.Errorf("parse create view: parser is nil")
+	}
+	if err := parser.lexer.EatKeyword("create"); err != nil {
+		return CreateViewData{}, fmt.Errorf("parse create view CREATE keyword: %w", err)
+	}
+	if err := parser.lexer.EatKeyword("view"); err != nil {
+		return CreateViewData{}, fmt.Errorf("parse create view VIEW keyword: %w", err)
+	}
+	viewName, err := parser.ParseField()
+	if err != nil {
+		return CreateViewData{}, fmt.Errorf("parse create view name: %w", err)
+	}
+	if err := parser.lexer.EatKeyword("as"); err != nil {
+		return CreateViewData{}, fmt.Errorf("parse create view AS keyword: %w", err)
+	}
+	definition, err := parser.ParseQuery()
+	if err != nil {
+		return CreateViewData{}, fmt.Errorf("parse create view definition: %w", err)
+	}
+	return NewCreateViewData(viewName, definition), nil
+}
+
 func (parser *Parser) parseInsertFieldList() ([]string, error) {
 	field, err := parser.ParseField()
 	if err != nil {

@@ -1,0 +1,19 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-parse-create-view" name="Chapter 9 - Parse CREATE VIEW">
+    <mxGraphModel page="1" pageWidth="1160" pageHeight="540">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 22: Parse SQL CREATE VIEW statements" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="130" y="25" width="900" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="SQL input&#xa;&#xa;CREATE VIEW name&#xa;AS SELECT ..." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;" vertex="1" parent="1"><mxGeometry x="45" y="210" width="260" height="130" as="geometry"/></mxCell>
+        <mxCell id="parser" value="ParseCreateView&#xa;&#xa;create → view → name&#xa;as → ParseQuery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;" vertex="1" parent="1"><mxGeometry x="385" y="195" width="300" height="160" as="geometry"/></mxCell>
+        <mxCell id="result" value="CreateViewData&#xa;&#xa;normalized view name&#xa;rendered QueryData definition" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="790" y="195" width="325" height="160" as="geometry"/></mxCell>
+        <mxCell id="tail" value="Following token stays available&#xa;&#xa;caller continues parsing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=16;" vertex="1" parent="1"><mxGeometry x="385" y="405" width="300" height="90" as="geometry"/></mxCell>
+        <mxCell id="error" value="Errors keep byte offsets&#xa;&#xa;grammar context is added" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;" vertex="1" parent="1"><mxGeometry x="790" y="405" width="325" height="90" as="geometry"/></mxCell>
+        <mxCell id="e1" value="consume" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="input" target="parser"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="build result" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="parser" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="no extra consume" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="parser" target="tail"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="wrap context" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="parser" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
