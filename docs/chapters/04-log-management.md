@@ -194,6 +194,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | `TestAppendDoesNotChangeStateWhenRecordDoesNotFit` | capacity errorがPageとLSNを変更しない |
 | `TestAppendDoesNotFlushTheTailPage` | appendだけではdisk boundaryを変更しない |
 | `TestAppendPreservesBoundaryReadFailure` | tail boundary read failureのcause、block context、LSN不変 |
+| `TestAppendPreservesPageWriteFailure` | corrupt tail boundaryによるPage write failureとstate不変 |
 
 ## Javaソースリーディング
 

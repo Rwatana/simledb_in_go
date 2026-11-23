@@ -237,6 +237,9 @@ committing a new block or position to the iterator.
 `log.Manager.Append` now also covers failure to read the in-memory tail boundary. A short Page deterministically
 exercises the read error and verifies that Append returns LSN zero, preserves the block and Page-read context, and
 does not advance the latest LSN.
+
+A separate malformed-boundary case covers failure to write the encoded record bytes. It verifies the returned block
+and offset context and confirms both the tail Page and latest LSN remain unchanged.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

@@ -127,6 +127,36 @@ func TestAppendPreservesBoundaryReadFailure(t *testing.T) {
 	}
 }
 
+func TestAppendPreservesPageWriteFailure(t *testing.T) {
+	t.Parallel()
+
+	manager, _ := newLogManager(t, 32)
+	if err := manager.page.SetInt(0, 100); err != nil {
+		t.Fatalf("Page.SetInt(boundary) error = %v", err)
+	}
+	before := manager.page.Snapshot()
+
+	lsn, err := manager.Append([]byte("next"))
+	if lsn != 0 {
+		t.Errorf("Append() LSN = %d, want 0 on page write failure", lsn)
+	}
+	for _, want := range []string{
+		"append log record to [file simpledb.log, block 0] at offset 92",
+		"set bytes at offset 92 with length 4",
+		"byte range [92:100] exceeds page capacity 32",
+	} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("Append() error = %v, want context containing %q", err, want)
+		}
+	}
+	if got := manager.page.Snapshot(); !bytes.Equal(got, before) {
+		t.Errorf("tail Page changed after failed append: got %v, want %v", got, before)
+	}
+	if manager.latestLSN != 0 {
+		t.Errorf("latest LSN = %d, want unchanged value 0", manager.latestLSN)
+	}
+}
+
 func newLogManager(t *testing.T, blockSize int) (*Manager, *storagefile.Manager) {
 	t.Helper()
 
