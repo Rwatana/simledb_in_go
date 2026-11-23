@@ -377,6 +377,24 @@ The tests first failed to compile because `RecordPage.NextEmptyAfter` did not ex
 This maps the empty-flag branch of Java `RecordPage.searchAfter`. The separate Go method intentionally exposes selection
 without combining it with the mutation performed by Java `insertAfter`.
 
+## Feature 22: Mark a record slot occupied
+
+`RecordPage.Occupy` changes only the selected slot's leading occupancy flag to the used value. It performs exactly one
+logged integer write, without reading the flag or touching field payload bytes. Signed 32-bit position overflow stops
+before transaction access, and write failures retain block, slot, and byte-position context.
+
+### Test-first record
+
+The tests first failed to compile because `RecordPage.Occupy` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageOccupyWritesUsedFlagWithLogging` | One logged used-flag write reserves the selected slot without extra access |
+| `TestRecordPageOccupyRejectsInvalidPositionAndWrapsFailures` | Offset overflow prevents access, while transaction failure retains physical context |
+
+This maps Java `RecordPage.setFlag(slot, USED)`. The explicit Go operation keeps reservation separate from empty-slot
+selection so each stacked PR has one observable behavior.
+
 ## Next behavior
 
-Mark a selected record slot occupied as the next stacked PR.
+Compose empty-slot selection and occupation into record insertion as the next stacked PR.
