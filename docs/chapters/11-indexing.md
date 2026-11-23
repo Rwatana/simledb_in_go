@@ -230,6 +230,18 @@ schema, so this check does not advance either the index or the current record.
 The focused tests first failed because `IndexSelectScan.HasField` was undefined. They verify integer and varchar fields,
 an absent field, and false results for nil adapter or missing table-scan state.
 
+## Feature 17: Close the index-select scan
+
+`IndexSelectScan.Close` releases the index first and then the retained data-table scan, matching the Java close order.
+Both resources are attempted even if the index close fails; contextual errors are joined so callers can inspect either
+cause. A nil adapter returns an error, while absent resource references are harmless.
+
+### Test-first record
+
+The focused tests first failed because `IndexSelectScan.Close` was undefined. They verify index-before-table ordering,
+attempting both closes after a failure, preserving both wrapped causes, nil receiver handling, and partial/absent resource
+states.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -243,3 +255,4 @@ an absent field, and false results for nil adapter or missing table-scan state.
 - `IndexSelectScan.GetString` reports data-scan read failures as Go errors while preserving their wrapped causes.
 - `IndexSelectScan.GetVal` uses the query-level record adapter to return schema-typed constants without making the record package depend on query types.
 - `IndexSelectScan.HasField` reports false for invalid scan state and otherwise delegates to the table schema.
+- `IndexSelectScan.Close` attempts both retained resources in Java order and joins all Go close errors.
