@@ -640,10 +640,31 @@ failed because `RollbackTransactionAndAppend` did not exist.
 This maps to `RollbackRecord.writeToLog` after `bm.flushAll(txnum)` in Java `RecoveryMgr.rollback`. Marker durability is
 the next behavior.
 
+## Feature 26: Make transaction rollback durable
+
+`RollbackTransaction` completes history undo, restored-buffer flush, and ROLLBACK append before flushing exactly the
+returned marker LSN. It returns that LSN unchanged on success. Any earlier failure prevents marker flush; durability
+failure includes both transaction and LSN while preserving its cause.
+
+### Test-first record
+
+Successful LSN identity, early failure cutoff, append failure cutoff, and marker flush failure were tested first. The
+initial build failed because `RollbackTransaction` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRollbackTransactionFlushesReturnedMarkerLSN` | Flush exactly the appended marker and return its LSN |
+| `TestRollbackTransactionDoesNotFlushAfterEarlierFailure` | Failed history phase performs no marker I/O |
+| `TestRollbackTransactionDoesNotFlushAfterAppendFailure` | Failed marker append cannot be flushed |
+| `TestRollbackTransactionReturnsMarkerFlushFailure` | Durability failure identifies transaction and LSN |
+
+This completes Java `RecoveryMgr.rollback`'s recovery/durability responsibility. Lock release and buffer unpin ownership
+belong to the later public transaction layer.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.2 by flushing the returned ROLLBACK marker LSN as a separate behavior, then begin restart
-recovery's finished-transaction tracking.
+Continue with Sect. 5.3.9.3 restart recovery, beginning with newest-to-oldest finished-transaction tracking before adding
+unfinished update undo and checkpoint termination as separate behaviors.
 
 ## Sources
 
