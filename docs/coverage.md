@@ -321,6 +321,10 @@ Statistics refresh now also exercises failure while advancing the registered-tab
 wrapped cause, cleanup of the failed scan's pin, and retention of the previous cache and lookup count. `refreshLocked`
 is now 88.9% covered, metadata package coverage is 99.0%, and full-module statement coverage is 99.2%.
 
+A separate refresh test now covers a registered table-name read failure after layout loading. It checks the wrapped
+cause and catalog context, releases the scan pin, and retains the existing statistics snapshot. `refreshLocked` is now
+92.6% covered, metadata package coverage is 99.2%, and full-module statement coverage is 99.3%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
