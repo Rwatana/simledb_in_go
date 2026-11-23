@@ -350,6 +350,37 @@ func TestTableScanNextWrapsCurrentBlockReadFailure(t *testing.T) {
 	}
 }
 
+func TestTableScanNextReportsNextBlockPinFailure(t *testing.T) {
+	pinErr := errors.New("next block pin failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16, value: recordSlotEmpty},
+		size:                       2,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	transaction.pinErr = pinErr
+
+	found, err := scan.Next()
+	if found || !errors.Is(err, pinErr) {
+		t.Fatalf("Next() = (%t, %v), want wrapped next-block pin failure", found, err)
+	}
+	for _, want := range []string{"student.tbl", "continue after block 0", "block 1"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Next() error = %q, want context %q", err, want)
+		}
+	}
+	if scan.recordPage != nil || scan.currentSlot != -1 {
+		t.Errorf("scan state after next-block pin failure: page=%v slot=%d", scan.recordPage, scan.currentSlot)
+	}
+	if len(transaction.unpinCalls) != 1 || transaction.unpinCalls[0].Number() != 0 {
+		t.Errorf("unpin calls = %v, want the exhausted block zero", transaction.unpinCalls)
+	}
+}
+
 func TestTableScanNextInBlockRejectsClosedScan(t *testing.T) {
 	transaction := &recordingTableTransaction{size: 1}
 	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))

@@ -272,6 +272,10 @@ record package coverage is 97.0%, and full-module statement coverage is 98.5%.
 wrapped cause and block/slot context survive and that the cursor stays on the same record position. Record package
 coverage is now 97.3%; full-module statement coverage remains 98.5%.
 
+A second `TableScan.Next` test exercises failure to pin the next existing block after the current page is exhausted.
+It checks that the error retains the next-block context and the current block has already been unpinned. `Next` is
+now 100.0% covered; record package coverage is 97.6%, and full-module statement coverage is 98.6%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
