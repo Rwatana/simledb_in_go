@@ -381,6 +381,22 @@ The first focused test run failed because `BasicUpdatePlanner` and `NewBasicUpda
 matching-row deletion, untouched nonmatching rows, affected counts, scan cleanup, contextual metadata/open failures,
 and combined iteration/delete/close errors.
 
+## Feature 28: Execute UPDATE with the basic update planner
+
+`BasicUpdatePlanner.ExecuteModify` resolves the target layout, opens a `TablePlan` beneath a `SelectPlan`, evaluates
+the parsed replacement expression against every matching `query.UpdateScan`, writes the resulting constant to the target
+field, and returns the number of successful writes. It closes the scan on success and on iteration, expression, or write
+errors, joining any close failure with the original cause. An empty target field is rejected before metadata access; a
+missing field is reported by the scan's schema-aware write. The [planning diagram](../diagrams/ch10-plan-contract.svg)
+shows UPDATE alongside DELETE under the distinct update-planner contract; its editable source remains
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `BasicUpdatePlanner.ExecuteModify` was undefined. Tests cover matching, unmatched,
+and empty-predicate rows, expression evaluation, target writes, nil dependencies, metadata and scan-open failures, and
+preservation of iteration/evaluation/write errors when scan cleanup also fails.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -404,3 +420,4 @@ and combined iteration/delete/close errors.
 - `BasicQueryPlanner` detects recursive view cycles and returns an error rather than allowing unbounded recursion.
 - `BetterQueryPlanner` uses block-access estimates to choose each product's child order, reversing only when strictly cheaper.
 - `BasicUpdatePlanner.ExecuteDelete` returns an error with its affected count and closes the scan on all operation paths.
+- `BasicUpdatePlanner.ExecuteModify` evaluates replacement expressions per matching row and reports the number of successful writes.

@@ -73,7 +73,7 @@
 
 ## 次の一歩
 
-Chapter 9のparsingを終え、Chapter 10 PlanningのQueryPlanner、UpdatePlanner契約、BasicQueryPlannerによるテーブル・ビューSELECT計画、BetterQueryPlannerによるブロックアクセス見積もりに基づく結合順序の選択、BasicUpdatePlannerによるDELETE、TablePlan/SelectPlan/ProductPlan/ProjectPlanを追加しています。
+Chapter 9のparsingを終え、Chapter 10 PlanningのQueryPlanner、UpdatePlanner契約、BasicQueryPlannerによるテーブル・ビューSELECT計画、BetterQueryPlannerによるブロックアクセス見積もりに基づく結合順序の選択、BasicUpdatePlannerによるDELETEとUPDATE、TablePlan/SelectPlan/ProductPlan/ProjectPlanを追加しています。
 
 ## 参照元
 

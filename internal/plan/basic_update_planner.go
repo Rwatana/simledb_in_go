@@ -57,6 +57,73 @@ func (planner *BasicUpdatePlanner) ExecuteDelete(data parse.DeleteData, transact
 	return deleteRowsFromScan(tableName, scan)
 }
 
+// ExecuteModify evaluates the update expression for matching rows and returns their count.
+func (planner *BasicUpdatePlanner) ExecuteModify(data parse.ModifyData, transaction record.TableScanTransaction) (int, error) {
+	if planner == nil {
+		return 0, fmt.Errorf("execute update: planner is nil")
+	}
+	if planner.metadata == nil {
+		return 0, fmt.Errorf("execute update: metadata is nil")
+	}
+	if transaction == nil {
+		return 0, fmt.Errorf("execute update: transaction is nil")
+	}
+	tableName := data.TableName()
+	if tableName == "" {
+		return 0, fmt.Errorf("execute update: table name is empty")
+	}
+	targetField := data.TargetField()
+	if targetField == "" {
+		return 0, fmt.Errorf("execute update for table %q: target field is empty", tableName)
+	}
+	layout, err := planner.metadata.Layout(tableName, transaction)
+	if err != nil {
+		return 0, fmt.Errorf("execute update for table %q: resolve layout: %w", tableName, err)
+	}
+	if layout == nil {
+		return 0, fmt.Errorf("execute update for table %q: layout is nil", tableName)
+	}
+	selection := NewSelectPlan(NewTablePlan(transaction, tableName, layout, nil), data.Predicate())
+	scan, err := selection.Open()
+	if err != nil {
+		return 0, fmt.Errorf("execute update for table %q: open selection scan: %w", tableName, err)
+	}
+	return modifyRowsFromScan(tableName, targetField, data.NewValue(), scan)
+}
+
+func modifyRowsFromScan(tableName, targetField string, expression query.Expression, scan query.Scan) (int, error) {
+	updateScan, err := requireUpdateScan(scan)
+	if err != nil {
+		return 0, closeUpdatePlannerScan(scan, fmt.Errorf("execute update for table %q: %w", tableName, err))
+	}
+
+	modified := 0
+	for {
+		next, err := updateScan.Next()
+		if err != nil {
+			primary := fmt.Errorf("execute update for table %q: advance selection scan: %w", tableName, err)
+			return modified, closeUpdatePlannerScan(scan, primary)
+		}
+		if !next {
+			break
+		}
+		value, err := expression.Evaluate(updateScan)
+		if err != nil {
+			primary := fmt.Errorf("execute update for table %q: evaluate replacement expression: %w", tableName, err)
+			return modified, closeUpdatePlannerScan(scan, primary)
+		}
+		if err := updateScan.SetVal(targetField, value); err != nil {
+			primary := fmt.Errorf("execute update for table %q: write field %q: %w", tableName, targetField, err)
+			return modified, closeUpdatePlannerScan(scan, primary)
+		}
+		modified++
+	}
+	if err := closeUpdatePlannerScan(scan, nil); err != nil {
+		return modified, fmt.Errorf("execute update for table %q: close selection scan: %w", tableName, err)
+	}
+	return modified, nil
+}
+
 func deleteRowsFromScan(tableName string, scan query.Scan) (int, error) {
 	updateScan, err := requireUpdateScan(scan)
 	if err != nil {
