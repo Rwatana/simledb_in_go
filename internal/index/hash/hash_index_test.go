@@ -1,6 +1,7 @@
 package hash
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -47,12 +48,21 @@ func TestBucketNumberRejectsUnsetConstant(t *testing.T) {
 
 type hashIndexTransactionProbe struct {
 	record.RecordTransaction
-	calls int
+	calls            int
+	size             int
+	pinErr, unpinErr error
+	pins, unpins     []storage.BlockID
+}
+
+func (transaction *hashIndexTransactionProbe) Pin(block storage.BlockID) error {
+	transaction.calls++
+	transaction.pins = append(transaction.pins, block)
+	return transaction.pinErr
 }
 
 func (transaction *hashIndexTransactionProbe) Size(string) (int, error) {
 	transaction.calls++
-	return 0, nil
+	return transaction.size, nil
 }
 
 func (transaction *hashIndexTransactionProbe) Append(string) (storage.BlockID, error) {
@@ -60,9 +70,10 @@ func (transaction *hashIndexTransactionProbe) Append(string) (storage.BlockID, e
 	return storage.BlockID{}, nil
 }
 
-func (transaction *hashIndexTransactionProbe) Unpin(storage.BlockID) error {
+func (transaction *hashIndexTransactionProbe) Unpin(block storage.BlockID) error {
 	transaction.calls++
-	return nil
+	transaction.unpins = append(transaction.unpins, block)
+	return transaction.unpinErr
 }
 
 func TestNewHashIndexRetainsConfigurationWithoutTransactionIO(t *testing.T) {
@@ -80,5 +91,66 @@ func TestNewHashIndexRetainsConfigurationWithoutTransactionIO(t *testing.T) {
 	}
 	if transaction.calls != 0 {
 		t.Errorf("constructor made %d table transaction calls, want none", transaction.calls)
+	}
+}
+
+func TestHashIndexCloseWithoutScanIsNoOp(t *testing.T) {
+	transaction := &hashIndexTransactionProbe{}
+	index := NewHashIndex(transaction, "student-id", record.NewLayout(&record.Schema{}))
+	if err := index.Close(); err != nil {
+		t.Fatalf("Close() without scan error = %v", err)
+	}
+	if transaction.calls != 0 || index.scan != nil {
+		t.Errorf("close without scan made %d transaction calls and left scan %v", transaction.calls, index.scan)
+	}
+}
+
+func TestHashIndexCloseUnpinsAndClearsScanOnce(t *testing.T) {
+	transaction := &hashIndexTransactionProbe{size: 1}
+	layout := record.NewLayout(&record.Schema{})
+	scan, err := record.NewTableScan(transaction, "student-index", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	index := NewHashIndex(transaction, "student-id", layout)
+	index.scan = scan
+
+	if err := index.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if index.scan != nil {
+		t.Errorf("scan after Close() = %v, want nil", index.scan)
+	}
+	if len(transaction.unpins) != 1 {
+		t.Fatalf("Unpin calls = %v, want one call", transaction.unpins)
+	}
+	if err := index.Close(); err != nil {
+		t.Fatalf("repeated Close() error = %v", err)
+	}
+	if len(transaction.unpins) != 1 {
+		t.Errorf("Unpin calls after repeated close = %v, want one call", transaction.unpins)
+	}
+}
+
+func TestHashIndexCloseRetainsScanWhenUnpinFails(t *testing.T) {
+	unpinErr := errors.New("unpin failed")
+	transaction := &hashIndexTransactionProbe{size: 1, unpinErr: unpinErr}
+	layout := record.NewLayout(&record.Schema{})
+	scan, err := record.NewTableScan(transaction, "student-index", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	index := NewHashIndex(transaction, "student-id", layout)
+	index.scan = scan
+
+	if err := index.Close(); !errors.Is(err, unpinErr) || !strings.Contains(err.Error(), "student-id") || index.scan != scan {
+		t.Fatalf("Close() on unpin failure = (%v, scan %v), want wrapped error and retryable scan", err, index.scan)
+	}
+	transaction.unpinErr = nil
+	if err := index.Close(); err != nil {
+		t.Fatalf("Close() retry error = %v", err)
+	}
+	if index.scan != nil || len(transaction.unpins) != 2 {
+		t.Errorf("after retry scan = %v, unpins = %v; want nil scan and two attempts", index.scan, transaction.unpins)
 	}
 }

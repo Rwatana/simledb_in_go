@@ -63,6 +63,17 @@ so constructing the index does not create or pin a bucket table.
 The focused constructor test first failed to compile because `NewHashIndex` was undefined. It verifies retained
 configuration, the unset-key/no-scan initial state, and that construction makes no table-transaction calls.
 
+## Feature 5: Close the active bucket scan
+
+`HashIndex.Close` delegates resource release to the active `record.TableScan`. Closing without a scan is a no-op. When
+unpinning fails, the error retains its cause and the scan reference remains available for a retry; successful release
+clears the reference, making repeated closes harmless.
+
+### Test-first record
+
+The focused close tests first failed to compile because `HashIndex.Close` was undefined. They cover the no-scan path,
+successful unpin and scan clearing, repeated close, contextual error wrapping, and retry after an unpin failure.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
