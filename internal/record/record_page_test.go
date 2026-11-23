@@ -486,6 +486,35 @@ func TestRecordPageFormatRejectsSlotFlagOffsetBeyondInt32(t *testing.T) {
 	}
 }
 
+func TestRecordPageFormatRejectsFieldOffsetBeyondInt32(t *testing.T) {
+	overflowOffset64 := int64(math.MaxInt32) + 1
+	if int64(^uint(0)>>1) < overflowOffset64 {
+		t.Skip("test requires a physical field offset beyond signed int32")
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	transaction := &recordingRecordTransaction{blockSize: 8}
+	block := storage.NewBlockID("records.tbl", 3)
+	layout := NewLayoutFromMetadata(&schema, map[string]int{"id": int(overflowOffset64)}, 8)
+	page, err := NewRecordPage(transaction, block, layout)
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	err = page.Format()
+	if err == nil {
+		t.Fatal("Format() with a field offset beyond int32 returned nil error")
+	}
+	for _, want := range []string{block.String(), "slot 0", `field "id"`, "offset 2147483648", "exceeds int32 range"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Format() error = %q, want context %q", err, want)
+		}
+	}
+	if len(transaction.writeOperations) != 1 || transaction.writeOperations[0] != (writeOperation{kind: "int", offset: 0, integer: recordSlotEmpty}) {
+		t.Errorf("Format() writes = %v, want only valid slot zero flag", transaction.writeOperations)
+	}
+}
+
 func TestRecordPageNextAfterFindsOccupiedSlotWithinCompleteSlots(t *testing.T) {
 	transaction := &recordingRecordTransaction{blockSize: 34, readValues: []int32{recordSlotEmpty, recordSlotEmpty, 1}}
 	block := storage.NewBlockID("records.tbl", 3)

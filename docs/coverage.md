@@ -297,6 +297,10 @@ A synthetic two-slot layout now exercises `RecordPage.Format` rejecting a second
 signed int32. The test confirms the invalid offset is reported before a write is attempted. `Format` is now 92.6%
 covered, record package coverage is 99.4%, and full-module statement coverage is 98.9%.
 
+A separate synthetic layout now tests `RecordPage.Format` rejecting a field offset beyond signed int32. The test checks
+field context and confirms no field write follows the valid slot-flag write. `Format` is now 96.3% covered, record
+package coverage is 99.7%, and full-module statement coverage remains 98.9%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
