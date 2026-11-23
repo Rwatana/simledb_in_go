@@ -1,11 +1,110 @@
 package metadata
 
 import (
+	"errors"
+	"fmt"
+	"math"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/record"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
+
+type catalogTransaction struct {
+	pages             map[storage.BlockID]*storage.Page
+	blockSize         int
+	pins              []storage.BlockID
+	unpins            []storage.BlockID
+	appendCalls       []string
+	sizeErr           error
+	setStringErr      error
+	setStringErrAfter int
+	setStringCalls    int
+	setIntErr         error
+	setIntOffset      int32
+	setIntErrAfter    int
+	setIntOffsetCalls int
+	setIntCalls       int
+	unpinErr          error
+}
+
+func newCatalogTransaction(t *testing.T, blockSize int) *catalogTransaction {
+	t.Helper()
+	pages := make(map[storage.BlockID]*storage.Page)
+	for _, fileName := range []string{"tblcat.tbl", "fldcat.tbl"} {
+		page, err := storage.NewPage(blockSize)
+		if err != nil {
+			t.Fatalf("NewPage(%d) error = %v", blockSize, err)
+		}
+		pages[storage.NewBlockID(fileName, 0)] = page
+	}
+	return &catalogTransaction{pages: pages, blockSize: blockSize}
+}
+
+func (t *catalogTransaction) Size(fileName string) (int, error) {
+	if t.sizeErr != nil {
+		return 0, t.sizeErr
+	}
+	if _, ok := t.pages[storage.NewBlockID(fileName, 0)]; !ok {
+		return 0, nil
+	}
+	return 1, nil
+}
+
+func (t *catalogTransaction) Append(fileName string) (storage.BlockID, error) {
+	t.appendCalls = append(t.appendCalls, fileName)
+	return storage.BlockID{}, fmt.Errorf("unexpected append of %q", fileName)
+}
+
+func (t *catalogTransaction) Pin(block storage.BlockID) error {
+	if _, ok := t.pages[block]; !ok {
+		return fmt.Errorf("unknown block %v", block)
+	}
+	t.pins = append(t.pins, block)
+	return nil
+}
+
+func (t *catalogTransaction) Unpin(block storage.BlockID) error {
+	t.unpins = append(t.unpins, block)
+	return t.unpinErr
+}
+
+func (t *catalogTransaction) BlockSize() (int, error) {
+	return t.blockSize, nil
+}
+
+func (t *catalogTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
+	return t.pages[block].GetInt(offset)
+}
+
+func (t *catalogTransaction) GetString(block storage.BlockID, offset int) (string, error) {
+	value, err := t.pages[block].GetBytes(offset)
+	return string(value), err
+}
+
+func (t *catalogTransaction) SetInt(block storage.BlockID, offset int32, value int32, _ bool) error {
+	t.setIntCalls++
+	if t.setIntErr != nil && offset == t.setIntOffset {
+		t.setIntOffsetCalls++
+		if t.setIntErrAfter == 0 || t.setIntOffsetCalls == t.setIntErrAfter {
+			return t.setIntErr
+		}
+	}
+	return t.pages[block].SetInt(int(offset), value)
+}
+
+func (t *catalogTransaction) SetString(block storage.BlockID, offset int32, value string, logUpdate bool) error {
+	if logUpdate {
+		t.setStringCalls++
+		if t.setStringErr != nil && (t.setStringErrAfter == 0 || t.setStringCalls == t.setStringErrAfter) {
+			return t.setStringErr
+		}
+	}
+	return t.pages[block].SetBytes(int(offset), []byte(value))
+}
 
 func TestNewTableManagerRetainsCatalogLayouts(t *testing.T) {
 	manager := NewTableManager()
@@ -39,5 +138,471 @@ func assertSameLayout(t *testing.T, got, want *record.Layout) {
 		if !gotOK || !wantOK || gotOffset != wantOffset {
 			t.Fatalf("offset %q = (%d, %v), want (%d, %v)", name, gotOffset, gotOK, wantOffset, wantOK)
 		}
+	}
+}
+
+func TestTableManagerCreateTableStoresCatalogRows(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	manager := NewTableManager()
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	schema.AddVarcharField("sname", 10)
+
+	if err := manager.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	assertPageInt(t, tablePage, 0, 1)
+	assertPageString(t, tablePage, 4, "student")
+	assertPageInt(t, tablePage, 72, int32(record.NewLayout(&schema).SlotSize()))
+
+	fieldPage := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)]
+	assertFieldCatalogRow(t, fieldPage, 0, "student", "sid", record.IntegerField, 0, 4)
+	assertFieldCatalogRow(t, fieldPage, 152, "student", "sname", record.VarcharField, 10, 8)
+	assertPageInt(t, fieldPage, 304, 0)
+
+	wantBlocks := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantBlocks) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantBlocks)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantBlocks) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantBlocks)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+}
+
+func TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess(t *testing.T) {
+	manager := NewTableManager()
+	err := manager.CreateTable("student", nil, nil)
+	if err == nil {
+		t.Fatal("CreateTable() error = nil, want nil-schema error")
+	}
+	for _, context := range []string{"student", "schema is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestTableManagerCreateTableRejectsUnencodableSlotSizeBeforeTransactionAccess(t *testing.T) {
+	if strconv.IntSize < 64 {
+		t.Skip("int cannot represent a schema whose slot size exceeds int32 on this platform")
+	}
+	var schema record.Schema
+	schema.AddVarcharField("oversized", math.MaxInt32)
+
+	err := NewTableManager().CreateTable("oversized", &schema, nil)
+	if err == nil {
+		t.Fatal("CreateTable() error = nil, want slot-size range error")
+	}
+	for _, context := range []string{"oversized", "slot size", "exceeds int32 range"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+}
+
+func TestTableManagerCreateTableReportsCloseFailureAfterSuccessfulTableWrite(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	closeErr := errors.New("catalog unpin failed")
+	transaction.unpinErr = closeErr
+	var schema record.Schema
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, closeErr) {
+		t.Fatalf("CreateTable() error = %v, want close cause", err)
+	}
+	for _, context := range []string{"student", "table catalog", "close catalog scan"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	if got, want := transaction.unpins, []storage.BlockID{storage.NewBlockID("tblcat.tbl", 0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unpins = %v, want %v", got, want)
+	}
+	if len(transaction.pins) != 1 || transaction.pins[0] != storage.NewBlockID("tblcat.tbl", 0) {
+		t.Fatalf("pins = %v, want only the table catalog", transaction.pins)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+}
+
+func TestTableManagerCreateTablePreservesCatalogScanOpenFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	sizeErr := errors.New("catalog size failed")
+	transaction.sizeErr = sizeErr
+	var schema record.Schema
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, sizeErr) {
+		t.Fatalf("CreateTable() error = %v, want size cause", err)
+	}
+	for _, context := range []string{"student", "table catalog", "open catalog scan", "read size"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	if len(transaction.pins) != 0 || len(transaction.unpins) != 0 {
+		t.Fatalf("pins/unpins = %v/%v, want none for an unopened scan", transaction.pins, transaction.unpins)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+}
+
+func TestMetadataIntegerPreservesInt32Bounds(t *testing.T) {
+	for _, value := range []int{math.MinInt32, math.MaxInt32} {
+		got, err := metadataInteger("slot size", value)
+		if err != nil || got != int32(value) {
+			t.Errorf("metadataInteger(%d) = (%d, %v), want (%d, nil)", value, got, err, int32(value))
+		}
+	}
+}
+
+func TestMetadataIntegerRejectsValuesOutsideInt32(t *testing.T) {
+	if strconv.IntSize < 64 {
+		t.Skip("int cannot represent values outside the int32 range on this platform")
+	}
+
+	below := int(int64(math.MinInt32) - 1)
+	above := int(int64(math.MaxInt32) + 1)
+	for _, value := range []int{below, above} {
+		t.Run(strconv.Itoa(value), func(t *testing.T) {
+			got, err := metadataInteger("slot size", value)
+			if got != 0 || err == nil {
+				t.Fatalf("metadataInteger(%d) = (%d, %v), want (0, range error)", value, got, err)
+			}
+			if want := fmt.Sprintf("slot size %d exceeds int32 range", value); err.Error() != want {
+				t.Fatalf("metadataInteger(%d) error = %q, want %q", value, err, want)
+			}
+		})
+	}
+}
+
+func TestTableManagerCreateTablePreservesOperationAndCloseFailures(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("write failed")
+	closeErr := errors.New("close failed")
+	transaction.setStringErr = writeErr
+	transaction.unpinErr = closeErr
+	manager := NewTableManager()
+	var schema record.Schema
+
+	err := manager.CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) || !errors.Is(err, closeErr) {
+		t.Fatalf("CreateTable() error = %v, want write and close causes", err)
+	}
+	for _, context := range []string{"student", "table catalog", "store table name", "close catalog scan"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	if got, want := transaction.unpins, []storage.BlockID{storage.NewBlockID("tblcat.tbl", 0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unpins = %v, want %v", got, want)
+	}
+}
+
+func TestTableManagerCreateTablePreservesTableCatalogInsertFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	insertErr := errors.New("table catalog row insert failed")
+	transaction.setIntErr = insertErr
+	transaction.setIntOffset = 0
+	var schema record.Schema
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, insertErr) {
+		t.Fatalf("CreateTable() error = %v, want table catalog insert cause", err)
+	}
+	for _, context := range []string{"student", "table catalog", "insert table catalog row"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	if got, want := transaction.pins, []storage.BlockID{storage.NewBlockID("tblcat.tbl", 0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins = %v, want %v", got, want)
+	}
+	if !reflect.DeepEqual(transaction.unpins, transaction.pins) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, transaction.pins)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+}
+
+func TestTableManagerCreateTablePreservesFieldCatalogInsertFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	insertErr := errors.New("field catalog row insert failed")
+	transaction.setIntErr = insertErr
+	transaction.setIntOffset = 0
+	transaction.setIntErrAfter = 2
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, insertErr) {
+		t.Fatalf("CreateTable() error = %v, want field catalog insert cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `insert field catalog row for "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if len(transaction.appendCalls) != 0 {
+		t.Fatalf("append calls = %v, want none", transaction.appendCalls)
+	}
+	if got, err := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)].GetInt(0); err != nil || got != 0 {
+		t.Fatalf("fldcat occupancy = (%d, %v), want (0, nil)", got, err)
+	}
+}
+
+func TestTableManagerCreateTablePreservesFieldCatalogTableNameWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("field catalog table-name write failed")
+	transaction.setStringErr = writeErr
+	transaction.setStringErrAfter = 2
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want fldcat table-name write cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `store table name for field "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if transaction.setStringCalls != 2 {
+		t.Fatalf("string writes = %d, want stop at the field table-name write", transaction.setStringCalls)
+	}
+	if got, err := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)].GetInt(0); err != nil || got != 1 {
+		t.Fatalf("fldcat occupancy = (%d, %v), want the inserted row marked used", got, err)
+	}
+}
+
+func TestTableManagerCreateTablePreservesFieldCatalogFieldNameWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("field catalog field-name write failed")
+	transaction.setStringErr = writeErr
+	transaction.setStringErrAfter = 3
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want fldcat field-name write cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `store field name "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if transaction.setStringCalls != 3 {
+		t.Fatalf("string writes = %d, want stop at the field name write", transaction.setStringCalls)
+	}
+	if got, err := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)].GetInt(0); err != nil || got != 1 {
+		t.Fatalf("fldcat occupancy = (%d, %v), want the inserted row marked used", got, err)
+	}
+}
+
+func TestTableManagerCreateTablePreservesFieldCatalogOffsetWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("field catalog offset write failed")
+	manager := NewTableManager()
+	offset, _ := manager.fieldCatalogLayout.Offset("offset")
+	transaction.setIntErr = writeErr
+	transaction.setIntOffset = int32(offset)
+	transaction.setIntErrAfter = 1
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	schema.AddIntegerField("name")
+
+	err := manager.CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want fldcat offset write cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `store field offset for "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if transaction.setIntCalls != 6 {
+		t.Fatalf("integer writes = %d, want stop at the first field-offset write", transaction.setIntCalls)
+	}
+	if transaction.setStringCalls != 3 {
+		t.Fatalf("string writes = %d, want table name and first field metadata only", transaction.setStringCalls)
+	}
+}
+
+func TestTableManagerCreateTablePreservesFieldCatalogLengthWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("field catalog length write failed")
+	manager := NewTableManager()
+	lengthOffset, _ := manager.fieldCatalogLayout.Offset("length")
+	transaction.setIntErr = writeErr
+	transaction.setIntOffset = int32(lengthOffset)
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := manager.CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want fldcat length write cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `store field length for "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if transaction.setIntCalls != 5 {
+		t.Fatalf("integer writes = %d, want stop at the field-length write", transaction.setIntCalls)
+	}
+	if transaction.setStringCalls != 3 {
+		t.Fatalf("string writes = %d, want table name, field table name, and field name", transaction.setStringCalls)
+	}
+}
+
+func TestTableManagerCreateTablePreservesFieldCatalogTypeWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("field catalog type write failed")
+	manager := NewTableManager()
+	typeOffset, _ := manager.fieldCatalogLayout.Offset("type")
+	transaction.setIntErr = writeErr
+	transaction.setIntOffset = int32(typeOffset)
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := manager.CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want fldcat type write cause", err)
+	}
+	for _, context := range []string{"student", "field catalog", `store field type for "sid"`} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	wantScans := []storage.BlockID{
+		storage.NewBlockID("tblcat.tbl", 0),
+		storage.NewBlockID("fldcat.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.pins, wantScans) {
+		t.Fatalf("pins = %v, want %v", transaction.pins, wantScans)
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantScans) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, wantScans)
+	}
+	if transaction.setIntCalls != 4 {
+		t.Fatalf("integer writes = %d, want stop at the field-type write", transaction.setIntCalls)
+	}
+	if transaction.setStringCalls != 3 {
+		t.Fatalf("string writes = %d, want table name, field table name, and field name", transaction.setStringCalls)
+	}
+}
+
+func TestTableManagerCreateTablePreservesTableSlotSizeWriteFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 512)
+	writeErr := errors.New("integer metadata write failed")
+	transaction.setIntErr = writeErr
+	transaction.setIntOffset = 72
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+
+	err := NewTableManager().CreateTable("student", &schema, transaction)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("CreateTable() error = %v, want slot-size write cause", err)
+	}
+	for _, context := range []string{"student", "table catalog", "store table slot size"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
+	if got, want := transaction.pins, []storage.BlockID{storage.NewBlockID("tblcat.tbl", 0)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins = %v, want %v", got, want)
+	}
+	if !reflect.DeepEqual(transaction.unpins, transaction.pins) {
+		t.Fatalf("unpins = %v, want %v", transaction.unpins, transaction.pins)
+	}
+}
+
+func assertFieldCatalogRow(t *testing.T, page *storage.Page, base int, tableName, fieldName string, fieldType record.FieldType, length, offset int) {
+	t.Helper()
+	assertPageInt(t, page, base, 1)
+	assertPageString(t, page, base+4, tableName)
+	assertPageString(t, page, base+72, fieldName)
+	assertPageInt(t, page, base+140, int32(fieldType))
+	assertPageInt(t, page, base+144, int32(length))
+	assertPageInt(t, page, base+148, int32(offset))
+}
+
+func assertPageInt(t *testing.T, page *storage.Page, offset int, want int32) {
+	t.Helper()
+	got, err := page.GetInt(offset)
+	if err != nil || got != want {
+		t.Fatalf("GetInt(%d) = (%d, %v), want (%d, nil)", offset, got, err, want)
+	}
+}
+
+func assertPageString(t *testing.T, page *storage.Page, offset int, want string) {
+	t.Helper()
+	value, err := page.GetBytes(offset)
+	got := string(value)
+	if err != nil || got != want {
+		t.Fatalf("GetBytes(%d) = (%q, %v), want (%q, nil)", offset, got, err, want)
 	}
 }
