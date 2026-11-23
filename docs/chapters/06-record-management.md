@@ -82,6 +82,22 @@ The test first failed to compile because the field-copy operation did not exist.
 
 This maps Java `Schema.add` to a Go operation with an explicit missing-field result.
 
+## Feature 5: Merge every field from another schema
+
+`Schema.AddAllFrom` walks the source's copied field-name slice in declaration order and delegates each entry to
+`AddFrom`. Existing destination fields remain first, and all copied type and conceptual-length metadata follows the
+single-field path.
+
+### Test-first record
+
+The test first failed to compile because the all-field merge operation did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestSchemaAddAllFromPreservesSourceOrderAndMetadata` | All source fields retain order, type, and length after existing destination fields |
+
+This maps Java `Schema.addAll` while retaining the immutable field-list boundary used by the Go schema.
+
 ## Next behavior
 
-Add merging every field from another schema as the next stacked PR.
+Add field-membership lookup as the next stacked PR.
