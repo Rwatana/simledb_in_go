@@ -941,6 +941,139 @@ func TestProjectPlanDistinctValuesDelegatesAndHandlesNilPlan(t *testing.T) {
 	}
 }
 
+func TestBasicQueryPlannerComposesPlansForPhysicalTables(t *testing.T) {
+	leftSchema := newPlannerTestSchema("left_id")
+	rightSchema := newPlannerTestSchema("right_name")
+	metadata := &basicPlannerMetadataProbe{
+		layouts: map[string]*record.Layout{
+			"left":  record.NewLayout(leftSchema),
+			"right": record.NewLayout(rightSchema),
+		},
+		statistics: map[string]*metadata.StatInfo{
+			"left":  metadata.NewStatInfo(2, 5),
+			"right": metadata.NewStatInfo(3, 7),
+		},
+	}
+	predicate := query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("left_id"),
+		query.NewConstantExpression(query.NewIntConstant(7)),
+	))
+	planner := NewBasicQueryPlanner(metadata)
+	got, err := planner.CreatePlan(parse.NewQueryData(
+		[]string{"right_name", "left_id"}, []string{"left", "right"}, predicate,
+	), &tablePlanTransaction{})
+	if err != nil {
+		t.Fatalf("CreatePlan() error = %v", err)
+	}
+	project, ok := got.(*ProjectPlan)
+	if !ok {
+		t.Fatalf("CreatePlan() type = %T, want *ProjectPlan", got)
+	}
+	if fields, want := project.Schema().Fields(), []string{"right_name", "left_id"}; !reflect.DeepEqual(fields, want) {
+		t.Errorf("projected fields = %v, want %v", fields, want)
+	}
+	selectPlan, ok := project.child.(*SelectPlan)
+	if !ok {
+		t.Fatalf("ProjectPlan child type = %T, want *SelectPlan", project.child)
+	}
+	if got := selectPlan.predicate.String(); got != predicate.String() {
+		t.Errorf("selection predicate = %q, want %q", got, predicate.String())
+	}
+	product, ok := selectPlan.child.(*ProductPlan)
+	if !ok {
+		t.Fatalf("SelectPlan child type = %T, want *ProductPlan", selectPlan.child)
+	}
+	left, leftOK := product.left.(*TablePlan)
+	right, rightOK := product.right.(*TablePlan)
+	if !leftOK || !rightOK {
+		t.Fatalf("ProductPlan children = (%T, %T), want two *TablePlan values", product.left, product.right)
+	}
+	if left.tableName != "left" || right.tableName != "right" {
+		t.Errorf("product table order = (%q, %q), want (left, right)", left.tableName, right.tableName)
+	}
+	if got, want := metadata.layoutRequests, []string{"left", "right"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("layout requests = %v, want %v", got, want)
+	}
+	if got, want := metadata.statisticsRequests, []string{"left", "right"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("statistics requests = %v, want %v", got, want)
+	}
+}
+
+func TestBasicQueryPlannerRejectsInvalidInputsAndMetadataFailures(t *testing.T) {
+	var nilPlanner *BasicQueryPlanner
+	validQuery := parse.NewQueryData([]string{"id"}, []string{"student"}, query.Predicate{})
+	if plan, err := nilPlanner.CreatePlan(validQuery, &tablePlanTransaction{}); plan != nil || err == nil {
+		t.Errorf("nil planner CreatePlan() = (%v, %v), want an error", plan, err)
+	}
+	if plan, err := NewBasicQueryPlanner(nil).CreatePlan(validQuery, &tablePlanTransaction{}); plan != nil || err == nil {
+		t.Errorf("planner without metadata CreatePlan() = (%v, %v), want an error", plan, err)
+	}
+	metadata := &basicPlannerMetadataProbe{}
+	planner := NewBasicQueryPlanner(metadata)
+	if plan, err := planner.CreatePlan(validQuery, nil); plan != nil || err == nil {
+		t.Errorf("CreatePlan() with nil transaction = (%v, %v), want an error", plan, err)
+	}
+	if plan, err := planner.CreatePlan(parse.QueryData{}, &tablePlanTransaction{}); plan != nil || err == nil {
+		t.Errorf("CreatePlan() without tables = (%v, %v), want an error", plan, err)
+	}
+
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	layout := record.NewLayout(&schema)
+	layoutErr := errors.New("layout unavailable")
+	metadata.layoutErr = layoutErr
+	data := parse.NewQueryData([]string{"id"}, []string{"student"}, query.Predicate{})
+	if plan, err := planner.CreatePlan(data, &tablePlanTransaction{}); plan != nil || !errors.Is(err, layoutErr) {
+		t.Errorf("CreatePlan() with layout error = (%v, %v), want wrapped layout error", plan, err)
+	}
+	metadata.layoutErr = nil
+	metadata.layouts = map[string]*record.Layout{"student": nil}
+	if plan, err := planner.CreatePlan(data, &tablePlanTransaction{}); plan != nil || err == nil {
+		t.Errorf("CreatePlan() with nil layout = (%v, %v), want an error", plan, err)
+	}
+	metadata.layouts["student"] = layout
+	statisticsErr := errors.New("statistics unavailable")
+	metadata.statisticsErr = statisticsErr
+	if plan, err := planner.CreatePlan(data, &tablePlanTransaction{}); plan != nil || !errors.Is(err, statisticsErr) {
+		t.Errorf("CreatePlan() with statistics error = (%v, %v), want wrapped error", plan, err)
+	}
+	metadata.statisticsErr = nil
+	if plan, err := planner.CreatePlan(parse.NewQueryData([]string{"missing"}, []string{"student"}, query.Predicate{}), &tablePlanTransaction{}); plan != nil || err == nil {
+		t.Errorf("CreatePlan() with unknown projection = (%v, %v), want an error", plan, err)
+	}
+}
+
+func newPlannerTestSchema(fieldName string) *record.Schema {
+	schema := &record.Schema{}
+	schema.AddIntegerField(fieldName)
+	return schema
+}
+
+type basicPlannerMetadataProbe struct {
+	layouts            map[string]*record.Layout
+	statistics         map[string]*metadata.StatInfo
+	layoutErr          error
+	statisticsErr      error
+	layoutRequests     []string
+	statisticsRequests []string
+}
+
+func (probe *basicPlannerMetadataProbe) Layout(tableName string, _ record.TableScanTransaction) (*record.Layout, error) {
+	probe.layoutRequests = append(probe.layoutRequests, tableName)
+	if probe.layoutErr != nil {
+		return nil, probe.layoutErr
+	}
+	return probe.layouts[tableName], nil
+}
+
+func (probe *basicPlannerMetadataProbe) Statistics(tableName string, _ *record.Layout, _ record.TableScanTransaction) (*metadata.StatInfo, error) {
+	probe.statisticsRequests = append(probe.statisticsRequests, tableName)
+	if probe.statisticsErr != nil {
+		return nil, probe.statisticsErr
+	}
+	return probe.statistics[tableName], nil
+}
+
 type productPlanProbe struct {
 	scan     query.Scan
 	openErr  error

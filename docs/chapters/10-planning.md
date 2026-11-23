@@ -13,6 +13,7 @@ and planner composition remains a separate observable behavior and Issue.
 | `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas, open the Cartesian-product scan, and estimate its output |
 | `internal/plan.ProjectPlan` | `simpledb/plan/ProjectPlan.java` | Build the projected schema, open its `ProjectScan`, and delegate estimates |
 | `internal/plan.QueryPlanner` | `simpledb/plan/QueryPlanner.java` | Convert parsed query data and a transaction into an executable plan |
+| `internal/plan.BasicQueryPlanner` | `simpledb/plan/BasicQueryPlanner.java` | Resolve table metadata and compose product, selection, and projection plans |
 
 ## Feature 1: Define the query plan contract
 
@@ -308,6 +309,20 @@ parsed query data into a plan tree; its editable source is
 The first focused test run failed because `QueryPlanner` was undefined. A compile-time conformance assertion verifies
 that an implementation with the declared input and result types satisfies the interface.
 
+## Feature 23: Plan SELECT queries over physical tables
+
+`BasicQueryPlanner.CreatePlan` maps to Java `BasicQueryPlanner.createPlan` for physical table sources. It resolves each
+table's layout and statistics in query order, combines multiple tables left-associatively with `ProductPlan`, then wraps
+the result in `SelectPlan` followed by `ProjectPlan`. Nil dependencies, metadata failures, a query without tables, and
+unknown projected fields return contextual errors. The [plan diagram](../diagrams/ch10-plan-contract.svg) shows this
+operator order; its editable source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `BasicQueryPlanner` and `NewBasicQueryPlanner` were undefined. Tests verify
+two-table order, metadata lookup order, the product/selection/projection tree, predicate and output-field preservation,
+and nil/error cases.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -327,3 +342,4 @@ that an implementation with the declared input and result types satisfies the in
 - `ProjectPlan.RecordsOutput` delegates directly to its child because projection does not change row count.
 - `ProjectPlan.DistinctValues` delegates field estimates to the child, preserving the child's statistics model.
 - `QueryPlanner.CreatePlan` returns `(Plan, error)` so Go planning failures remain explicit.
+- `BasicQueryPlanner` currently plans physical tables; recursive view expansion is a separate planning behavior.
