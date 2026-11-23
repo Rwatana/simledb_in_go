@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/record"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 func TestNewStatManagerStartsWithEmptyCache(t *testing.T) {
@@ -57,6 +58,51 @@ func TestStatManagerCalculateTableStatsCountsRecordsAndBlocks(t *testing.T) {
 	}
 	if manager.calls != 0 || len(manager.stats) != 0 {
 		t.Fatalf("manager state = (%d calls, %v), want unchanged", manager.calls, manager.stats)
+	}
+}
+
+func TestStatManagerCalculateTableStatsPreservesScanFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(64)
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	layout := record.NewLayout(&schema)
+	scan, err := record.NewTableScan(transaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	transaction.unpins = nil
+
+	wantErr := errors.New("record flag unavailable")
+	transaction.getIntErr = wantErr
+	transaction.getIntOffset = 0
+	transaction.getIntErrFile = "student.tbl"
+
+	manager := NewStatManager(nil)
+	stats, err := manager.calculateTableStats("student", layout, transaction)
+	if stats != nil {
+		t.Fatalf("calculateTableStats() stats = %v, want nil after scan failure", stats)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("calculateTableStats() error = %v, want wrapped scan failure", err)
+	}
+	for _, context := range []string{
+		`calculate statistics for table "student"`,
+		"scan records",
+		"find occupied record",
+	} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("calculateTableStats() error = %q, want context %q", err, context)
+		}
+	}
+	wantBlock := storage.NewBlockID("student.tbl", 0)
+	if len(transaction.unpins) != 1 || transaction.unpins[0] != wantBlock {
+		t.Errorf("unpins = %v, want [%v] after scan failure", transaction.unpins, wantBlock)
+	}
+	if manager.calls != 0 || len(manager.stats) != 0 {
+		t.Errorf("manager state = (%d calls, %v), want unchanged", manager.calls, manager.stats)
 	}
 }
 

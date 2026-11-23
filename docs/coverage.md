@@ -313,6 +313,10 @@ A separate synthetic host-int boundary now exercises the SETINT encoder's record
 no partial encoding is returned. The bounded encoder helper and recovery package are now 100.0% covered, and full-module
 statement coverage is 99.1%.
 
+Table-statistics calculation now exercises a record scan failure caused by a slot-flag read error. The test verifies
+the underlying cause and table/scan context and confirms the scan releases its page pin. `calculateTableStats` is now
+93.8% covered, metadata package coverage is 98.4%, and full-module statement coverage remains 99.1%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
