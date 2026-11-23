@@ -95,23 +95,36 @@ func (m *StatManager) calculateTableStats(tableName string, layout *record.Layou
 	blocks := 0
 	records := 0
 	if err := withCatalogScan(transaction, tableName, layout, func(scan *record.TableScan) error {
-		for {
-			found, err := scan.Next()
-			if err != nil {
-				return fmt.Errorf("scan records: %w", err)
-			}
-			if !found {
-				return nil
-			}
-			records++
-			rid, err := scan.GetRID()
-			if err != nil {
-				return fmt.Errorf("read RID for record %d: %w", records, err)
-			}
-			blocks = rid.BlockNumber() + 1
-		}
+		var err error
+		blocks, records, err = scanTableStatistics(scan)
+		return err
 	}); err != nil {
 		return nil, fmt.Errorf("calculate statistics for table %q: %w", tableName, err)
 	}
 	return NewStatInfo(blocks, records), nil
+}
+
+type tableStatisticsScan interface {
+	Next() (bool, error)
+	GetRID() (record.RID, error)
+}
+
+func scanTableStatistics(scan tableStatisticsScan) (int, int, error) {
+	blocks := 0
+	records := 0
+	for {
+		found, err := scan.Next()
+		if err != nil {
+			return blocks, records, fmt.Errorf("scan records: %w", err)
+		}
+		if !found {
+			return blocks, records, nil
+		}
+		records++
+		rid, err := scan.GetRID()
+		if err != nil {
+			return blocks, records, fmt.Errorf("read RID for record %d: %w", records, err)
+		}
+		blocks = rid.BlockNumber() + 1
+	}
 }

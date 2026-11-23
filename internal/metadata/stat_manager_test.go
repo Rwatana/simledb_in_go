@@ -61,6 +61,37 @@ func TestStatManagerCalculateTableStatsCountsRecordsAndBlocks(t *testing.T) {
 	}
 }
 
+func TestScanTableStatisticsPreservesRecordIdentifierFailure(t *testing.T) {
+	wantErr := errors.New("record identifier unavailable")
+	blocks, records, err := scanTableStatistics(&failingRIDStatisticsScan{err: wantErr})
+	if blocks != 0 || records != 1 {
+		t.Errorf("scanTableStatistics() counts = (%d blocks, %d records), want (0, 1)", blocks, records)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("scanTableStatistics() error = %v, want wrapped RID failure", err)
+	}
+	if !strings.Contains(err.Error(), "read RID for record 1") {
+		t.Errorf("scanTableStatistics() error = %q, want record-index context", err)
+	}
+}
+
+type failingRIDStatisticsScan struct {
+	err  error
+	read bool
+}
+
+func (s *failingRIDStatisticsScan) Next() (bool, error) {
+	if s.read {
+		return false, nil
+	}
+	s.read = true
+	return true, nil
+}
+
+func (s *failingRIDStatisticsScan) GetRID() (record.RID, error) {
+	return record.RID{}, s.err
+}
+
 func TestStatManagerCalculateTableStatsPreservesScanFailure(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(64)
 	var schema record.Schema

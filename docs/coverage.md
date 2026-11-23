@@ -334,6 +334,10 @@ Refresh also now covers a registered table whose record scan fails while reading
 verifies the table and scan context, confirms the page pin is released, and keeps the old cache intact. Every statement
 in `refreshLocked` is now covered, metadata package coverage is 99.7%, and full-module statement coverage is 99.4%.
 
+The statistics record loop now uses a private scan interface so a defensive `GetRID` failure after a successful
+`Next` can be exercised directly. The test checks the record index and wrapped cause; all metadata statements are
+now covered, while full-module statement coverage remains 99.4%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
