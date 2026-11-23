@@ -1,0 +1,17 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-insert-data" name="Chapter 9 - INSERT Data">
+    <mxGraphModel page="1" pageWidth="1160" pageHeight="520">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 15: Store INSERT command data" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="170" y="25" width="820" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="Constructor input&#xa;&#xa;fields: name, age&#xa;values: Ada, 37" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;" vertex="1" parent="1"><mxGeometry x="35" y="195" width="250" height="145" as="geometry"/></mxCell>
+        <mxCell id="data" value="InsertData&#xa;&#xa;tableName&#xa;ordered fields[]&#xa;matching values[]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;" vertex="1" parent="1"><mxGeometry x="390" y="175" width="280" height="185" as="geometry"/></mxCell>
+        <mxCell id="accessors" value="Read-only accessors&#xa;&#xa;TableName()&#xa;Fields() → copy&#xa;Values() → copy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="780" y="175" width="255" height="185" as="geometry"/></mxCell>
+        <mxCell id="zero" value="Zero value&#xa;&#xa;empty table&#xa;nil field and value lists" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=17;" vertex="1" parent="1"><mxGeometry x="390" y="405" width="280" height="90" as="geometry"/></mxCell>
+        <mxCell id="e1" value="copy input" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="input" target="data"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="return copies" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="data" target="accessors"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="safe defaults" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="data" target="zero"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
