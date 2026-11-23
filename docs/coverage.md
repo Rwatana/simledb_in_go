@@ -3,8 +3,8 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint for Issue #646, the full-module statement coverage is **96.3%** (rounded to one
-decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 97.4%, query
+At the 2026-11-23 checkpoint for Issue #648, the full-module statement coverage is **96.3%** (rounded to one
+decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 97.6%, query
 100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 91.3%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
 both catalog-initialization failure paths, table- and field-catalog row insertion, field-catalog table-name,
@@ -107,6 +107,10 @@ coverage is 97.1%, and full-module coverage is 96.2%.
 The separate `viewname` read failure in `ViewDefinition` now returns the cause and requested-view context, an empty
 result, and closes the scan. `ViewDefinition` is now 96.0% covered, metadata coverage is 97.4%, and full-module
 coverage is 96.3%.
+
+The matching-row `viewdef` read failure in `ViewDefinition` now returns the wrapped cause and requested-view context,
+an empty result, and closes the scan. `ViewDefinition` is now 100.0% covered, metadata coverage is 97.6%, and
+full-module coverage is 96.3%.
 
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
