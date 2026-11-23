@@ -9,11 +9,14 @@ import (
 )
 
 type recordingRecordTransaction struct {
-	pins    []storage.BlockID
-	pinErr  error
-	reads   []integerRead
-	value   int32
-	readErr error
+	pins        []storage.BlockID
+	pinErr      error
+	reads       []integerRead
+	value       int32
+	readErr     error
+	stringReads []integerRead
+	stringValue string
+	stringErr   error
 }
 
 type integerRead struct {
@@ -29,6 +32,11 @@ func (t *recordingRecordTransaction) Pin(block storage.BlockID) error {
 func (t *recordingRecordTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
 	t.reads = append(t.reads, integerRead{block: block, offset: offset})
 	return t.value, t.readErr
+}
+
+func (t *recordingRecordTransaction) GetString(block storage.BlockID, offset int) (string, error) {
+	t.stringReads = append(t.stringReads, integerRead{block: block, offset: offset})
+	return t.stringValue, t.stringErr
 }
 
 func TestRecordPageGetIntReadsCalculatedFieldPosition(t *testing.T) {
@@ -68,6 +76,47 @@ func TestRecordPageGetIntReportsLookupAndReadFailures(t *testing.T) {
 	_, err = page.GetInt(1, "id")
 	if !errors.Is(err, readErr) || !strings.Contains(err.Error(), "slot 1 field \"id\"") || !strings.Contains(err.Error(), "offset 12") {
 		t.Fatalf("GetInt read error = %v, want contextual wrapped failure", err)
+	}
+}
+
+func TestRecordPageGetStringReadsCalculatedFieldPosition(t *testing.T) {
+	transaction := &recordingRecordTransaction{stringValue: "東京"}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 20)
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	got, err := page.GetString(2, "name")
+	if err != nil || got != "東京" {
+		t.Fatalf("GetString(2, name) = (%q, %v), want (東京, nil)", got, err)
+	}
+	wantRead := integerRead{block: block, offset: 192}
+	if len(transaction.stringReads) != 1 || transaction.stringReads[0] != wantRead {
+		t.Fatalf("GetString calls = %v, want [%v]", transaction.stringReads, wantRead)
+	}
+}
+
+func TestRecordPageGetStringReportsLookupAndReadFailures(t *testing.T) {
+	readErr := errors.New("string read failed")
+	transaction := &recordingRecordTransaction{stringErr: readErr}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddVarcharField("name", 20)
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	if _, err := page.GetString(1, "missing"); err == nil || len(transaction.stringReads) != 0 {
+		t.Fatalf("GetString(missing) = %v with reads %v, want lookup failure before read", err, transaction.stringReads)
+	}
+	_, err = page.GetString(1, "name")
+	if !errors.Is(err, readErr) || !strings.Contains(err.Error(), "slot 1 field \"name\"") || !strings.Contains(err.Error(), "offset 92") {
+		t.Fatalf("GetString read error = %v, want contextual wrapped failure", err)
 	}
 }
 

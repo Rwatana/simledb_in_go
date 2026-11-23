@@ -250,6 +250,23 @@ The tests first failed to compile because `RecordPage.GetInt` did not exist.
 
 This maps Java `RecordPage.getInt` and makes its implicit map/transaction failures explicit Go errors.
 
+## Feature 15: Read a string field from a record slot
+
+`RecordPage.GetString` uses the same slot and field offset calculation as integer reads, then performs one transaction
+string read from the retained block. UTF-8 values pass through unchanged. Unknown fields stop before transaction access,
+and read failures retain the full physical record context.
+
+### Test-first record
+
+The tests first failed to compile because `RecordPage.GetString` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageGetStringReadsCalculatedFieldPosition` | Slot and layout metadata select one transaction string read and preserve UTF-8 |
+| `TestRecordPageGetStringReportsLookupAndReadFailures` | Unknown fields prevent reads, while transaction failures retain record context |
+
+This maps Java `RecordPage.getString` with explicit Go error boundaries.
+
 ## Next behavior
 
-Read one string field from a specified record slot as the next stacked PR.
+Write one integer field in a specified record slot as the next stacked PR.
