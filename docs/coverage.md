@@ -209,6 +209,9 @@ Its overflow path is tested without depending on the machine architecture or all
 SETSTRING's signed int32 component-length guard now tests both the filename and old-value inputs through the same
 encoder path using a small synthetic limit. Both are rejected before record allocation, with the production limit and
 wire bytes unchanged.
+
+The SETSTRING combined-size check now accepts a synthetic host-int maximum. Separate filename and old-value cases
+verify each contribution is rejected before allocation when it exceeds the remaining encoded capacity.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

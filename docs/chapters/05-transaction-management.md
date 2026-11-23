@@ -380,6 +380,7 @@ failed because the SETSTRING operation, encoder, and decoder did not exist.
 | `TestSetStringRecordRoundTripsUTF8AndSignedFields` | Both strings and signed fields round-trip |
 | `TestEncodeSetStringRecordRejectsBlockOutsideInt32` | Block number cannot truncate |
 | `TestEncodeSetStringRecordRejectsOversizedLengthComponentsBeforeAllocation` | Filename and old-value length limits reject before record allocation |
+| `TestEncodeSetStringRecordRejectsCombinedSizeOverflowBeforeAllocation` | Combined encoded size cannot exceed the host-int limit before allocation |
 | `TestDecodeSetStringRecordRejectsInvalidEncoding` | Both lengths and exact boundary are strict |
 | `TestDecodeSetStringRecordRejectsTruncatedFilenameLength` | Filename length cannot claim bytes missing before the fixed fields |
 

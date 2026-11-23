@@ -39,22 +39,22 @@ func (r SetStringRecord) OldValue() string { return r.oldValue }
 
 // EncodeSetStringRecord returns the SETSTRING record's variable-length on-disk form.
 func EncodeSetStringRecord(transaction TransactionID, block storage.BlockID, offset int32, oldValue string) ([]byte, error) {
-	return encodeSetStringRecordWithLengthLimit(transaction, block, offset, oldValue, math.MaxInt32)
+	return encodeSetStringRecordWithLimits(transaction, block, offset, oldValue, math.MaxInt32, int(^uint(0)>>1))
 }
 
-func encodeSetStringRecordWithLengthLimit(transaction TransactionID, block storage.BlockID, offset int32, oldValue string, maxLength int) ([]byte, error) {
+func encodeSetStringRecordWithLimits(transaction TransactionID, block storage.BlockID, offset int32, oldValue string, maxLength, maxInt int) ([]byte, error) {
 	fileName, oldBytes := []byte(block.FileName()), []byte(oldValue)
 	if len(fileName) > maxLength || len(oldBytes) > maxLength {
 		return nil, fmt.Errorf("encode setstring record: string length exceeds int32: filename %d old value %d", len(fileName), len(oldBytes))
 	}
-	maxInt := int(^uint(0) >> 1)
-	if len(fileName) > maxInt-setStringFixedSize || len(oldBytes) > maxInt-setStringFixedSize-len(fileName) {
-		return nil, fmt.Errorf("encode setstring record: combined string lengths overflow record size")
+	encodedSize, err := setStringRecordSize(len(fileName), len(oldBytes), maxInt)
+	if err != nil {
+		return nil, fmt.Errorf("encode setstring record: %w", err)
 	}
 	if block.Number() < math.MinInt32 || block.Number() > math.MaxInt32 {
 		return nil, fmt.Errorf("encode setstring record: block number %d exceeds int32", block.Number())
 	}
-	encoded := make([]byte, setStringFixedSize+len(fileName)+len(oldBytes))
+	encoded := make([]byte, encodedSize)
 	binary.BigEndian.PutUint32(encoded[0:4], uint32(OperationSetString))
 	binary.BigEndian.PutUint32(encoded[4:8], uint32(transaction))
 	binary.BigEndian.PutUint32(encoded[8:12], uint32(len(fileName)))
@@ -65,6 +65,13 @@ func encodeSetStringRecordWithLengthLimit(transaction TransactionID, block stora
 	binary.BigEndian.PutUint32(encoded[fixed+8:fixed+12], uint32(len(oldBytes)))
 	copy(encoded[fixed+12:], oldBytes)
 	return encoded, nil
+}
+
+func setStringRecordSize(fileNameLength, oldValueLength, maxInt int) (int, error) {
+	if fileNameLength > maxInt-setStringFixedSize || oldValueLength > maxInt-setStringFixedSize-fileNameLength {
+		return 0, fmt.Errorf("combined string lengths overflow record size")
+	}
+	return setStringFixedSize + fileNameLength + oldValueLength, nil
 }
 
 // DecodeSetStringRecord interprets an exact SETSTRING record encoding.

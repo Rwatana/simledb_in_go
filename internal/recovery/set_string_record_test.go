@@ -52,9 +52,29 @@ func TestEncodeSetStringRecordRejectsOversizedLengthComponentsBeforeAllocation(t
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			encoded, err := encodeSetStringRecordWithLengthLimit(7, storage.NewBlockID(test.fileName, 2), 16, test.oldValue, test.maxLength)
+			encoded, err := encodeSetStringRecordWithLimits(7, storage.NewBlockID(test.fileName, 2), 16, test.oldValue, test.maxLength, int(^uint(0)>>1))
 			if encoded != nil || err == nil || !strings.Contains(err.Error(), "string length exceeds int32") {
-				t.Fatalf("encodeSetStringRecordWithLengthLimit() = (%v, %v), want nil record and length error", encoded, err)
+				t.Fatalf("encodeSetStringRecordWithLimits() = (%v, %v), want nil record and length error", encoded, err)
+			}
+		})
+	}
+}
+
+func TestEncodeSetStringRecordRejectsCombinedSizeOverflowBeforeAllocation(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileName string
+		oldValue string
+		maxInt   int
+	}{
+		{name: "filename leaves no room for fixed fields", fileName: "tbl", oldValue: "", maxInt: setStringFixedSize + 2},
+		{name: "old value exceeds remaining capacity", fileName: "tbl", oldValue: "old", maxInt: setStringFixedSize + 5},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			encoded, err := encodeSetStringRecordWithLimits(7, storage.NewBlockID(test.fileName, 2), 16, test.oldValue, math.MaxInt32, test.maxInt)
+			if encoded != nil || err == nil || !strings.Contains(err.Error(), "combined string lengths overflow record size") {
+				t.Fatalf("encodeSetStringRecordWithLimits() = (%v, %v), want nil record and size error", encoded, err)
 			}
 		})
 	}
