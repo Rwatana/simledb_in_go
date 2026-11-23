@@ -92,3 +92,27 @@ func TestConstantString(t *testing.T) {
 		}
 	}
 }
+
+func TestConstantHashCode(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		constant Constant
+		want     int32
+		ok       bool
+	}{
+		{"integer", NewIntConstant(-42), -42, true},
+		{"empty string", NewStringConstant(""), 0, true},
+		{"ASCII string", NewStringConstant("abc"), 96354, true},
+		{"non-ASCII string", NewStringConstant("東"), 26481, true},
+		{"supplementary character", NewStringConstant("😀"), 1772899, true},
+		{"signed overflow", NewStringConstant("zzzzzz"), -685785664, true},
+		{"malformed UTF-8", NewStringConstant("\xff"), 65533, true},
+		{"unset", Constant{}, 0, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, ok := tt.constant.HashCode(); got != tt.want || ok != tt.ok {
+				t.Errorf("HashCode() = (%d, %v), want (%d, %v)", got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
