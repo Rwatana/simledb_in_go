@@ -65,3 +65,11 @@ func (i *IndexInfo) BlocksAccessed() (int, error) {
 func (i *IndexInfo) RecordsOutput() int {
 	return i.stats.RecordsOutput() / i.stats.DistinctValues(i.fieldName)
 }
+
+// DistinctValues estimates distinct output values after an indexed search.
+func (i *IndexInfo) DistinctValues(fieldName string) int {
+	if fieldName == i.fieldName {
+		return 1
+	}
+	return i.stats.DistinctValues(i.fieldName)
+}
