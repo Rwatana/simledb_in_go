@@ -62,3 +62,11 @@ func (p *TablePlan) RecordsOutput() int {
 	}
 	return p.statistics.RecordsOutput()
 }
+
+// DistinctValues estimates the number of distinct values for fieldName.
+func (p *TablePlan) DistinctValues(fieldName string) int {
+	if p == nil || p.statistics == nil {
+		return 0
+	}
+	return p.statistics.DistinctValues(fieldName)
+}

@@ -81,9 +81,23 @@ estimates; its editable source is [`ch10-plan-contract.drawio`](../diagrams/ch10
 The first test run failed because `TablePlan.RecordsOutput` was undefined. Tests verify a nonzero forwarded row estimate
 and nil-safe zero results.
 
+## Feature 6: Estimate table distinct values
+
+`TablePlan.DistinctValues` forwards a field-name estimate to the retained `metadata.StatInfo`, matching Java
+`TablePlan.distinctValues(fieldName)`. A nil plan or missing statistics returns zero without panicking. The current
+`StatInfo` uses its documented simple estimate for any field; choosing or refreshing the statistics remains a metadata
+behavior. The [plan diagram](../diagrams/ch10-plan-contract.svg) now connects this estimate to `StatInfo`; its editable
+source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first test run failed because `TablePlan.DistinctValues` was undefined. Tests cover the current nonzero statistic
+estimate and nil-safe zero results.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
 - `NewTablePlan` receives a resolved layout rather than a metadata manager. This keeps metadata lookup outside the leaf plan and makes the table plan's schema dependency explicit.
 - `TablePlan.Open` returns a query-layer `RecordScan` adapter, rather than exposing the record-layer `TableScan`, because query plans require `GetVal`.
 - `NewTablePlan` receives precomputed `metadata.StatInfo` so obtaining statistics remains a separate metadata behavior; `BlocksAccessed` only forwards the estimate.
+- `TablePlan.DistinctValues` forwards the current simple `StatInfo` estimate; field-specific statistics remain outside this table-plan behavior.
