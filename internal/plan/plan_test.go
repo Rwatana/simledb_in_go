@@ -276,6 +276,23 @@ func TestSelectPlanSchemaHandlesNilPlanAndChild(t *testing.T) {
 	}
 }
 
+func TestSelectPlanBlocksAccessedReturnsChildEstimate(t *testing.T) {
+	selectPlan := NewSelectPlan(contractProbe{}, query.Predicate{})
+	if got := selectPlan.BlocksAccessed(); got != 2 {
+		t.Fatalf("BlocksAccessed() = %d, want child estimate 2", got)
+	}
+}
+
+func TestSelectPlanBlocksAccessedHandlesNilPlanAndChild(t *testing.T) {
+	var nilPlan *SelectPlan
+	if got := nilPlan.BlocksAccessed(); got != 0 {
+		t.Fatalf("nil SelectPlan.BlocksAccessed() = %d, want 0", got)
+	}
+	if got := NewSelectPlan(nil, query.Predicate{}).BlocksAccessed(); got != 0 {
+		t.Fatalf("SelectPlan without child BlocksAccessed() = %d, want 0", got)
+	}
+}
+
 type tablePlanTransaction struct {
 	size    int
 	sizeErr error

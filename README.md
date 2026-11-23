@@ -73,7 +73,7 @@
 
 ## 次の一歩
 
-Chapter 9のparsingを終え、Chapter 10 PlanningのPlan contract、TablePlan estimates、SelectPlanのscanとschema delegationを追加しています。
+Chapter 9のparsingを終え、Chapter 10 PlanningのPlan contract、TablePlan estimates、SelectPlanのscan・schema・block estimateを追加しています。
 
 ## 参照元
 
