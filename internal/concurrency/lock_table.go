@@ -65,15 +65,7 @@ func (t *LockTable) WaitSharedFor(block storage.BlockID, timeout time.Duration) 
 		expired := false
 		finished := false
 		timer := time.AfterFunc(remaining, func() {
-			t.mu.Lock()
-			defer t.mu.Unlock()
-			if finished {
-				return
-			}
-			expired = true
-			if t.changed != nil {
-				t.changed.Broadcast()
-			}
+			t.expireWait(&finished, &expired)
 		})
 		t.waitForChangeLocked()
 		finished = true
@@ -89,6 +81,16 @@ func (t *LockTable) WaitSharedFor(block storage.BlockID, timeout time.Duration) 
 	return nil
 }
 
+func (t *LockTable) expireWait(finished, expired *bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if *finished {
+		return
+	}
+	*expired = true
+	t.changed.Broadcast()
+}
+
 // WaitExclusive waits for competing shared holders to release block, then upgrades the caller's shared hold.
 func (t *LockTable) WaitExclusive(block storage.BlockID) error {
 	t.mu.Lock()
@@ -97,6 +99,34 @@ func (t *LockTable) WaitExclusive(block storage.BlockID) error {
 		t.exclusiveWaiters++
 		t.waitForChangeLocked()
 		t.exclusiveWaiters--
+	}
+	t.locks[block] = -1
+	return nil
+}
+
+// WaitExclusiveFor waits up to timeout for competing shared holders to release block, then upgrades the caller's shared hold.
+func (t *LockTable) WaitExclusiveFor(block storage.BlockID, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for t.locks[block] > 1 {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return ErrLockTimeout
+		}
+		expired := false
+		finished := false
+		t.exclusiveWaiters++
+		timer := time.AfterFunc(remaining, func() {
+			t.expireWait(&finished, &expired)
+		})
+		t.waitForChangeLocked()
+		t.exclusiveWaiters--
+		finished = true
+		timer.Stop()
+		if expired && t.locks[block] > 1 {
+			return ErrLockTimeout
+		}
 	}
 	t.locks[block] = -1
 	return nil
