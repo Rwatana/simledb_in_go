@@ -173,3 +173,28 @@ func TestPredicateJoinSubPredicate(t *testing.T) {
 		t.Fatalf("nil schema literal selection = (%v, %v), want (empty predicate, false)", selectedLiteral.terms, ok)
 	}
 }
+
+func TestPredicateEquatesWithConstant(t *testing.T) {
+	zeroValue := Constant{}
+	other := NewIntConstant(7)
+	nonmatching := NewTerm(NewFieldExpression("other"), NewConstantExpression(other))
+	firstMatch := NewTerm(NewFieldExpression("age"), NewConstantExpression(zeroValue))
+	secondMatch := NewTerm(NewConstantExpression(other), NewFieldExpression("age"))
+	predicate := Predicate{terms: []Term{nonmatching, firstMatch, secondMatch}}
+
+	got, ok := predicate.EquatesWithConstant("age")
+	if got != zeroValue || !ok {
+		t.Fatalf("EquatesWithConstant(age) = (%v, %v), want present zero-value constant", got, ok)
+	}
+	if want := []Term{nonmatching, firstMatch, secondMatch}; !reflect.DeepEqual(predicate.terms, want) {
+		t.Fatalf("predicate terms = %v, want unchanged %v", predicate.terms, want)
+	}
+
+	if got, ok := predicate.EquatesWithConstant("missing"); got != (Constant{}) || ok {
+		t.Fatalf("EquatesWithConstant(missing) = (%v, %v), want absent", got, ok)
+	}
+	var empty Predicate
+	if got, ok := empty.EquatesWithConstant("age"); got != (Constant{}) || ok {
+		t.Fatalf("empty.EquatesWithConstant(age) = (%v, %v), want absent", got, ok)
+	}
+}

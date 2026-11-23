@@ -58,6 +58,16 @@ func (predicate Predicate) JoinSubPredicate(first, second *record.Schema) (Predi
 	return selected, true
 }
 
+// EquatesWithConstant returns the first constant implied by fieldName, if any term provides one.
+func (predicate Predicate) EquatesWithConstant(fieldName string) (Constant, bool) {
+	for _, term := range predicate.terms {
+		if constant, ok := term.EquatesWithConstant(fieldName); ok {
+			return constant, true
+		}
+	}
+	return Constant{}, false
+}
+
 // IsSatisfied reports whether every term in the predicate is satisfied by scan.
 func (predicate Predicate) IsSatisfied(scan ValueScan) (bool, error) {
 	for _, term := range predicate.terms {
