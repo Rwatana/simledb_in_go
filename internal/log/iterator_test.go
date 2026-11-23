@@ -141,3 +141,27 @@ func TestBlockBoundaryRejectsPageWithoutCompleteInteger(t *testing.T) {
 		}
 	}
 }
+
+func TestIteratorRejectsPositionPastPageCapacity(t *testing.T) {
+	page, err := storage.NewPage(8)
+	if err != nil {
+		t.Fatalf("NewPage() error = %v", err)
+	}
+	iterator := &Iterator{
+		page:     page,
+		position: page.Capacity() + 1,
+		block:    storage.NewBlockID("simpledb.log", 0),
+	}
+	record, ok, err := iterator.Next()
+	if record != nil || ok {
+		t.Errorf("Next() = (%v, %t, %v), want no record", record, ok, err)
+	}
+	if err == nil {
+		t.Fatal("Next() error = nil, want invalid position error")
+	}
+	for _, context := range []string{"position 9", "page capacity 8"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Next() error = %q, want context %q", err, context)
+		}
+	}
+}

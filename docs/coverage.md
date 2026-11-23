@@ -224,6 +224,9 @@ iterator creation returns no partial iterator and retains both the `ESPIPE` caus
 
 The log iterator boundary parser now directly covers a Page too short to hold its four-byte boundary, retaining both
 the block identifier and field-read stage in the returned error.
+
+`Iterator.Next` now directly covers its corrupted-position guard, verifying a position beyond Page capacity returns
+no record and preserves both numeric values in the error context.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
