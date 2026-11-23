@@ -305,6 +305,18 @@ metadata owns this estimate.
 The focused test first failed because `IndexSelectPlan.RecordsOutput` was undefined. Tests verify metadata delegation
 without a child plan and zero results for nil plan and missing metadata.
 
+## Feature 23: Estimate index-select plan distinct values
+
+`IndexSelectPlan.DistinctValues` forwards the requested field to its retained `metadata.IndexInfo`. The indexed field
+has one value for a single-key selection, while other fields use the metadata statistics estimate. Nil plan and missing
+index metadata return zero; the child plan is not consulted for this index-defined estimate.
+
+### Test-first record
+
+The focused test first failed because `IndexSelectPlan.DistinctValues` was undefined. Tests verify the single value for
+the indexed field, metadata delegation for another field even when the child has different estimates, and zero results
+for nil plan and absent metadata. A compile-time assertion confirms that `IndexSelectPlan` now implements `Plan`.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

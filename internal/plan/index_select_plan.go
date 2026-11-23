@@ -50,6 +50,14 @@ func (p *IndexSelectPlan) RecordsOutput() int {
 	return p.indexInfo.RecordsOutput()
 }
 
+// DistinctValues estimates distinct values using the retained index metadata.
+func (p *IndexSelectPlan) DistinctValues(fieldName string) int {
+	if p == nil || p.indexInfo == nil {
+		return 0
+	}
+	return p.indexInfo.DistinctValues(fieldName)
+}
+
 // Open opens the child table scan and positions its index-select scan before the first match.
 func (p *IndexSelectPlan) Open() (query.Scan, error) {
 	if p == nil {
@@ -90,3 +98,5 @@ func (p *IndexSelectPlan) Open() (query.Scan, error) {
 	}
 	return scan, nil
 }
+
+var _ Plan = (*IndexSelectPlan)(nil)
