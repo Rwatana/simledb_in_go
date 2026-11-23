@@ -1104,6 +1104,7 @@ initial build failed because `WaitExclusiveFor` did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestLockTableTimesOutBlockedExclusiveUpgrade` | Persistent competing shared holders cause a distinguishable timeout without lock-state mutation or a stale waiter registration |
+| `TestLockTableImmediatelyTimesOutBlockedExclusiveUpgrade` | A zero-duration request times out before registering a waiter and preserves every shared hold |
 | `TestLockTableBoundedExclusiveUpgradeAcquiresBeforeDeadline` | The final competing release before the deadline grants exclusive state and removes the waiter registration |
 
 This maps to Java `LockTable.xLock`'s elapsed-time check and `LockAbortException`. As with bounded shared acquisition,

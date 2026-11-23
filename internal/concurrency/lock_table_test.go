@@ -552,6 +552,27 @@ func TestLockTableTimesOutBlockedExclusiveUpgrade(t *testing.T) {
 	}
 }
 
+func TestLockTableImmediatelyTimesOutBlockedExclusiveUpgrade(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := table.WaitExclusiveFor(block, 0); !errors.Is(err, ErrLockTimeout) {
+		t.Fatalf("WaitExclusiveFor() error = %v, want ErrLockTimeout", err)
+	}
+	if got := table.locks[block]; got != 2 {
+		t.Fatalf("shared holders after immediate timeout = %d, want 2", got)
+	}
+	if table.exclusiveWaiters != 0 {
+		t.Fatalf("exclusive waiters after immediate timeout = %d, want 0", table.exclusiveWaiters)
+	}
+}
+
 func TestLockTableBoundedExclusiveUpgradeAcquiresBeforeDeadline(t *testing.T) {
 	var table LockTable
 	block := storage.NewBlockID("tbl", 1)
