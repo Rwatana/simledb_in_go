@@ -24,7 +24,8 @@
 | 6 | Record Management | 基礎実装済み | [Schema、Layout、RecordPage、TableScanの解説・実装記録](docs/chapters/06-record-management.md) |
 | 7 | Metadata Management | 実装中 | [Catalog metadataの解説・実装記録](docs/chapters/07-metadata-management.md) |
 | 8 | Query Processing | 実装中 | [query scanと関係演算子の解説・実装記録](docs/chapters/08-query-processing.md) |
-| 9 | Parsing | 実装中 | [SQL tokenizationの解説・実装記録](docs/chapters/09-parsing.md) |
+| 9 | Parsing | 実装完了（PR stack上） | [SQL tokenizationとupdate-command dispatchの解説・実装記録](docs/chapters/09-parsing.md) |
+| 10 | Planning | 実装中 | [query plan contractの解説・実装記録](docs/chapters/10-planning.md) |
 
 第1章は概念導入、第2章はJDBCによるクライアント境界の説明であり、書籍もSimpleDBの
 内部実装の解説を第3章から始めています。そのため、第1章と第2章のPRにはGo実装を含めません。
@@ -72,7 +73,7 @@
 
 ## 次の一歩
 
-Chapter 9ではSQLの字句解析とSELECT文、DELETE文、INSERT文、UPDATE文、CREATE TABLE/VIEW/INDEX文の解析、および各command dataとトップレベルのcommand dispatchまで実装しています。次は書籍のChapter 10 Planningへ進みます。
+Chapter 9のparsingを終え、Chapter 10 Planningのquery plan contractを追加しています。
 
 ## 参照元
 
