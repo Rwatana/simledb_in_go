@@ -1420,6 +1420,18 @@ func TestTransactionAppendUpgradesAndReusesEOFExclusiveLock(t *testing.T) {
 	}
 }
 
+func TestTransactionAppendRequiresFileManager(t *testing.T) {
+	var transaction Transaction
+
+	block, err := transaction.Append("tbl")
+	if block != (storage.BlockID{}) {
+		t.Errorf("Append() block = %v, want zero block without a file manager", block)
+	}
+	if err == nil || err.Error() != `append transaction file "tbl": file manager is not configured` {
+		t.Errorf("Append() error = %v, want file-manager configuration error", err)
+	}
+}
+
 func TestTransactionAppendReturnsFileFailure(t *testing.T) {
 	wantErr := errors.New("append failed")
 	var allocator IDAllocator

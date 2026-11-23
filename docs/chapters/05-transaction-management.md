@@ -1825,6 +1825,7 @@ propagation.
 | `TestTransactionAppendReturnsFileFailure` | Physical append failures retain transaction and file context |
 | `TestNewWithFileManagerRejectsNilManagerBeforeStartingTransaction` | Missing file operations are rejected before allocating an ID or appending START |
 | `TestNewWithFileManagerReturnsStartAppendFailure` | A START append failure returns no transaction and preserves its cause and transaction ID context |
+| `TestTransactionAppendRequiresFileManager` | A zero-value transaction reports the missing file manager before lock access |
 
 This mirrors Java `Transaction.append` without allowing the EOF sentinel to reach physical file addressing.
 
