@@ -726,3 +726,21 @@ The test first failed to compile because `MetadataManager.ViewDefinition` did no
 | --- | --- |
 | `TestMetadataManagerViewDefinitionLooksUpStoredAndMissingViews` | Lookup returns the exact stored SQL for `seniors` and an explicit non-error absence result for an unknown view |
 | `TestMetadataManagerViewDefinitionPreservesCatalogReadError` | A failed view-catalog layout lookup returns an empty not-found result and preserves the requested-view facade context and cause |
+
+## Feature 36: Create an index through the metadata facade
+
+`MetadataManager.CreateIndex` delegates the index, table, and field names plus the transaction to the shared index
+manager. The `IndexManager` remains responsible for reconstructing `idxcat`, inserting the registration, and closing the
+catalog scan; the facade adds the index name to any failure.
+
+This maps Java `MetadataMgr.createIndex` and, like the underlying Chapter 7 behavior, records metadata only rather than
+building or traversing a concrete index.
+
+### Test-first record
+
+The test first failed to compile because `MetadataManager.CreateIndex` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestMetadataManagerCreateIndexStoresRegistrationThroughFacade` | Creating `idx_student_major` through the facade produces exactly one `majorid` registration visible to the shared index manager |
+| `TestMetadataManagerCreateIndexPreservesMissingTableManagerError` | A missing table-manager dependency returns the requested index name and facade context before transaction access |
