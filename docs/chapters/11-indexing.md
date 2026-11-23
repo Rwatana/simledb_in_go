@@ -1,8 +1,9 @@
 # Chapter 11: Indexing
 
 Indexes provide a second access path from a search value to the record identifiers stored in a table. This chapter
-introduces the index contract before adding any concrete hash or B-tree storage. Search, insertion, deletion, and
-resource cleanup remain separate observable behaviors so each implementation can preserve the same interface.
+introduces the index contract before adding any concrete hash or B-tree storage. Search positioning, matching-entry
+iteration, RID retrieval, insertion, deletion, and resource cleanup remain separate observable behaviors so each
+implementation can preserve the same interface.
 
 ## Java source map
 
@@ -86,6 +87,23 @@ only when it could not be released, and an unopened bucket is never installed as
 The first focused test run failed because `HashIndex.BeforeFirst` was undefined. Tests verify integer/string bucket
 selection, close-before-open order, invalid inputs without I/O, preservation after close failure, and contextual size/pin
 failures with an unset search state.
+
+## Feature 7: Find matching entries in a hash bucket
+
+`HashIndex.Next` advances the positioned bucket `record.TableScan` until it finds a `dataval` equal to the search key.
+The index-record schema selects integer or varchar reads; nonmatching entries are hash collisions and are skipped. An
+exhausted bucket returns `(false, nil)`. Missing scan/key/layout state, an invalid `dataval` definition, scan errors,
+and field-read errors return contextual errors while preserving wrapped storage causes. A key and field of different
+types compare as nonmatches through `query.Constant.Equal`.
+
+The [hash-index traversal diagram](../diagrams/ch11-hash-traversal.svg) shows the collision-filter loop and its two
+observable outcomes; the editable source is [`ch11-hash-traversal.drawio`](../diagrams/ch11-hash-traversal.drawio).
+
+### Test-first record
+
+The first focused test run failed because `HashIndex.Next` was undefined. Tests exercise integer collisions with
+duplicate matches, varchar matching, mismatched key/value types, bucket exhaustion, every invalid search/layout state,
+and wrapped scan, slot-flag, integer-field, and varchar-field read failures.
 
 ## Intentional differences from Java
 

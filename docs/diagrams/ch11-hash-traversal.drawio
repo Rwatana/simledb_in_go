@@ -1,0 +1,24 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ch11-hash-traversal" name="Static hash matching-entry traversal">
+    <mxGraphModel dx="1200" dy="760" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="760" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 11 / Feature 7: Matching hash-bucket entries" style="text;html=1;align=center;fontSize=24;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="170" y="25" width="860" height="50" as="geometry"/></mxCell>
+        <mxCell id="state" value="Positioned HashIndex&#xa;scan + search key + dataval schema" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="380" y="105" width="440" height="90" as="geometry"/></mxCell>
+        <mxCell id="advance" value="TableScan.Next()&#xa;advance to next occupied slot" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;" vertex="1" parent="1"><mxGeometry x="380" y="255" width="440" height="90" as="geometry"/></mxCell>
+        <mxCell id="read" value="Read dataval by schema type&#xa;integer → GetInt&#xa;varchar → GetString" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="380" y="405" width="440" height="120" as="geometry"/></mxCell>
+        <mxCell id="compare" value="query.Constant.Equal(searchKey)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=17;" vertex="1" parent="1"><mxGeometry x="440" y="595" width="320" height="110" as="geometry"/></mxCell>
+        <mxCell id="match" value="Match&#xa;return true, nil" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="865" y="605" width="250" height="85" as="geometry"/></mxCell>
+        <mxCell id="end" value="Bucket exhausted&#xa;return false, nil" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="55" y="255" width="250" height="90" as="geometry"/></mxCell>
+        <mxCell id="error" value="Scan or field read fails&#xa;return contextual wrapped error" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;" vertex="1" parent="1"><mxGeometry x="865" y="405" width="280" height="105" as="geometry"/></mxCell>
+        <mxCell id="e1" value="begin" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="state" target="advance"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="record found" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="advance" target="read"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="typed value" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="read" target="compare"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="equal" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="compare" target="match"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="collision: not equal" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="compare" target="advance"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="no record" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="advance" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="read/scan error" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="advance" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
