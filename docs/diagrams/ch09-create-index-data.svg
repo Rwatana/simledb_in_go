@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="520" viewBox="0 0 1160 520" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 21: Store CREATE INDEX command data</title>
+  <desc id="description">CreateIndexData stores the index, table, and indexed-field names and exposes them through read-only accessors. The zero value safely returns empty strings.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <text class="title" x="580" y="62" text-anchor="middle">Chapter 9 / Feature 21: Store CREATE INDEX command data</text>
+  <rect class="box" x="45" y="205" width="300" height="135" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="195" y="245"><tspan x="195">Constructor input</tspan><tspan x="195" dy="30">index: student_name_idx</tspan><tspan x="195" dy="27">table: student · field: name</tspan></text>
+  <rect class="box" x="430" y="195" width="300" height="155" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="580" y="238"><tspan x="580">CreateIndexData</tspan><tspan x="580" dy="31">private indexName</tspan><tspan x="580" dy="27">tableName · fieldName</tspan></text>
+  <rect class="box" x="815" y="195" width="300" height="155" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="965" y="238"><tspan x="965">Read-only accessors</tspan><tspan x="965" dy="31">IndexName()</tspan><tspan x="965" dy="27">TableName() · FieldName()</tspan></text>
+  <rect class="box" x="430" y="400" width="300" height="90" fill="#f5f5f5" stroke="#666"/>
+  <text class="label" x="580" y="435"><tspan x="580">Zero value</tspan><tspan x="580" dy="27">all names are empty strings</tspan></text>
+  <path class="edge" d="M345 272 H422"/><text class="small" x="383" y="260">store names</text>
+  <path class="edge" d="M730 272 H807"/><text class="small" x="768" y="260">read names</text>
+  <path class="edge" d="M580 400 V360 H575 V358" stroke-dasharray="7 6"/><text class="small" x="635" y="383">safe default</text>
+</svg>

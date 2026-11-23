@@ -217,3 +217,29 @@ func TestCreateViewDataZeroValueHasSafeAccessors(t *testing.T) {
 		t.Errorf("ViewDefinition() = %q, want <unset-query>", got)
 	}
 }
+
+func TestCreateIndexDataStoresIndexTableAndFieldNames(t *testing.T) {
+	data := NewCreateIndexData("student_name_idx", "student", "name")
+	if got, want := data.IndexName(), "student_name_idx"; got != want {
+		t.Errorf("IndexName() = %q, want %q", got, want)
+	}
+	if got, want := data.TableName(), "student"; got != want {
+		t.Errorf("TableName() = %q, want %q", got, want)
+	}
+	if got, want := data.FieldName(), "name"; got != want {
+		t.Errorf("FieldName() = %q, want %q", got, want)
+	}
+}
+
+func TestCreateIndexDataZeroValueHasEmptyAccessors(t *testing.T) {
+	var data CreateIndexData
+	if got := data.IndexName(); got != "" {
+		t.Errorf("IndexName() = %q, want empty", got)
+	}
+	if got := data.TableName(); got != "" {
+		t.Errorf("TableName() = %q, want empty", got)
+	}
+	if got := data.FieldName(); got != "" {
+		t.Errorf("FieldName() = %q, want empty", got)
+	}
+}

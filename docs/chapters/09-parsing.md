@@ -18,6 +18,7 @@ Request.
 | `Parser.ParseUpdate` | `simpledb/parse/Parser.java` (`modify`) | Parse the UPDATE target, assignment, and optional predicate |
 | `internal/parse.CreateTableData` | `simpledb/parse/CreateTableData.java` | Hold the table name and schema of a CREATE TABLE statement |
 | `internal/parse.CreateViewData` | `simpledb/parse/CreateViewData.java` | Hold the view name and rendered query definition of a CREATE VIEW statement |
+| `internal/parse.CreateIndexData` | `simpledb/parse/CreateIndexData.java` | Hold the index, table, and field names of a CREATE INDEX statement |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -352,6 +353,18 @@ and returned definition; its editable source is [`ch09-create-view-data.drawio`]
 Tests first failed to compile because `CreateViewData` and `NewCreateViewData` were undefined. They cover the stored
 view name, rendering a query definition with its predicate, and safe zero-value accessors.
 
+## Feature 21: Store parsed CREATE INDEX command data
+
+`parse.CreateIndexData` maps to Java `parse.CreateIndexData`. It stores the index, table, and indexed-field names and
+returns them through read-only accessors. The zero value safely returns empty names. CREATE INDEX grammar parsing is a
+separate behavior. The [CREATE INDEX-data diagram](../diagrams/ch09-create-index-data.svg) shows the three constructor
+values and their accessors; its editable source is [`ch09-create-index-data.drawio`](../diagrams/ch09-create-index-data.drawio).
+
+### Test-first record
+
+Tests first failed to compile because `CreateIndexData` and `NewCreateIndexData` were undefined. They cover each stored
+name and the safe zero-value accessors.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -370,3 +383,4 @@ view name, rendering a query definition with its predicate, and safe zero-value 
 - `ParseUpdate` is a concrete command parser separate from top-level dispatch; it leaves trailing tokens to its caller.
 - `CreateTableData` copies schema values to avoid shared internal slices and maps; Java stores and returns the same mutable schema reference.
 - `CreateViewData` exposes the query definition as rendered text rather than returning `QueryData`; the stored query value remains read-only through its public API.
+- `CreateIndexData` keeps the Java command's three string values private and exposes Go-style accessors; its zero value returns empty strings.
