@@ -3,7 +3,6 @@ package log
 import (
 	"fmt"
 
-	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
@@ -11,7 +10,7 @@ import (
 type Iterator struct {
 	page     *storage.Page
 	position int
-	files    *storagefile.Manager
+	files    logFiles
 	block    storage.BlockID
 }
 

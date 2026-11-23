@@ -102,6 +102,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | `TestNewManagerRejectsNilFileManager` | nil FileManagerをfile-specific errorで拒否する |
 | `TestNewManagerRejectsInvalidPersistedTailBoundary` | 保存済みboundaryが最低値未満またはblock size超過なら拒否する |
 | `TestNewManagerPreservesInitialBlockAppendFailure` | Darwin/LinuxのFIFOで初期block append error causeとcontextを保持する |
+| `TestNewManagerPreservesTailBlockReadFailure` | 既存tail blockのread error causeとblock contextを保持する |
 
 ## Javaソースリーディング
 

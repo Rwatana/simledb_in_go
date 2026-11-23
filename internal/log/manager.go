@@ -12,12 +12,20 @@ import (
 
 const boundarySize = 4
 
+type logFiles interface {
+	BlockSize() int
+	Length(fileName string) (int, error)
+	Append(fileName string) (storage.BlockID, error)
+	Read(block storage.BlockID) (*storage.Page, error)
+	Write(block storage.BlockID, page *storage.Page) error
+}
+
 // LSN identifies one log record appended during the current process lifetime.
 type LSN uint64
 
 // Manager owns the in-memory tail page of one database log file.
 type Manager struct {
-	files        *storagefile.Manager
+	files        logFiles
 	fileName     string
 	page         *storage.Page
 	block        storage.BlockID
@@ -31,6 +39,10 @@ func NewManager(files *storagefile.Manager, fileName string) (*Manager, error) {
 	if files == nil {
 		return nil, fmt.Errorf("create log manager for %q: file manager must not be nil", fileName)
 	}
+	return newManager(files, fileName)
+}
+
+func newManager(files logFiles, fileName string) (*Manager, error) {
 	blockSize := files.BlockSize()
 	if blockSize < boundarySize {
 		return nil, fmt.Errorf("create log manager for %q: block size %d cannot store the %d-byte boundary", fileName, blockSize, boundarySize)
