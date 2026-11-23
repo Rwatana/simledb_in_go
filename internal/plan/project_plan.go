@@ -39,6 +39,14 @@ func (p *ProjectPlan) Schema() *record.Schema {
 	return &p.schema
 }
 
+// BlocksAccessed returns the child's estimated block accesses.
+func (p *ProjectPlan) BlocksAccessed() int {
+	if p == nil || p.child == nil {
+		return 0
+	}
+	return p.child.BlocksAccessed()
+}
+
 // Open opens the child and wraps its scan with the requested projection.
 func (p *ProjectPlan) Open() (query.Scan, error) {
 	if p == nil {

@@ -869,6 +869,26 @@ func TestProjectPlanOpenWrapsChildErrorsAndRejectsNilScan(t *testing.T) {
 	}
 }
 
+func TestProjectPlanBlocksAccessedDelegatesAndHandlesNilPlan(t *testing.T) {
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	project, err := NewProjectPlan(&productPlanProbe{schema: &schema, blocks: 2}, nil)
+	if err != nil {
+		t.Fatalf("NewProjectPlan() error = %v", err)
+	}
+	if got := project.BlocksAccessed(); got != 2 {
+		t.Errorf("BlocksAccessed() = %d, want child estimate 2", got)
+	}
+
+	var nilPlan *ProjectPlan
+	if got := nilPlan.BlocksAccessed(); got != 0 {
+		t.Errorf("nil ProjectPlan.BlocksAccessed() = %d, want 0", got)
+	}
+	if got := (&ProjectPlan{}).BlocksAccessed(); got != 0 {
+		t.Errorf("ProjectPlan without child BlocksAccessed() = %d, want 0", got)
+	}
+}
+
 type productPlanProbe struct {
 	scan     query.Scan
 	openErr  error
