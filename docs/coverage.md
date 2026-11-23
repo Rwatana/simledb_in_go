@@ -218,6 +218,9 @@ shared holders remain unchanged and the request returns before registering an ex
 
 Bounded shared and exclusive waits now share a timeout callback helper. Its completed-wait branch is called directly in
 a deterministic test, while the existing deadline tests continue to cover active expiry and condition notification.
+
+`log.Manager.Iterator` now has a Darwin/Linux FIFO regression test for current-tail flush failure. It confirms that
+iterator creation returns no partial iterator and retains both the `ESPIPE` cause and operation context.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

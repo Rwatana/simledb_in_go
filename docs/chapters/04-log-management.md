@@ -625,6 +625,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | Test | 説明する振る舞い |
 | --- | --- |
 | `TestIteratorFlushesTheCurrentTailBeforeSnapshot` | saved LSN、disk/current Page一致、iterator作成成功 |
+| `TestIteratorReturnsTailFlushFailure` | Darwin/Linux FIFO write failure preserves `ESPIPE` and returns no iterator |
 | `TestIteratorTraversesPreviousBlocksNewestToOldest` | current blockもflushされた状態でcross-block orderを維持 |
 | `TestIteratorRejectsInvalidCurrentBlockBoundary` | current snapshotのboundaryが範囲外ならblock contextを返し、disk tailは未変更 |
 
