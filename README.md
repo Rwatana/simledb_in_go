@@ -72,9 +72,9 @@
 
 ## 次の一歩
 
-Chapter 9ではSQLの字句解析、式・predicate、SELECT query dataとSELECT文の解析まで進みました。次はJava
-`Parser.updateCmd()`のdispatchを実装し、INSERT、DELETE、UPDATE、CREATEの各構文を小さなIssueへ分けて
-追加します。
+Chapter 9ではSQLの字句解析とSELECT文の解析を進めています。現在はDELETE command dataを追加しました。
+次はDELETE構文の解析を実装し、その後にINSERT、UPDATE、CREATEとupdate command dispatchを個別のIssueへ
+分けて進めます。
 
 ## 参照元
 

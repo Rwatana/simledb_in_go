@@ -11,6 +11,7 @@ Request.
 | --- | --- | --- |
 | `internal/parse.Lexer` | `simpledb/parse/Lexer.java` | Read tokens while retaining source position for lookahead |
 | `internal/parse.Parser` | `simpledb/parse/Parser.java` | Turn token sequences into query values |
+| `internal/parse.DeleteData` | `simpledb/parse/DeleteData.java` | Hold the target table and predicate of a DELETE statement |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -223,6 +224,19 @@ Tests first failed to compile because `Parser.ParseQuery` was undefined. They co
 lists, a multi-term `where` clause, queries without `where`, preservation of a following keyword, missing `select` or
 `from`, missing names at either list position, incomplete predicates, byte offsets, and a nil parser receiver.
 
+## Feature 13: Store parsed DELETE command data
+
+`parse.DeleteData` maps to Java `parse.DeleteData`. It keeps the affected table name and the query predicate that selects
+records to delete. Go uses unexported fields, a value constructor, and read-only accessors so command data cannot be
+changed through field assignment. The zero value returns an empty table name and empty predicate. The
+[DELETE-data diagram](../diagrams/ch09-delete-data.svg) shows the table and predicate stored together; its editable
+source is [`ch09-delete-data.drawio`](../diagrams/ch09-delete-data.drawio).
+
+### Test-first record
+
+Tests first failed to compile because `DeleteData` and `NewDeleteData` were undefined. They cover storing and reading
+the target table and predicate, plus safe accessors on the zero value.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -233,3 +247,4 @@ lists, a multi-term `where` clause, queries without `where`, preservation of a f
 - Delimiters are visible ASCII punctuation bytes; multi-character operators are matched one byte at a time, and quoted values are not delimiters.
 - Keyword matching compares the normalized input word to the expected argument exactly, as Java does; callers provide the canonical lower-case spelling.
 - SELECT field and table lists are parsed iteratively rather than recursively, and query parsing leaves any trailing token for its caller.
+- `DeleteData` keeps its fields private and exposes a safe zero value; Java exposes its command data only through accessor methods but does not define Go's zero-value behavior.
