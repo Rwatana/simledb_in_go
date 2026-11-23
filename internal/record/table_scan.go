@@ -213,3 +213,18 @@ func (s *TableScan) SetInt(fieldName string, value int32) error {
 	}
 	return nil
 }
+
+// SetString writes a string field in the current record.
+func (s *TableScan) SetString(fieldName, value string) error {
+	if s.recordPage == nil {
+		return fmt.Errorf("write string field %q through table scan for %q: no current record page", fieldName, s.fileName)
+	}
+	if s.currentSlot < 0 {
+		return fmt.Errorf("write string field %q through table scan for %q: no current record", fieldName, s.fileName)
+	}
+	block := s.recordPage.Block()
+	if err := s.recordPage.SetString(s.currentSlot, fieldName, value); err != nil {
+		return fmt.Errorf("write table %q block %d slot %d field %q as string: %w", s.fileName, block.Number(), s.currentSlot, fieldName, err)
+	}
+	return nil
+}
