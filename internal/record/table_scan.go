@@ -72,3 +72,18 @@ func (s *TableScan) Close() error {
 	s.recordPage = nil
 	return nil
 }
+
+// BeforeFirst moves the scan to block zero before its first record.
+func (s *TableScan) BeforeFirst() error {
+	if err := s.Close(); err != nil {
+		return fmt.Errorf("rewind table scan for %q: close current page: %w", s.fileName, err)
+	}
+	block := storage.NewBlockID(s.fileName, 0)
+	page, err := NewRecordPage(s.transaction, block, s.layout)
+	if err != nil {
+		return fmt.Errorf("rewind table scan for %q: move to block 0: %w", s.fileName, err)
+	}
+	s.recordPage = page
+	s.currentSlot = -1
+	return nil
+}

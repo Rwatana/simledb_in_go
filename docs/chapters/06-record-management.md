@@ -541,6 +541,24 @@ The tests first failed to compile because `TableScan.Close` did not exist.
 
 This maps Java `TableScan.close` while adding explicit error propagation, idempotency, and cleanup retry behavior.
 
+## Feature 32: Rewind a table scan before its first record
+
+`TableScan.BeforeFirst` closes the current page, pins a new record page for block zero, and resets the cursor to `-1` only
+after the replacement page is ready. A close failure prevents the new pin and preserves the current page. A repin failure
+after a successful close leaves no current page and does not claim the cursor was reset.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.BeforeFirst` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanBeforeFirstRepinsBlockZeroAndResetsCursor` | Rewind releases the current page, repins block zero, and restores before-first position |
+| `TestTableScanBeforeFirstStopsOnCloseFailure` | A failed release stops before repinning and retains current state |
+| `TestTableScanBeforeFirstReportsRepinFailureAfterClose` | A failed block-zero pin leaves the scan without a current page and retains cursor state |
+
+This maps Java `TableScan.beforeFirst` and `moveToBlock(0)` with explicit sequencing errors.
+
 ## Next behavior
 
-Move a table scan back to the first block and before-first cursor position as the next stacked PR.
+Advance a table scan to the next occupied record within its current block as the next stacked PR.
