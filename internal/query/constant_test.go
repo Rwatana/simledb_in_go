@@ -75,3 +75,20 @@ func TestConstantCompare(t *testing.T) {
 		})
 	}
 }
+
+func TestConstantString(t *testing.T) {
+	for _, tt := range []struct {
+		constant Constant
+		want     string
+	}{
+		{NewIntConstant(-1 << 31), "-2147483648"},
+		{NewIntConstant(0), "0"},
+		{NewStringConstant("東京"), "東京"},
+		{NewStringConstant(""), ""},
+		{Constant{}, "<unset>"},
+	} {
+		if got := tt.constant.String(); got != tt.want {
+			t.Errorf("constant.String() = %q, want %q", got, tt.want)
+		}
+	}
+}
