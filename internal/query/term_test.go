@@ -4,6 +4,8 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
 type termScanStub struct {
@@ -215,4 +217,75 @@ func TestTermEquatesWithField(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTermAppliesToSchema(t *testing.T) {
+	var nilSchema *record.Schema
+	tests := []struct {
+		name   string
+		term   Term
+		schema *record.Schema
+		want   bool
+	}{
+		{
+			name:   "both fields present",
+			term:   NewTerm(NewFieldExpression("age"), NewFieldExpression("name")),
+			schema: schemaWithFields("age", "name"),
+			want:   true,
+		},
+		{
+			name:   "left field absent",
+			term:   NewTerm(NewFieldExpression("age"), NewFieldExpression("name")),
+			schema: schemaWithFields("name"),
+		},
+		{
+			name:   "right field absent",
+			term:   NewTerm(NewFieldExpression("age"), NewFieldExpression("name")),
+			schema: schemaWithFields("age"),
+		},
+		{
+			name:   "field and literal apply",
+			term:   NewTerm(NewFieldExpression("age"), NewConstantExpression(NewIntConstant(1))),
+			schema: schemaWithFields("age"),
+			want:   true,
+		},
+		{
+			name:   "literal term applies to nil schema",
+			term:   NewTerm(NewConstantExpression(NewIntConstant(1)), NewConstantExpression(NewStringConstant("x"))),
+			schema: nilSchema,
+			want:   true,
+		},
+		{
+			name:   "field term does not apply to nil schema",
+			term:   NewTerm(NewFieldExpression("age"), NewConstantExpression(NewIntConstant(1))),
+			schema: nilSchema,
+		},
+		{
+			name:   "empty field name can apply",
+			term:   NewTerm(NewFieldExpression(""), NewConstantExpression(NewIntConstant(1))),
+			schema: schemaWithFields(""),
+			want:   true,
+		},
+		{
+			name:   "unset expression does not apply",
+			term:   NewTerm(Expression{}, NewConstantExpression(NewIntConstant(1))),
+			schema: schemaWithFields(""),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.term.AppliesTo(test.schema); got != test.want {
+				t.Fatalf("AppliesTo() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func schemaWithFields(names ...string) *record.Schema {
+	var schema record.Schema
+	for _, name := range names {
+		schema.AddIntegerField(name)
+	}
+	return &schema
 }
