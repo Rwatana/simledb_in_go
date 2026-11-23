@@ -541,6 +541,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | `TestIteratorTraversesPreviousBlocksNewestToOldest` | 3 blocksのglobal reverse order、block 0 exhaustion、no flush |
 | `TestIteratorReportsAnInvalidPreviousBlockBoundary` | previous Pageをcommitする前のboundary validationとerror |
 | `TestIteratorRejectsPositionPastPageCapacity` | An out-of-range iterator position returns no record and retains position/capacity context |
+| `TestIteratorRejectsTruncatedRecordLengthPrefix` | A current-block record missing its full length prefix returns a contextual read error |
 
 ## Javaソースリーディング
 

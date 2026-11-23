@@ -165,3 +165,27 @@ func TestIteratorRejectsPositionPastPageCapacity(t *testing.T) {
 		}
 	}
 }
+
+func TestIteratorRejectsTruncatedRecordLengthPrefix(t *testing.T) {
+	page, err := storage.NewPage(8)
+	if err != nil {
+		t.Fatalf("NewPage() error = %v", err)
+	}
+	iterator := &Iterator{
+		page:     page,
+		position: page.Capacity() - 3,
+		block:    storage.NewBlockID("simpledb.log", 0),
+	}
+	record, ok, err := iterator.Next()
+	if record != nil || ok {
+		t.Errorf("Next() = (%v, %t, %v), want no record", record, ok, err)
+	}
+	if err == nil {
+		t.Fatal("Next() error = nil, want a truncated length-prefix error")
+	}
+	for _, context := range []string{"iterate log block at offset 5", "get integer at offset 5", "page capacity 8"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Next() error = %q, want context %q", err, context)
+		}
+	}
+}
