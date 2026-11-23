@@ -360,6 +360,11 @@ be tested after the file block size has passed validation. Both failures preserv
 block. `newManagerWithPageFactory` is 100.0% covered, log package coverage is 97.5%, and full-module statement
 coverage is 99.7%.
 
+Rollover now uses the same private page-factory seam to cover failures while creating or initializing the next tail
+page after the old tail flush succeeds. The tests confirm the old in-memory tail remains selected, no LSN is assigned
+to the rejected record, the flushed LSN is retained, and no new disk block is appended. `rollOverLocked` is now
+100.0% covered, log package coverage is 99.2%, and full-module statement coverage is 99.8%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

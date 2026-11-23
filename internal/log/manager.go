@@ -27,6 +27,7 @@ type LSN uint64
 type Manager struct {
 	files        logFiles
 	fileName     string
+	newPage      func(int) (*storage.Page, error)
 	page         *storage.Page
 	block        storage.BlockID
 	mu           sync.Mutex
@@ -74,7 +75,7 @@ func newManagerWithPageFactory(files logFiles, fileName string, newPage func(int
 		if err := files.Write(block, page); err != nil {
 			return nil, fmt.Errorf("create log manager for %q: write first block: %w", fileName, err)
 		}
-		return &Manager{files: files, fileName: fileName, page: page, block: block}, nil
+		return &Manager{files: files, fileName: fileName, newPage: newPage, page: page, block: block}, nil
 	}
 
 	block := storage.NewBlockID(fileName, length-1)
@@ -89,7 +90,7 @@ func newManagerWithPageFactory(files logFiles, fileName string, newPage func(int
 	if boundary < boundarySize || boundary > int32(blockSize) {
 		return nil, fmt.Errorf("create log manager for %q: tail boundary %d outside [%d, %d]", fileName, boundary, boundarySize, blockSize)
 	}
-	return &Manager{files: files, fileName: fileName, page: page, block: block}, nil
+	return &Manager{files: files, fileName: fileName, newPage: newPage, page: page, block: block}, nil
 }
 
 // Append stores record in the current tail block and returns its LSN.
@@ -149,7 +150,7 @@ func (m *Manager) rollOverLocked() error {
 		return err
 	}
 
-	page, err := storage.NewPage(m.files.BlockSize())
+	page, err := m.newPage(m.files.BlockSize())
 	if err != nil {
 		return fmt.Errorf("create new tail page: %w", err)
 	}
