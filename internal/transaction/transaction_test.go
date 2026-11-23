@@ -689,3 +689,150 @@ func TestTransactionSetIntWithoutLoggingReturnsPreconditionAndPageFailures(t *te
 		t.Fatal("logged SetInt silently used the no-log path")
 	}
 }
+
+func TestTransactionSetIntLogsPreviousValueBeforeMutation(t *testing.T) {
+	bufferManager, _, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	logs := &recordingTransactionLog{}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.SetInt(block, 8, 77, true); err != nil {
+		t.Fatal(err)
+	}
+	if len(logs.records) != 2 {
+		t.Fatalf("log records = %d, want START and SETINT", len(logs.records))
+	}
+	record, err := recovery.DecodeSetIntRecord(logs.records[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.TransactionID() != tx.ID() || record.Block() != block || record.Offset() != 8 || record.OldValue() != 42 {
+		t.Fatalf("SETINT = tx %d block %v offset %d old %d", record.TransactionID(), record.Block(), record.Offset(), record.OldValue())
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("SetInt removed transaction buffer ownership")
+	}
+	got, err := frame.Contents().GetInt(8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 77 {
+		t.Fatalf("stored integer = %d, want 77", got)
+	}
+	if modifiedBy, dirty := frame.ModifyingTransaction(); !dirty || modifiedBy != buffer.TransactionID(tx.ID()) {
+		t.Fatalf("modifying transaction = (%d, %v), want (%d, true)", modifiedBy, dirty, tx.ID())
+	}
+	if lsn, ok := frame.RecoveryLSN(); !ok || lsn != 2 {
+		t.Fatalf("recovery LSN = (%d, %v), want (2, true)", lsn, ok)
+	}
+}
+
+func TestTransactionSetIntLogFailurePreservesPageAndMetadata(t *testing.T) {
+	wantErr := errors.New("append setint failed")
+	bufferManager, _, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	logs := &failingUpdateTransactionLog{updateErr: wantErr}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.SetInt(block, 8, 77, true); !errors.Is(err, wantErr) {
+		t.Fatalf("SetInt() error = %v, want %v", err, wantErr)
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("failed SetInt removed transaction buffer ownership")
+	}
+	got, err := frame.Contents().GetInt(8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 42 {
+		t.Fatalf("integer after log failure = %d, want old value 42", got)
+	}
+	if _, dirty := frame.ModifyingTransaction(); dirty {
+		t.Fatal("log failure marked buffer modified")
+	}
+	if _, ok := frame.RecoveryLSN(); ok {
+		t.Fatal("log failure recorded a recovery LSN")
+	}
+}
+
+func TestTransactionSetIntPreservesExclusiveLockFailure(t *testing.T) {
+	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	wantErr := concurrency.ErrLockConflict
+	locks := &recordingTransactionLockManager{exclusiveErr: wantErr}
+	tx.locks = locks
+
+	err = tx.SetInt(block, 8, 77, false)
+	if !errors.Is(err, wantErr) {
+		t.Errorf("SetInt() error = %v, want lock conflict", err)
+	}
+	wantContext := "set integer in transaction buffer " + block.String() + " at offset 8: acquire exclusive lock"
+	if err == nil || !strings.Contains(err.Error(), wantContext) {
+		t.Errorf("SetInt() error = %v, want context %q", err, wantContext)
+	}
+	if locks.exclusiveCall != 1 {
+		t.Errorf("exclusive lock calls = %d, want 1", locks.exclusiveCall)
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("failed SetInt removed transaction buffer ownership")
+	}
+	got, err := frame.Contents().GetInt(8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 42 {
+		t.Errorf("integer after lock failure = %d, want original value 42", got)
+	}
+	if _, dirty := frame.ModifyingTransaction(); dirty {
+		t.Error("exclusive lock failure marked the page modified")
+	}
+}
+
+func TestSetIntRecoveryLSNPreservesRecorderFailure(t *testing.T) {
+	t.Parallel()
+
+	block := storage.NewBlockID("student.tbl", 4)
+	wantErr := errors.New("recovery LSN rejected")
+	var gotLSN logmanager.LSN
+	err := recordRecoveryLSN(func(lsn logmanager.LSN) error {
+		gotLSN = lsn
+		return wantErr
+	}, 17, "set integer", block, 8)
+
+	if gotLSN != 17 {
+		t.Errorf("recorded LSN = %d, want 17", gotLSN)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("recordRecoveryLSN() error = %v, want wrapped recorder failure", err)
+	}
+	for _, context := range []string{"set integer", block.String(), "offset 8", "LSN 17"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("recordRecoveryLSN() error = %q, want context %q", err, context)
+		}
+	}
+}
