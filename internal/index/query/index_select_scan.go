@@ -6,18 +6,17 @@ import (
 
 	"github.com/Rwatana/simledb_in_go/internal/index"
 	"github.com/Rwatana/simledb_in_go/internal/query"
-	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
 // IndexSelectScan retains the data scan, index, and key for an indexed selection.
 type IndexSelectScan struct {
-	dataScan  *record.TableScan
+	dataScan  *query.RecordScan
 	index     index.Index
 	searchKey query.Constant
 }
 
 // NewIndexSelectScan initializes an indexed selection positioned before its first result.
-func NewIndexSelectScan(dataScan *record.TableScan, indexScan index.Index, searchKey query.Constant) (*IndexSelectScan, error) {
+func NewIndexSelectScan(dataScan *query.RecordScan, indexScan index.Index, searchKey query.Constant) (*IndexSelectScan, error) {
 	if dataScan == nil {
 		return nil, fmt.Errorf("initialize index select scan: table scan is nil")
 	}
@@ -108,6 +107,21 @@ func (scan *IndexSelectScan) GetString(fieldName string) (string, error) {
 	value, err := scan.dataScan.GetString(fieldName)
 	if err != nil {
 		return "", fmt.Errorf("read string field %q through index select scan: %w", fieldName, err)
+	}
+	return value, nil
+}
+
+// GetVal reads a typed query value from the current data record.
+func (scan *IndexSelectScan) GetVal(fieldName string) (query.Constant, error) {
+	if scan == nil {
+		return query.Constant{}, fmt.Errorf("read field %q through nil index select scan", fieldName)
+	}
+	if scan.dataScan == nil {
+		return query.Constant{}, fmt.Errorf("read field %q through index select scan: table scan is nil", fieldName)
+	}
+	value, err := scan.dataScan.GetVal(fieldName)
+	if err != nil {
+		return query.Constant{}, fmt.Errorf("read field %q through index select scan: %w", fieldName, err)
 	}
 	return value, nil
 }

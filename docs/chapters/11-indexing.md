@@ -11,7 +11,8 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a table scan and expose the selected record's fields |
+| `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
+| `internal/query.RecordScan` | `simpledb/record/TableScan.java` | Go adapter that converts typed record fields into query constants without coupling records to query values |
 
 ## Feature 1: Define the index traversal contract
 
@@ -155,7 +156,7 @@ scan, rejecting invalid state, and wrapping bucket-open, iteration, RID-read, an
 
 ## Feature 11: Position an index-select scan
 
-`indexquery.NewIndexSelectScan` retains a table scan, index, and search key, then positions the index before the first
+`indexquery.NewIndexSelectScan` retains a `query.RecordScan`, index, and search key, then positions the index before the first
 matching entry as Java `IndexSelectScan` does during construction. Its `BeforeFirst` operation repeats that positioning
 for the retained key. Missing scans/indexes, unset keys, and index errors return contextual errors with wrapped causes;
 the index remains caller-owned and is not closed by the adapter. The existing [hash-index traversal diagram](../diagrams/ch11-hash-traversal.svg)
@@ -181,7 +182,7 @@ exhaustion without movement, index-next and RID-read failures, table-page moveme
 
 ## Feature 13: Read an integer from the selected data row
 
-`IndexSelectScan.GetInt` delegates to its retained `record.TableScan` and returns the integer value unchanged. A nil
+`IndexSelectScan.GetInt` delegates to its retained `query.RecordScan` and returns the integer value unchanged. A nil
 adapter or missing table scan produces a contextual error; table-read errors are wrapped so callers retain the original
 cause. The existing index traversal diagram already establishes that the adapter reads fields from the data table, so
 this accessor does not need a duplicate diagram.
@@ -194,7 +195,7 @@ failure through error wrapping.
 
 ## Feature 14: Read a string from the selected data row
 
-`IndexSelectScan.GetString` delegates to its retained `record.TableScan` and returns the string value unchanged. A nil
+`IndexSelectScan.GetString` delegates to its retained `query.RecordScan` and returns the string value unchanged. A nil
 adapter or missing table scan produces a contextual error; table-read errors are wrapped so callers retain the original
 cause. As with integer access, the index traversal illustration already explains the data-table side of this adapter.
 
@@ -203,6 +204,20 @@ cause. As with integer access, the index traversal illustration already explains
 The focused tests first failed because `IndexSelectScan.GetString` was undefined. They verify forwarding of the current
 record's string value, contextual errors for a nil receiver or missing table scan, and preservation of a table-read
 failure through error wrapping.
+
+## Feature 15: Read a typed value from the selected data row
+
+`IndexSelectScan.GetVal` delegates to `query.RecordScan.GetVal`, which uses the record schema to convert integer and
+varchar fields into the matching `query.Constant` kind. This adapter retains `query.RecordScan` instead of the lower-level
+`record.TableScan` so query-value conversion stays outside the record package. Nil state and field-read errors are
+returned with index-select context while retaining wrapped causes. The existing index-traversal diagram already shows
+the data-record boundary and no duplicate illustration is needed.
+
+### Test-first record
+
+The focused test run first failed because `IndexSelectScan.GetVal` was undefined and exposed that the adapter retained
+only a low-level record scan without schema-driven value conversion. Tests verify integer and varchar constants, nil
+receiver/table-scan state, and wrapped read failures.
 
 ## Intentional differences from Java
 
@@ -215,3 +230,4 @@ failure through error wrapping.
 - `IndexSelectScan.Next` reports index and table-scan failures as errors, and avoids moving the data scan after exhaustion.
 - `IndexSelectScan.GetInt` reports data-scan read failures as Go errors while preserving their wrapped causes.
 - `IndexSelectScan.GetString` reports data-scan read failures as Go errors while preserving their wrapped causes.
+- `IndexSelectScan.GetVal` uses the query-level record adapter to return schema-typed constants without making the record package depend on query types.
