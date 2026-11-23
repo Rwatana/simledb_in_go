@@ -858,10 +858,29 @@ did not exist.
 This maps to the non-waiting path of Java `LockTable.sLock`. Go uses a zero-value-ready synchronized table and postpones
 conflict policy until the corresponding observable behaviors require it.
 
+## Feature 37: Add compatible shared lock holders
+
+`LockShared` increments the shared-holder count when the same block is already shared. The table mutex serializes
+concurrent acquisitions so no increment is lost, while state for other blocks remains unchanged. Shared acquisition
+still has no conflict path because exclusive state has not been introduced.
+
+### Test-first record
+
+Sequential and concurrent compatible acquisitions were tested first. The initial test run failed because every
+acquisition replaced the holder count with one.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableAddsCompatibleSharedHolder` | A second compatible request raises the holder count to two |
+| `TestLockTableSerializesConcurrentSharedHolders` | Concurrent requests preserve every holder and other block state |
+
+This completes the compatible path of Java `LockTable.sLock`: the integer value represents the number of shared
+holders. Exclusive state and its conflict policy remain separate behaviors.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by allowing an additional compatible shared holder, then add uncontended
-exclusive acquisition, upgrade, unlock, waiting, and timeout as separate behaviors.
+Continue with Chapter 5 concurrency control by upgrading a sole shared holder to an exclusive lock, then add conflict
+waiting, unlock notification, timeout, and transaction-local lock tracking as separate behaviors.
 
 ## Sources
 
