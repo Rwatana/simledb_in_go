@@ -280,6 +280,10 @@ now 100.0% covered; record package coverage is 97.6%, and full-module statement 
 the outer scan context, preserves the cause and cursor, and confirms no slot write occurs after the failed search.
 Record package coverage is 97.9%, and full-module statement coverage remains 98.6%.
 
+`TableScan.Insert` now also covers a failure when advancing from a full block to the next existing block. The test
+checks error context, that the exhausted block is unpinned, and that no insert write occurs. `Insert` is now 92.0%
+covered, record package coverage is 98.2%, and full-module statement coverage is 98.7%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
