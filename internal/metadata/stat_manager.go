@@ -23,6 +23,22 @@ func NewStatManager(tables *TableManager) *StatManager {
 	}
 }
 
+// Statistics returns the cached statistics for a table, calculating them on the first lookup.
+func (m *StatManager) Statistics(tableName string, layout *record.Layout, transaction record.TableScanTransaction) (*StatInfo, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.calls++
+	if stats := m.stats[tableName]; stats != nil {
+		return stats, nil
+	}
+	stats, err := m.calculateTableStats(tableName, layout, transaction)
+	if err != nil {
+		return nil, fmt.Errorf("look up statistics for table %q: %w", tableName, err)
+	}
+	m.stats[tableName] = stats
+	return stats, nil
+}
+
 // Refresh rebuilds statistics for every registered table and resets the lookup counter.
 func (m *StatManager) Refresh(transaction record.TableScanTransaction) error {
 	m.mu.Lock()
