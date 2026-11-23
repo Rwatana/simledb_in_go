@@ -83,6 +83,29 @@ func (lexer *Lexer) EatStringConstant() (string, error) {
 	return value, nil
 }
 
+// MatchKeyword reports whether the next word equals keyword without consuming it.
+func (lexer *Lexer) MatchKeyword(keyword string) bool {
+	if lexer == nil {
+		return false
+	}
+	lexer.peekToken()
+	return lexer.wordToken && lexer.wordValue == keyword
+}
+
+// EatKeyword consumes the next word when it equals keyword.
+func (lexer *Lexer) EatKeyword(keyword string) error {
+	if lexer == nil {
+		return fmt.Errorf("read keyword %q: lexer is nil", keyword)
+	}
+	lexer.peekToken()
+	if !lexer.wordToken || lexer.wordValue != keyword {
+		return fmt.Errorf("read keyword %q at byte %d: next token does not match", keyword, lexer.tokenStart)
+	}
+	lexer.position = lexer.tokenEnd
+	lexer.tokenReady = false
+	return nil
+}
+
 // MatchIdentifier reports whether the next token is an identifier rather than a reserved word.
 func (lexer *Lexer) MatchIdentifier() bool {
 	if lexer == nil {
