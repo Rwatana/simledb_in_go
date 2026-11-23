@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/query"
+	"github.com/Rwatana/simledb_in_go/internal/record"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 func TestBucketNumberUsesJavaCompatibleHashesAndNonnegativeRemainders(t *testing.T) {
@@ -40,5 +42,43 @@ func TestBucketNumberUsesJavaCompatibleHashesAndNonnegativeRemainders(t *testing
 func TestBucketNumberRejectsUnsetConstant(t *testing.T) {
 	if bucket, err := BucketNumber(query.Constant{}); err == nil || bucket != 0 || !strings.Contains(err.Error(), "unset") {
 		t.Fatalf("BucketNumber(unset) = (%d, %v), want contextual unset-value error", bucket, err)
+	}
+}
+
+type hashIndexTransactionProbe struct {
+	record.RecordTransaction
+	calls int
+}
+
+func (transaction *hashIndexTransactionProbe) Size(string) (int, error) {
+	transaction.calls++
+	return 0, nil
+}
+
+func (transaction *hashIndexTransactionProbe) Append(string) (storage.BlockID, error) {
+	transaction.calls++
+	return storage.BlockID{}, nil
+}
+
+func (transaction *hashIndexTransactionProbe) Unpin(storage.BlockID) error {
+	transaction.calls++
+	return nil
+}
+
+func TestNewHashIndexRetainsConfigurationWithoutTransactionIO(t *testing.T) {
+	transaction := &hashIndexTransactionProbe{}
+	layout := record.NewLayout(&record.Schema{})
+	index := NewHashIndex(transaction, "student-id", layout)
+	if index == nil {
+		t.Fatal("NewHashIndex() returned nil")
+	}
+	if index.transaction != transaction || index.indexName != "student-id" || index.layout != layout {
+		t.Fatalf("index configuration = %+v, want transaction, name, and layout retained", index)
+	}
+	if _, initialized := index.searchKey.HashCode(); initialized || index.scan != nil {
+		t.Fatalf("initial search state = (key %v, scan %v), want unset key and no scan", index.searchKey, index.scan)
+	}
+	if transaction.calls != 0 {
+		t.Errorf("constructor made %d table transaction calls, want none", transaction.calls)
 	}
 }

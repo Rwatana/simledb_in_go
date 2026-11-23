@@ -527,6 +527,8 @@ At the Issue #927 static-hash-bucket checkpoint, `/tmp/simpledb-coverage-927.out
 
 At the Issue #929 static-hash-search-cost checkpoint, `/tmp/simpledb-coverage-929.out` measures 100.0% statement coverage in the full module and every executable package. `index/hash.SearchCost` covers empty, sub-bucket, exact-bucket, truncated, multi-bucket, and records-per-block-independent estimates. Uncached tests, race, vet, docs, gofmt, and diff checks pass.
 
+At the Issue #931 static-hash-index-initialization checkpoint, `/tmp/simpledb-coverage-931.out` measures 100.0% statement coverage in every executable package and every executable function. `hash.NewHashIndex` covers retaining the transaction, index name, and layout while leaving the search key unset and scan unopened without transaction I/O. Uncached tests, race, vet, docs, gofmt, and diff checks pass.
+
 At the Issue #893 project-plan-schema checkpoint, `/tmp/simpledb-coverage-893.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `NewProjectPlan` covers nil dependencies, valid ordered fields, empty projections, and missing-field errors; `ProjectPlan.Schema` covers both ordinary and nil receivers. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
 
 At the Issue #891 product-plan-distinct-estimate checkpoint, `/tmp/simpledb-coverage-891.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProductPlan.DistinctValues` covers left/right field routing, left-side duplicate-name precedence, nil dependencies, missing schemas, and unknown fields. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
