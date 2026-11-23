@@ -87,3 +87,16 @@ func (s *TableScan) BeforeFirst() error {
 	s.currentSlot = -1
 	return nil
 }
+
+// NextInBlock advances to the next occupied record in the current block.
+func (s *TableScan) NextInBlock() (bool, error) {
+	if s.recordPage == nil {
+		return false, fmt.Errorf("advance table scan for %q: no current record page", s.fileName)
+	}
+	next, err := s.recordPage.NextAfter(s.currentSlot)
+	if err != nil {
+		return false, fmt.Errorf("advance table scan for %q within block %v after slot %d: %w", s.fileName, s.recordPage.Block(), s.currentSlot, err)
+	}
+	s.currentSlot = next
+	return next >= 0, nil
+}

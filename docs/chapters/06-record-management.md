@@ -559,6 +559,24 @@ The tests first failed to compile because `TableScan.BeforeFirst` did not exist.
 
 This maps Java `TableScan.beforeFirst` and `moveToBlock(0)` with explicit sequencing errors.
 
+## Feature 33: Advance within a table scan block
+
+`TableScan.NextInBlock` asks the current record page for the next occupied slot after the cursor. A match updates the
+cursor and returns true. Current-block exhaustion records slot `-1` and returns false without moving blocks. A flag-read
+failure preserves the previous cursor and adds table context, while a scan without a current page is rejected explicitly.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.NextInBlock` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanNextInBlockAdvancesToOccupiedSlotsAndReportsExhaustion` | Occupied slots advance the cursor and current-block exhaustion resets it to `-1` |
+| `TestTableScanNextInBlockPreservesCursorOnReadFailure` | Flag-read failure preserves the previous cursor and returns table context |
+| `TestTableScanNextInBlockRejectsClosedScan` | A scan without a current page cannot advance |
+
+This isolates the current-block portion of Java `TableScan.next` before cross-block traversal is added.
+
 ## Next behavior
 
-Advance a table scan to the next occupied record within its current block as the next stacked PR.
+Report whether the current table-scan page is the file's last block as the next stacked PR.
