@@ -1271,10 +1271,30 @@ tested first. The initial build failed because `New` did not exist.
 This maps to the initialization portion of Java `Transaction`, but dependency assembly is explicit instead of reading
 static server state. START logging remains separate so constructor state and recovery side effects can be tested independently.
 
+## Feature 58: Append START while creating a transaction
+
+`transaction.New` now accepts the recovery log's append port. It allocates the transaction ID, appends exactly one START
+record for that ID, and returns initialized local state only after append succeeds. An append failure is wrapped with the
+transaction context and returns no partially initialized transaction. The returned LSN is intentionally not flushed,
+matching the existing START-record durability policy.
+
+### Test-first record
+
+One START per transaction, encoded ID correspondence, successful construction ordering, and append-failure propagation
+were tested first. The initial build failed because `New` did not accept a log or return an error.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewInitializesIsolatedTransactionLocalState` | Each successful construction appends one START carrying the same ID exposed by the transaction |
+| `TestNewReturnsNoTransactionWhenStartAppendFails` | START append failure returns its cause and no transaction instance |
+
+This maps to Java `RecoveryMgr` construction invoked from the `Transaction` constructor. Go makes the fallible side effect
+part of the constructor result instead of relying on an unchecked exception. START flush remains intentionally absent.
+
 ## Next behavior
 
-Continue with Chapter 5 by appending the transaction's START record as a separate behavior before composing commit and
-rollback.
+Continue with Chapter 5 by composing transaction commit in separately testable durability, lock-release, and buffer-unpin
+steps without mixing rollback.
 
 ## Sources
 
