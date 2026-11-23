@@ -2,17 +2,16 @@ package transaction
 
 import (
 	"errors"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"testing"
-
 	"github.com/Rwatana/simledb_in_go/internal/buffer"
 	"github.com/Rwatana/simledb_in_go/internal/concurrency"
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
 	"github.com/Rwatana/simledb_in_go/internal/recovery"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
 )
 
 type recordingTransactionLog struct {
@@ -1152,5 +1151,65 @@ func TestTransactionRollbackRequiresRecoveryIterator(t *testing.T) {
 	}
 	if len(logs.records) != 0 {
 		t.Errorf("log records = %d, want none without a recovery iterator", len(logs.records))
+	}
+}
+
+type failingUpdateTransactionLog struct {
+	recordingTransactionLog
+	updateErr error
+}
+
+type transactionRecordIterator struct {
+	records [][]byte
+	index   int
+}
+
+func (i *transactionRecordIterator) Next() ([]byte, bool, error) {
+	if i.index >= len(i.records) {
+		return nil, false, nil
+	}
+	record := i.records[i.index]
+	i.index++
+	return record, true, nil
+}
+
+func TestTransactionRollbackReturnsDurableLSNWhenUnpinFails(t *testing.T) {
+	wantErr := errors.New("unpin failed")
+	start := recovery.EncodeStartRecord(1)
+	frame := &buffer.Buffer{}
+	bufferManager := &recordingBufferPinner{frame: frame, unpinErr: wantErr}
+	logs := &recordingTransactionLog{}
+	factory := func() (recovery.EncodedRecordIterator, error) {
+		return &transactionRecordIterator{records: [][]byte{start}}, nil
+	}
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, logs, factory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := storage.NewBlockID("tbl", 1)
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.locks.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+
+	lsn, err := tx.Rollback()
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Rollback() error = %v, want %v", err, wantErr)
+	}
+	if lsn != 2 {
+		t.Fatalf("Rollback() LSN after cleanup failure = %d, want durable LSN 2", lsn)
+	}
+	if len(logs.flushed) != 1 || logs.flushed[0] != lsn {
+		t.Fatalf("log flushes = %v, want [%d]", logs.flushed, lsn)
+	}
+	if got, ok := tx.buffers.Buffer(block); !ok || got != frame {
+		t.Fatalf("buffer after failed cleanup = (%p, %v), want (%p, true)", got, ok, frame)
+	}
+	if err := table.LockShared(block); err != nil {
+		t.Fatalf("lock remained held after durable rollback cleanup failure: %v", err)
 	}
 }
