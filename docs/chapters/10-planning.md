@@ -10,7 +10,7 @@ and planner composition remains a separate observable behavior and Issue.
 | --- | --- | --- |
 | `internal/plan.Plan` | `simpledb/plan/Plan.java` | Describe opening a scan, estimating its cost and output, and exposing its schema |
 | `internal/plan.TablePlan` | `simpledb/plan/TablePlan.java` | Retain one table's resolved layout and expose its logical schema |
-| `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas and open their Cartesian-product scan |
+| `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas, open the Cartesian-product scan, and estimate its block reads |
 
 ## Feature 1: Define the query plan contract
 
@@ -192,6 +192,19 @@ ProductPlan opening both child scans into the product scan; its editable source 
 The first focused test run failed because `ProductPlan.Open` was undefined. Tests verify the returned scan type and
 first product row, nil plan/scan handling, contextual child errors, and closing opened scans after a later-stage failure.
 
+## Feature 14: Estimate product block accesses
+
+`ProductPlan.BlocksAccessed` maps to Java `ProductPlan.blocksAccessed()` and the nested-loop formula
+`B(left) + R(left) * B(right)`: the left input is read once, then the right input is scanned for each left row. It
+uses signed 32-bit arithmetic to preserve Java `int` overflow behavior. Missing children and a nil plan report zero.
+The [plan diagram](../diagrams/ch10-plan-contract.svg) records this estimate beside the product scan; the editable
+source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `ProductPlan.BlocksAccessed` was undefined. Tests verify the nested-loop
+formula, both nil-child cases, a nil receiver, and independent multiplication/addition overflow behavior.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -202,3 +215,4 @@ first product row, nil plan/scan handling, contextual child errors, and closing 
 - `SelectPlan.Schema` returns the child schema directly because filtering does not change the set of output fields.
 - `SelectPlan.BlocksAccessed` delegates directly to the child; estimates affected by selectivity remain distinct methods.
 - `ProductPlan.Open` initializes both child scans before returning and closes partial scan resources when composition fails.
+- `ProductPlan.BlocksAccessed` explicitly retains Java's signed 32-bit arithmetic instead of the host-sized Go `int` calculation.

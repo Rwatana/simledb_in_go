@@ -603,18 +603,71 @@ func TestProductPlanOpenClosesBothScansAfterInitializationFailure(t *testing.T) 
 	}
 }
 
+func TestProductPlanBlocksAccessedUsesNestedLoopEstimate(t *testing.T) {
+	left := &productPlanProbe{blocks: 3, records: 4}
+	right := &productPlanProbe{blocks: 5, records: 6}
+	if got, want := NewProductPlan(left, right).BlocksAccessed(), 23; got != want {
+		t.Fatalf("BlocksAccessed() = %d, want %d", got, want)
+	}
+}
+
+func TestProductPlanBlocksAccessedHandlesNilPlanAndChildren(t *testing.T) {
+	var nilPlan *ProductPlan
+	if got := nilPlan.BlocksAccessed(); got != 0 {
+		t.Errorf("nil ProductPlan.BlocksAccessed() = %d, want 0", got)
+	}
+	if got := NewProductPlan(nil, &productPlanProbe{blocks: 5}).BlocksAccessed(); got != 0 {
+		t.Errorf("ProductPlan without left child BlocksAccessed() = %d, want 0", got)
+	}
+	if got := NewProductPlan(&productPlanProbe{blocks: 3, records: 4}, nil).BlocksAccessed(); got != 0 {
+		t.Errorf("ProductPlan without right child BlocksAccessed() = %d, want 0", got)
+	}
+}
+
+func TestProductPlanBlocksAccessedUsesJavaInt32Arithmetic(t *testing.T) {
+	maxInt32 := int(^uint32(0) >> 1)
+	tests := []struct {
+		name  string
+		left  *productPlanProbe
+		right *productPlanProbe
+		want  int
+	}{
+		{
+			name:  "multiplication wraps before addition",
+			left:  &productPlanProbe{blocks: 10, records: maxInt32},
+			right: &productPlanProbe{blocks: 2},
+			want:  8,
+		},
+		{
+			name:  "addition wraps",
+			left:  &productPlanProbe{blocks: maxInt32, records: 1},
+			right: &productPlanProbe{blocks: 1},
+			want:  int(int32(maxInt32 + 1)),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := NewProductPlan(test.left, test.right).BlocksAccessed(); got != test.want {
+				t.Errorf("BlocksAccessed() = %d, want Java int result %d", got, test.want)
+			}
+		})
+	}
+}
+
 type productPlanProbe struct {
 	scan    query.Scan
 	openErr error
 	opens   int
+	blocks  int
+	records int
 }
 
 func (plan *productPlanProbe) Open() (query.Scan, error) {
 	plan.opens++
 	return plan.scan, plan.openErr
 }
-func (*productPlanProbe) BlocksAccessed() int       { return 0 }
-func (*productPlanProbe) RecordsOutput() int        { return 0 }
+func (plan *productPlanProbe) BlocksAccessed() int  { return plan.blocks }
+func (plan *productPlanProbe) RecordsOutput() int   { return plan.records }
 func (*productPlanProbe) DistinctValues(string) int { return 0 }
 func (*productPlanProbe) Schema() *record.Schema    { return nil }
 
