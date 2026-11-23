@@ -72,7 +72,7 @@ block rollover、current block内のreverse iterationまで進みました。次
 移動する振る舞いまで実装済みです。次はiterator生成時にcurrent tailをflushするdurability契約だけを、
 独立したIssueとPRで実装済みです。Chapter 4の次の機能はbuffer管理で、pinとunpinをさらに小さな
 振る舞いへ分けて進めます。未割当buffer frameとpin incrementを実装し、次はunpin decrementと
-underflow rejectionだけを追加します。
+underflow rejectionまで実装済みです。次はdirty stateを識別するtransaction IDだけを追加します。
 
 ## 参照元
 
