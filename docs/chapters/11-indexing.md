@@ -282,6 +282,18 @@ The focused test first failed because `IndexSelectPlan.Open` was undefined. Test
 cleanup, missing state/key checks before child I/O, wrapped child errors including partial scan cleanup, nil and
 incompatible scan rejection, and joined bucket-position/table-cleanup errors.
 
+## Feature 21: Estimate index-select plan block accesses
+
+`IndexSelectPlan.BlocksAccessed` adds the estimated static-hash index traversal cost to the estimated matching table
+rows. If the plan or index metadata is unavailable, or the metadata cannot estimate index blocks, it returns zero
+because the `Plan` estimate interface has no error result. The final addition follows the repository's signed 32-bit
+estimate arithmetic.
+
+### Test-first record
+
+The focused test first failed because `IndexSelectPlan.BlocksAccessed` was undefined. Tests cover the index-plus-row
+formula, nil plan and metadata, metadata block-size errors, and signed 32-bit overflow behavior.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

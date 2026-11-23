@@ -30,6 +30,18 @@ func (p *IndexSelectPlan) Schema() *record.Schema {
 	return p.child.Schema()
 }
 
+// BlocksAccessed estimates the index traversal and matching table-row accesses.
+func (p *IndexSelectPlan) BlocksAccessed() int {
+	if p == nil || p.indexInfo == nil {
+		return 0
+	}
+	indexBlocks, err := p.indexInfo.BlocksAccessed()
+	if err != nil {
+		return 0
+	}
+	return int(int32(indexBlocks) + int32(p.indexInfo.RecordsOutput()))
+}
+
 // Open opens the child table scan and positions its index-select scan before the first match.
 func (p *IndexSelectPlan) Open() (query.Scan, error) {
 	if p == nil {
