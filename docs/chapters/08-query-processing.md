@@ -15,6 +15,7 @@ dependency order. Each observable behavior remains a separate Issue, branch, com
 | `internal/query.RecordScan` | `simpledb/record/TableScan.java` | Adapter from record storage scans to query values |
 | `internal/query.SelectScan` | `simpledb/query/SelectScan.java` | Filters rows with a predicate and delegates scan operations |
 | `internal/query.ProductScan` | `simpledb/query/ProductScan.java` | Enumerates row pairs from two scans in left-major order |
+| `internal/query.ProjectScan` | `simpledb/query/ProjectScan.java` | Reports a selected field list while delegating row access |
 
 ## Feature 1: Initialize an integer query constant
 
@@ -317,3 +318,17 @@ reiteration, empty inputs, duplicate-field precedence, field routing, nil inputs
 traversal and right-restart errors, and closing both scans when either fails. The [product-scan diagram](../diagrams/ch08-product-scan.svg)
 shows the nested iteration; its editable source is
 [`ch08-product-scan.drawio`](../diagrams/ch08-product-scan.drawio).
+
+## Feature 30: Expose a projected field list
+
+`NewProjectScan` and `ProjectScan` map to Java `ProjectScan`. Traversal, typed reads, and close delegate to the source;
+`HasField` reports only names in the projection. Like Java, read methods do not enforce the projected list, so callers
+use `HasField` to determine which values the operator exposes. The Go constructor copies the input field slice into a
+set, preventing later caller mutation from changing membership; duplicates do not affect membership and an empty
+projection exposes no fields. Go rejects nil sources and wraps storage errors with project-scan context.
+
+The tests first failed to compile because `NewProjectScan` and `ProjectScan` were undefined. They cover field
+membership, delegated reads and traversal, an unprojected source read, empty and duplicate names, constructor-slice
+ownership, nil input, zero-value errors, and wrapped failures from each delegated operation. The
+[project-scan diagram](../diagrams/ch08-project-scan.svg) shows field visibility; its editable source is
+[`ch08-project-scan.drawio`](../diagrams/ch08-project-scan.drawio).
