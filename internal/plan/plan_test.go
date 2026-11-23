@@ -889,6 +889,26 @@ func TestProjectPlanBlocksAccessedDelegatesAndHandlesNilPlan(t *testing.T) {
 	}
 }
 
+func TestProjectPlanRecordsOutputDelegatesAndHandlesNilPlan(t *testing.T) {
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	project, err := NewProjectPlan(&productPlanProbe{schema: &schema, records: 3}, nil)
+	if err != nil {
+		t.Fatalf("NewProjectPlan() error = %v", err)
+	}
+	if got := project.RecordsOutput(); got != 3 {
+		t.Errorf("RecordsOutput() = %d, want child estimate 3", got)
+	}
+
+	var nilPlan *ProjectPlan
+	if got := nilPlan.RecordsOutput(); got != 0 {
+		t.Errorf("nil ProjectPlan.RecordsOutput() = %d, want 0", got)
+	}
+	if got := (&ProjectPlan{}).RecordsOutput(); got != 0 {
+		t.Errorf("ProjectPlan without child RecordsOutput() = %d, want 0", got)
+	}
+}
+
 type productPlanProbe struct {
 	scan     query.Scan
 	openErr  error

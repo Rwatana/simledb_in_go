@@ -270,6 +270,18 @@ editable source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.
 The first focused test run failed because `ProjectPlan.BlocksAccessed` was undefined. Tests verify a nonzero child estimate
 and nil receiver/missing-child behavior.
 
+## Feature 20: Delegate projected-plan output estimates
+
+`ProjectPlan.RecordsOutput` maps to Java `ProjectPlan.recordsOutput()` and forwards the child's estimated row count
+unchanged; removing columns does not remove rows. A nil receiver or missing child returns zero, matching the other
+nil-safe Go plan estimates. The [plan diagram](../diagrams/ch10-plan-contract.svg) records this delegation; its editable
+source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `ProjectPlan.RecordsOutput` was undefined. Tests verify a nonzero child row
+estimate and nil receiver/missing-child behavior.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -286,3 +298,4 @@ and nil receiver/missing-child behavior.
 - `NewProjectPlan` reports missing schema/field errors because Go callers must handle failures explicitly rather than receive Java exceptions.
 - `ProjectPlan.Open` keeps the child's before-first position rather than resetting it a second time.
 - `ProjectPlan.BlocksAccessed` delegates directly to its child because projection does not change child block access.
+- `ProjectPlan.RecordsOutput` delegates directly to its child because projection does not change row count.

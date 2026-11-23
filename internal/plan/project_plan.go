@@ -47,6 +47,14 @@ func (p *ProjectPlan) BlocksAccessed() int {
 	return p.child.BlocksAccessed()
 }
 
+// RecordsOutput returns the child's estimated output rows.
+func (p *ProjectPlan) RecordsOutput() int {
+	if p == nil || p.child == nil {
+		return 0
+	}
+	return p.child.RecordsOutput()
+}
+
 // Open opens the child and wraps its scan with the requested projection.
 func (p *ProjectPlan) Open() (query.Scan, error) {
 	if p == nil {
