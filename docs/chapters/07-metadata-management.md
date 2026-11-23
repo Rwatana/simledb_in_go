@@ -598,3 +598,23 @@ The test first failed to compile because `IndexManager.CreateIndex` did not exis
 | `TestIndexManagerCreateIndexPreservesTableNameWriteError` | Failure storing the indexed table-name field preserves the cause and table-name field-stage context |
 | `TestIndexManagerCreateIndexPreservesFieldNameWriteError` | Failure storing the indexed field-name field preserves the cause and field-name write context |
 | `TestIndexManagerCreateIndexPreservesCatalogRowInsertError` | Failure occupying the next index-catalog record slot preserves the cause and registration-stage context |
+
+## Feature 29: Look up index metadata by table
+
+`IndexManager.IndexInfo` scans `idxcat`, filters registrations by their stored table name, and returns `IndexInfo`
+values keyed by indexed field name. Each match reconstructs the target table layout, obtains its cached or freshly
+calculated statistics, and builds the Chapter 7 cost metadata without opening a concrete index.
+
+The result is an initialized empty map when no registration matches. Missing dependencies and every catalog, layout,
+statistics, metadata-construction, and cleanup failure receive table or field context. Duplicate field registrations
+retain Java `IndexMgr.getIndexInfo` map semantics: the later catalog row replaces the earlier value for that key.
+
+### Test-first record
+
+The test first failed to compile because `IndexManager.IndexInfo` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable` | Lookup returns only the requested table's two indexes, keyed by field, and returns an empty map for an unindexed table |
+| `TestIndexManagerIndexInfoRejectsMissingStatisticsManager` | Lookup reports table and dependency context before attempting any catalog transaction |
+| `TestIndexManagerIndexInfoRejectsMissingTableManager` | Lookup returns table-specific dependency context before catalog or statistics access |
