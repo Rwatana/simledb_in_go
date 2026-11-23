@@ -239,9 +239,42 @@ build failed because `DurableLog` and `AppendAndFlushCommitRecord` were undefine
 | implicit concrete `LogMgr` | `DurableLog` consumer port | Require only append and flush |
 | unchecked flush failure | contextual wrapped error | Expose the exact failed durability cut point |
 
+## Feature 7: Transaction ROLLBACK log record codec
+
+ROLLBACK is the third fixed-width transaction marker. Its operation code is `3`, followed by the same signed four-byte
+transaction ID representation used by START and COMMIT. The public type remains distinct because the operation has a
+different recovery meaning even though the bytes share a private codec.
+
+```text
+offset 0                  offset 4                 offset 8
++-------------------------+------------------------+
+| ROLLBACK operation = 3  | transaction ID (int32) |
++-------------------------+------------------------+
+```
+
+### Test-first record
+
+Exact positive, zero, and negative-bit-pattern encodings plus malformed inputs were tested first. The initial build failed
+because `OperationRollback`, `EncodeRollbackRecord`, and `DecodeRollbackRecord` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRollbackRecordRoundTrip` | Exact ROLLBACK bytes and signed transaction ID round-trip |
+| `TestDecodeRollbackRecordRejectsInvalidEncoding` | Truncation, trailing bytes, and a COMMIT operation are rejected |
+
+### Java source map and Go decision
+
+| Java `RollbackRecord` | Go | Decision |
+| --- | --- | --- |
+| `ROLLBACK = 3` | `OperationRollback Operation = 3` | Preserve the durable operator value |
+| operator plus transaction integer | shared private fixed-width codec | Reuse layout without merging semantic types |
+| constructor extracts `txnum` | strict `DecodeRollbackRecord` | Validate size and operation before returning the ID |
+| `writeToLog` | excluded | Append and flush remain separate behaviors |
+| empty `undo` | no undo method yet | Rollback scanning belongs to later orchestration |
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 with the ROLLBACK record codec as a separate issue and stacked PR.
+Continue Sect. 5.3.9.1 by appending the ROLLBACK record as a separate issue and stacked PR.
 
 ## Sources
 
