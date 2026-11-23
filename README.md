@@ -73,7 +73,7 @@
 
 ## 次の一歩
 
-Chapter 9のparsingを終え、Chapter 10 PlanningのQueryPlanner contract、物理テーブルSELECTのBasicQueryPlanner、TablePlan/SelectPlan/ProductPlan/ProjectPlanを追加しています。
+Chapter 9のparsingを終え、Chapter 10 PlanningのQueryPlanner、BasicQueryPlannerによるテーブル・ビューSELECT計画、TablePlan/SelectPlan/ProductPlan/ProjectPlanを追加しています。
 
 ## 参照元
 

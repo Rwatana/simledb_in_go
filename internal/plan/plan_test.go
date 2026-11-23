@@ -1043,6 +1043,123 @@ func TestBasicQueryPlannerRejectsInvalidInputsAndMetadataFailures(t *testing.T) 
 	}
 }
 
+func TestBasicQueryPlannerExpandsViewsRecursively(t *testing.T) {
+	schema := newPlannerTestSchema("student_id")
+	courseSchema := newPlannerTestSchema("course_code")
+	metadata := &basicPlannerMetadataProbe{
+		layouts: map[string]*record.Layout{
+			"student": record.NewLayout(schema),
+			"course":  record.NewLayout(courseSchema),
+		},
+		statistics: map[string]*metadata.StatInfo{
+			"student": metadata.NewStatInfo(2, 8),
+			"course":  metadata.NewStatInfo(1, 4),
+		},
+		viewDefinitions: map[string]string{"active_students": "select student_id from student"},
+	}
+	planner := NewBasicQueryPlanner(metadata)
+	got, err := planner.CreatePlan(
+		parse.NewQueryData([]string{"student_id", "course_code"}, []string{"active_students", "course"}, query.Predicate{}),
+		&tablePlanTransaction{},
+	)
+	if err != nil {
+		t.Fatalf("CreatePlan() for view error = %v", err)
+	}
+	outerProject, ok := got.(*ProjectPlan)
+	if !ok {
+		t.Fatalf("CreatePlan() type = %T, want *ProjectPlan", got)
+	}
+	outerSelect, ok := outerProject.child.(*SelectPlan)
+	if !ok {
+		t.Fatalf("outer ProjectPlan child type = %T, want *SelectPlan", outerProject.child)
+	}
+	product, ok := outerSelect.child.(*ProductPlan)
+	if !ok {
+		t.Fatalf("outer SelectPlan child type = %T, want *ProductPlan", outerSelect.child)
+	}
+	viewProject, ok := product.left.(*ProjectPlan)
+	if !ok {
+		t.Fatalf("product left child type = %T, want *ProjectPlan for view", product.left)
+	}
+	viewSelect, ok := viewProject.child.(*SelectPlan)
+	if !ok {
+		t.Fatalf("view projection child type = %T, want *SelectPlan", viewProject.child)
+	}
+	table, ok := viewSelect.child.(*TablePlan)
+	if !ok || table.tableName != "student" {
+		t.Fatalf("view base plan = %#v, want TablePlan for student", viewSelect.child)
+	}
+	right, ok := product.right.(*TablePlan)
+	if !ok || right.tableName != "course" {
+		t.Fatalf("product right child = %#v, want TablePlan for course", product.right)
+	}
+	if got, want := metadata.viewRequests, []string{"active_students", "student", "course"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("view lookups = %v, want %v", got, want)
+	}
+}
+
+func TestBasicQueryPlannerCombinesMultipleViews(t *testing.T) {
+	studentSchema := newPlannerTestSchema("student_id")
+	courseSchema := newPlannerTestSchema("course_id")
+	metadata := &basicPlannerMetadataProbe{
+		layouts: map[string]*record.Layout{
+			"student": record.NewLayout(studentSchema),
+			"course":  record.NewLayout(courseSchema),
+		},
+		statistics: map[string]*metadata.StatInfo{
+			"student": metadata.NewStatInfo(1, 1),
+			"course":  metadata.NewStatInfo(1, 1),
+		},
+		viewDefinitions: map[string]string{
+			"students": "select student_id from student",
+			"courses":  "select course_id from course",
+		},
+	}
+	got, err := NewBasicQueryPlanner(metadata).CreatePlan(
+		parse.NewQueryData([]string{"student_id", "course_id"}, []string{"students", "courses"}, query.Predicate{}),
+		&tablePlanTransaction{},
+	)
+	if err != nil {
+		t.Fatalf("CreatePlan() for two views error = %v", err)
+	}
+	outerSelect := got.(*ProjectPlan).child.(*SelectPlan)
+	product, ok := outerSelect.child.(*ProductPlan)
+	if !ok {
+		t.Fatalf("selection child type = %T, want *ProductPlan", outerSelect.child)
+	}
+	if _, ok := product.left.(*ProjectPlan); !ok {
+		t.Errorf("product left type = %T, want *ProjectPlan", product.left)
+	}
+	if _, ok := product.right.(*ProjectPlan); !ok {
+		t.Errorf("product right type = %T, want *ProjectPlan", product.right)
+	}
+}
+
+func TestBasicQueryPlannerReportsViewErrorsAndCycles(t *testing.T) {
+	metadata := &basicPlannerMetadataProbe{viewErr: errors.New("view metadata unavailable")}
+	planner := NewBasicQueryPlanner(metadata)
+	data := parse.NewQueryData([]string{"id"}, []string{"active_students"}, query.Predicate{})
+	if plan, err := planner.CreatePlan(data, &tablePlanTransaction{}); plan != nil || !errors.Is(err, metadata.viewErr) || !strings.Contains(err.Error(), "active_students") {
+		t.Errorf("CreatePlan() with view lookup error = (%v, %v), want contextual wrapped error", plan, err)
+	}
+
+	metadata.viewErr = nil
+	metadata.viewDefinitions = map[string]string{"broken_view": "select from student"}
+	data = parse.NewQueryData([]string{"id"}, []string{"broken_view"}, query.Predicate{})
+	if plan, err := planner.CreatePlan(data, &tablePlanTransaction{}); plan != nil || err == nil || !strings.Contains(err.Error(), "broken_view") {
+		t.Errorf("CreatePlan() with invalid view query = (%v, %v), want contextual parse error", plan, err)
+	}
+
+	metadata.viewDefinitions = map[string]string{
+		"first_view":  "select id from second_view",
+		"second_view": "select id from first_view",
+	}
+	data = parse.NewQueryData([]string{"id"}, []string{"first_view"}, query.Predicate{})
+	if plan, err := planner.CreatePlan(data, &tablePlanTransaction{}); plan != nil || err == nil || !strings.Contains(err.Error(), "recursive view") {
+		t.Errorf("CreatePlan() with cyclic views = (%v, %v), want recursive-view error", plan, err)
+	}
+}
+
 func newPlannerTestSchema(fieldName string) *record.Schema {
 	schema := &record.Schema{}
 	schema.AddIntegerField(fieldName)
@@ -1052,10 +1169,22 @@ func newPlannerTestSchema(fieldName string) *record.Schema {
 type basicPlannerMetadataProbe struct {
 	layouts            map[string]*record.Layout
 	statistics         map[string]*metadata.StatInfo
+	viewDefinitions    map[string]string
 	layoutErr          error
 	statisticsErr      error
+	viewErr            error
 	layoutRequests     []string
 	statisticsRequests []string
+	viewRequests       []string
+}
+
+func (probe *basicPlannerMetadataProbe) ViewDefinition(viewName string, _ record.TableScanTransaction) (string, bool, error) {
+	probe.viewRequests = append(probe.viewRequests, viewName)
+	if probe.viewErr != nil {
+		return "", false, probe.viewErr
+	}
+	definition, found := probe.viewDefinitions[viewName]
+	return definition, found, nil
 }
 
 func (probe *basicPlannerMetadataProbe) Layout(tableName string, _ record.TableScanTransaction) (*record.Layout, error) {

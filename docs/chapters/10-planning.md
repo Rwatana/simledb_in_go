@@ -13,7 +13,7 @@ and planner composition remains a separate observable behavior and Issue.
 | `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas, open the Cartesian-product scan, and estimate its output |
 | `internal/plan.ProjectPlan` | `simpledb/plan/ProjectPlan.java` | Build the projected schema, open its `ProjectScan`, and delegate estimates |
 | `internal/plan.QueryPlanner` | `simpledb/plan/QueryPlanner.java` | Convert parsed query data and a transaction into an executable plan |
-| `internal/plan.BasicQueryPlanner` | `simpledb/plan/BasicQueryPlanner.java` | Resolve table metadata and compose product, selection, and projection plans |
+| `internal/plan.BasicQueryPlanner` | `simpledb/plan/BasicQueryPlanner.java` | Resolve tables and recursively expand views before composing product, selection, and projection plans |
 
 ## Feature 1: Define the query plan contract
 
@@ -323,6 +323,19 @@ The first focused test run failed because `BasicQueryPlanner` and `NewBasicQuery
 two-table order, metadata lookup order, the product/selection/projection tree, predicate and output-field preservation,
 and nil/error cases.
 
+## Feature 24: Expand views in basic query plans
+
+`BasicQueryPlanner` checks metadata for each source view before treating it as a physical table. A found definition is
+parsed as `QueryData` and planned recursively with the same transaction, preserving its original position in a product.
+View lookup and parse errors keep their causes and include the view name; recursive view cycles return an error instead
+of recursing indefinitely. The [plan diagram](../diagrams/ch10-plan-contract.svg) shows views expanding into the same
+plan tree; its editable source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed: stored views were sent to physical table layout lookup. Tests verify nested view
+expansion, view/table ordering, multiple-view products, contextual metadata/parse errors, and cycle detection.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -342,4 +355,5 @@ and nil/error cases.
 - `ProjectPlan.RecordsOutput` delegates directly to its child because projection does not change row count.
 - `ProjectPlan.DistinctValues` delegates field estimates to the child, preserving the child's statistics model.
 - `QueryPlanner.CreatePlan` returns `(Plan, error)` so Go planning failures remain explicit.
-- `BasicQueryPlanner` currently plans physical tables; recursive view expansion is a separate planning behavior.
+- `BasicQueryPlanner` first added physical-table planning; recursive view expansion is recorded as its own follow-up behavior.
+- `BasicQueryPlanner` detects recursive view cycles and returns an error rather than allowing unbounded recursion.
