@@ -930,10 +930,28 @@ One release from three shared holders was tested first. The initial build failed
 This maps to the `val > 1` decrement branch of Java `LockTable.unlock`. Removing the final lock and waking waiters are
 kept out of this behavior.
 
+## Feature 41: Remove the final shared block lock
+
+`Unlock` removes a block entry when its shared-holder count is exactly one. The removal happens under the table mutex,
+leaves other blocks unchanged, and performs no waiter notification because waiting infrastructure has not been
+introduced. Exclusive release remains separate.
+
+### Test-first record
+
+Final shared removal and independent block state were tested first. The initial test failed because `Unlock` left the
+count-one entry unchanged.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableRemovesFinalSharedLock` | Releasing the sole shared holder removes only that block's entry |
+
+This implements the shared-lock case of Java `LockTable.unlock`'s removal branch. Java's accompanying `notifyAll` and
+the exclusive-lock case remain later behaviors.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by removing a block's final lock without notification, then separately add
-waiter notification, conflict waiting, timeout, and transaction-local lock tracking.
+Continue with Chapter 5 concurrency control by removing an exclusive block lock without notification, then separately
+add waiter notification, conflict waiting, timeout, and transaction-local lock tracking.
 
 ## Sources
 
