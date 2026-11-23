@@ -135,6 +135,38 @@ func TestViewManagerCreateViewWrapsCatalogLayoutFailure(t *testing.T) {
 	}
 }
 
+func TestViewManagerCreateViewPreservesViewNameWriteFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewViewManager(tables)
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+
+	wantErr := errors.New("view name write failed")
+	transaction.setStringErr = wantErr
+	transaction.setStringErrAfter = transaction.setStringCalls + 1
+	transaction.unpins = nil
+
+	err := manager.CreateView("seniors", "select sid from student", transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("CreateView() error = %v, want wrapped write cause", err)
+	}
+	for _, context := range []string{`create view "seniors"`, "store view name"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("CreateView() error = %q, want context %q", err, context)
+		}
+	}
+	viewBlock := storage.NewBlockID("viewcat.tbl", 0)
+	if len(transaction.unpins) == 0 || transaction.unpins[len(transaction.unpins)-1] != viewBlock {
+		t.Errorf("last catalog scan unpin = %v, want %v", transaction.unpins, viewBlock)
+	}
+	assertPageString(t, transaction.pages[viewBlock], 4, "")
+}
+
 func TestViewManagerViewDefinitionFindsMatchAndReportsAbsence(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()

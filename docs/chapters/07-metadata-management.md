@@ -776,6 +776,9 @@ index result.
 An invalid index field name is also tested independently: when the catalog names a field absent from the stored table
 schema, `IndexInfo` rejects the entry and returns index/field context rather than a partial map.
 
+View creation now also has a focused regression for failure while writing the catalog's `viewname` field. The wrapped
+cause and requested view context are preserved, and the opened catalog scan is closed after the write fails.
+
 ## Feature 36: Create an index through the metadata facade
 
 `MetadataManager.CreateIndex` delegates the index, table, and field names plus the transaction to the shared index
