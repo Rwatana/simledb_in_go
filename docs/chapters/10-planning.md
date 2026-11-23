@@ -442,6 +442,21 @@ The first focused test run failed because `BasicUpdatePlanner.ExecuteCreateView`
 SELECT text and original transaction reach metadata, successful DDL returns zero affected rows, and nil dependencies,
 empty names, unset definitions, and wrapped metadata failures are handled.
 
+## Feature 32: Execute CREATE INDEX with the basic update planner
+
+`BasicUpdatePlanner.ExecuteCreateIndex` passes the parsed index name, table name, field name, and same transaction to
+the metadata manager. It returns zero affected rows because index creation does not change table records. Nil
+planner/metadata/transaction dependencies and empty index, table, or field names return contextual errors, while
+metadata failures retain their original cause. The [planning diagram](../diagrams/ch10-plan-contract.svg) now includes
+CREATE INDEX as metadata-backed DDL; its editable source remains
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `BasicUpdatePlanner.ExecuteCreateIndex` was undefined. Tests verify each parsed
+name and the original transaction reach metadata, successful DDL returns zero affected rows, and nil dependencies, each
+empty name, and wrapped metadata errors are handled.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -469,3 +484,4 @@ empty names, unset definitions, and wrapped metadata failures are handled.
 - `BasicUpdatePlanner.ExecuteInsert` returns a successful count only after inserting one row and writing all parsed field values.
 - `BasicUpdatePlanner.ExecuteCreateTable` delegates schema creation to metadata and returns zero affected rows because DDL does not change table records.
 - `BasicUpdatePlanner.ExecuteCreateView` delegates the rendered SELECT definition to metadata and returns zero affected rows because DDL does not change table records.
+- `BasicUpdatePlanner.ExecuteCreateIndex` delegates all parsed identifiers to metadata and returns zero affected rows because DDL does not change table records.

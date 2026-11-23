@@ -181,6 +181,35 @@ func (planner *BasicUpdatePlanner) ExecuteCreateView(data parse.CreateViewData, 
 	return 0, nil
 }
 
+// ExecuteCreateIndex asks metadata to create the parsed index and returns no row count.
+func (planner *BasicUpdatePlanner) ExecuteCreateIndex(data parse.CreateIndexData, transaction record.TableScanTransaction) (int, error) {
+	if planner == nil {
+		return 0, fmt.Errorf("execute create index: planner is nil")
+	}
+	if planner.metadata == nil {
+		return 0, fmt.Errorf("execute create index: metadata is nil")
+	}
+	if transaction == nil {
+		return 0, fmt.Errorf("execute create index: transaction is nil")
+	}
+	indexName := data.IndexName()
+	if indexName == "" {
+		return 0, fmt.Errorf("execute create index: index name is empty")
+	}
+	tableName := data.TableName()
+	if tableName == "" {
+		return 0, fmt.Errorf("execute create index %q: table name is empty", indexName)
+	}
+	fieldName := data.FieldName()
+	if fieldName == "" {
+		return 0, fmt.Errorf("execute create index %q: field name is empty", indexName)
+	}
+	if err := planner.metadata.CreateIndex(indexName, tableName, fieldName, transaction); err != nil {
+		return 0, fmt.Errorf("execute create index %q on %s.%s: create metadata: %w", indexName, tableName, fieldName, err)
+	}
+	return 0, nil
+}
+
 func insertRowIntoScan(tableName string, fields []string, values []query.Constant, scan query.Scan) (int, error) {
 	updateScan, err := requireUpdateScan(scan)
 	if err != nil {
