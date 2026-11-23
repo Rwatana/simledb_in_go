@@ -1891,3 +1891,36 @@ func TestTransactionAppendPreservesEOFExclusiveLockFailure(t *testing.T) {
 		t.Errorf("FileManager.Append() calls = %v, want none after lock failure", files.appendNames)
 	}
 }
+
+func (s *recordingFileSizer) BlockSize() int {
+	return s.blockSize
+}
+
+func TestTransactionBlockSizeReturnsImmutableFileMetadata(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	files := &recordingFileSizer{lengths: map[string]int{}, blockSize: 4096}
+	tx, err := NewWithFileManager(&allocator, &table, files, &recordingBufferPinner{}, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := tx.BlockSize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 4096 {
+		t.Fatalf("BlockSize() = %d, want 4096", got)
+	}
+}
+
+func TestTransactionBlockSizeRequiresFullFileManager(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := NewWithFileSizer(&allocator, &table, &recordingFileSizer{lengths: map[string]int{}}, &recordingBufferPinner{}, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.BlockSize(); err == nil {
+		t.Fatal("BlockSize() without full file manager returned nil error")
+	}
+}

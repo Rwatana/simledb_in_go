@@ -43,6 +43,7 @@ type transactionLockManager interface {
 type FileManager interface {
 	FileSizer
 	Append(fileName string) (storage.BlockID, error)
+	BlockSize() int
 }
 
 // Transaction owns the resources and identity of one database transaction.
@@ -143,6 +144,14 @@ func (t *Transaction) Append(fileName string) (storage.BlockID, error) {
 		return storage.BlockID{}, fmt.Errorf("append transaction file %q: %w", fileName, err)
 	}
 	return block, nil
+}
+
+// BlockSize returns the immutable database block size from the configured file manager.
+func (t *Transaction) BlockSize() (int, error) {
+	if t.fileManager == nil {
+		return 0, fmt.Errorf("get transaction block size: file manager is not configured")
+	}
+	return t.fileManager.BlockSize(), nil
 }
 
 // Pin acquires a buffer for block and records it as transaction-local ownership.
