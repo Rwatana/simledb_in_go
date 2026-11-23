@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
@@ -95,6 +96,34 @@ func TestAppendDoesNotFlushTheTailPage(t *testing.T) {
 	}
 	if boundary != 32 {
 		t.Errorf("disk boundary = %d, want unchanged boundary 32", boundary)
+	}
+}
+
+func TestAppendPreservesBoundaryReadFailure(t *testing.T) {
+	t.Parallel()
+
+	manager, _ := newLogManager(t, 32)
+	if lsn, err := manager.Append([]byte("saved")); err != nil || lsn != 1 {
+		t.Fatalf("Append(first) = (%d, %v), want (1, nil)", lsn, err)
+	}
+	manager.page = storage.NewPageFromBytes([]byte{0, 0, 0})
+
+	lsn, err := manager.Append([]byte("next"))
+	if lsn != 0 {
+		t.Errorf("Append() LSN = %d, want 0 on boundary read failure", lsn)
+	}
+	for _, want := range []string{
+		"append log record to [file simpledb.log, block 0]",
+		"read boundary",
+		"get integer at offset 0",
+		"byte range [0:4] exceeds page capacity 3",
+	} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("Append() error = %v, want context containing %q", err, want)
+		}
+	}
+	if manager.latestLSN != 1 {
+		t.Errorf("latest LSN = %d, want unchanged value 1", manager.latestLSN)
 	}
 }
 

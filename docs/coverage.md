@@ -233,6 +233,10 @@ prefix, returning no partial record and retaining the offset and Page-read conte
 
 Previous-block traversal now covers a FileManager read failure, confirming the wrapped cause is returned without
 committing a new block or position to the iterator.
+
+`log.Manager.Append` now also covers failure to read the in-memory tail boundary. A short Page deterministically
+exercises the read error and verifies that Append returns LSN zero, preserves the block and Page-read context, and
+does not advance the latest LSN.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

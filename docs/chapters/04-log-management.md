@@ -193,6 +193,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | `TestAppendStoresRecordsRightToLeftAndAllocatesLSN` | layout、boundary、LSN、empty/binary payload、copy |
 | `TestAppendDoesNotChangeStateWhenRecordDoesNotFit` | capacity errorがPageとLSNを変更しない |
 | `TestAppendDoesNotFlushTheTailPage` | appendだけではdisk boundaryを変更しない |
+| `TestAppendPreservesBoundaryReadFailure` | tail boundary read failureのcause、block context、LSN不変 |
 
 ## Javaソースリーディング
 
