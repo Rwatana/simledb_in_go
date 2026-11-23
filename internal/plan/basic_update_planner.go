@@ -156,6 +156,31 @@ func (planner *BasicUpdatePlanner) ExecuteCreateTable(data parse.CreateTableData
 	return 0, nil
 }
 
+// ExecuteCreateView stores the parsed view definition and returns no row count.
+func (planner *BasicUpdatePlanner) ExecuteCreateView(data parse.CreateViewData, transaction record.TableScanTransaction) (int, error) {
+	if planner == nil {
+		return 0, fmt.Errorf("execute create view: planner is nil")
+	}
+	if planner.metadata == nil {
+		return 0, fmt.Errorf("execute create view: metadata is nil")
+	}
+	if transaction == nil {
+		return 0, fmt.Errorf("execute create view: transaction is nil")
+	}
+	viewName := data.ViewName()
+	if viewName == "" {
+		return 0, fmt.Errorf("execute create view: view name is empty")
+	}
+	definition := data.ViewDefinition()
+	if definition == "" || definition == "<unset-query>" {
+		return 0, fmt.Errorf("execute create view %q: definition is unset", viewName)
+	}
+	if err := planner.metadata.CreateView(viewName, definition, transaction); err != nil {
+		return 0, fmt.Errorf("execute create view %q: create metadata: %w", viewName, err)
+	}
+	return 0, nil
+}
+
 func insertRowIntoScan(tableName string, fields []string, values []query.Constant, scan query.Scan) (int, error) {
 	updateScan, err := requireUpdateScan(scan)
 	if err != nil {

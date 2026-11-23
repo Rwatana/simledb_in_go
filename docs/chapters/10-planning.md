@@ -427,6 +427,21 @@ The first focused test run failed because `BasicUpdatePlanner.ExecuteCreateTable
 delegation, field order/type/length, transaction identity, zero affected rows, nil dependencies, empty names, and wrapped
 metadata errors.
 
+## Feature 31: Execute CREATE VIEW with the basic update planner
+
+`BasicUpdatePlanner.ExecuteCreateView` sends the parsed view name, rendered SELECT definition, and same transaction to
+the metadata manager. It returns zero affected rows because creating a view does not modify table records. Nil
+planner/metadata/transaction dependencies, an empty view name, and an unset query definition return contextual errors;
+metadata failures keep their original cause. The [planning diagram](../diagrams/ch10-plan-contract.svg) now shows
+CREATE VIEW as metadata-backed DDL alongside CREATE TABLE and the row-oriented commands; its editable source remains
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `BasicUpdatePlanner.ExecuteCreateView` was undefined. Tests verify the rendered
+SELECT text and original transaction reach metadata, successful DDL returns zero affected rows, and nil dependencies,
+empty names, unset definitions, and wrapped metadata failures are handled.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -453,3 +468,4 @@ metadata errors.
 - `BasicUpdatePlanner.ExecuteModify` evaluates replacement expressions per matching row and reports the number of successful writes.
 - `BasicUpdatePlanner.ExecuteInsert` returns a successful count only after inserting one row and writing all parsed field values.
 - `BasicUpdatePlanner.ExecuteCreateTable` delegates schema creation to metadata and returns zero affected rows because DDL does not change table records.
+- `BasicUpdatePlanner.ExecuteCreateView` delegates the rendered SELECT definition to metadata and returns zero affected rows because DDL does not change table records.

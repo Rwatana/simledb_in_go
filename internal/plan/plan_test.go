@@ -560,6 +560,72 @@ func TestBasicUpdatePlannerExecuteCreateTableValidatesInputsAndMetadataErrors(t 
 	}
 }
 
+func TestBasicUpdatePlannerExecuteCreateViewForwardsDefinitionAndTransaction(t *testing.T) {
+	definition := parse.NewQueryData(
+		[]string{"id", "name"},
+		[]string{"student"},
+		query.NewPredicateWithTerm(query.NewTerm(
+			query.NewFieldExpression("active"),
+			query.NewConstantExpression(query.NewIntConstant(1)),
+		)),
+	)
+	data := parse.NewCreateViewData("active_students", definition)
+	transaction := &tablePlanTransaction{}
+	metadata := &basicUpdatePlannerMetadataProbe{}
+
+	count, err := NewBasicUpdatePlanner(metadata).ExecuteCreateView(data, transaction)
+	if err != nil {
+		t.Fatalf("ExecuteCreateView() error = %v", err)
+	}
+	if count != 0 {
+		t.Errorf("ExecuteCreateView() affected = %d, want 0", count)
+	}
+	if !reflect.DeepEqual(metadata.createViewRequests, []string{"active_students"}) {
+		t.Errorf("CreateView requests = %v, want [active_students]", metadata.createViewRequests)
+	}
+	if !reflect.DeepEqual(metadata.createViewDefinitions, []string{"select id, name from student where active=1"}) {
+		t.Errorf("CreateView definitions = %v, want rendered SELECT", metadata.createViewDefinitions)
+	}
+	if len(metadata.createViewTransactions) != 1 || metadata.createViewTransactions[0] != transaction {
+		t.Errorf("CreateView transactions = %v, want original transaction", metadata.createViewTransactions)
+	}
+}
+
+func TestBasicUpdatePlannerExecuteCreateViewValidatesInputsAndMetadataErrors(t *testing.T) {
+	queryData := parse.NewQueryData([]string{"id"}, []string{"student"}, query.Predicate{})
+	data := parse.NewCreateViewData("active_students", queryData)
+	transaction := &tablePlanTransaction{}
+	var nilPlanner *BasicUpdatePlanner
+	if count, err := nilPlanner.ExecuteCreateView(data, transaction); count != 0 || err == nil {
+		t.Errorf("nil planner ExecuteCreateView() = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(nil).ExecuteCreateView(data, transaction); count != 0 || err == nil {
+		t.Errorf("planner without metadata ExecuteCreateView() = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{}).ExecuteCreateView(data, nil); count != 0 || err == nil {
+		t.Errorf("ExecuteCreateView() with nil transaction = (%d, %v), want an error", count, err)
+	}
+	metadata := &basicUpdatePlannerMetadataProbe{}
+	if count, err := NewBasicUpdatePlanner(metadata).ExecuteCreateView(parse.NewCreateViewData("", queryData), transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteCreateView() with empty view name = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(metadata).ExecuteCreateView(parse.NewCreateViewData("active_students", parse.QueryData{}), transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteCreateView() with unset definition = (%d, %v), want an error", count, err)
+	}
+	if len(metadata.createViewRequests) != 0 {
+		t.Errorf("CreateView requests for invalid inputs = %v, want none", metadata.createViewRequests)
+	}
+
+	metadataErr := errors.New("create view failed")
+	metadata = &basicUpdatePlannerMetadataProbe{createViewErr: metadataErr}
+	if count, err := NewBasicUpdatePlanner(metadata).ExecuteCreateView(data, transaction); count != 0 || !errors.Is(err, metadataErr) {
+		t.Errorf("ExecuteCreateView() with metadata error = (%d, %v), want wrapped metadata error", count, err)
+	}
+	if len(metadata.createViewRequests) != 1 {
+		t.Errorf("CreateView requests after metadata failure = %v, want one attempted create", metadata.createViewRequests)
+	}
+}
+
 func TestDeleteRowsFromScanHandlesReadOnlyAndNilScans(t *testing.T) {
 	closeErr := errors.New("read-only scan close failed")
 	scan := &productPlanScanStub{closeErr: closeErr}
@@ -2005,6 +2071,10 @@ type basicUpdatePlannerMetadataProbe struct {
 	createTableRequests     []string
 	createTableSchemas      []record.Schema
 	createTableTransactions []record.TableScanTransaction
+	createViewErr           error
+	createViewRequests      []string
+	createViewDefinitions   []string
+	createViewTransactions  []record.TableScanTransaction
 }
 
 func (probe *basicUpdatePlannerMetadataProbe) Layout(tableName string, _ record.TableScanTransaction) (*record.Layout, error) {
@@ -2019,8 +2089,11 @@ func (probe *basicUpdatePlannerMetadataProbe) CreateTable(tableName string, sche
 	probe.createTableTransactions = append(probe.createTableTransactions, transaction)
 	return probe.createTableErr
 }
-func (*basicUpdatePlannerMetadataProbe) CreateView(string, string, record.TableScanTransaction) error {
-	return nil
+func (probe *basicUpdatePlannerMetadataProbe) CreateView(viewName, definition string, transaction record.TableScanTransaction) error {
+	probe.createViewRequests = append(probe.createViewRequests, viewName)
+	probe.createViewDefinitions = append(probe.createViewDefinitions, definition)
+	probe.createViewTransactions = append(probe.createViewTransactions, transaction)
+	return probe.createViewErr
 }
 func (*basicUpdatePlannerMetadataProbe) CreateIndex(string, string, string, record.TableScanTransaction) error {
 	return nil
