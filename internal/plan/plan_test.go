@@ -1160,6 +1160,143 @@ func TestBasicQueryPlannerReportsViewErrorsAndCycles(t *testing.T) {
 	}
 }
 
+func TestBetterQueryPlannerChoosesLowerCostJoinOrder(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		left       *metadata.StatInfo
+		right      *metadata.StatInfo
+		wantTables []string
+	}{
+		{
+			name:       "swap when reversed order is cheaper",
+			left:       metadata.NewStatInfo(1, 100),
+			right:      metadata.NewStatInfo(100, 1),
+			wantTables: []string{"right", "left"},
+		},
+		{
+			name:       "preserve order when original is cheaper",
+			left:       metadata.NewStatInfo(100, 1),
+			right:      metadata.NewStatInfo(1, 10),
+			wantTables: []string{"left", "right"},
+		},
+		{
+			name:       "preserve order on equal cost",
+			left:       metadata.NewStatInfo(1, 1),
+			right:      metadata.NewStatInfo(1, 1),
+			wantTables: []string{"left", "right"},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			metadata := &basicPlannerMetadataProbe{
+				layouts: map[string]*record.Layout{
+					"left":  record.NewLayout(newPlannerTestSchema("left_id")),
+					"right": record.NewLayout(newPlannerTestSchema("right_id")),
+				},
+				statistics: map[string]*metadata.StatInfo{"left": test.left, "right": test.right},
+			}
+			got, err := NewBetterQueryPlanner(metadata).CreatePlan(
+				parse.NewQueryData([]string{"left_id", "right_id"}, []string{"left", "right"}, query.Predicate{}),
+				&tablePlanTransaction{},
+			)
+			if err != nil {
+				t.Fatalf("CreatePlan() error = %v", err)
+			}
+			if tables := basicPlannerTableOrder(t, got); !reflect.DeepEqual(tables, test.wantTables) {
+				t.Errorf("table order = %v, want %v", tables, test.wantTables)
+			}
+		})
+	}
+}
+
+func TestBetterQueryPlannerBuildsLeftDeepProductsAndRejectsInvalidInputs(t *testing.T) {
+	metadata := &basicPlannerMetadataProbe{
+		layouts: map[string]*record.Layout{
+			"first":  record.NewLayout(newPlannerTestSchema("first_id")),
+			"second": record.NewLayout(newPlannerTestSchema("second_id")),
+			"third":  record.NewLayout(newPlannerTestSchema("third_id")),
+		},
+		statistics: map[string]*metadata.StatInfo{
+			"first":  metadata.NewStatInfo(1, 1),
+			"second": metadata.NewStatInfo(1, 1),
+			"third":  metadata.NewStatInfo(1, 1),
+		},
+	}
+	planner := NewBetterQueryPlanner(metadata)
+	data := parse.NewQueryData([]string{"first_id", "second_id", "third_id"}, []string{"first", "second", "third"}, query.Predicate{})
+	got, err := planner.CreatePlan(data, &tablePlanTransaction{})
+	if err != nil {
+		t.Fatalf("CreatePlan() with three tables error = %v", err)
+	}
+	outerSelect := got.(*ProjectPlan).child.(*SelectPlan)
+	product, ok := outerSelect.child.(*ProductPlan)
+	if !ok {
+		t.Fatalf("selection child type = %T, want *ProductPlan", outerSelect.child)
+	}
+	if _, ok := product.left.(*ProductPlan); !ok {
+		t.Errorf("three-table product left type = %T, want *ProductPlan", product.left)
+	}
+
+	var nilPlanner *BetterQueryPlanner
+	if plan, err := nilPlanner.CreatePlan(data, &tablePlanTransaction{}); plan != nil || err == nil {
+		t.Errorf("nil planner CreatePlan() = (%v, %v), want an error", plan, err)
+	}
+	if plan, err := (&BetterQueryPlanner{}).CreatePlan(data, &tablePlanTransaction{}); plan != nil || err == nil {
+		t.Errorf("planner without basic planner CreatePlan() = (%v, %v), want an error", plan, err)
+	}
+	if plan, err := NewBetterQueryPlanner(nil).CreatePlan(data, &tablePlanTransaction{}); plan != nil || err == nil {
+		t.Errorf("planner without metadata CreatePlan() = (%v, %v), want an error", plan, err)
+	}
+	if plan, err := planner.CreatePlan(data, nil); plan != nil || err == nil {
+		t.Errorf("CreatePlan() with nil transaction = (%v, %v), want an error", plan, err)
+	}
+	if plan, err := planner.CreatePlan(parse.QueryData{}, &tablePlanTransaction{}); plan != nil || err == nil {
+		t.Errorf("CreatePlan() without sources = (%v, %v), want an error", plan, err)
+	}
+	if plan, err := planner.CreatePlan(parse.NewQueryData([]string{"missing"}, []string{"first"}, query.Predicate{}), &tablePlanTransaction{}); plan != nil || err == nil {
+		t.Errorf("CreatePlan() with unknown projection = (%v, %v), want an error", plan, err)
+	}
+}
+
+func TestBetterQueryPlannerReusesRecursiveViewExpansion(t *testing.T) {
+	metadata := &basicPlannerMetadataProbe{
+		layouts: map[string]*record.Layout{
+			"left":  record.NewLayout(newPlannerTestSchema("left_id")),
+			"right": record.NewLayout(newPlannerTestSchema("right_id")),
+		},
+		statistics: map[string]*metadata.StatInfo{
+			"left":  metadata.NewStatInfo(1, 100),
+			"right": metadata.NewStatInfo(100, 1),
+		},
+		viewDefinitions: map[string]string{"right_view": "select right_id from right"},
+	}
+	data := parse.NewQueryData([]string{"left_id", "right_id"}, []string{"left", "right_view"}, query.Predicate{})
+
+	got, err := NewBetterQueryPlanner(metadata).CreatePlan(data, &tablePlanTransaction{})
+	if err != nil {
+		t.Fatalf("CreatePlan() with view source error = %v", err)
+	}
+	if tables := basicPlannerTableOrder(t, got); !reflect.DeepEqual(tables, []string{"right", "left"}) {
+		t.Errorf("expanded and ordered tables = %v, want [right left]", tables)
+	}
+}
+
+func basicPlannerTableOrder(t *testing.T, plan Plan) []string {
+	t.Helper()
+	switch current := plan.(type) {
+	case *ProjectPlan:
+		return basicPlannerTableOrder(t, current.child)
+	case *SelectPlan:
+		return basicPlannerTableOrder(t, current.child)
+	case *ProductPlan:
+		return append(basicPlannerTableOrder(t, current.left), basicPlannerTableOrder(t, current.right)...)
+	case *TablePlan:
+		return []string{current.tableName}
+	default:
+		t.Fatalf("unexpected plan node %T", plan)
+		return nil
+	}
+}
+
 func newPlannerTestSchema(fieldName string) *record.Schema {
 	schema := &record.Schema{}
 	schema.AddIntegerField(fieldName)

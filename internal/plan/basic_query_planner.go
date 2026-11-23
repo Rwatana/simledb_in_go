@@ -31,6 +31,23 @@ func (planner *BasicQueryPlanner) CreatePlan(data parse.QueryData, transaction r
 }
 
 func (planner *BasicQueryPlanner) createPlan(data parse.QueryData, transaction record.TableScanTransaction, viewStack map[string]bool) (Plan, error) {
+	sources, err := planner.sourcePlans(data, transaction, viewStack)
+	if err != nil {
+		return nil, err
+	}
+	var root Plan
+	for _, source := range sources {
+		if root == nil {
+			root = source
+			continue
+		}
+		root = NewProductPlan(root, source)
+	}
+	return finishQueryPlan(root, data)
+}
+
+// sourcePlans resolves physical tables and recursively expands views in source order.
+func (planner *BasicQueryPlanner) sourcePlans(data parse.QueryData, transaction record.TableScanTransaction, viewStack map[string]bool) ([]Plan, error) {
 	if planner == nil {
 		return nil, fmt.Errorf("create basic query plan: planner is nil")
 	}
@@ -45,7 +62,7 @@ func (planner *BasicQueryPlanner) createPlan(data parse.QueryData, transaction r
 		return nil, fmt.Errorf("create basic query plan: query has no tables")
 	}
 
-	var root Plan
+	sources := make([]Plan, 0, len(tableNames))
 	for _, tableName := range tableNames {
 		definition, isView, err := planner.metadata.ViewDefinition(tableName, transaction)
 		if err != nil {
@@ -66,11 +83,7 @@ func (planner *BasicQueryPlanner) createPlan(data parse.QueryData, transaction r
 			if err != nil {
 				return nil, fmt.Errorf("create basic query plan for view %q: %w", tableName, err)
 			}
-			if root == nil {
-				root = viewPlan
-				continue
-			}
-			root = NewProductPlan(root, viewPlan)
+			sources = append(sources, viewPlan)
 			continue
 		}
 
@@ -86,13 +99,12 @@ func (planner *BasicQueryPlanner) createPlan(data parse.QueryData, transaction r
 			return nil, fmt.Errorf("create basic query plan for table %q: read statistics: %w", tableName, err)
 		}
 		tablePlan := NewTablePlan(transaction, tableName, layout, statistics)
-		if root == nil {
-			root = tablePlan
-			continue
-		}
-		root = NewProductPlan(root, tablePlan)
+		sources = append(sources, tablePlan)
 	}
+	return sources, nil
+}
 
+func finishQueryPlan(root Plan, data parse.QueryData) (Plan, error) {
 	selected := NewSelectPlan(root, data.Predicate())
 	projected, err := NewProjectPlan(selected, data.Fields())
 	if err != nil {

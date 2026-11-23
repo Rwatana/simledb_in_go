@@ -14,6 +14,7 @@ and planner composition remains a separate observable behavior and Issue.
 | `internal/plan.ProjectPlan` | `simpledb/plan/ProjectPlan.java` | Build the projected schema, open its `ProjectScan`, and delegate estimates |
 | `internal/plan.QueryPlanner` | `simpledb/plan/QueryPlanner.java` | Convert parsed query data and a transaction into an executable plan |
 | `internal/plan.BasicQueryPlanner` | `simpledb/plan/BasicQueryPlanner.java` | Resolve tables and recursively expand views before composing product, selection, and projection plans |
+| `internal/plan.BetterQueryPlanner` | `simpledb/plan/BetterQueryPlanner.java` | Choose the lower estimated block-access order as each source joins the left-deep product |
 
 ## Feature 1: Define the query plan contract
 
@@ -336,6 +337,20 @@ plan tree; its editable source is [`ch10-plan-contract.drawio`](../diagrams/ch10
 The first focused test run failed: stored views were sent to physical table layout lookup. Tests verify nested view
 expansion, view/table ordering, multiple-view products, contextual metadata/parse errors, and cycle detection.
 
+## Feature 25: Choose lower-cost orders for basic joins
+
+`BetterQueryPlanner` reuses `BasicQueryPlanner` source resolution, including recursive views, then chooses the child order
+with the lower `ProductPlan.BlocksAccessed` estimate as each source joins the accumulated left-deep product. It reverses
+the order only when that candidate is strictly cheaper, retaining query source order on ties. Selection and projection
+remain above the product tree. The [plan diagram](../diagrams/ch10-plan-contract.svg) shows the cost-aware planner next
+to the basic planner; its editable source remains [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `NewBetterQueryPlanner` and `BetterQueryPlanner` were undefined. Tests verify
+both cost choices, stable order on ties, left-deep products for multiple sources, final selection/projection placement,
+and invalid planner inputs.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -357,3 +372,4 @@ expansion, view/table ordering, multiple-view products, contextual metadata/pars
 - `QueryPlanner.CreatePlan` returns `(Plan, error)` so Go planning failures remain explicit.
 - `BasicQueryPlanner` first added physical-table planning; recursive view expansion is recorded as its own follow-up behavior.
 - `BasicQueryPlanner` detects recursive view cycles and returns an error rather than allowing unbounded recursion.
+- `BetterQueryPlanner` uses block-access estimates to choose each product's child order, reversing only when strictly cheaper.
