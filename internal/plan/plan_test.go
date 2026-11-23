@@ -654,6 +654,38 @@ func TestProductPlanBlocksAccessedUsesJavaInt32Arithmetic(t *testing.T) {
 	}
 }
 
+func TestProductPlanRecordsOutputMultipliesChildEstimates(t *testing.T) {
+	left := &productPlanProbe{records: 4}
+	right := &productPlanProbe{records: 6}
+	if got, want := NewProductPlan(left, right).RecordsOutput(), 24; got != want {
+		t.Fatalf("RecordsOutput() = %d, want %d", got, want)
+	}
+}
+
+func TestProductPlanRecordsOutputHandlesNilPlanAndChildren(t *testing.T) {
+	var nilPlan *ProductPlan
+	if got := nilPlan.RecordsOutput(); got != 0 {
+		t.Errorf("nil ProductPlan.RecordsOutput() = %d, want 0", got)
+	}
+	if got := NewProductPlan(nil, &productPlanProbe{records: 6}).RecordsOutput(); got != 0 {
+		t.Errorf("ProductPlan without left child RecordsOutput() = %d, want 0", got)
+	}
+	if got := NewProductPlan(&productPlanProbe{records: 4}, nil).RecordsOutput(); got != 0 {
+		t.Errorf("ProductPlan without right child RecordsOutput() = %d, want 0", got)
+	}
+}
+
+func TestProductPlanRecordsOutputUsesJavaInt32Arithmetic(t *testing.T) {
+	maxInt32 := int(^uint32(0) >> 1)
+	product := NewProductPlan(
+		&productPlanProbe{records: maxInt32},
+		&productPlanProbe{records: 2},
+	)
+	if got, want := product.RecordsOutput(), -2; got != want {
+		t.Fatalf("RecordsOutput() = %d, want Java int result %d", got, want)
+	}
+}
+
 type productPlanProbe struct {
 	scan    query.Scan
 	openErr error

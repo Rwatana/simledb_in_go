@@ -10,7 +10,7 @@ and planner composition remains a separate observable behavior and Issue.
 | --- | --- | --- |
 | `internal/plan.Plan` | `simpledb/plan/Plan.java` | Describe opening a scan, estimating its cost and output, and exposing its schema |
 | `internal/plan.TablePlan` | `simpledb/plan/TablePlan.java` | Retain one table's resolved layout and expose its logical schema |
-| `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas, open the Cartesian-product scan, and estimate its block reads |
+| `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas, open the Cartesian-product scan, and estimate its output and block reads |
 
 ## Feature 1: Define the query plan contract
 
@@ -205,6 +205,18 @@ source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
 The first focused test run failed because `ProductPlan.BlocksAccessed` was undefined. Tests verify the nested-loop
 formula, both nil-child cases, a nil receiver, and independent multiplication/addition overflow behavior.
 
+## Feature 15: Estimate product output rows
+
+`ProductPlan.RecordsOutput` maps to Java `ProductPlan.recordsOutput()` and estimates the Cartesian-product row count as
+`R(left) * R(right)`. Signed 32-bit multiplication preserves Java `int` overflow. A nil product or missing child returns
+zero. The [plan diagram](../diagrams/ch10-plan-contract.svg) records the product row estimate; its editable source is
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `ProductPlan.RecordsOutput` was undefined. Tests verify the multiplication,
+nil receiver and child handling, and signed 32-bit overflow.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -216,3 +228,4 @@ formula, both nil-child cases, a nil receiver, and independent multiplication/ad
 - `SelectPlan.BlocksAccessed` delegates directly to the child; estimates affected by selectivity remain distinct methods.
 - `ProductPlan.Open` initializes both child scans before returning and closes partial scan resources when composition fails.
 - `ProductPlan.BlocksAccessed` explicitly retains Java's signed 32-bit arithmetic instead of the host-sized Go `int` calculation.
+- `ProductPlan.RecordsOutput` uses Java-compatible signed 32-bit multiplication rather than host-sized arithmetic.

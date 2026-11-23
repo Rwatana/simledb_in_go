@@ -94,6 +94,14 @@ func (p *ProductPlan) BlocksAccessed() int {
 	return int(leftBlocks + leftRecords*rightBlocks)
 }
 
+// RecordsOutput estimates the number of rows in the product scan.
+func (p *ProductPlan) RecordsOutput() int {
+	if p == nil || p.left == nil || p.right == nil {
+		return 0
+	}
+	return int(int32(p.left.RecordsOutput()) * int32(p.right.RecordsOutput()))
+}
+
 type productPlanScanSource struct {
 	name string
 	scan query.Scan
