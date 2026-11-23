@@ -2,10 +2,14 @@
 package concurrency
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
+
+// ErrLockConflict reports that another lock holder prevents the requested transition.
+var ErrLockConflict = errors.New("lock conflict")
 
 // LockTable stores the shared lock state for database blocks.
 // Its zero value is ready for use.
@@ -29,6 +33,9 @@ func (t *LockTable) LockShared(block storage.BlockID) error {
 func (t *LockTable) LockExclusive(block storage.BlockID) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.locks[block] > 1 {
+		return ErrLockConflict
+	}
 	t.locks[block] = -1
 	return nil
 }

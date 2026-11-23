@@ -895,10 +895,28 @@ The sole-holder transition and independent block state were tested first. The in
 This maps to the non-waiting assignment in Java `LockTable.xLock`, where `-1` denotes exclusive ownership. Detection of
 other shared holders and its wait policy remain separate behaviors.
 
+## Feature 39: Reject exclusive upgrade with competing shared holders
+
+`LockExclusive` checks the shared-holder count while holding the table mutex. A count greater than one returns the
+distinguishable `ErrLockConflict` sentinel and preserves both that count and every other block's state. It does not wait
+or apply a timeout yet.
+
+### Test-first record
+
+The competing-holder rejection and state preservation were tested first. The initial build failed because
+`ErrLockConflict` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableRejectsExclusiveUpgradeWithCompetingSharedHolder` | Competing shared holders prevent the exclusive transition without changing state |
+
+The `count > 1` predicate maps directly to Java `LockTable.hasOtherSLocks`. Go exposes the temporary non-waiting result
+as a sentinel so the later waiting behavior can distinguish contention from other failures.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by detecting competing shared holders before exclusive acquisition, then
-add conflict waiting, unlock notification, timeout, and transaction-local lock tracking as separate behaviors.
+Continue with Chapter 5 concurrency control by releasing one shared holder while retaining the remaining holders, then
+separately add final-release notification, conflict waiting, timeout, and transaction-local lock tracking.
 
 ## Sources
 
