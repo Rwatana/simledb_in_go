@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="520" viewBox="0 0 1160 520" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 20: Store CREATE VIEW command data</title>
+  <desc id="description">CreateViewData stores a view name and QueryData definition, then exposes the name and rendered query text. The zero value renders an unset-query marker.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <text class="title" x="580" y="62" text-anchor="middle">Chapter 9 / Feature 20: Store CREATE VIEW command data</text>
+  <rect class="box" x="45" y="205" width="270" height="135" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="180" y="245"><tspan x="180">Constructor input</tspan><tspan x="180" dy="30">view name: active_students</tspan><tspan x="180" dy="27">QueryData</tspan></text>
+  <rect class="box" x="405" y="195" width="290" height="155" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="550" y="238"><tspan x="550">CreateViewData</tspan><tspan x="550" dy="31">private viewName</tspan><tspan x="550" dy="27">stored QueryData</tspan></text>
+  <rect class="box" x="785" y="195" width="330" height="155" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="950" y="238"><tspan x="950">Read-only accessors</tspan><tspan x="950" dy="31">ViewName()</tspan><tspan x="950" dy="27">ViewDefinition() → query text</tspan></text>
+  <rect class="box" x="405" y="400" width="290" height="90" fill="#f5f5f5" stroke="#666"/>
+  <text class="label" x="550" y="435"><tspan x="550">Zero value</tspan><tspan x="550" dy="27">empty name · &lt;unset-query&gt;</tspan></text>
+  <path class="edge" d="M315 272 H397"/><text class="small" x="356" y="260">store</text>
+  <path class="edge" d="M695 272 H777"/><text class="small" x="736" y="260">render query</text>
+  <path class="edge" d="M550 400 V360 H545 V358" stroke-dasharray="7 6"/><text class="small" x="605" y="383">safe default</text>
+</svg>
