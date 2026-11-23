@@ -9,6 +9,7 @@ resource cleanup remain separate observable behaviors so each implementation can
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
+| `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
 
 ## Feature 1: Define the index traversal contract
 
@@ -50,6 +51,17 @@ negative integers, ASCII/BMP/supplementary Unicode strings, the empty-string has
 The first focused test run failed because `SearchCost` was undefined. Tests cover an empty index, estimates below and at
 one bucket, integer truncation between bucket boundaries, multiple buckets, and the intentionally ignored
 records-per-block argument.
+
+## Feature 4: Initialize static hash index state
+
+`hash.NewHashIndex` retains the table-scan transaction, index name, and index-record layout. It starts with an unset
+search key and no active table scan, and does not perform transaction I/O. Bucket positioning remains a later operation,
+so constructing the index does not create or pin a bucket table.
+
+### Test-first record
+
+The focused constructor test first failed to compile because `NewHashIndex` was undefined. It verifies retained
+configuration, the unset-key/no-scan initial state, and that construction makes no table-transaction calls.
 
 ## Intentional differences from Java
 
