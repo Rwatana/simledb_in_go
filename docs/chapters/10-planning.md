@@ -16,6 +16,7 @@ and planner composition remains a separate observable behavior and Issue.
 | `internal/plan.BasicQueryPlanner` | `simpledb/plan/BasicQueryPlanner.java` | Resolve tables and recursively expand views before composing product, selection, and projection plans |
 | `internal/plan.BetterQueryPlanner` | `simpledb/plan/BetterQueryPlanner.java` | Choose the lower estimated block-access order as each source joins the left-deep product |
 | `internal/plan.UpdatePlanner` | `simpledb/plan/UpdatePlanner.java` | Define separate execution methods for parsed DML and DDL commands |
+| `internal/plan.BasicUpdatePlanner` | `simpledb/plan/BasicUpdatePlanner.java` | Plan DELETE with a table scan and selection, delete matching rows, and return the count |
 
 ## Feature 1: Define the query plan contract
 
@@ -366,6 +367,20 @@ shows update commands on their own contract; its editable source remains
 The first focused test run failed because `UpdatePlanner` was undefined. A compile-time probe implements all six
 command methods, and focused calls verify the parsed input types and `(affected rows, error)` result shape.
 
+## Feature 27: Execute DELETE with the basic update planner
+
+`BasicUpdatePlanner.ExecuteDelete` resolves the target layout, opens a `TablePlan` under a `SelectPlan`, deletes each
+matching row through `query.UpdateScan`, and returns the deleted count. It closes the scan on success and on iteration,
+delete, or scan-type failures, joining close errors with the original cause. The [planning diagram](../diagrams/ch10-plan-contract.svg)
+shows DELETE execution beneath the separate update-planner contract; its editable source remains
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `BasicUpdatePlanner` and `NewBasicUpdatePlanner` were undefined. Tests verify
+matching-row deletion, untouched nonmatching rows, affected counts, scan cleanup, contextual metadata/open failures,
+and combined iteration/delete/close errors.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -388,3 +403,4 @@ command methods, and focused calls verify the parsed input types and `(affected 
 - `BasicQueryPlanner` first added physical-table planning; recursive view expansion is recorded as its own follow-up behavior.
 - `BasicQueryPlanner` detects recursive view cycles and returns an error rather than allowing unbounded recursion.
 - `BetterQueryPlanner` uses block-access estimates to choose each product's child order, reversing only when strictly cheaper.
+- `BasicUpdatePlanner.ExecuteDelete` returns an error with its affected count and closes the scan on all operation paths.

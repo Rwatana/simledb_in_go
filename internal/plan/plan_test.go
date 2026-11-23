@@ -67,6 +67,158 @@ func TestUpdatePlannerContractCoversEachUpdateCommand(t *testing.T) {
 	}
 }
 
+func TestBasicUpdatePlannerExecuteDeleteCountsMatchesAndClosesScan(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		predicate query.Predicate
+		wantCount int
+		wantFlags []int32
+	}{
+		{
+			name:      "delete matching row",
+			predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(10)))),
+			wantCount: 1,
+			wantFlags: []int32{0, 1},
+		},
+		{
+			name:      "preserve unmatched rows",
+			predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(99)))),
+			wantCount: 0,
+			wantFlags: []int32{1, 1},
+		},
+		{
+			name:      "delete every row for an empty predicate",
+			predicate: query.Predicate{},
+			wantCount: 2,
+			wantFlags: []int32{0, 0},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			schema := newPlannerTestSchema("id")
+			layout := record.NewLayout(schema)
+			transaction := newBasicUpdatePlannerTransaction(layout, []int32{1, 1}, []int32{10, 20})
+			planner := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout})
+
+			count, err := planner.ExecuteDelete(parse.NewDeleteData("student", test.predicate), transaction)
+			if err != nil {
+				t.Fatalf("ExecuteDelete() error = %v", err)
+			}
+			if count != test.wantCount {
+				t.Errorf("ExecuteDelete() affected = %d, want %d", count, test.wantCount)
+			}
+			if !reflect.DeepEqual(transaction.flags, test.wantFlags) {
+				t.Errorf("record flags = %v, want %v", transaction.flags, test.wantFlags)
+			}
+			if len(transaction.unpins) != 1 {
+				t.Errorf("unpin calls = %v, want one closed scan block", transaction.unpins)
+			}
+		})
+	}
+}
+
+func TestBasicUpdatePlannerExecuteDeleteValidatesDependenciesAndMetadata(t *testing.T) {
+	data := parse.NewDeleteData("student", query.Predicate{})
+	transaction := &tablePlanTransaction{size: 1}
+	var nilPlanner *BasicUpdatePlanner
+	if count, err := nilPlanner.ExecuteDelete(data, transaction); count != 0 || err == nil {
+		t.Errorf("nil planner ExecuteDelete() = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(nil).ExecuteDelete(data, transaction); count != 0 || err == nil {
+		t.Errorf("planner without metadata ExecuteDelete() = (%d, %v), want an error", count, err)
+	}
+	metadataErr := errors.New("layout unavailable")
+	metadata := &basicUpdatePlannerMetadataProbe{layoutErr: metadataErr}
+	if count, err := NewBasicUpdatePlanner(metadata).ExecuteDelete(data, transaction); count != 0 || !errors.Is(err, metadataErr) {
+		t.Errorf("ExecuteDelete() with metadata error = (%d, %v), want wrapped layout error", count, err)
+	}
+	if !reflect.DeepEqual(metadata.layoutRequests, []string{"student"}) {
+		t.Errorf("layout requests = %v, want [student]", metadata.layoutRequests)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{}).ExecuteDelete(data, transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteDelete() with nil layout = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: record.NewLayout(newPlannerTestSchema("id"))}).ExecuteDelete(data, nil); count != 0 || err == nil {
+		t.Errorf("ExecuteDelete() with nil transaction = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: record.NewLayout(newPlannerTestSchema("id"))}).ExecuteDelete(parse.DeleteData{}, transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteDelete() with empty table name = (%d, %v), want an error", count, err)
+	}
+}
+
+func TestBasicUpdatePlannerExecuteDeleteJoinsOperationAndCloseErrors(t *testing.T) {
+	readErr := errors.New("record flag read failed")
+	closeErr := errors.New("scan close failed")
+	layout := record.NewLayout(newPlannerTestSchema("id"))
+	transaction := newBasicUpdatePlannerTransaction(layout, []int32{1}, []int32{10})
+	transaction.readErrOffset = 0
+	transaction.readErr = readErr
+	transaction.unpinErr = closeErr
+	count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteDelete(parse.NewDeleteData("student", query.Predicate{}), transaction)
+	if count != 0 || !errors.Is(err, readErr) || !errors.Is(err, closeErr) {
+		t.Errorf("ExecuteDelete() with iteration/close errors = (%d, %v), want both causes", count, err)
+	}
+	if len(transaction.unpins) != 1 {
+		t.Errorf("unpin calls = %v, want one close attempt after iteration failure", transaction.unpins)
+	}
+
+	deleteErr := errors.New("record delete failed")
+	transaction = newBasicUpdatePlannerTransaction(layout, []int32{1}, []int32{10})
+	transaction.writeErrOffset = 0
+	transaction.writeErr = deleteErr
+	transaction.unpinErr = closeErr
+	count, err = NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteDelete(parse.NewDeleteData("student", query.Predicate{}), transaction)
+	if count != 0 || !errors.Is(err, deleteErr) || !errors.Is(err, closeErr) {
+		t.Errorf("ExecuteDelete() with delete/close errors = (%d, %v), want both causes", count, err)
+	}
+}
+
+func TestBasicUpdatePlannerExecuteDeleteReportsScanOpenAndCloseErrors(t *testing.T) {
+	layout := record.NewLayout(newPlannerTestSchema("id"))
+	openErr := errors.New("table size unavailable")
+	transaction := &basicUpdatePlannerTransaction{tablePlanTransaction: tablePlanTransaction{sizeErr: openErr}, slotSize: layout.SlotSize()}
+	count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteDelete(parse.NewDeleteData("student", query.Predicate{}), transaction)
+	if count != 0 || !errors.Is(err, openErr) {
+		t.Errorf("ExecuteDelete() with scan-open error = (%d, %v), want wrapped size error", count, err)
+	}
+
+	transaction = newBasicUpdatePlannerTransaction(layout, []int32{0}, []int32{10})
+	closeErr := errors.New("scan close failed")
+	transaction.unpinErr = closeErr
+	count, err = NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteDelete(parse.NewDeleteData("student", query.Predicate{}), transaction)
+	if count != 0 || !errors.Is(err, closeErr) {
+		t.Errorf("ExecuteDelete() with close error = (%d, %v), want wrapped close error", count, err)
+	}
+}
+
+func TestDeleteRowsFromScanHandlesReadOnlyAndNilScans(t *testing.T) {
+	closeErr := errors.New("read-only scan close failed")
+	scan := &productPlanScanStub{closeErr: closeErr}
+	if count, err := deleteRowsFromScan("student", scan); count != 0 || err == nil || !errors.Is(err, closeErr) {
+		t.Errorf("deleteRowsFromScan() with read-only scan = (%d, %v), want unsupported and close errors", count, err)
+	}
+	if scan.closeCalls != 1 {
+		t.Errorf("read-only scan close calls = %d, want 1", scan.closeCalls)
+	}
+	if count, err := deleteRowsFromScan("student", nil); count != 0 || err == nil {
+		t.Errorf("deleteRowsFromScan() with nil scan = (%d, %v), want an error", count, err)
+	}
+	primary := errors.New("primary operation failed")
+	if err := closeUpdatePlannerScan(nil, primary); !errors.Is(err, primary) {
+		t.Errorf("closing nil scan with primary error = %v, want primary error", err)
+	}
+}
+
+func TestRequireUpdateScanRejectsReadOnlyScan(t *testing.T) {
+	closeErr := errors.New("scan close failed")
+	scan := &productPlanScanStub{closeErr: closeErr}
+	if update, err := requireUpdateScan(scan); update != nil || err == nil {
+		t.Errorf("requireUpdateScan() = (%v, %v), want a read-only scan error", update, err)
+	}
+	if err := closeUpdatePlannerScan(scan, errors.New("primary")); !errors.Is(err, closeErr) {
+		t.Errorf("closeUpdatePlannerScan() error = %v, want close error", err)
+	}
+}
+
 type contractProbe struct{}
 
 func (contractProbe) Open() (query.Scan, error) { return nil, nil }
@@ -1473,6 +1625,97 @@ type tablePlanTransaction struct {
 	sizeErr error
 	pins    []storage.BlockID
 	unpins  []storage.BlockID
+}
+
+type basicUpdatePlannerMetadataProbe struct {
+	layout         *record.Layout
+	layoutErr      error
+	layoutRequests []string
+}
+
+func (probe *basicUpdatePlannerMetadataProbe) Layout(tableName string, _ record.TableScanTransaction) (*record.Layout, error) {
+	probe.layoutRequests = append(probe.layoutRequests, tableName)
+	return probe.layout, probe.layoutErr
+}
+func (*basicUpdatePlannerMetadataProbe) CreateTable(string, *record.Schema, record.TableScanTransaction) error {
+	return nil
+}
+func (*basicUpdatePlannerMetadataProbe) CreateView(string, string, record.TableScanTransaction) error {
+	return nil
+}
+func (*basicUpdatePlannerMetadataProbe) CreateIndex(string, string, string, record.TableScanTransaction) error {
+	return nil
+}
+
+type basicUpdatePlannerTransaction struct {
+	tablePlanTransaction
+	slotSize       int
+	blockSize      int
+	flags          []int32
+	values         []int32
+	readErrOffset  int
+	readErr        error
+	writeErrOffset int
+	writeErr       error
+	unpinErr       error
+}
+
+func newBasicUpdatePlannerTransaction(layout *record.Layout, flags, values []int32) *basicUpdatePlannerTransaction {
+	slotSize := layout.SlotSize()
+	return &basicUpdatePlannerTransaction{
+		tablePlanTransaction: tablePlanTransaction{size: 1},
+		slotSize:             slotSize,
+		blockSize:            slotSize * len(flags),
+		flags:                append([]int32(nil), flags...),
+		values:               append([]int32(nil), values...),
+		readErrOffset:        -1,
+		writeErrOffset:       -1,
+	}
+}
+
+func (transaction *basicUpdatePlannerTransaction) BlockSize() (int, error) {
+	return transaction.blockSize, nil
+}
+
+func (transaction *basicUpdatePlannerTransaction) GetInt(_ storage.BlockID, offset int) (int32, error) {
+	if offset == transaction.readErrOffset && transaction.readErr != nil {
+		return 0, transaction.readErr
+	}
+	slot := offset / transaction.slotSize
+	if slot < 0 || slot >= len(transaction.flags) {
+		return 0, errors.New("record offset outside test block")
+	}
+	if offset%transaction.slotSize == 0 {
+		return transaction.flags[slot], nil
+	}
+	return transaction.values[slot], nil
+}
+
+func (*basicUpdatePlannerTransaction) GetString(storage.BlockID, int) (string, error) { return "", nil }
+
+func (transaction *basicUpdatePlannerTransaction) SetInt(_ storage.BlockID, offset int32, value int32, _ bool) error {
+	if int(offset) == transaction.writeErrOffset && transaction.writeErr != nil {
+		return transaction.writeErr
+	}
+	slot := int(offset) / transaction.slotSize
+	if slot < 0 || slot >= len(transaction.flags) {
+		return errors.New("record offset outside test block")
+	}
+	if int(offset)%transaction.slotSize == 0 {
+		transaction.flags[slot] = value
+	} else {
+		transaction.values[slot] = value
+	}
+	return nil
+}
+
+func (*basicUpdatePlannerTransaction) SetString(storage.BlockID, int32, string, bool) error {
+	return nil
+}
+
+func (transaction *basicUpdatePlannerTransaction) Unpin(block storage.BlockID) error {
+	transaction.unpins = append(transaction.unpins, block)
+	return transaction.unpinErr
 }
 
 func (t *tablePlanTransaction) Pin(block storage.BlockID) error {
