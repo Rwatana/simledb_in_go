@@ -8,3 +8,10 @@ func TestRIDBlockNumberReturnsConstructedValue(t *testing.T) {
 		t.Fatalf("BlockNumber() = %d, want 7", got)
 	}
 }
+
+func TestRIDSlotReturnsConstructedValue(t *testing.T) {
+	rid := NewRID(7, 3)
+	if got := rid.Slot(); got != 3 {
+		t.Fatalf("Slot() = %d, want 3", got)
+	}
+}
