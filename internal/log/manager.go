@@ -79,10 +79,14 @@ func NewManager(files *storagefile.Manager, fileName string) (*Manager, error) {
 // Append stores record in the current tail block and returns its LSN.
 // A full tail is flushed before Append starts a newly initialized block.
 func (m *Manager) Append(record []byte) (LSN, error) {
+	return m.appendWithMaxInt32(record, math.MaxInt32)
+}
+
+func (m *Manager) appendWithMaxInt32(record []byte, maxInt32 int) (LSN, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if len(record) > math.MaxInt32-boundarySize {
+	if len(record) > maxInt32-boundarySize {
 		return 0, fmt.Errorf("append log record of %d bytes: encoded length exceeds four-byte boundary capacity", len(record))
 	}
 	encodedLength := boundarySize + len(record)

@@ -240,6 +240,10 @@ does not advance the latest LSN.
 
 A separate malformed-boundary case covers failure to write the encoded record bytes. It verifies the returned block
 and offset context and confirms both the tail Page and latest LSN remain unchanged.
+
+The log record length guard now accepts a synthetic signed-int32 maximum in an internal append helper. Its
+rejection path is covered without allocating a multi-gigabyte record, while the public Append path keeps the same
+production limit and error text.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

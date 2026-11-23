@@ -195,6 +195,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | `TestAppendDoesNotFlushTheTailPage` | appendだけではdisk boundaryを変更しない |
 | `TestAppendPreservesBoundaryReadFailure` | tail boundary read failureのcause、block context、LSN不変 |
 | `TestAppendPreservesPageWriteFailure` | corrupt tail boundaryによるPage write failureとstate不変 |
+| `TestAppendRejectsSyntheticOversizedRecordBeforeStateChanges` | 合成したint32上限による巨大recordの事前拒否 |
 
 ## Javaソースリーディング
 
