@@ -72,6 +72,26 @@ func TestNewTableScanReportsSizeAndPinFailures(t *testing.T) {
 	}
 }
 
+func TestNewTableScanRejectsNegativeSizeBeforePageAccess(t *testing.T) {
+	transaction := &recordingTableTransaction{size: -1}
+
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if scan != nil || err == nil {
+		t.Fatalf("NewTableScan(negative size) = (%v, %v), want no scan and an error", scan, err)
+	}
+	for _, want := range []string{"student", "student.tbl", "negative size -1"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("NewTableScan() error = %q, want context %q", err, want)
+		}
+	}
+	if len(transaction.sizeCalls) != 1 || transaction.sizeCalls[0] != "student.tbl" {
+		t.Errorf("Size calls = %v, want [student.tbl]", transaction.sizeCalls)
+	}
+	if len(transaction.appendCalls) != 0 || len(transaction.pins) != 0 || len(transaction.writes) != 0 {
+		t.Errorf("negative-size side effects: appends %v, pins %v, writes %v", transaction.appendCalls, transaction.pins, transaction.writes)
+	}
+}
+
 func TestNewTableScanAppendsPinsAndFormatsEmptyTable(t *testing.T) {
 	block := storage.NewBlockID("student.tbl", 0)
 	transaction := &recordingTableTransaction{
