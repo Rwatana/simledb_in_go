@@ -39,3 +39,17 @@ func TestSchemaAddIntegerFieldUsesIntegerMetadata(t *testing.T) {
 		t.Fatalf("Field(count) = (%+v, %v), want integer length 0", definition, ok)
 	}
 }
+
+func TestSchemaAddVarcharFieldUsesSuppliedLength(t *testing.T) {
+	var schema Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 24)
+
+	if got, want := schema.Fields(), []string{"id", "name"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Fields() = %v, want %v", got, want)
+	}
+	definition, ok := schema.Field("name")
+	if !ok || definition.Type != VarcharField || definition.Length != 24 {
+		t.Fatalf("Field(name) = (%+v, %v), want varchar length 24", definition, ok)
+	}
+}
