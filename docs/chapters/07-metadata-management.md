@@ -779,6 +779,9 @@ schema, `IndexInfo` rejects the entry and returns index/field context rather tha
 View creation now also has a focused regression for failure while writing the catalog's `viewname` field. The wrapped
 cause and requested view context are preserved, and the opened catalog scan is closed after the write fails.
 
+The separate `viewdef` write failure is covered after the view name has been stored. The error retains its cause and
+view context, closes the scan, and leaves the definition field unwritten.
+
 ## Feature 36: Create an index through the metadata facade
 
 `MetadataManager.CreateIndex` delegates the index, table, and field names plus the transaction to the shared index
