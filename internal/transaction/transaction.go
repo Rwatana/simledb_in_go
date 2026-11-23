@@ -83,6 +83,9 @@ func (t *Transaction) Unpin(block storage.BlockID) error {
 
 // GetInt reads a four-byte integer from a pinned block while retaining a shared lock.
 func (t *Transaction) GetInt(block storage.BlockID, offset int) (int32, error) {
+	if t.state != transactionActive {
+		return 0, fmt.Errorf("get integer from block %v at offset %d for transaction %d: %w", block, offset, t.id, ErrTransactionCompleted)
+	}
 	frame, ok := t.buffers.Buffer(block)
 	if !ok {
 		return 0, fmt.Errorf("get integer from transaction buffer %v at offset %d: %w", block, offset, ErrBufferNotPinned)
