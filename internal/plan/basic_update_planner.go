@@ -91,6 +91,70 @@ func (planner *BasicUpdatePlanner) ExecuteModify(data parse.ModifyData, transact
 	return modifyRowsFromScan(tableName, targetField, data.NewValue(), scan)
 }
 
+// ExecuteInsert inserts one record using the parsed field names and values.
+func (planner *BasicUpdatePlanner) ExecuteInsert(data parse.InsertData, transaction record.TableScanTransaction) (int, error) {
+	if planner == nil {
+		return 0, fmt.Errorf("execute insert: planner is nil")
+	}
+	if planner.metadata == nil {
+		return 0, fmt.Errorf("execute insert: metadata is nil")
+	}
+	if transaction == nil {
+		return 0, fmt.Errorf("execute insert: transaction is nil")
+	}
+	tableName := data.TableName()
+	if tableName == "" {
+		return 0, fmt.Errorf("execute insert: table name is empty")
+	}
+	fields := data.Fields()
+	values := data.Values()
+	if len(fields) == 0 {
+		return 0, fmt.Errorf("execute insert for table %q: no fields provided", tableName)
+	}
+	if len(fields) != len(values) {
+		return 0, fmt.Errorf("execute insert for table %q: field/value count mismatch: %d fields, %d values", tableName, len(fields), len(values))
+	}
+	for _, field := range fields {
+		if field == "" {
+			return 0, fmt.Errorf("execute insert for table %q: field name is empty", tableName)
+		}
+	}
+	layout, err := planner.metadata.Layout(tableName, transaction)
+	if err != nil {
+		return 0, fmt.Errorf("execute insert for table %q: resolve layout: %w", tableName, err)
+	}
+	if layout == nil {
+		return 0, fmt.Errorf("execute insert for table %q: layout is nil", tableName)
+	}
+	plan := NewTablePlan(transaction, tableName, layout, nil)
+	scan, err := plan.Open()
+	if err != nil {
+		return 0, fmt.Errorf("execute insert for table %q: open table scan: %w", tableName, err)
+	}
+	return insertRowIntoScan(tableName, fields, values, scan)
+}
+
+func insertRowIntoScan(tableName string, fields []string, values []query.Constant, scan query.Scan) (int, error) {
+	updateScan, err := requireUpdateScan(scan)
+	if err != nil {
+		return 0, closeUpdatePlannerScan(scan, fmt.Errorf("execute insert for table %q: %w", tableName, err))
+	}
+	if err := updateScan.Insert(); err != nil {
+		primary := fmt.Errorf("execute insert for table %q: insert row: %w", tableName, err)
+		return 0, closeUpdatePlannerScan(scan, primary)
+	}
+	for index, field := range fields {
+		if err := updateScan.SetVal(field, values[index]); err != nil {
+			primary := fmt.Errorf("execute insert for table %q: set field %q: %w", tableName, field, err)
+			return 0, closeUpdatePlannerScan(scan, primary)
+		}
+	}
+	if err := closeUpdatePlannerScan(scan, nil); err != nil {
+		return 1, fmt.Errorf("execute insert for table %q: close table scan: %w", tableName, err)
+	}
+	return 1, nil
+}
+
 func modifyRowsFromScan(tableName, targetField string, expression query.Expression, scan query.Scan) (int, error) {
 	updateScan, err := requireUpdateScan(scan)
 	if err != nil {
