@@ -105,6 +105,19 @@ The first focused test run failed because `HashIndex.Next` was undefined. Tests 
 duplicate matches, varchar matching, mismatched key/value types, bucket exhaustion, every invalid search/layout state,
 and wrapped scan, slot-flag, integer-field, and varchar-field read failures.
 
+## Feature 8: Read the data record identifier
+
+`HashIndex.GetDataRID` reads the current index entry's integer `block` and `id` fields and returns them as a
+`record.RID`. Both fields must be present and declared as integers in the index-record schema. Calls without a scan or
+current record, invalid layouts, and storage failures return contextual errors; underlying field-read errors remain
+available through wrapping. The index-contract diagram already shows the `GetDataRID` output boundary, so this
+straight field mapping does not require a duplicate illustration.
+
+### Test-first record
+
+The focused test run first failed because `HashIndex.GetDataRID` was undefined. Tests cover block/slot conversion,
+missing scan and current row, nil or absent schema fields, non-integer fields, and wrapped reads of both RID components.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

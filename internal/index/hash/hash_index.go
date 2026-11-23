@@ -111,6 +111,41 @@ func (index *HashIndex) Next() (bool, error) {
 	}
 }
 
+// GetDataRID returns the table record identifier stored at the current index entry.
+func (index *HashIndex) GetDataRID() (record.RID, error) {
+	if index == nil {
+		return record.RID{}, fmt.Errorf("read data RID from nil hash index")
+	}
+	if index.scan == nil {
+		return record.RID{}, fmt.Errorf("read data RID from hash index %q: bucket scan is not positioned", index.indexName)
+	}
+	if index.layout == nil {
+		return record.RID{}, fmt.Errorf("read data RID from hash index %q: record layout is nil", index.indexName)
+	}
+	schema := index.layout.Schema()
+	if schema == nil {
+		return record.RID{}, fmt.Errorf("read data RID from hash index %q: record layout schema is nil", index.indexName)
+	}
+	for _, fieldName := range []string{"block", "id"} {
+		fieldType, ok := schema.TypeOf(fieldName)
+		if !ok {
+			return record.RID{}, fmt.Errorf("read data RID from hash index %q: record layout has no %q field", index.indexName, fieldName)
+		}
+		if fieldType != record.IntegerField {
+			return record.RID{}, fmt.Errorf("read data RID from hash index %q: %q field has non-integer type %d", index.indexName, fieldName, fieldType)
+		}
+	}
+	blockNumber, err := index.scan.GetInt("block")
+	if err != nil {
+		return record.RID{}, fmt.Errorf("read data RID from hash index %q: read block number: %w", index.indexName, err)
+	}
+	slot, err := index.scan.GetInt("id")
+	if err != nil {
+		return record.RID{}, fmt.Errorf("read data RID from hash index %q: read slot id: %w", index.indexName, err)
+	}
+	return record.NewRID(int(blockNumber), int(slot)), nil
+}
+
 // Close releases the current bucket scan and clears it after successful release.
 func (index *HashIndex) Close() error {
 	if index.scan == nil {
