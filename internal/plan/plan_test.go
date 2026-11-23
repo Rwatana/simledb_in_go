@@ -468,6 +468,210 @@ func TestProductPlanSchemaHandlesNilPlanAndChildren(t *testing.T) {
 	}
 }
 
+func TestProductPlanOpenStartsLeftMajorProductScan(t *testing.T) {
+	left := &productPlanScanStub{
+		rows:   []map[string]query.Constant{{"left_id": query.NewIntConstant(7)}},
+		fields: map[string]bool{"left_id": true},
+	}
+	right := &productPlanScanStub{
+		rows:   []map[string]query.Constant{{"right_id": query.NewStringConstant("Ada")}},
+		fields: map[string]bool{"right_id": true},
+	}
+	leftPlan := &productPlanProbe{scan: left}
+	rightPlan := &productPlanProbe{scan: right}
+
+	scan, err := NewProductPlan(leftPlan, rightPlan).Open()
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	if _, ok := scan.(*query.ProductScan); !ok {
+		t.Fatalf("Open() scan has type %T, want *query.ProductScan", scan)
+	}
+	if next, err := scan.Next(); err != nil || !next {
+		t.Fatalf("first Next() = (%t, %v), want (true, nil)", next, err)
+	}
+	if got, err := scan.GetInt("left_id"); err != nil || got != 7 {
+		t.Errorf("GetInt(left_id) = (%d, %v), want (7, nil)", got, err)
+	}
+	if got, err := scan.GetString("right_id"); err != nil || got != "Ada" {
+		t.Errorf("GetString(right_id) = (%q, %v), want (Ada, nil)", got, err)
+	}
+	if leftPlan.opens != 1 || rightPlan.opens != 1 {
+		t.Errorf("child Open() calls = (%d, %d), want (1, 1)", leftPlan.opens, rightPlan.opens)
+	}
+	if left.beforeFirstCalls != 1 || right.beforeFirstCalls != 1 {
+		t.Errorf("child BeforeFirst() calls = (%d, %d), want (1, 1)", left.beforeFirstCalls, right.beforeFirstCalls)
+	}
+	if err := scan.Close(); err != nil {
+		t.Errorf("Close() error = %v", err)
+	}
+}
+
+func TestProductPlanOpenRejectsNilPlanAndChildPlans(t *testing.T) {
+	var nilPlan *ProductPlan
+	if scan, err := nilPlan.Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "nil plan") {
+		t.Errorf("nil ProductPlan.Open() = (%v, %v), want nil scan and nil-plan error", scan, err)
+	}
+	if scan, err := NewProductPlan(nil, &productPlanProbe{}).Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "left child plan") {
+		t.Errorf("ProductPlan without left child Open() = (%v, %v), want left-plan error", scan, err)
+	}
+
+	leftPlan := &productPlanProbe{scan: &productPlanScanStub{}}
+	if scan, err := NewProductPlan(leftPlan, nil).Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "right child plan") {
+		t.Errorf("ProductPlan without right child Open() = (%v, %v), want right-plan error", scan, err)
+	}
+	if leftPlan.opens != 0 {
+		t.Errorf("left child Open() calls = %d, want 0 when a child plan is absent", leftPlan.opens)
+	}
+}
+
+func TestProductPlanOpenWrapsLeftPlanErrorWithoutOpeningRight(t *testing.T) {
+	openErr := errors.New("left child failed")
+	leftPlan := &productPlanProbe{openErr: openErr}
+	rightPlan := &productPlanProbe{scan: &productPlanScanStub{}}
+
+	scan, err := NewProductPlan(leftPlan, rightPlan).Open()
+	if scan != nil || !errors.Is(err, openErr) || !strings.Contains(err.Error(), "left child") {
+		t.Fatalf("Open() = (%v, %v), want wrapped left child error", scan, err)
+	}
+	if rightPlan.opens != 0 {
+		t.Errorf("right child Open() calls = %d, want 0 after left failure", rightPlan.opens)
+	}
+}
+
+func TestProductPlanOpenClosesLeftAfterRightPlanError(t *testing.T) {
+	openErr := errors.New("right child failed")
+	closeErr := errors.New("left scan close failed")
+	leftScan := &productPlanScanStub{closeErr: closeErr}
+	leftPlan := &productPlanProbe{scan: leftScan}
+	rightPlan := &productPlanProbe{openErr: openErr}
+
+	scan, err := NewProductPlan(leftPlan, rightPlan).Open()
+	if scan != nil || !errors.Is(err, openErr) || !errors.Is(err, closeErr) ||
+		!strings.Contains(err.Error(), "right child") || !strings.Contains(err.Error(), "close left") {
+		t.Fatalf("Open() = (%v, %v), want contextual right-open and left-close errors", scan, err)
+	}
+	if leftScan.closeCalls != 1 {
+		t.Errorf("left child Close() calls = %d, want 1 after right-open failure", leftScan.closeCalls)
+	}
+}
+
+func TestProductPlanOpenRejectsMissingScansAndClosesAvailableInputs(t *testing.T) {
+	t.Run("left scan is nil", func(t *testing.T) {
+		rightScan := &productPlanScanStub{}
+		rightPlan := &productPlanProbe{scan: rightScan}
+		scan, err := NewProductPlan(&productPlanProbe{}, rightPlan).Open()
+		if scan != nil || err == nil || !strings.Contains(err.Error(), "left child scan is nil") {
+			t.Fatalf("Open() = (%v, %v), want nil scan and left-scan error", scan, err)
+		}
+		if rightPlan.opens != 0 || rightScan.closeCalls != 0 {
+			t.Errorf("right child Open()/Close() calls = (%d, %d), want (0, 0) after missing left scan", rightPlan.opens, rightScan.closeCalls)
+		}
+	})
+
+	t.Run("right scan is nil", func(t *testing.T) {
+		leftScan := &productPlanScanStub{}
+		scan, err := NewProductPlan(&productPlanProbe{scan: leftScan}, &productPlanProbe{}).Open()
+		if scan != nil || err == nil || !strings.Contains(err.Error(), "right scan is nil") {
+			t.Fatalf("Open() = (%v, %v), want nil scan and right-scan error", scan, err)
+		}
+		if leftScan.closeCalls != 1 {
+			t.Errorf("left child Close() calls = %d, want 1 after construction failure", leftScan.closeCalls)
+		}
+	})
+}
+
+func TestProductPlanOpenClosesBothScansAfterInitializationFailure(t *testing.T) {
+	leftErr := errors.New("left reset failed")
+	rightErr := errors.New("right reset failed")
+	leftCloseErr := errors.New("left close failed")
+	rightCloseErr := errors.New("right close failed")
+	leftScan := &productPlanScanStub{beforeFirstErr: leftErr, closeErr: leftCloseErr}
+	rightScan := &productPlanScanStub{beforeFirstErr: rightErr, closeErr: rightCloseErr}
+
+	scan, err := NewProductPlan(&productPlanProbe{scan: leftScan}, &productPlanProbe{scan: rightScan}).Open()
+	for _, want := range []error{leftErr, rightErr, leftCloseErr, rightCloseErr} {
+		if !errors.Is(err, want) {
+			t.Errorf("Open() error = %v, want cause %v", err, want)
+		}
+	}
+	if scan != nil || !strings.Contains(err.Error(), "initialize product scan") {
+		t.Fatalf("Open() = (%v, %v), want nil scan and initialization context", scan, err)
+	}
+	if leftScan.closeCalls != 1 || rightScan.closeCalls != 1 {
+		t.Errorf("child Close() calls = (%d, %d), want (1, 1)", leftScan.closeCalls, rightScan.closeCalls)
+	}
+}
+
+type productPlanProbe struct {
+	scan    query.Scan
+	openErr error
+	opens   int
+}
+
+func (plan *productPlanProbe) Open() (query.Scan, error) {
+	plan.opens++
+	return plan.scan, plan.openErr
+}
+func (*productPlanProbe) BlocksAccessed() int       { return 0 }
+func (*productPlanProbe) RecordsOutput() int        { return 0 }
+func (*productPlanProbe) DistinctValues(string) int { return 0 }
+func (*productPlanProbe) Schema() *record.Schema    { return nil }
+
+type productPlanScanStub struct {
+	rows             []map[string]query.Constant
+	fields           map[string]bool
+	position         int
+	beforeFirstErr   error
+	closeErr         error
+	beforeFirstCalls int
+	closeCalls       int
+}
+
+func (scan *productPlanScanStub) BeforeFirst() error {
+	scan.beforeFirstCalls++
+	scan.position = -1
+	return scan.beforeFirstErr
+}
+func (scan *productPlanScanStub) Next() (bool, error) {
+	scan.position++
+	return scan.position < len(scan.rows), nil
+}
+func (scan *productPlanScanStub) GetInt(fieldName string) (int32, error) {
+	value, ok := scan.rows[scan.position][fieldName]
+	if !ok {
+		return 0, errors.New("integer field is missing")
+	}
+	integer, ok := value.AsInt()
+	if !ok {
+		return 0, errors.New("field is not an integer")
+	}
+	return integer, nil
+}
+func (scan *productPlanScanStub) GetString(fieldName string) (string, error) {
+	value, ok := scan.rows[scan.position][fieldName]
+	if !ok {
+		return "", errors.New("string field is missing")
+	}
+	text, ok := value.AsString()
+	if !ok {
+		return "", errors.New("field is not a string")
+	}
+	return text, nil
+}
+func (scan *productPlanScanStub) GetVal(fieldName string) (query.Constant, error) {
+	value, ok := scan.rows[scan.position][fieldName]
+	if !ok {
+		return query.Constant{}, errors.New("field is missing")
+	}
+	return value, nil
+}
+func (scan *productPlanScanStub) HasField(fieldName string) bool { return scan.fields[fieldName] }
+func (scan *productPlanScanStub) Close() error {
+	scan.closeCalls++
+	return scan.closeErr
+}
+
 type selectPlanEstimateProbe map[string]int
 
 func (selectPlanEstimateProbe) Open() (query.Scan, error) { return nil, nil }
