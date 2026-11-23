@@ -104,3 +104,14 @@ func (predicate Predicate) IsSatisfied(scan ValueScan) (bool, error) {
 	}
 	return true, nil
 }
+
+// ReductionFactor estimates how much the predicate reduces result rows by
+// multiplying the estimates for its terms using Java's 32-bit integer behavior.
+// An empty predicate has a reduction factor of one.
+func (predicate Predicate) ReductionFactor(estimator DistinctValueEstimator) int {
+	factor := int32(1)
+	for _, term := range predicate.terms {
+		factor *= int32(term.ReductionFactor(estimator))
+	}
+	return int(factor)
+}

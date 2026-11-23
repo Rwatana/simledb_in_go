@@ -2,9 +2,61 @@ package query
 
 import (
 	"errors"
+	"math"
 	"reflect"
 	"testing"
 )
+
+func TestPredicateReductionFactorMultipliesTermEstimates(t *testing.T) {
+	estimator := distinctValueEstimatorStub{"age": 7, "score": 3, "large": math.MaxInt32, "small": 2}
+	tests := []struct {
+		name      string
+		predicate Predicate
+		want      int
+	}{
+		{name: "empty predicate", predicate: Predicate{}, want: 1},
+		{
+			name: "one term",
+			predicate: NewPredicateWithTerm(NewTerm(
+				NewFieldExpression("age"), NewConstantExpression(NewIntConstant(20)),
+			)),
+			want: 7,
+		},
+		{
+			name: "multiple terms",
+			predicate: NewPredicateWithTerm(NewTerm(
+				NewFieldExpression("age"), NewConstantExpression(NewIntConstant(20)),
+			)).ConjoinWith(NewPredicateWithTerm(NewTerm(
+				NewConstantExpression(NewIntConstant(5)), NewFieldExpression("score"),
+			))),
+			want: 21,
+		},
+		{
+			name: "Java 32-bit multiplication overflow",
+			predicate: NewPredicateWithTerm(NewTerm(
+				NewFieldExpression("large"), NewConstantExpression(NewIntConstant(20)),
+			)).ConjoinWith(NewPredicateWithTerm(NewTerm(
+				NewFieldExpression("small"), NewConstantExpression(NewIntConstant(5)),
+			))),
+			want: -2,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.predicate.ReductionFactor(estimator); got != test.want {
+				t.Fatalf("ReductionFactor() = %d, want %d", got, test.want)
+			}
+		})
+	}
+}
+
+func TestPredicateReductionFactorWithoutEstimator(t *testing.T) {
+	predicate := NewPredicateWithTerm(NewTerm(NewFieldExpression("age"), NewConstantExpression(NewIntConstant(1))))
+	if got := predicate.ReductionFactor(nil); got != 0 {
+		t.Fatalf("ReductionFactor(nil) = %d, want 0 for an unavailable estimate", got)
+	}
+}
 
 func TestEmptyPredicateIsTrueWithoutScanAccess(t *testing.T) {
 	var predicate Predicate

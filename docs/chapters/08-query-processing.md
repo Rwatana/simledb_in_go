@@ -349,3 +349,17 @@ shows the dependency from plan statistics to one equality term; its editable sou
 The first focused test run failed because `Term.ReductionFactor` was undefined. It verifies field estimates in both
 operand orders, the maximum estimate for two fields, equal and unequal constants, a missing estimator, and a zero-value
 term.
+
+## Feature 32: Combine predicate selectivity estimates
+
+`Predicate.ReductionFactor` maps to Java `Predicate.reductionFactor(Plan)`. It starts at one, then multiplies each
+term's estimate using 32-bit integer arithmetic, matching Java's `int` overflow behavior. Therefore the empty
+predicate keeps the full row count. It accepts the same query-owned `DistinctValueEstimator` as `Term.ReductionFactor`,
+without adding a dependency from query code to the plan package. `SelectPlan.RecordsOutput` remains the next separate
+consumer behavior. The updated [term-estimate diagram](../diagrams/ch08-term-reduction-factor.svg) also shows predicate
+composition; the editable source is [`ch08-term-reduction-factor.drawio`](../diagrams/ch08-term-reduction-factor.drawio).
+
+### Test-first record
+
+The first focused test run failed because `Predicate.ReductionFactor` was undefined. Tests verify empty, single-term,
+and multiple-term estimates, a missing estimator, and Java-compatible 32-bit multiplication overflow.

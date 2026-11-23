@@ -1,26 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="600" viewBox="0 0 1120 600" role="img" aria-labelledby="title desc">
-  <title id="title">Chapter 8 Feature 31: Equality-term selectivity</title>
-  <desc id="desc">A query-owned distinct-value estimate flows into a term reduction factor. Field equality uses the larger field estimate, field-to-constant equality uses its field estimate, equal constants return one, and unequal constants return the maximum 32-bit integer. The query package owns the interface and does not import the planning package.</desc>
+  <title id="title">Chapter 8 Features 31–32: Predicate selectivity</title>
+  <desc id="desc">A query-owned distinct-value estimate flows into a term reduction factor. Field equality uses the larger field estimate, field-to-constant equality uses its field estimate, equal constants return one, and unequal constants return the maximum 32-bit integer. A predicate starts at one and multiplies the term estimates with Java-compatible 32-bit integer arithmetic.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
     <style>.title{font:700 25px sans-serif;fill:#1f2937}.head{font:700 19px sans-serif;fill:#1f2937;text-anchor:middle}.text{font:16px sans-serif;fill:#334155;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}</style>
   </defs>
   <rect width="1120" height="600" fill="#fff"/>
-  <text class="title" x="560" y="60" text-anchor="middle">Chapter 8 / Feature 31: Equality-term selectivity</text>
+  <text class="title" x="560" y="60" text-anchor="middle">Chapter 8 / Features 31–32: Predicate selectivity</text>
   <rect x="70" y="190" width="310" height="180" rx="16" fill="#dae8fc" stroke="#6c8ebf" stroke-width="2"/>
   <text class="head" x="225" y="230">Plan statistics</text>
   <text class="text" x="225" y="268">DistinctValues(field)</text>
   <text class="text" x="225" y="306">For field = field, use</text>
   <text class="text" x="225" y="332">the larger estimate</text>
-  <rect x="690" y="170" width="360" height="220" rx="16" fill="#d5e8d4" stroke="#82b366" stroke-width="2"/>
-  <text class="head" x="870" y="208">query.Term</text>
-  <text class="text" x="870" y="239">ReductionFactor(estimator)</text>
-  <text class="text" x="870" y="280">field = constant: field estimate</text>
-  <text class="text" x="870" y="310">equal constants: 1</text>
-  <text class="text" x="870" y="340">unequal constants: Integer.MAX_VALUE</text>
+  <rect x="690" y="155" width="360" height="205" rx="16" fill="#d5e8d4" stroke="#82b366" stroke-width="2"/>
+  <text class="head" x="870" y="194">query.Term</text>
+  <text class="text" x="870" y="225">ReductionFactor(estimator)</text>
+  <text class="text" x="870" y="266">field = constant: field estimate</text>
+  <text class="text" x="870" y="296">equal constants: 1</text>
+  <text class="text" x="870" y="326">unequal constants: Integer.MAX_VALUE</text>
   <path class="edge" d="M390 280 H670"/>
   <text class="text" x="530" y="265">field cardinality estimates</text>
-  <rect x="330" y="450" width="460" height="80" rx="16" fill="#fff2cc" stroke="#d6b656" stroke-width="2"/>
-  <text class="head" x="560" y="482">Dependency boundary</text>
-  <text class="text" x="560" y="510">query owns the interface; it does not import plan</text>
+  <rect x="690" y="415" width="360" height="125" rx="16" fill="#e1d5e7" stroke="#9673a6" stroke-width="2"/>
+  <text class="head" x="870" y="451">query.Predicate</text>
+  <text class="text" x="870" y="482">starts at 1; multiplies term estimates</text>
+  <text class="text" x="870" y="510">with Java 32-bit arithmetic</text>
+  <path class="edge" d="M870 365 V400"/>
+  <text class="text" x="980" y="391">term estimates</text>
+  <rect x="70" y="450" width="330" height="90" rx="16" fill="#fff2cc" stroke="#d6b656" stroke-width="2"/>
+  <text class="head" x="235" y="482">Dependency boundary</text>
+  <text class="text" x="235" y="512">query owns the estimator interface</text>
 </svg>
