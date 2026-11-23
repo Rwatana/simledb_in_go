@@ -1,7 +1,9 @@
 # Go test coverage
 
-The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
-GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
+The `Go test` and `Go coverage` workflows are independent checks. `Go coverage` runs the full suite with a coverage
+profile, writes total statement coverage to the GitHub Actions job summary, and fails unless the full module reaches
+100.0%. `Go vet`, documentation, issue-policy, pull-request-policy, and commit-count checks each have their own
+workflow file and status check.
 
 At the 2026-11-23 checkpoint for Issue #662, the full-module statement coverage is **96.7%** (rounded to one
 decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 97.6%, query
@@ -376,10 +378,8 @@ with a failing recorder. The test checks the wrapped cause and integer block/off
 
 `Transaction.SetString` now uses the same recovery-LSN error helper with string-specific context. The focused failure
 test verifies the wrapped cause and block/offset/LSN details. All ten Go packages and the full module now measure
-100.0% statement coverage (`/tmp/simpledb-coverage-788.out`). The CI workflow still reports coverage without enforcing
-the threshold; add the required 100.0% check in a separate CI change.
-
-The CI coverage summary should remain visible while enforcing this threshold so regressions are easy to locate.
+100.0% statement coverage (`/tmp/simpledb-coverage-788.out`). CI keeps the total percentage in the step summary and
+fails when full-module statement coverage falls below 100.0%.
 
 For a local full-module measurement, run:
 
