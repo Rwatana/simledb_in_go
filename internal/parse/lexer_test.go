@@ -81,3 +81,94 @@ func TestLexerEmptyInputHasNoInteger(t *testing.T) {
 		}
 	}
 }
+
+func TestLexerMatchesAndConsumesStringConstants(t *testing.T) {
+	lexer := NewLexer("  'MiXeD 東京'   'it''s SQL' 42")
+	if !lexer.MatchStringConstant() {
+		t.Fatal("MatchStringConstant() = false, want true")
+	}
+	if !lexer.MatchStringConstant() {
+		t.Fatal("MatchStringConstant() consumed the token")
+	}
+	value, err := lexer.EatStringConstant()
+	if err != nil {
+		t.Fatalf("EatStringConstant() error = %v", err)
+	}
+	if value != "MiXeD 東京" {
+		t.Fatalf("EatStringConstant() = %q, want original case and UTF-8 content", value)
+	}
+	if !lexer.MatchStringConstant() {
+		t.Fatal("MatchStringConstant() for doubled quote = false, want true")
+	}
+	value, err = lexer.EatStringConstant()
+	if err != nil {
+		t.Fatalf("EatStringConstant() for doubled quote error = %v", err)
+	}
+	if value != "it's SQL" {
+		t.Fatalf("EatStringConstant() for doubled quote = %q, want %q", value, "it's SQL")
+	}
+	if !lexer.MatchIntConstant() {
+		t.Fatal("integer after string constants was not preserved")
+	}
+}
+
+func TestLexerConsumesEmptyStringConstant(t *testing.T) {
+	lexer := NewLexer("''")
+	if !lexer.MatchStringConstant() {
+		t.Fatal("MatchStringConstant() = false for an empty string")
+	}
+	value, err := lexer.EatStringConstant()
+	if err != nil {
+		t.Fatalf("EatStringConstant() error = %v", err)
+	}
+	if value != "" {
+		t.Fatalf("EatStringConstant() = %q, want empty string", value)
+	}
+}
+
+func TestLexerRejectsUnterminatedStringWithoutConsumingIt(t *testing.T) {
+	lexer := NewLexer("  'unterminated")
+	if lexer.MatchStringConstant() {
+		t.Fatal("MatchStringConstant() = true for an unterminated string")
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := lexer.EatStringConstant(); err == nil || !strings.Contains(err.Error(), "byte 2") {
+			t.Fatalf("EatStringConstant() error = %v, want stable byte offset 2", err)
+		}
+	}
+}
+
+func TestLexerRejectsNonStringWithoutConsumingIt(t *testing.T) {
+	lexer := NewLexer(" 12")
+	if lexer.MatchStringConstant() {
+		t.Fatal("MatchStringConstant() = true for an integer")
+	}
+	if _, err := lexer.EatStringConstant(); err == nil || !strings.Contains(err.Error(), "byte 1") {
+		t.Fatalf("EatStringConstant() error = %v, want token byte offset 1", err)
+	}
+	if !lexer.MatchIntConstant() {
+		t.Fatal("rejected string token attempt consumed the integer")
+	}
+}
+
+func TestLexerNilReceiverIsSafeForStringConstants(t *testing.T) {
+	var lexer *Lexer
+	if lexer.MatchStringConstant() {
+		t.Fatal("nil MatchStringConstant() = true, want false")
+	}
+	if _, err := lexer.EatStringConstant(); err == nil {
+		t.Fatal("nil EatStringConstant() error = nil")
+	}
+}
+
+func TestLexerEmptyInputHasNoStringConstant(t *testing.T) {
+	for _, input := range []string{"", " \t\n"} {
+		lexer := NewLexer(input)
+		if lexer.MatchStringConstant() {
+			t.Fatalf("MatchStringConstant() = true for input %q", input)
+		}
+		if _, err := lexer.EatStringConstant(); err == nil {
+			t.Fatalf("EatStringConstant() error = nil for input %q", input)
+		}
+	}
+}
