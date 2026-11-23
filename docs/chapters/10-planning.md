@@ -99,14 +99,26 @@ estimate and nil-safe zero results.
 `SelectPlan.Open` opens its child plan and wraps that scan in the existing `query.SelectScan`, which evaluates the
 stored `query.Predicate` while advancing. The constructor retains the child plan and predicate. Child-open errors keep
 their cause and gain selection-plan context; missing plans and a child that returns no scan produce explicit errors.
-This follows Java `SelectPlan.open()` while using Go's `(query.Scan, error)` result. Selection estimates and schema
-delegation remain separate behaviors. The [plan diagram](../diagrams/ch10-plan-contract.svg) now records the
+This follows Java `SelectPlan.open()` while using Go's `(query.Scan, error)` result. Selection estimates remain a
+separate behavior; schema delegation is added in Feature 8. The [plan diagram](../diagrams/ch10-plan-contract.svg) records the
 `SelectPlan` to `SelectScan` path; its editable source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
 
 ### Test-first record
 
 The first test run failed because `SelectPlan` and `NewSelectPlan` were undefined. Tests verify matching and
 nonmatching rows, the returned scan adapter, child-error wrapping, nil plans, and a child that supplies no scan.
+
+## Feature 8: Expose the selection schema
+
+`SelectPlan.Schema` returns the output schema of its child plan, matching Java `SelectPlan.schema()`. Selection changes
+which rows are returned but does not change the fields exposed by the child. A nil selection plan or absent child
+returns nil. The [plan diagram](../diagrams/ch10-plan-contract.svg) records that the predicate-filtering node retains
+its child's schema; the editable source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first test run failed because `SelectPlan.Schema` was undefined. Tests verify schema identity and nil-safe results
+for a nil receiver and missing child plan.
 
 ## Intentional differences from Java
 
@@ -115,3 +127,4 @@ nonmatching rows, the returned scan adapter, child-error wrapping, nil plans, an
 - `TablePlan.Open` returns a query-layer `RecordScan` adapter, rather than exposing the record-layer `TableScan`, because query plans require `GetVal`.
 - `NewTablePlan` receives precomputed `metadata.StatInfo` so obtaining statistics remains a separate metadata behavior; `BlocksAccessed` only forwards the estimate.
 - `TablePlan.DistinctValues` forwards the current simple `StatInfo` estimate; field-specific statistics remain outside this table-plan behavior.
+- `SelectPlan.Schema` returns the child schema directly because filtering does not change the set of output fields.

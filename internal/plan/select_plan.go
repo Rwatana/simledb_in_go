@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Rwatana/simledb_in_go/internal/query"
+	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
 // SelectPlan applies a query predicate to the scan opened by a child plan.
@@ -34,4 +35,12 @@ func (p *SelectPlan) Open() (query.Scan, error) {
 		return nil, fmt.Errorf("open select plan scan: %w", err)
 	}
 	return scan, nil
+}
+
+// Schema returns the output schema exposed by the child plan.
+func (p *SelectPlan) Schema() *record.Schema {
+	if p == nil || p.child == nil {
+		return nil
+	}
+	return p.child.Schema()
 }
