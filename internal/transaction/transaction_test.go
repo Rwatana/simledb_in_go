@@ -1633,3 +1633,139 @@ func TestNewRejectsMultipleRecoveryIteratorFactories(t *testing.T) {
 		t.Errorf("New() error = %v, want %q", err, want)
 	}
 }
+
+type recordingFileSizer struct {
+	lengths map[string]int
+	err     error
+	names   []string
+}
+
+func (s *recordingFileSizer) Length(fileName string) (int, error) {
+	s.names = append(s.names, fileName)
+	if s.err != nil {
+		return 0, s.err
+	}
+	return s.lengths[fileName], nil
+}
+
+func TestTransactionSizeReadsLengthUnderReusableEOFSharedLock(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	sizer := &recordingFileSizer{lengths: map[string]int{"tbl": 7}}
+	eof := storage.NewBlockID("tbl", -1)
+	if err := table.LockShared(eof); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := NewWithFileSizer(&allocator, &table, sizer, &recordingBufferPinner{}, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for attempt := 0; attempt < 2; attempt++ {
+		got, err := tx.Size("tbl")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != 7 {
+			t.Fatalf("Size() = %d, want 7", got)
+		}
+	}
+	if !reflect.DeepEqual(sizer.names, []string{"tbl", "tbl"}) {
+		t.Fatalf("Length() files = %v, want [tbl tbl]", sizer.names)
+	}
+	if err := table.LockExclusive(eof); !errors.Is(err, concurrency.ErrLockConflict) {
+		t.Fatalf("exclusive EOF acquisition with competing shared hold error = %v, want ErrLockConflict", err)
+	}
+	table.Unlock(eof)
+	if err := table.LockExclusive(eof); err != nil {
+		t.Fatalf("repeated Size acquired more than one transaction shared hold: %v", err)
+	}
+}
+
+func TestTransactionSizeReturnsFileLengthFailure(t *testing.T) {
+	wantErr := errors.New("length failed")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := NewWithFileSizer(&allocator, &table, &recordingFileSizer{err: wantErr}, &recordingBufferPinner{}, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Size("tbl"); !errors.Is(err, wantErr) {
+		t.Fatalf("Size() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestNewWithFileSizerRejectsNilSizerBeforeStartingTransaction(t *testing.T) {
+	var allocator IDAllocator
+	logs := &recordingTransactionLog{}
+
+	transaction, err := NewWithFileSizer(&allocator, &concurrency.LockTable{}, nil, &recordingBufferPinner{}, logs)
+	if transaction != nil {
+		t.Fatalf("NewWithFileSizer() transaction = %v, want nil", transaction)
+	}
+	if err == nil || err.Error() != "create transaction with file sizer: file sizer must not be nil" {
+		t.Fatalf("NewWithFileSizer() error = %v, want missing file-sizer context", err)
+	}
+	if got := allocator.last.Load(); got != 0 {
+		t.Errorf("allocated transaction IDs = %d, want 0 before dependency rejection", got)
+	}
+	if len(logs.records) != 0 {
+		t.Errorf("START record count = %d, want 0 before dependency rejection", len(logs.records))
+	}
+}
+
+func TestNewWithFileSizerReturnsStartAppendFailure(t *testing.T) {
+	wantErr := errors.New("start failed")
+	var allocator IDAllocator
+	logs := &recordingTransactionLog{err: wantErr}
+
+	transaction, err := NewWithFileSizer(&allocator, &concurrency.LockTable{}, &recordingFileSizer{}, &recordingBufferPinner{}, logs)
+	if transaction != nil {
+		t.Fatalf("NewWithFileSizer() transaction = %v, want nil", transaction)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("NewWithFileSizer() error = %v, want wrapped START append failure", err)
+	}
+	if got, want := err.Error(), "start transaction 1: append start record for transaction 1: start failed"; got != want {
+		t.Errorf("NewWithFileSizer() error = %q, want transaction context %q", got, want)
+	}
+	if got := allocator.last.Load(); got != 1 {
+		t.Errorf("allocated transaction IDs = %d, want 1 before START append", got)
+	}
+}
+
+func TestTransactionSizeRequiresFileSizer(t *testing.T) {
+	var transaction Transaction
+
+	length, err := transaction.Size("tbl")
+	if length != 0 {
+		t.Errorf("Size() length = %d, want 0 without a configured file sizer", length)
+	}
+	if err == nil || err.Error() != `get transaction file size for "tbl": file sizer is not configured` {
+		t.Errorf("Size() error = %v, want file-sizer configuration error", err)
+	}
+}
+
+func TestTransactionSizePreservesEOFSharedLockFailure(t *testing.T) {
+	wantErr := concurrency.ErrLockConflict
+	locks := &recordingTransactionLockManager{sharedErr: wantErr}
+	sizer := &recordingFileSizer{lengths: map[string]int{"tbl": 7}}
+	transaction := &Transaction{locks: locks, fileSizer: sizer}
+
+	length, err := transaction.Size("tbl")
+	if length != 0 {
+		t.Errorf("Size() length = %d, want 0 after lock failure", length)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("Size() error = %v, want lock conflict", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), `get transaction file size for "tbl": acquire EOF shared lock`) {
+		t.Errorf("Size() error = %v, want file and operation context", err)
+	}
+	if locks.sharedCalls != 1 {
+		t.Errorf("shared lock calls = %d, want 1", locks.sharedCalls)
+	}
+	if len(sizer.names) != 0 {
+		t.Errorf("Length() calls = %v, want none after lock failure", sizer.names)
+	}
+}
