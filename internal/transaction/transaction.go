@@ -121,6 +121,9 @@ func (t *Transaction) GetString(block storage.BlockID, offset int) (string, erro
 
 // SetInt writes a four-byte integer to a pinned block and optionally records its old value.
 func (t *Transaction) SetInt(block storage.BlockID, offset, value int32, logUpdate bool) error {
+	if t.state != transactionActive {
+		return fmt.Errorf("set integer in block %v at offset %d for transaction %d: %w", block, offset, t.id, ErrTransactionCompleted)
+	}
 	frame, ok := t.buffers.Buffer(block)
 	if !ok {
 		return fmt.Errorf("set integer in transaction buffer %v at offset %d: %w", block, offset, ErrBufferNotPinned)
