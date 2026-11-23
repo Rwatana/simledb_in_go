@@ -801,6 +801,22 @@ The tests first failed to compile because `TableScan.Delete` did not exist.
 
 This maps Java `TableScan.delete`; record field bytes remain unchanged because slot occupancy alone controls visibility.
 
+## Feature 46: Return the current table scan record identifier
+
+`TableScan.GetRID` requires an open page and a positioned cursor, then constructs an immutable RID from the current
+block number and slot. It performs no transaction access and does not change the scan position.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.GetRID` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanGetRIDReturnsTheCurrentCoordinatesWithoutTransactionAccess` | Current block and slot become the exact RID without I/O or cursor movement |
+| `TestTableScanGetRIDRequiresACurrentRecord` | Before-first and closed scans reject RID access explicitly |
+
+This maps Java `TableScan.getRid` while representing unavailable current-record state as an error.
+
 ## Next behavior
 
-Return the current record identifier from a table scan.
+Move a table scan to a supplied record identifier.
