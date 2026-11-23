@@ -797,6 +797,78 @@ func TestNewProjectPlanRejectsNilDependenciesAndUnknownFields(t *testing.T) {
 	}
 }
 
+func TestProjectPlanOpenReturnsProjectedScanAtChildPosition(t *testing.T) {
+	var childSchema record.Schema
+	childSchema.AddIntegerField("student_id")
+	childSchema.AddVarcharField("student_name", 24)
+	source := &productPlanScanStub{
+		rows: []map[string]query.Constant{{
+			"student_id":   query.NewIntConstant(42),
+			"student_name": query.NewStringConstant("Ada"),
+		}},
+		fields:   map[string]bool{"student_id": true, "student_name": true},
+		position: -1,
+	}
+	child := &productPlanProbe{schema: &childSchema, scan: source}
+	project, err := NewProjectPlan(child, []string{"student_id"})
+	if err != nil {
+		t.Fatalf("NewProjectPlan() error = %v", err)
+	}
+	scan, err := project.Open()
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	if _, ok := scan.(*query.ProjectScan); !ok {
+		t.Fatalf("Open() scan has type %T, want *query.ProjectScan", scan)
+	}
+	if !scan.HasField("student_id") || scan.HasField("student_name") {
+		t.Error("Open() scan fields do not match the projection")
+	}
+	if next, err := scan.Next(); err != nil || !next {
+		t.Fatalf("first Next() = (%t, %v), want (true, nil) without resetting the child", next, err)
+	}
+	if got, err := scan.GetInt("student_id"); err != nil || got != 42 {
+		t.Errorf("GetInt(student_id) = (%d, %v), want (42, nil)", got, err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Errorf("Close() error = %v", err)
+	}
+	if source.closeCalls != 1 {
+		t.Errorf("child scan Close() calls = %d, want 1", source.closeCalls)
+	}
+}
+
+func TestProjectPlanOpenRejectsNilPlanAndChild(t *testing.T) {
+	var nilPlan *ProjectPlan
+	if scan, err := nilPlan.Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "nil plan") {
+		t.Errorf("nil ProjectPlan.Open() = (%v, %v), want nil scan and nil-plan error", scan, err)
+	}
+	if scan, err := (&ProjectPlan{}).Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "child plan") {
+		t.Errorf("ProjectPlan without child Open() = (%v, %v), want child-plan error", scan, err)
+	}
+}
+
+func TestProjectPlanOpenWrapsChildErrorsAndRejectsNilScan(t *testing.T) {
+	var childSchema record.Schema
+	childSchema.AddIntegerField("id")
+	openErr := errors.New("child open failed")
+	project, err := NewProjectPlan(&productPlanProbe{schema: &childSchema, openErr: openErr}, []string{"id"})
+	if err != nil {
+		t.Fatalf("NewProjectPlan() error = %v", err)
+	}
+	if scan, err := project.Open(); scan != nil || !errors.Is(err, openErr) || !strings.Contains(err.Error(), "project plan child") {
+		t.Errorf("Open() = (%v, %v), want wrapped child-open error", scan, err)
+	}
+
+	project, err = NewProjectPlan(&productPlanProbe{schema: &childSchema}, []string{"id"})
+	if err != nil {
+		t.Fatalf("NewProjectPlan() for nil child scan error = %v", err)
+	}
+	if scan, err := project.Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "project scan") {
+		t.Errorf("Open() with nil child scan = (%v, %v), want project-scan error", scan, err)
+	}
+}
+
 type productPlanProbe struct {
 	scan     query.Scan
 	openErr  error
