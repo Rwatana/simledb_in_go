@@ -96,3 +96,18 @@ func (scan *IndexSelectScan) GetInt(fieldName string) (int32, error) {
 	}
 	return value, nil
 }
+
+// GetString reads a string field from the current data record.
+func (scan *IndexSelectScan) GetString(fieldName string) (string, error) {
+	if scan == nil {
+		return "", fmt.Errorf("read string field %q through nil index select scan", fieldName)
+	}
+	if scan.dataScan == nil {
+		return "", fmt.Errorf("read string field %q through index select scan: table scan is nil", fieldName)
+	}
+	value, err := scan.dataScan.GetString(fieldName)
+	if err != nil {
+		return "", fmt.Errorf("read string field %q through index select scan: %w", fieldName, err)
+	}
+	return value, nil
+}

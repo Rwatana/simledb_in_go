@@ -192,6 +192,18 @@ The focused tests first failed because `IndexSelectScan.GetInt` was undefined. T
 record's integer value, contextual errors for a nil receiver or missing table scan, and preservation of a table-read
 failure through error wrapping.
 
+## Feature 14: Read a string from the selected data row
+
+`IndexSelectScan.GetString` delegates to its retained `record.TableScan` and returns the string value unchanged. A nil
+adapter or missing table scan produces a contextual error; table-read errors are wrapped so callers retain the original
+cause. As with integer access, the index traversal illustration already explains the data-table side of this adapter.
+
+### Test-first record
+
+The focused tests first failed because `IndexSelectScan.GetString` was undefined. They verify forwarding of the current
+record's string value, contextual errors for a nil receiver or missing table scan, and preservation of a table-read
+failure through error wrapping.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -202,3 +214,4 @@ failure through error wrapping.
 - `IndexSelectScan` reports index-position failures as Go errors and leaves index lifetime management to its caller.
 - `IndexSelectScan.Next` reports index and table-scan failures as errors, and avoids moving the data scan after exhaustion.
 - `IndexSelectScan.GetInt` reports data-scan read failures as Go errors while preserving their wrapped causes.
+- `IndexSelectScan.GetString` reports data-scan read failures as Go errors while preserving their wrapped causes.

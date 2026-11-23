@@ -51,12 +51,14 @@ func (*indexSelectNextIndex) Delete(query.Constant, record.RID) error { return n
 func (*indexSelectNextIndex) Close() error                            { return nil }
 
 type indexSelectNextTransaction struct {
-	pinErr   error
-	unpinErr error
-	intValue int32
-	intErr   error
-	pinned   []storage.BlockID
-	unpinned []storage.BlockID
+	pinErr      error
+	unpinErr    error
+	intValue    int32
+	intErr      error
+	stringValue string
+	stringErr   error
+	pinned      []storage.BlockID
+	unpinned    []storage.BlockID
 }
 
 func (transaction *indexSelectNextTransaction) Pin(block storage.BlockID) error {
@@ -67,8 +69,8 @@ func (*indexSelectNextTransaction) BlockSize() (int, error) { return 32, nil }
 func (transaction *indexSelectNextTransaction) GetInt(storage.BlockID, int) (int32, error) {
 	return transaction.intValue, transaction.intErr
 }
-func (*indexSelectNextTransaction) GetString(storage.BlockID, int) (string, error) {
-	return "", nil
+func (transaction *indexSelectNextTransaction) GetString(storage.BlockID, int) (string, error) {
+	return transaction.stringValue, transaction.stringErr
 }
 func (*indexSelectNextTransaction) SetInt(storage.BlockID, int32, int32, bool) error { return nil }
 func (*indexSelectNextTransaction) SetString(storage.BlockID, int32, string, bool) error {
@@ -87,6 +89,7 @@ func newIndexSelectNextDataScan(t *testing.T) (*record.TableScan, *indexSelectNe
 	t.Helper()
 	schema := &record.Schema{}
 	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 12)
 	transaction := &indexSelectNextTransaction{}
 	scan, err := record.NewTableScan(transaction, "students", record.NewLayout(schema))
 	if err != nil {
