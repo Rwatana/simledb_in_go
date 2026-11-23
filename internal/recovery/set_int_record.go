@@ -40,11 +40,15 @@ func (r SetIntRecord) OldValue() int32 { return r.oldValue }
 
 // EncodeSetIntRecord returns the SETINT record's variable-length on-disk form.
 func EncodeSetIntRecord(transaction TransactionID, block storage.BlockID, offset, oldValue int32) ([]byte, error) {
+	return encodeSetIntRecordWithLimits(transaction, block, offset, oldValue, math.MaxInt32, int(^uint(0)>>1))
+}
+
+func encodeSetIntRecordWithLimits(transaction TransactionID, block storage.BlockID, offset, oldValue int32, maxFilenameLength, maxInt int) ([]byte, error) {
 	fileName := []byte(block.FileName())
-	if err := validateSetIntFilenameLength(len(fileName)); err != nil {
+	if err := validateSetIntFilenameLengthAtMost(len(fileName), maxFilenameLength); err != nil {
 		return nil, fmt.Errorf("encode setint record: %w", err)
 	}
-	encodedSize, err := setIntRecordSize(len(fileName), int(^uint(0)>>1))
+	encodedSize, err := setIntRecordSize(len(fileName), maxInt)
 	if err != nil {
 		return nil, fmt.Errorf("encode setint record: %w", err)
 	}
@@ -64,8 +68,15 @@ func EncodeSetIntRecord(transaction TransactionID, block storage.BlockID, offset
 }
 
 func validateSetIntFilenameLength(length int) error {
-	if length > math.MaxInt32 {
-		return fmt.Errorf("filename length %d exceeds int32", length)
+	return validateSetIntFilenameLengthAtMost(length, math.MaxInt32)
+}
+
+func validateSetIntFilenameLengthAtMost(length, maxLength int) error {
+	if length > maxLength {
+		if maxLength == math.MaxInt32 {
+			return fmt.Errorf("filename length %d exceeds int32", length)
+		}
+		return fmt.Errorf("filename length %d exceeds limit %d", length, maxLength)
 	}
 	return nil
 }

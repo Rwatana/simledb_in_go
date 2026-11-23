@@ -63,6 +63,19 @@ func TestEncodeSetIntRecordRejectsBlockOutsideInt32(t *testing.T) {
 	}
 }
 
+func TestEncodeSetIntRecordWrapsSyntheticFilenameLimitFailure(t *testing.T) {
+	block := storage.NewBlockID("student.tbl", 2)
+	encoded, err := encodeSetIntRecordWithLimits(7, block, 8, 3, 4, int(^uint(0)>>1))
+	if encoded != nil || err == nil {
+		t.Fatalf("encodeSetIntRecordWithLimits() = (%v, %v), want no encoding and a validation error", encoded, err)
+	}
+	for _, want := range []string{"encode setint record", "filename length 11", "exceeds limit 4"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("encoder error = %q, want context %q", err, want)
+		}
+	}
+}
+
 func TestSetIntFilenameLengthValidationRejectsValuesAboveInt32(t *testing.T) {
 	if strconv.IntSize < 64 {
 		t.Skip("host int cannot represent a value above int32")
