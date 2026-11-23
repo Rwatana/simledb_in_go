@@ -251,3 +251,76 @@ func TestLexerNilReceiverIsSafeForIdentifiers(t *testing.T) {
 		t.Fatal("nil EatIdentifier() error = nil")
 	}
 }
+
+func TestLexerMatchesAndConsumesDelimiters(t *testing.T) {
+	for _, delimiter := range "!#$%&()*+,-./:;<=>?@[\\]^`{|}~" {
+		t.Run(string(delimiter), func(t *testing.T) {
+			lexer := NewLexer(" " + string(delimiter) + "_next")
+			if !lexer.MatchDelimiter(byte(delimiter)) {
+				t.Fatalf("MatchDelimiter(%q) = false, want true", delimiter)
+			}
+			if !lexer.MatchDelimiter(byte(delimiter)) {
+				t.Fatal("MatchDelimiter() consumed the delimiter")
+			}
+			if err := lexer.EatDelimiter(byte(delimiter)); err != nil {
+				t.Fatalf("EatDelimiter(%q) error = %v", delimiter, err)
+			}
+			if !lexer.MatchIdentifier() {
+				t.Fatal("identifier after delimiter was not preserved")
+			}
+		})
+	}
+}
+
+func TestLexerRejectsMismatchedDelimiterWithoutConsumingIt(t *testing.T) {
+	lexer := NewLexer("  ,")
+	if lexer.MatchDelimiter(';') {
+		t.Fatal("MatchDelimiter(';') = true for a comma token")
+	}
+	if err := lexer.EatDelimiter(';'); err == nil || !strings.Contains(err.Error(), "byte 2") {
+		t.Fatalf("EatDelimiter(';') error = %v, want byte offset 2", err)
+	}
+	if !lexer.MatchDelimiter(',') {
+		t.Fatal("mismatched delimiter attempt consumed the comma")
+	}
+}
+
+func TestLexerRejectsNonDelimitersWithoutConsumingThem(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		byteOffset int
+	}{
+		{name: "empty", input: ""},
+		{name: "whitespace", input: " \t", byteOffset: 2},
+		{name: "identifier", input: " word", byteOffset: 1},
+		{name: "integer", input: "42"},
+		{name: "string", input: "'value'"},
+		{name: "double-quoted", input: `"value"`},
+		{name: "control-byte", input: "\x01"},
+		{name: "non-ASCII", input: "é"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lexer := NewLexer(test.input)
+			if lexer.MatchDelimiter(',') {
+				t.Fatalf("MatchDelimiter(',') = true for %q", test.input)
+			}
+			for i := 0; i < 2; i++ {
+				if err := lexer.EatDelimiter(','); err == nil || !strings.Contains(err.Error(), "byte "+strconv.Itoa(test.byteOffset)) {
+					t.Fatalf("EatDelimiter(',') error = %v, want stable byte offset %d", err, test.byteOffset)
+				}
+			}
+		})
+	}
+}
+
+func TestLexerNilReceiverIsSafeForDelimiters(t *testing.T) {
+	var lexer *Lexer
+	if lexer.MatchDelimiter(',') {
+		t.Fatal("nil MatchDelimiter(',') = true, want false")
+	}
+	if err := lexer.EatDelimiter(','); err == nil {
+		t.Fatal("nil EatDelimiter(',') error = nil")
+	}
+}

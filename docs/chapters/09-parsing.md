@@ -69,6 +69,24 @@ Tests first failed to compile because `MatchIdentifier` and `EatIdentifier` were
 normalization, underscores, digits after the first character, every reserved word in the Java keyword list, byte offsets,
 non-consuming mismatch, empty input, whitespace, nil receivers, and the following integer token.
 
+## Feature 4: Read SQL delimiters
+
+`MatchDelimiter` and `EatDelimiter` map to Java `Lexer.matchDelim` and `eatDelim`. They compare a requested ASCII
+punctuation byte with the next token. Lookahead does not consume input, and eating advances exactly one punctuation
+byte only when it matches. Mismatches preserve the current token and report its byte offset.
+
+The Go lexer classifies visible ASCII punctuation as delimiters except the single and double quote bytes. Operators
+containing multiple punctuation bytes remain separate tokens, so `<` followed by `=` is two delimiter operations. The
+[delimiter-token diagram](../diagrams/ch09-delimiter-token.svg) shows matching, single-byte consumption,
+and the unchanged cursor on failure; the editable source is
+[`ch09-delimiter-token.drawio`](../diagrams/ch09-delimiter-token.drawio).
+
+### Test-first record
+
+The tests first failed to compile because `MatchDelimiter` and `EatDelimiter` were undefined. They cover visible
+punctuation, repeated lookahead, adjacent identifiers, mismatched expected delimiters, wrong token kinds, byte offsets,
+empty input, whitespace, and nil receivers.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -76,3 +94,4 @@ non-consuming mismatch, empty input, whitespace, nil receivers, and the followin
 - Errors include the token's byte offset and do not advance the lexer, making callers able to report a stable location.
 - SQL string literals support doubled single quotes; backslash escapes follow the simpler Go SQL lexer policy and are not decoded as Java `StreamTokenizer` escapes.
 - SQL identifiers use an explicit ASCII grammar instead of `StreamTokenizer`'s additional non-ASCII word-byte behavior.
+- Delimiters are visible ASCII punctuation bytes; multi-character operators are matched one byte at a time, and quoted values are not delimiters.
