@@ -68,6 +68,19 @@ hidden inside the estimate. The updated [plan diagram](../diagrams/ch10-plan-con
 The first test run failed because `NewTablePlan` did not retain a statistics argument and `BlocksAccessed` was
 undefined. Tests verify forwarding a nonzero block estimate and nil-safe zero estimates.
 
+## Feature 5: Estimate table output rows
+
+`TablePlan.RecordsOutput` delegates the expected table cardinality to its retained `metadata.StatInfo`, matching Java
+`TablePlan.recordsOutput()`. This keeps the estimate tied to the same statistics snapshot used for block-access
+estimation. A nil plan or missing statistics returns zero. Distinct-value estimation remains a separate behavior. The
+[plan diagram](../diagrams/ch10-plan-contract.svg) now shows the table plan forwarding both block and output-row
+estimates; its editable source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first test run failed because `TablePlan.RecordsOutput` was undefined. Tests verify a nonzero forwarded row estimate
+and nil-safe zero results.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.

@@ -143,6 +143,25 @@ func TestTablePlanBlocksAccessedHandlesNilPlanAndStatistics(t *testing.T) {
 	}
 }
 
+func TestTablePlanRecordsOutputReturnsStatistic(t *testing.T) {
+	stats := metadata.NewStatInfo(12, 30)
+	var schema record.Schema
+	tablePlan := NewTablePlan(nil, "student", record.NewLayout(&schema), stats)
+	if got := tablePlan.RecordsOutput(); got != 30 {
+		t.Fatalf("RecordsOutput() = %d, want 30", got)
+	}
+}
+
+func TestTablePlanRecordsOutputHandlesNilPlanAndStatistics(t *testing.T) {
+	var nilPlan *TablePlan
+	if got := nilPlan.RecordsOutput(); got != 0 {
+		t.Fatalf("nil TablePlan.RecordsOutput() = %d, want 0", got)
+	}
+	if got := NewTablePlan(nil, "student", nil, nil).RecordsOutput(); got != 0 {
+		t.Fatalf("TablePlan with nil statistics RecordsOutput() = %d, want 0", got)
+	}
+}
+
 type tablePlanTransaction struct {
 	size    int
 	sizeErr error
