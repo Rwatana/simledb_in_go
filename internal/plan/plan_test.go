@@ -909,6 +909,30 @@ func TestProjectPlanRecordsOutputDelegatesAndHandlesNilPlan(t *testing.T) {
 	}
 }
 
+func TestProjectPlanDistinctValuesDelegatesAndHandlesNilPlan(t *testing.T) {
+	var schema record.Schema
+	schema.AddIntegerField("student_id")
+	child := &productPlanProbe{
+		schema:   &schema,
+		distinct: map[string]int{"student_id": 7},
+	}
+	project, err := NewProjectPlan(child, []string{"student_id"})
+	if err != nil {
+		t.Fatalf("NewProjectPlan() error = %v", err)
+	}
+	if got := project.DistinctValues("student_id"); got != 7 {
+		t.Errorf("DistinctValues(student_id) = %d, want child estimate 7", got)
+	}
+
+	var nilPlan *ProjectPlan
+	if got := nilPlan.DistinctValues("student_id"); got != 0 {
+		t.Errorf("nil ProjectPlan.DistinctValues() = %d, want 0", got)
+	}
+	if got := (&ProjectPlan{}).DistinctValues("student_id"); got != 0 {
+		t.Errorf("ProjectPlan without child DistinctValues() = %d, want 0", got)
+	}
+}
+
 type productPlanProbe struct {
 	scan     query.Scan
 	openErr  error

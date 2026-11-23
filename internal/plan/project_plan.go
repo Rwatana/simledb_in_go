@@ -55,6 +55,14 @@ func (p *ProjectPlan) RecordsOutput() int {
 	return p.child.RecordsOutput()
 }
 
+// DistinctValues returns the child's estimate for a field.
+func (p *ProjectPlan) DistinctValues(fieldName string) int {
+	if p == nil || p.child == nil {
+		return 0
+	}
+	return p.child.DistinctValues(fieldName)
+}
+
 // Open opens the child and wraps its scan with the requested projection.
 func (p *ProjectPlan) Open() (query.Scan, error) {
 	if p == nil {
