@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="460" viewBox="0 0 1120 460" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 13: Store DELETE command data</title>
+  <desc id="description">DeleteData stores a target table name and deletion predicate in private fields. Read-only accessors expose both values, and the zero value returns an empty name and predicate.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:18px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:16px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1120" height="460" fill="#fff"/>
+  <text class="title" x="560" y="62" text-anchor="middle">Chapter 9 / Feature 13: Store DELETE command data</text>
+  <rect class="box" x="70" y="190" width="220" height="120" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="180" y="231"><tspan x="180">Target table</tspan><tspan class="small" x="180" dy="30">student</tspan></text>
+  <rect class="box" x="70" y="345" width="220" height="95" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="180" y="376"><tspan x="180">Deletion predicate</tspan><tspan class="small" x="180" dy="25">age = 18 and active = 1</tspan></text>
+  <rect class="box" x="445" y="250" width="250" height="145" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="570" y="291"><tspan x="570">DeleteData</tspan><tspan class="small" x="570" dy="30">private tableName</tspan><tspan class="small" x="570" dy="25">private predicate</tspan></text>
+  <rect class="box" x="830" y="255" width="220" height="130" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="940" y="294"><tspan x="940">Read-only accessors</tspan><tspan class="small" x="940" dy="29">TableName()</tspan><tspan class="small" x="940" dy="24">Predicate()</tspan></text>
+  <rect class="box" x="445" y="105" width="250" height="105" fill="#f5f5f5" stroke="#666"/>
+  <text class="label" x="570" y="143"><tspan x="570">Zero value</tspan><tspan class="small" x="570" dy="28">empty table name</tspan><tspan class="small" x="570" dy="23">empty predicate</tspan></text>
+  <path class="edge" d="M290 240 L435 305"/><text class="small" x="354" y="253">construct</text>
+  <path class="edge" d="M290 380 L435 355"/><text class="small" x="355" y="390">construct</text>
+  <path class="edge" d="M695 322 H820"/><text class="small" x="757" y="308">read</text>
+</svg>
