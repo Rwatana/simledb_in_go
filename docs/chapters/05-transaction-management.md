@@ -576,6 +576,7 @@ failed because `UndoRollbackRecords` did not exist.
 | `TestUndoRollbackRecordsRestoresUpdatesInSourceOrder` | SETSTRING then SETINT restore in reverse-log order without logging |
 | `TestUndoRollbackRecordsReturnsSourceFailure` | Bounded traversal failure stops rollback |
 | `TestUndoRollbackRecordsStopsAfterUndoFailure` | Failed newest undo prevents older mutations |
+| `TestUndoRollbackRecordsPreservesIntegerUndoFailure` | A failed SETINT restore keeps its cause and prevents consuming older rollback history |
 
 This maps to `rec.undo(tx)` in Java `RecoveryMgr.doRollback`, while iterator construction and rollback durability remain
 outside this behavior.
