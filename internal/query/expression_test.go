@@ -1,6 +1,22 @@
 package query
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
+
+type valueScanStub struct {
+	name  string
+	value Constant
+	err   error
+	calls int
+}
+
+func (scan *valueScanStub) GetVal(name string) (Constant, error) {
+	scan.calls++
+	scan.name = name
+	return scan.value, scan.err
+}
 
 func TestLiteralExpressionReturnsItsConstant(t *testing.T) {
 	for _, constant := range []Constant{NewIntConstant(0), NewStringConstant("")} {
@@ -36,5 +52,56 @@ func TestFieldExpressionReturnsItsName(t *testing.T) {
 func TestZeroValueExpressionHasNoFieldName(t *testing.T) {
 	if got, ok := (Expression{}).AsFieldName(); ok || got != "" {
 		t.Fatalf("AsFieldName() = (%q, %v), want (empty, false)", got, ok)
+	}
+}
+
+func TestEvaluateLiteralExpressionDoesNotReadScan(t *testing.T) {
+	want := NewIntConstant(7)
+	scan := &valueScanStub{}
+	got, err := NewConstantExpression(want).Evaluate(scan)
+	if err != nil || !got.Equal(want) {
+		t.Fatalf("Evaluate() = (%v, %v), want (%v, nil)", got, err, want)
+	}
+	if scan.calls != 0 {
+		t.Fatalf("GetVal calls = %d, want 0", scan.calls)
+	}
+}
+
+func TestEvaluateFieldExpressionReadsFieldOnce(t *testing.T) {
+	want := NewStringConstant("Ada")
+	scan := &valueScanStub{value: want}
+	got, err := NewFieldExpression("name").Evaluate(scan)
+	if err != nil || !got.Equal(want) {
+		t.Fatalf("Evaluate() = (%v, %v), want (%v, nil)", got, err, want)
+	}
+	if scan.calls != 1 || scan.name != "name" {
+		t.Fatalf("GetVal calls = %d for %q, want one call for name", scan.calls, scan.name)
+	}
+}
+
+func TestEvaluateFieldExpressionReturnsScanError(t *testing.T) {
+	want := errors.New("missing field")
+	scan := &valueScanStub{err: want}
+	_, err := NewFieldExpression("unknown").Evaluate(scan)
+	if err != want {
+		t.Fatalf("Evaluate() error = %v, want original error %v", err, want)
+	}
+}
+
+func TestEvaluateFieldExpressionRejectsNilScan(t *testing.T) {
+	_, err := NewFieldExpression("name").Evaluate(nil)
+	if err == nil || err.Error() != `evaluate field "name": nil scan` {
+		t.Fatalf("Evaluate() error = %v, want contextual nil-scan error", err)
+	}
+}
+
+func TestEvaluateUnsetExpressionReturnsErrorWithoutScan(t *testing.T) {
+	scan := &valueScanStub{}
+	_, err := (Expression{}).Evaluate(scan)
+	if err == nil || err.Error() != "evaluate expression: no literal or field reference" {
+		t.Fatalf("Evaluate() error = %v, want contextual unset-expression error", err)
+	}
+	if scan.calls != 0 {
+		t.Fatalf("GetVal calls = %d, want 0 for an unset expression", scan.calls)
 	}
 }
