@@ -1370,10 +1370,30 @@ retention were tested first. The initial tests failed because commit never invok
 This completes Java `Transaction.commit` ordering: recovery commit, concurrency release, then `BufferList.unpinAll`.
 Go additionally reports cleanup failure without obscuring that COMMIT is already durable.
 
+## Feature 63: Pin a block through a transaction
+
+`Transaction.Pin` delegates directly to its transaction-local `BufferList`. A successful shared-manager pin is therefore
+available to later transaction operations through local block lookup, while a pin failure is returned without ownership
+state. Pinning is deliberately independent of concurrency control: it can load a buffer even when the block is currently
+locked exclusively elsewhere.
+
+### Test-first record
+
+One delegated pin, local frame lookup, lock independence, and failure atomicity were tested first. The initial build
+failed because `Transaction.Pin` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionPinsBlockWithoutAcquiringLock` | Transaction pinning records the shared frame without attempting a block lock |
+| `TestTransactionPinFailureDoesNotRecordBuffer` | A shared-manager pin failure propagates without local buffer ownership |
+
+This maps directly to Java `Transaction.pin`, which delegates to `BufferList.pin`; value access methods acquire their own
+locks separately.
+
 ## Next behavior
 
-Continue with Chapter 5 by composing transaction rollback durability, then add rollback lock release and buffer unpin as
-separate lifecycle behaviors.
+Continue with Chapter 5 by adding transaction-level unpin delegation, then implement locked value reads and writes needed
+for rollback undo.
 
 ## Sources
 
