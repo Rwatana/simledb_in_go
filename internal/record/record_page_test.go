@@ -17,6 +17,7 @@ type recordingRecordTransaction struct {
 	reads           []integerRead
 	value           int32
 	readValues      []int32
+	readErrors      []error
 	readErr         error
 	stringReads     []integerRead
 	stringValue     string
@@ -66,10 +67,14 @@ func (t *recordingRecordTransaction) BlockSize() (int, error) {
 
 func (t *recordingRecordTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
 	t.reads = append(t.reads, integerRead{block: block, offset: offset})
-	if len(t.readValues) >= len(t.reads) {
-		return t.readValues[len(t.reads)-1], t.readErr
+	readErr := t.readErr
+	if len(t.readErrors) >= len(t.reads) {
+		readErr = t.readErrors[len(t.reads)-1]
 	}
-	return t.value, t.readErr
+	if len(t.readValues) >= len(t.reads) {
+		return t.readValues[len(t.reads)-1], readErr
+	}
+	return t.value, readErr
 }
 
 func (t *recordingRecordTransaction) GetString(block storage.BlockID, offset int) (string, error) {

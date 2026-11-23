@@ -285,6 +285,10 @@ checks error context, that the exhausted block is unpinned, and that no insert w
 appending the next block to fail and checks the error context and page cleanup. `Insert` is now 96.0% covered, record
 package coverage is 98.5%, and full-module statement coverage remains 98.7%.
 
+The insertion path also has a focused test for a slot-flag read failure after rollover to a newly formatted block.
+It verifies the new-block context, preserves the scan state, and confirms no logged record write follows the failure.
+`TableScan.Insert` is now 100.0% covered, record package coverage is 98.8%, and full-module statement coverage is 98.8%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

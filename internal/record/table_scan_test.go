@@ -1094,6 +1094,46 @@ func TestTableScanInsertWrapsNewBlockAppendFailure(t *testing.T) {
 	}
 }
 
+func TestTableScanInsertWrapsNewBlockSlotSearchFailure(t *testing.T) {
+	readErr := errors.New("new block slot read failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{
+			blockSize:  16,
+			readValues: []int32{recordSlotUsed, recordSlotUsed},
+			readErrors: []error{nil, nil, readErr},
+		},
+		size:        1,
+		appendBlock: storage.NewBlockID("student.tbl", 1),
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	err = scan.Insert()
+	if !errors.Is(err, readErr) {
+		t.Fatalf("Insert() error = %v, want wrapped new-block slot read failure", err)
+	}
+	for _, want := range []string{"student.tbl", "occupy new block 1", "after slot -1"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Insert() error = %q, want context %q", err, want)
+		}
+	}
+	if scan.recordPage == nil || scan.recordPage.Block().Number() != 1 || scan.currentSlot != -1 {
+		t.Errorf("scan state after new-block read failure: page=%v slot=%d", scan.recordPage, scan.currentSlot)
+	}
+	if len(transaction.unpinCalls) != 1 || transaction.unpinCalls[0].Number() != 0 {
+		t.Errorf("unpin calls = %v, want exhausted block zero", transaction.unpinCalls)
+	}
+	for _, write := range transaction.writes {
+		if write.logUpdate {
+			t.Errorf("new-block slot search failure performed a logged write: %+v", write)
+		}
+	}
+}
+
 func TestTableScanMoveToNewBlockClosesAppendsPinsAndFormats(t *testing.T) {
 	newBlock := storage.NewBlockID("student.tbl", 1)
 	transaction := &recordingTableTransaction{
