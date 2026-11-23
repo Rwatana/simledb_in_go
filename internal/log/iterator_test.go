@@ -2,10 +2,9 @@ package log
 
 import (
 	"bytes"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 	"strings"
 	"testing"
-
-	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 func TestIteratorReadsCurrentBlockNewestToOldest(t *testing.T) {
@@ -198,5 +197,42 @@ func TestIteratorRejectsTruncatedRecordLengthPrefix(t *testing.T) {
 		if !strings.Contains(err.Error(), context) {
 			t.Errorf("Next() error = %q, want context %q", err, context)
 		}
+	}
+}
+
+func TestIteratorPreservesPreviousBlockReadFailure(t *testing.T) {
+	t.Parallel()
+
+	page, err := storage.NewPage(8)
+	if err != nil {
+		t.Fatalf("NewPage() error = %v", err)
+	}
+	if err := page.SetInt(0, 8); err != nil {
+		t.Fatalf("SetInt(boundary) error = %v", err)
+	}
+	_, files := newLogManager(t, 8)
+	iterator := &Iterator{
+		page:     page,
+		position: page.Capacity(),
+		files:    files,
+		block:    storage.NewBlockID("../escape", 1),
+	}
+	record, ok, err := iterator.Next()
+	if record != nil || ok {
+		t.Errorf("Next() = (%v, %t, %v), want no record", record, ok, err)
+	}
+	if err == nil {
+		t.Fatal("Next() error = nil, want previous-block read error")
+	}
+	for _, context := range []string{"iterate log: read previous block", "invalid database file name", "../escape"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Next() error = %q, want context %q", err, context)
+		}
+	}
+	if got, want := iterator.block, storage.NewBlockID("../escape", 1); got != want {
+		t.Errorf("iterator block after read failure = %v, want %v", got, want)
+	}
+	if iterator.position != page.Capacity() {
+		t.Errorf("iterator position after read failure = %d, want %d", iterator.position, page.Capacity())
 	}
 }
