@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 8: Parse an expression</title>
+  <desc id="description">Parser.ParseExpression chooses a lower-case field expression for identifiers, or parses an integer or string constant into a constant expression. Invalid tokens retain their position and input.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="560" fill="#fff"/>
+  <text class="title" x="600" y="60" text-anchor="middle">Chapter 9 / Feature 8: Parse an expression</text>
+  <rect class="box" x="35" y="205" width="245" height="130" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="157" y="248"><tspan x="157">SQL input</tspan><tspan class="small" x="157" dy="31">Customer or 42 or 'Ada'</tspan></text>
+  <polygon points="485,190 610,270 485,350 360,270" fill="#fff2cc" stroke="#d6b656" stroke-width="2"/>
+  <text class="label" x="485" y="263"><tspan x="485">ParseExpression()</tspan><tspan class="small" x="485" dy="27">MatchIdentifier?</tspan></text>
+  <rect class="box" x="710" y="105" width="270" height="125" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="845" y="141"><tspan x="845">Field branch</tspan><tspan class="small" x="845" dy="27">consume identifier</tspan><tspan class="small" x="845" dy="24">NewFieldExpression(lowercase)</tspan></text>
+  <rect class="box" x="710" y="275" width="270" height="125" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="845" y="311"><tspan x="845">Literal branch</tspan><tspan class="small" x="845" dy="27">parse integer or string</tspan><tspan class="small" x="845" dy="24">NewConstantExpression</tspan></text>
+  <rect class="box" x="360" y="420" width="250" height="95" fill="#f8cecc" stroke="#b85450"/>
+  <text class="small" x="485" y="449"><tspan x="485">reserved or invalid token</tspan><tspan x="485" dy="24">byte-positioned error</tspan><tspan x="485" dy="24">input remains available</tspan></text>
+  <rect class="box" x="1010" y="190" width="170" height="135" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="1095" y="234"><tspan x="1095">query.Expression</tspan><tspan class="small" x="1095" dy="31">following token</tspan><tspan class="small" x="1095" dy="24">preserved</tspan></text>
+  <path class="edge" d="M280 270 H350"/><text class="small" x="315" y="254">input</text>
+  <path class="edge" d="M545 232 L700 166"/><text class="small" x="624" y="181">yes</text>
+  <path class="edge" d="M545 308 L700 338"/><text class="small" x="624" y="340">no</text>
+  <path class="edge" d="M485 350 V410"/><text class="small" x="535" y="386">invalid literal</text>
+  <path class="edge" d="M980 167 L1000 230"/><text class="small" x="995" y="188">field</text>
+  <path class="edge" d="M980 337 L1000 285"/><text class="small" x="995" y="345">constant</text>
+</svg>

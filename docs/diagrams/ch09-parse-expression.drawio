@@ -1,0 +1,22 @@
+<mxfile host="app.diagrams.net" modified="2026-11-23T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-parse-expression" name="Chapter 9 - Parse Expression">
+    <mxGraphModel page="1" pageWidth="1200" pageHeight="560">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 8: Parse an expression" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="210" y="25" width="780" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="SQL input&#xa;&#xa;Customer or 42 or 'Ada'" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;" vertex="1" parent="1"><mxGeometry x="35" y="205" width="245" height="130" as="geometry"/></mxCell>
+        <mxCell id="parser" value="Parser.ParseExpression()&#xa;&#xa;MatchIdentifier?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;" vertex="1" parent="1"><mxGeometry x="360" y="195" width="250" height="150" as="geometry"/></mxCell>
+        <mxCell id="field" value="Field branch&#xa;&#xa;consume identifier&#xa;NewFieldExpression(lowercase)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="710" y="105" width="270" height="125" as="geometry"/></mxCell>
+        <mxCell id="constant" value="Literal branch&#xa;&#xa;parse integer or string&#xa;NewConstantExpression" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="710" y="275" width="270" height="125" as="geometry"/></mxCell>
+        <mxCell id="error" value="reserved or invalid token&#xa;&#xa;byte-positioned error&#xa;input remains available" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;" vertex="1" parent="1"><mxGeometry x="360" y="420" width="250" height="95" as="geometry"/></mxCell>
+        <mxCell id="result" value="query.Expression&#xa;&#xa;following token preserved" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=18;" vertex="1" parent="1"><mxGeometry x="1010" y="190" width="170" height="135" as="geometry"/></mxCell>
+        <mxCell id="e1" value="input" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="input" target="parser"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="yes" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="parser" target="field"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="no" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="parser" target="constant"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="invalid literal" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="parser" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="field" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="field" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="constant" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="constant" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
