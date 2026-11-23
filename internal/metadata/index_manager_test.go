@@ -377,6 +377,38 @@ func TestIndexManagerIndexInfoPreservesIndexNameReadError(t *testing.T) {
 	}
 }
 
+func TestIndexManagerIndexInfoPreservesFieldNameReadError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+	wantErr := errors.New("indexed field name unavailable")
+	transaction.getStringErr = wantErr
+	transaction.getStringOffset, _ = record.NewLayout(NewIndexCatalogSchema()).Offset("fieldname")
+	transaction.getStringErrFile = "idxcat.tbl"
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil after catalog field read failure", indexes)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("IndexInfo() error = %v, want wrapped field-name read cause", err)
+	}
+	for _, context := range []string{"student", "idxcat.tbl", "read indexed field", "fieldname"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()
