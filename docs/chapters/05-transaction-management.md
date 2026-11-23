@@ -1006,10 +1006,32 @@ Final shared/exclusive wakeup and partial-release silence were tested first. The
 This maps to Java `LockTable.unlock`'s `notifyAll` after entry removal. Actual shared/exclusive wait loops and bounded
 timeouts remain separate behaviors.
 
+## Feature 45: Wait for exclusive release before shared acquisition
+
+`WaitShared` holds the table mutex while checking the negative exclusive predicate. On conflict it waits on the same
+condition variable, then reacquires the mutex and loops to recheck state. After final release broadcasts, it increments
+the now-compatible state exactly once. The existing `LockShared` remains the non-waiting primitive.
+
+The wait/release/recheck path extends the state transition shown in the
+[editable Draw.io diagram](../diagrams/ch05-lock-release-notification.drawio) and
+[rendered SVG](../diagrams/ch05-lock-release-notification.svg).
+
+### Test-first record
+
+Blocking before release, state preservation while blocked, and acquisition after notification were tested first. The
+initial build failed because `WaitShared` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableWaitsForExclusiveReleaseBeforeAcquiringShared` | An exclusive holder blocks a shared request until final release, then one shared hold is granted |
+
+This is the unbounded wait/recheck portion of Java `LockTable.sLock`. The ten-second abort policy is intentionally a
+separate behavior.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by waiting for an exclusive holder to release before granting a shared
-lock, then add timeout, exclusive waiting, and transaction-local lock tracking separately.
+Continue with Chapter 5 concurrency control by applying a bounded timeout to shared-lock waiting, then add exclusive
+waiting and transaction-local lock tracking separately.
 
 ## Sources
 
