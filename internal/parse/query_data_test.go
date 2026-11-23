@@ -113,3 +113,41 @@ func TestInsertDataZeroValueHasEmptyAccessors(t *testing.T) {
 		t.Errorf("Values() = %v, want nil", got)
 	}
 }
+
+func TestModifyDataStoresUpdateTargetValueAndPredicate(t *testing.T) {
+	newValue := query.NewFieldExpression("grade")
+	predicate := query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("active"),
+		query.NewConstantExpression(query.NewIntConstant(1)),
+	))
+	data := NewModifyData("student", "score", newValue, predicate)
+
+	if got, want := data.TableName(), "student"; got != want {
+		t.Errorf("TableName() = %q, want %q", got, want)
+	}
+	if got, want := data.TargetField(), "score"; got != want {
+		t.Errorf("TargetField() = %q, want %q", got, want)
+	}
+	if got := data.NewValue(); got != newValue {
+		t.Errorf("NewValue() = %v, want %v", got, newValue)
+	}
+	if got, want := data.Predicate().String(), "active=1"; got != want {
+		t.Errorf("Predicate().String() = %q, want %q", got, want)
+	}
+}
+
+func TestModifyDataZeroValueHasSafeAccessors(t *testing.T) {
+	var data ModifyData
+	if got := data.TableName(); got != "" {
+		t.Errorf("TableName() = %q, want empty", got)
+	}
+	if got := data.TargetField(); got != "" {
+		t.Errorf("TargetField() = %q, want empty", got)
+	}
+	if got := data.NewValue().String(); got != "<unset-expression>" {
+		t.Errorf("NewValue().String() = %q, want <unset-expression>", got)
+	}
+	if got := data.Predicate().String(); got != "" {
+		t.Errorf("Predicate().String() = %q, want empty", got)
+	}
+}

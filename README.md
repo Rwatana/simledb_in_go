@@ -72,7 +72,7 @@
 
 ## 次の一歩
 
-Chapter 9ではSQLの字句解析とSELECT文、DELETE文、INSERT文の解析、およびINSERT command dataを実装しています。次はUPDATE、CREATEのcommand dataと構文解析を個別のIssueへ分け、その後にupdate command dispatchを追加します。
+Chapter 9ではSQLの字句解析とSELECT文、DELETE文、INSERT文の解析、およびINSERT・UPDATE command dataを実装しています。次はUPDATE文の構文解析とCREATE command data・構文解析を個別のIssueへ分け、その後にupdate command dispatchを追加します。
 
 ## 参照元
 
