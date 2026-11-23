@@ -71,7 +71,8 @@ Chapter 3の基礎file layerと、Chapter 4のlog manager基本機能が揃い�
 pin increment、unpin、modifying transaction、recovery LSN、最初のBlockID割当、WAL順flush、clean frameの
 再割当、dirty frameのWAL順replacement、fixed-size BufferManager pool初期化、existing assignment lookupまで
 進み、最初のunpinned victim候補を選び、cache済みframeをpinして0→1遷移だけをavailable countへ反映できます。
-次はManager経由のunpinと1→0遷移だけを、独立したIssueとPRで追加します。
+Manager経由のunpinも1→0遷移だけをavailable countへ反映します。次はcache miss時のframe割当だけを、
+独立したIssueとPRで追加します。
 
 ## 参照元
 
