@@ -744,3 +744,20 @@ The test first failed to compile because `MetadataManager.CreateIndex` did not e
 | --- | --- |
 | `TestMetadataManagerCreateIndexStoresRegistrationThroughFacade` | Creating `idx_student_major` through the facade produces exactly one `majorid` registration visible to the shared index manager |
 | `TestMetadataManagerCreateIndexPreservesMissingTableManagerError` | A missing table-manager dependency returns the requested index name and facade context before transaction access |
+
+## Feature 37: Look up indexes through the metadata facade
+
+`MetadataManager.IndexInfo` delegates the requested table and transaction to the shared index manager, returning its
+field-keyed metadata map unchanged. An unindexed table therefore retains the initialized empty-map result, while catalog,
+layout, statistics, and cleanup failures gain the requested table name plus facade context.
+
+This maps Java `MetadataMgr.getIndexInfo` without copying `IndexInfo` values or introducing a second index-metadata cache.
+
+### Test-first record
+
+The test first failed to compile because `MetadataManager.IndexInfo` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestMetadataManagerIndexInfoLooksUpRegisteredAndUnindexedTables` | Lookup returns the stored `majorid` index for `student` and a non-nil empty map for an unindexed table |
+| `TestMetadataManagerIndexInfoPreservesCatalogReadError` | A failed index-catalog layout lookup returns no index map and preserves the requested table, facade context, and original cause |
