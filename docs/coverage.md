@@ -338,6 +338,10 @@ The statistics record loop now uses a private scan interface so a defensive `Get
 `Next` can be exercised directly. The test checks the record index and wrapped cause; all metadata statements are
 now covered, while full-module statement coverage remains 99.4%.
 
+`FileManager.Append` now covers a file-handle `Stat` failure through a private file-operation seam. The test verifies
+the wrapped cause and path context, ensures the file is closed, and confirms no write or sync follows. The file package
+is now 98.0% covered, `Append` is 95.5% covered, and full-module statement coverage is 99.5%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

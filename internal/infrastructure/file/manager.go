@@ -15,7 +15,15 @@ import (
 type Manager struct {
 	directory string
 	blockSize int
+	openFile  func(string, int, os.FileMode) (blockFile, error)
 	mu        sync.Mutex
+}
+
+type blockFile interface {
+	Stat() (os.FileInfo, error)
+	WriteAt([]byte, int64) (int, error)
+	Sync() error
+	Close() error
 }
 
 // NewManager creates the database directory and returns a Manager for blockSize-byte blocks.
@@ -29,7 +37,13 @@ func NewManager(directory string, blockSize int) (*Manager, error) {
 	if err := os.MkdirAll(directory, 0o750); err != nil {
 		return nil, fmt.Errorf("create database directory %q: %w", directory, err)
 	}
-	return &Manager{directory: directory, blockSize: blockSize}, nil
+	return &Manager{
+		directory: directory,
+		blockSize: blockSize,
+		openFile: func(path string, flag int, perm os.FileMode) (blockFile, error) {
+			return os.OpenFile(path, flag, perm)
+		},
+	}, nil
 }
 
 // BlockSize returns the number of bytes in each database block.
@@ -70,7 +84,7 @@ func (m *Manager) Append(fileName string) (storage.BlockID, error) {
 	if err != nil {
 		return storage.BlockID{}, fmt.Errorf("append block to %q: %w", fileName, err)
 	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	file, err := m.openFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return storage.BlockID{}, fmt.Errorf("append block to %q: open %q: %w", fileName, path, err)
 	}
@@ -134,7 +148,7 @@ func (m *Manager) Write(block storage.BlockID, page *storage.Page) error {
 	if err != nil {
 		return fmt.Errorf("write block %v: %w", block, err)
 	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	file, err := m.openFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return fmt.Errorf("write block %v: open %q: %w", block, path, err)
 	}
