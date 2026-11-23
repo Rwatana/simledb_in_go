@@ -104,6 +104,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | `TestNewManagerPreservesInitialBlockAppendFailure` | Darwin/LinuxのFIFOで初期block append error causeとcontextを保持する |
 | `TestNewManagerPreservesTailBlockReadFailure` | 既存tail blockのread error causeとblock contextを保持する |
 | `TestNewManagerPreservesTailBoundaryReadFailure` | 短いtail Pageのboundary read errorとcontextを保持する |
+| `TestNewManagerPreservesFileLengthFailure` | log file length failureのcauseとfile contextを保持する |
 
 ## Javaソースリーディング
 

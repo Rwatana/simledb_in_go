@@ -19,12 +19,21 @@ type shortPageFileManager struct {
 	page *storage.Page
 }
 
+type lengthFailureFileManager struct {
+	*storagefile.Manager
+	err error
+}
+
 func (f readFailureFileManager) Read(storage.BlockID) (*storage.Page, error) {
 	return nil, f.err
 }
 
 func (f shortPageFileManager) Read(storage.BlockID) (*storage.Page, error) {
 	return f.page, nil
+}
+
+func (f lengthFailureFileManager) Length(string) (int, error) {
+	return 0, f.err
 }
 
 func TestNewManagerPreservesTailBlockReadFailure(t *testing.T) {
@@ -70,6 +79,27 @@ func TestNewManagerPreservesTailBoundaryReadFailure(t *testing.T) {
 	} {
 		if err == nil || !strings.Contains(err.Error(), context) {
 			t.Errorf("newManager() error = %v, want context %q", err, context)
+		}
+	}
+}
+
+func TestNewManagerPreservesFileLengthFailure(t *testing.T) {
+	t.Parallel()
+
+	const fileName = "simpledb.log"
+	_, files := newLogManager(t, 32)
+	lengthErr := errors.New("file length failed")
+
+	manager, err := newManager(lengthFailureFileManager{Manager: files, err: lengthErr}, fileName)
+	if manager != nil {
+		t.Errorf("newManager() manager = %v, want nil", manager)
+	}
+	if err == nil || !errors.Is(err, lengthErr) {
+		t.Fatalf("newManager() error = %v, want wrapped file-length error", err)
+	}
+	for _, context := range []string{"create log manager for \"simpledb.log\"", "file length failed"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("newManager() error = %q, want context %q", err, context)
 		}
 	}
 }

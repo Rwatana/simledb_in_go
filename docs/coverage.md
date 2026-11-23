@@ -257,6 +257,9 @@ constructor test injects an existing-tail read error and verifies the wrapped ca
 
 A short-page test exercises the existing-tail boundary decode failure through the same internal seam. It verifies
 that construction stops before returning a Manager and preserves the Page read error with file context.
+
+The internal log-file seam also injects a file-length lookup failure, confirming construction returns no Manager and
+preserves both the underlying cause and the requested filename context.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
