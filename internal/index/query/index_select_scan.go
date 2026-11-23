@@ -125,3 +125,11 @@ func (scan *IndexSelectScan) GetVal(fieldName string) (query.Constant, error) {
 	}
 	return value, nil
 }
+
+// HasField reports whether the data table declares fieldName.
+func (scan *IndexSelectScan) HasField(fieldName string) bool {
+	if scan == nil || scan.dataScan == nil || scan.dataScan.TableScan == nil {
+		return false
+	}
+	return scan.dataScan.HasField(fieldName)
+}
