@@ -1052,6 +1052,7 @@ timeout error immediately and leaves both the exclusive holder and unrelated blo
 | --- | --- |
 | `TestLockTableTimesOutBlockedSharedRequest` | A persistent exclusive holder causes a distinguishable timeout without state mutation |
 | `TestLockTableImmediatelyTimesOutBlockedSharedRequest` | A zero timeout returns immediately while preserving the exclusive holder and unrelated shared state |
+| `TestLockTableWaitSharedForAcquiresUncontendedZeroValueTable` | An unblocked request on a zero-value table initializes its lock map and grants one shared hold |
 | `TestLockTableBoundedSharedRequestAcquiresBeforeDeadline` | Final release before the deadline grants one shared hold |
 
 This maps to Java `LockTable.sLock`'s elapsed-time check and `LockAbortException`. Go accepts the duration explicitly so

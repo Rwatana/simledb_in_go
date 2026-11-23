@@ -191,6 +191,9 @@ coverage is 98.5%, and full-module statement coverage is 97.3%.
 `LockTable.WaitSharedFor` now also covers an already-expired deadline with a zero-duration request. The test verifies
 that timeout is immediate and leaves the exclusive holder and unrelated lock state unchanged. Concurrency package
 coverage is 96.5%, and full-module statement coverage remains 97.3%.
+
+An uncontended request on a zero-value `LockTable` now verifies that `WaitSharedFor` initializes the lock map and
+grants exactly one shared hold. Concurrency package coverage is 97.3%, and full-module statement coverage is 97.4%.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

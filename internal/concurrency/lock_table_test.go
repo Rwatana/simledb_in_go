@@ -412,6 +412,21 @@ func TestLockTableImmediatelyTimesOutBlockedSharedRequest(t *testing.T) {
 	}
 }
 
+func TestLockTableWaitSharedForAcquiresUncontendedZeroValueTable(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+
+	if err := table.WaitSharedFor(block, time.Second); err != nil {
+		t.Fatalf("WaitSharedFor() error = %v", err)
+	}
+	if got := table.locks[block]; got != 1 {
+		t.Fatalf("shared holders after acquisition = %d, want 1", got)
+	}
+	if len(table.locks) != 1 {
+		t.Fatalf("lock table entries = %d, want 1", len(table.locks))
+	}
+}
+
 func TestLockTableBoundedSharedRequestAcquiresBeforeDeadline(t *testing.T) {
 	var table LockTable
 	block := storage.NewBlockID("tbl", 1)
