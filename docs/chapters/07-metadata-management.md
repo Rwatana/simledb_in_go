@@ -765,6 +765,10 @@ The index-name read failure is tested separately after the indexed table name ma
 The following `fieldname` read failure has an independent test as well. Both preceding catalog reads must succeed, and
 the lookup still wraps the injected cause and returns no partial result.
 
+The indexed-table layout failure is tested after a matching idxcat row has been read. A call-counted table-catalog size
+failure proves that idxcat reconstruction succeeds first, while the later table layout lookup returns its cause and
+table-specific context without a partial index map.
+
 ## Feature 36: Create an index through the metadata facade
 
 `MetadataManager.CreateIndex` delegates the index, table, and field names plus the transaction to the shared index
