@@ -83,6 +83,17 @@ func (p *ProductPlan) Open() (query.Scan, error) {
 	return productScan, nil
 }
 
+// BlocksAccessed estimates the nested-loop block reads of the product scan.
+func (p *ProductPlan) BlocksAccessed() int {
+	if p == nil || p.left == nil || p.right == nil {
+		return 0
+	}
+	leftBlocks := int32(p.left.BlocksAccessed())
+	leftRecords := int32(p.left.RecordsOutput())
+	rightBlocks := int32(p.right.BlocksAccessed())
+	return int(leftBlocks + leftRecords*rightBlocks)
+}
+
 type productPlanScanSource struct {
 	name string
 	scan query.Scan
