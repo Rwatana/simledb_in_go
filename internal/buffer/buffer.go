@@ -10,14 +10,18 @@ import (
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
+// TransactionID identifies a transaction that modified a Buffer.
+type TransactionID int64
+
 // Buffer owns one in-memory Page and its optional disk block assignment.
 type Buffer struct {
-	files    *storagefile.Manager
-	logs     *logmanager.Manager
-	contents *storage.Page
-	block    *storage.BlockID
-	mu       sync.Mutex
-	pins     int
+	files      *storagefile.Manager
+	logs       *logmanager.Manager
+	contents   *storage.Page
+	block      *storage.BlockID
+	mu         sync.Mutex
+	pins       int
+	modifiedBy *TransactionID
 }
 
 // New returns a zero-filled Buffer that is not assigned to a disk block.
@@ -80,4 +84,23 @@ func (b *Buffer) unpin() (bool, error) {
 	}
 	b.pins--
 	return b.pins == 0, nil
+}
+
+// MarkModified records the transaction that most recently modified the Buffer.
+func (b *Buffer) MarkModified(transaction TransactionID) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.modifiedBy = &transaction
+}
+
+// ModifyingTransaction returns the transaction that marked the Buffer dirty.
+func (b *Buffer) ModifyingTransaction() (TransactionID, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.modifiedBy == nil {
+		return 0, false
+	}
+	return *b.modifiedBy, true
 }
