@@ -2,6 +2,7 @@
 package indexquery
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Rwatana/simledb_in_go/internal/index"
@@ -132,4 +133,23 @@ func (scan *IndexSelectScan) HasField(fieldName string) bool {
 		return false
 	}
 	return scan.dataScan.HasField(fieldName)
+}
+
+// Close releases the retained index and data-table scan.
+func (scan *IndexSelectScan) Close() error {
+	if scan == nil {
+		return fmt.Errorf("close nil index select scan")
+	}
+	var closeErrors []error
+	if scan.index != nil {
+		if err := scan.index.Close(); err != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("close index select scan index: %w", err))
+		}
+	}
+	if scan.dataScan != nil && scan.dataScan.TableScan != nil {
+		if err := scan.dataScan.Close(); err != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("close index select scan data table: %w", err))
+		}
+	}
+	return errors.Join(closeErrors...)
 }

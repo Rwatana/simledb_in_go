@@ -57,6 +57,7 @@ type indexSelectNextTransaction struct {
 	intErr      error
 	stringValue string
 	stringErr   error
+	events      *[]string
 	pinned      []storage.BlockID
 	unpinned    []storage.BlockID
 }
@@ -82,6 +83,9 @@ func (*indexSelectNextTransaction) Append(fileName string) (storage.BlockID, err
 }
 func (transaction *indexSelectNextTransaction) Unpin(block storage.BlockID) error {
 	transaction.unpinned = append(transaction.unpinned, block)
+	if transaction.events != nil {
+		*transaction.events = append(*transaction.events, "data")
+	}
 	return transaction.unpinErr
 }
 
