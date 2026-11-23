@@ -254,6 +254,9 @@ new-block append failure and confirms its wrapped cause and context do not advan
 
 `log.NewManager` now uses a private file-operation interface behind its unchanged public constructor. The internal
 constructor test injects an existing-tail read error and verifies the wrapped cause, filename, and tail BlockID.
+
+A short-page test exercises the existing-tail boundary decode failure through the same internal seam. It verifies
+that construction stops before returning a Manager and preserves the Page read error with file context.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
