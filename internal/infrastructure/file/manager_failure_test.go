@@ -1,6 +1,7 @@
 package file
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -98,6 +99,48 @@ func TestManagerAppendPreservesFileSyncFailure(t *testing.T) {
 	}
 }
 
+func TestManagerWritePreservesFileSyncFailure(t *testing.T) {
+	directory := t.TempDir()
+	manager, err := NewManager(directory, 16)
+	if err != nil {
+		t.Fatalf("NewManager() error = %v", err)
+	}
+	wantErr := errors.New("sync unavailable")
+	handle := &failedSyncFile{err: wantErr}
+	var openedPath string
+	manager.openFile = func(path string, _ int, _ os.FileMode) (blockFile, error) {
+		openedPath = path
+		return handle, nil
+	}
+	page, err := storage.NewPage(16)
+	if err != nil {
+		t.Fatalf("NewPage() error = %v", err)
+	}
+	if err := page.SetInt(0, 42); err != nil {
+		t.Fatalf("SetInt() error = %v", err)
+	}
+	block := storage.NewBlockID("student.tbl", 2)
+
+	err = manager.Write(block, page)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Write() error = %v, want wrapped sync failure", err)
+	}
+	for _, context := range []string{block.String(), "sync", openedPath} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Write() error = %q, want context %q", err, context)
+		}
+	}
+	if handle.writeCalls != 1 || handle.syncCalls != 1 || handle.closeCalls != 1 {
+		t.Errorf("file operations = (%d writes, %d syncs, %d closes), want (1, 1, 1)", handle.writeCalls, handle.syncCalls, handle.closeCalls)
+	}
+	if !bytes.Equal(handle.written, page.Snapshot()) {
+		t.Errorf("written bytes = %v, want complete page %v", handle.written, page.Snapshot())
+	}
+	if handle.writtenOffset != 32 {
+		t.Errorf("write offset = %d, want 32", handle.writtenOffset)
+	}
+}
+
 type failedStatFile struct {
 	err        error
 	writeCalls int
@@ -125,21 +168,23 @@ func (f *failedStatFile) Close() error {
 }
 
 type failedSyncFile struct {
-	info       os.FileInfo
-	err        error
-	written    []byte
-	writeCalls int
-	syncCalls  int
-	closeCalls int
+	info          os.FileInfo
+	err           error
+	written       []byte
+	writtenOffset int64
+	writeCalls    int
+	syncCalls     int
+	closeCalls    int
 }
 
 func (f *failedSyncFile) Stat() (os.FileInfo, error) {
 	return f.info, nil
 }
 
-func (f *failedSyncFile) WriteAt(contents []byte, _ int64) (int, error) {
+func (f *failedSyncFile) WriteAt(contents []byte, offset int64) (int, error) {
 	f.writeCalls++
 	f.written = append(f.written[:0], contents...)
+	f.writtenOffset = offset
 	return len(contents), nil
 }
 

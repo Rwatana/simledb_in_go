@@ -346,6 +346,10 @@ A separate `Append` test now covers a sync failure after the complete zero-fille
 context, the wrapped cause, and handle cleanup. `Append` is now 100.0% covered, file package coverage is 99.0%, and
 full-module statement coverage remains 99.5%.
 
+`FileManager.Write` now also covers a sync failure after writing the complete page. The test checks block/path context,
+the wrapped cause, page bytes, and handle cleanup. `Write` and the file package are now 100.0% covered, and full-module
+statement coverage is 99.6%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
