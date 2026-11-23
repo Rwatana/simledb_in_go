@@ -1924,3 +1924,19 @@ func TestTransactionBlockSizeRequiresFullFileManager(t *testing.T) {
 		t.Fatal("BlockSize() without full file manager returned nil error")
 	}
 }
+
+func TestTransactionAvailableBuffersDelegatesWithoutChangingOwnership(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	bufferManager := &recordingBufferPinner{available: 3}
+	tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := tx.AvailableBuffers(); got != 3 {
+		t.Fatalf("AvailableBuffers() = %d, want 3", got)
+	}
+	if len(bufferManager.blocks) != 0 || len(bufferManager.unpins) != 0 {
+		t.Fatalf("availability query changed pin ownership: pins %v unpins %d", bufferManager.blocks, len(bufferManager.unpins))
+	}
+}
