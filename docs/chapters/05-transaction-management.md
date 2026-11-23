@@ -1794,6 +1794,7 @@ length, EOF sentinel contention, repeated-lock reuse, and file-manager error pro
 | --- | --- |
 | `TestTransactionSizeReadsLengthUnderReusableEOFSharedLock` | File length reads retain and reuse one shared EOF lock |
 | `TestTransactionSizeReturnsFileLengthFailure` | File length failures retain file context and preserve the lock ordering |
+| `TestNewWithFileSizerRejectsNilSizerBeforeStartingTransaction` | Missing file metadata is rejected before allocating an ID or appending START |
 
 The negative block number is a lock namespace value only; it is never passed to physical file I/O.
 

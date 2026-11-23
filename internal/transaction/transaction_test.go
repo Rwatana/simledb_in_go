@@ -1240,6 +1240,25 @@ func TestTransactionSizeReadsLengthUnderReusableEOFSharedLock(t *testing.T) {
 	}
 }
 
+func TestNewWithFileSizerRejectsNilSizerBeforeStartingTransaction(t *testing.T) {
+	var allocator IDAllocator
+	logs := &recordingTransactionLog{}
+
+	transaction, err := NewWithFileSizer(&allocator, &concurrency.LockTable{}, nil, &recordingBufferPinner{}, logs)
+	if transaction != nil {
+		t.Fatalf("NewWithFileSizer() transaction = %v, want nil", transaction)
+	}
+	if err == nil || err.Error() != "create transaction with file sizer: file sizer must not be nil" {
+		t.Fatalf("NewWithFileSizer() error = %v, want missing file-sizer context", err)
+	}
+	if got := allocator.last.Load(); got != 0 {
+		t.Errorf("allocated transaction IDs = %d, want 0 before dependency rejection", got)
+	}
+	if len(logs.records) != 0 {
+		t.Errorf("START record count = %d, want 0 before dependency rejection", len(logs.records))
+	}
+}
+
 func TestTransactionSizeReturnsFileLengthFailure(t *testing.T) {
 	wantErr := errors.New("length failed")
 	var allocator IDAllocator
