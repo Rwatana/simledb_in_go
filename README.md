@@ -23,6 +23,8 @@
 | 5 | Transaction Management | 基礎実装済み | [Transactionの解説・実装記録](docs/chapters/05-transaction-management.md) |
 | 6 | Record Management | 基礎実装済み | [Schema、Layout、RecordPage、TableScanの解説・実装記録](docs/chapters/06-record-management.md) |
 | 7 | Metadata Management | 実装中 | [Catalog metadataの解説・実装記録](docs/chapters/07-metadata-management.md) |
+| 8 | Query Processing | 実装中 | [query scanと関係演算子の解説・実装記録](docs/chapters/08-query-processing.md) |
+| 9 | Parsing | 実装中 | [SQL tokenizationの解説・実装記録](docs/chapters/09-parsing.md) |
 
 第1章は概念導入、第2章はJDBCによるクライアント境界の説明であり、書籍もSimpleDBの
 内部実装の解説を第3章から始めています。そのため、第1章と第2章のPRにはGo実装を含めません。
