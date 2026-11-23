@@ -365,6 +365,11 @@ page after the old tail flush succeeds. The tests confirm the old in-memory tail
 to the rejected record, the flushed LSN is retained, and no new disk block is appended. `rollOverLocked` is now
 100.0% covered, log package coverage is 99.2%, and full-module statement coverage is 99.8%.
 
+Log append now isolates the boundary write and LSN increment into a private helper. A direct error-path test uses an
+undersized page to verify the wrapped block/offset context and unchanged LSN when the boundary write fails; ordinary
+append still covers the success path. Every statement in the log package is now covered, and full-module statement
+coverage is 99.9%. The only remaining package below 100.0% is transaction.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

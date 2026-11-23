@@ -124,6 +124,10 @@ func (m *Manager) appendWithMaxInt32(record []byte, maxInt32 int) (LSN, error) {
 	if err := m.page.SetBytes(position, record); err != nil {
 		return 0, fmt.Errorf("append log record to %v at offset %d: %w", m.block, position, err)
 	}
+	return m.setAppendBoundary(position)
+}
+
+func (m *Manager) setAppendBoundary(position int) (LSN, error) {
 	if err := m.page.SetInt(0, int32(position)); err != nil {
 		return 0, fmt.Errorf("append log record to %v: update boundary to %d: %w", m.block, position, err)
 	}

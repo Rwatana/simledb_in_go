@@ -312,6 +312,31 @@ func TestAppendPreservesRolloverTailBoundaryInitializationFailure(t *testing.T) 
 	assertRolloverPageSetupFailureState(t, manager, files, beforePage, beforeBlock, firstLSN, fileName)
 }
 
+func TestSetAppendBoundaryPreservesPageWriteFailure(t *testing.T) {
+	t.Parallel()
+
+	manager, _ := newInternalLogManager(t, 32)
+	shortPage, err := storage.NewPage(3)
+	if err != nil {
+		t.Fatalf("storage.NewPage() error = %v", err)
+	}
+	manager.page = shortPage
+	beforeLSN := manager.latestLSN
+
+	lsn, err := manager.setAppendBoundary(4)
+	if lsn != 0 {
+		t.Errorf("setAppendBoundary() LSN = %d, want 0", lsn)
+	}
+	for _, context := range []string{"append log record to [file simpledb.log, block 0]", "update boundary to 4", "page capacity 3"} {
+		if err == nil || !strings.Contains(err.Error(), context) {
+			t.Errorf("setAppendBoundary() error = %v, want context %q", err, context)
+		}
+	}
+	if manager.latestLSN != beforeLSN {
+		t.Errorf("latest LSN = %d, want unchanged value %d", manager.latestLSN, beforeLSN)
+	}
+}
+
 func newInternalLogManager(t *testing.T, blockSize int) (*Manager, *storagefile.Manager) {
 	t.Helper()
 
