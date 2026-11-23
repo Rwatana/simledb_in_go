@@ -266,3 +266,42 @@ func (s *TableScan) MoveToNewBlock() error {
 	s.currentSlot = -1
 	return nil
 }
+
+// Insert occupies the next available record slot across table blocks.
+func (s *TableScan) Insert() error {
+	if s.recordPage == nil {
+		return fmt.Errorf("insert through table scan for %q: no current record page", s.fileName)
+	}
+	for {
+		blockNumber := s.recordPage.Block().Number()
+		inserted, err := s.InsertInBlock()
+		if err != nil {
+			return fmt.Errorf("insert through table scan for %q: search block %d: %w", s.fileName, blockNumber, err)
+		}
+		if inserted {
+			return nil
+		}
+		last, err := s.AtLastBlock()
+		if err != nil {
+			return fmt.Errorf("insert through table scan for %q: continue after block %d: %w", s.fileName, blockNumber, err)
+		}
+		if !last {
+			if err := s.MoveToNextBlock(); err != nil {
+				return fmt.Errorf("insert through table scan for %q: continue after block %d: %w", s.fileName, blockNumber, err)
+			}
+			continue
+		}
+		if err := s.MoveToNewBlock(); err != nil {
+			return fmt.Errorf("insert through table scan for %q: roll over after block %d: %w", s.fileName, blockNumber, err)
+		}
+		newBlock := s.recordPage.Block()
+		inserted, err = s.InsertInBlock()
+		if err != nil {
+			return fmt.Errorf("insert through table scan for %q: occupy new block %d: %w", s.fileName, newBlock.Number(), err)
+		}
+		if !inserted {
+			return fmt.Errorf("insert through table scan for %q: new block %d has no complete record slot", s.fileName, newBlock.Number())
+		}
+		return nil
+	}
+}

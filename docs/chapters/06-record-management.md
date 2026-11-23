@@ -761,6 +761,28 @@ The tests first failed to compile because `TableScan.MoveToNewBlock` did not exi
 
 This maps Java `TableScan.moveToNewBlock` with explicit stage errors and retryable cleanup state.
 
+## Feature 44: Insert a record across table scan blocks
+
+`TableScan.Insert` first tries the current block. Full non-final blocks are released in order and the search continues on
+the next existing block without appending. Only a full final block triggers one append, pin, and no-log format before
+the first empty slot is occupied with logging. A newly formatted block without a complete slot is rejected explicitly
+instead of causing an unbounded append loop.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.Insert` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanInsertSkipsFullExistingBlocks` | Full existing blocks are traversed without append before the next empty slot is occupied |
+| `TestTableScanInsertAppendsOneFormattedBlockAfterFullLastBlock` | A full final block causes exactly one formatted rollover block and one logged occupation |
+| `TestTableScanInsertWrapsLastBlockCheckFailure` | A failed last-block decision retains its cause and identifies the exhausted block |
+| `TestTableScanInsertRejectsNewBlockWithoutACompleteSlot` | An unusable new block stops after one append instead of looping |
+| `TestTableScanInsertRejectsClosedScan` | A scan without a current page cannot insert |
+
+This completes Java `TableScan.insert` by composing the separately tested current-block insertion, existing-block
+movement, final-block decision, and `moveToNewBlock` behaviors.
+
 ## Next behavior
 
-Compose current-block insertion, existing-block movement, and new-block rollover into table insertion.
+Delete the table scan's current record.
