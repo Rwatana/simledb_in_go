@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="590" viewBox="0 0 1240 590" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 18: Parse SQL UPDATE statements</title>
+  <desc id="description">The parser consumes update, the table, set and the target assignment, then optionally parses a where predicate. It returns ModifyData, preserves the following token and reports contextual errors with byte offsets.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:16;ry:16}.label{font:16px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:14px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1240" height="590" fill="#fff"/>
+  <text class="title" x="620" y="62" text-anchor="middle">Chapter 9 / Feature 18: Parse SQL UPDATE statements</text>
+  <rect class="box" x="35" y="210" width="150" height="105" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="110" y="253"><tspan x="110">update</tspan><tspan class="small" x="110" dy="27">keyword</tspan></text>
+  <rect class="box" x="230" y="210" width="185" height="105" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="322" y="253"><tspan x="322">table</tspan><tspan class="small" x="322" dy="27">target field</tspan></text>
+  <rect class="box" x="460" y="195" width="250" height="135" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="585" y="239"><tspan x="585">set field = expression</tspan><tspan class="small" x="585" dy="30">field, constant, or literal</tspan></text>
+  <rect class="box" x="760" y="195" width="240" height="135" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="880" y="239"><tspan x="880">optional where predicate</tspan><tspan class="small" x="880" dy="30">ordered terms joined by and</tspan></text>
+  <rect class="box" x="1050" y="195" width="175" height="135" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="1137" y="232"><tspan x="1137">ModifyData</tspan><tspan class="small" x="1137" dy="26">table · target field</tspan><tspan class="small" x="1137" dy="22">new expression</tspan><tspan class="small" x="1137" dy="22">predicate</tspan></text>
+  <rect class="box" x="760" y="405" width="240" height="90" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="880" y="440"><tspan x="880">following token</tspan><tspan class="small" x="880" dy="25">remains for caller</tspan></text>
+  <rect class="box" x="230" y="405" width="480" height="90" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="470" y="440"><tspan x="470">missing clause, name, delimiter, or expression</tspan><tspan class="small" x="470" dy="25">contextual error with byte offset</tspan></text>
+  <path class="edge" d="M185 262 H220"/><path class="edge" d="M415 262 H450"/>
+  <path class="edge" d="M710 262 H750"/><text class="small" x="730" y="244">where or next token</text>
+  <path class="edge" d="M1000 262 H1040"/>
+  <path class="edge" d="M710 315 H1020 V285 H1040"/><text class="small" x="858" y="307">no where</text>
+  <path class="edge" d="M880 330 V395"/><text class="small" x="934" y="376">after command</text>
+  <path class="edge" d="M585 330 V375 H710 V450"/><text class="small" x="648" y="370">syntax failure</text>
+</svg>

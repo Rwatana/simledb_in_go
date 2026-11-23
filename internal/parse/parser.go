@@ -185,6 +185,44 @@ func (parser *Parser) ParseInsert() (InsertData, error) {
 	return NewInsertData(tableName, fields, values), nil
 }
 
+// ParseUpdate reads an UPDATE target, new-value expression, and optional predicate.
+func (parser *Parser) ParseUpdate() (ModifyData, error) {
+	if parser == nil {
+		return ModifyData{}, fmt.Errorf("parse update: parser is nil")
+	}
+	if err := parser.lexer.EatKeyword("update"); err != nil {
+		return ModifyData{}, fmt.Errorf("parse update UPDATE keyword: %w", err)
+	}
+	tableName, err := parser.ParseField()
+	if err != nil {
+		return ModifyData{}, fmt.Errorf("parse update table name: %w", err)
+	}
+	if err := parser.lexer.EatKeyword("set"); err != nil {
+		return ModifyData{}, fmt.Errorf("parse update SET keyword: %w", err)
+	}
+	targetField, err := parser.ParseField()
+	if err != nil {
+		return ModifyData{}, fmt.Errorf("parse update target field: %w", err)
+	}
+	if err := parser.lexer.EatDelimiter('='); err != nil {
+		return ModifyData{}, fmt.Errorf("parse update equals delimiter: %w", err)
+	}
+	newValue, err := parser.ParseExpression()
+	if err != nil {
+		return ModifyData{}, fmt.Errorf("parse update new expression: %w", err)
+	}
+	var predicate query.Predicate
+	if parser.lexer.MatchKeyword("where") {
+		// A successful match guarantees this consume succeeds before the lexer changes.
+		_ = parser.lexer.EatKeyword("where")
+		predicate, err = parser.ParsePredicate()
+		if err != nil {
+			return ModifyData{}, fmt.Errorf("parse update WHERE predicate: %w", err)
+		}
+	}
+	return NewModifyData(tableName, targetField, newValue, predicate), nil
+}
+
 func (parser *Parser) parseInsertFieldList() ([]string, error) {
 	field, err := parser.ParseField()
 	if err != nil {
