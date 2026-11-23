@@ -64,6 +64,28 @@ func (parser *Parser) ParseTerm() (query.Term, error) {
 	return query.NewTerm(lhs, rhs), nil
 }
 
+// ParsePredicate reads one term followed by any conjunctions with the SQL and keyword.
+func (parser *Parser) ParsePredicate() (query.Predicate, error) {
+	if parser == nil {
+		return query.Predicate{}, fmt.Errorf("parse predicate: parser is nil")
+	}
+	term, err := parser.ParseTerm()
+	if err != nil {
+		return query.Predicate{}, fmt.Errorf("parse predicate term: %w", err)
+	}
+	predicate := query.NewPredicateWithTerm(term)
+	if !parser.lexer.MatchKeyword("and") {
+		return predicate, nil
+	}
+	// A successful match guarantees this consume succeeds before the lexer changes.
+	_ = parser.lexer.EatKeyword("and")
+	rest, err := parser.ParsePredicate()
+	if err != nil {
+		return query.Predicate{}, fmt.Errorf("parse predicate after AND: %w", err)
+	}
+	return predicate.ConjoinWith(rest), nil
+}
+
 // ParseConstant reads a string or non-negative integer query constant.
 func (parser *Parser) ParseConstant() (query.Constant, error) {
 	if parser == nil {

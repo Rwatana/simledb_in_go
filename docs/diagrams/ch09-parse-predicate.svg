@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 10: Parse a predicate</title>
+  <desc id="description">Parser.ParsePredicate parses one term, then recursively conjoins each term after the and keyword. The first other token remains for the enclosing grammar. Invalid terms return contextual byte offsets.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="560" fill="#fff"/>
+  <text class="title" x="600" y="60" text-anchor="middle">Chapter 9 / Feature 10: Parse a predicate</text>
+  <rect class="box" x="55" y="215" width="220" height="125" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="165" y="258"><tspan x="165">ParseTerm()</tspan><tspan class="small" x="165" dy="30">one equality</tspan></text>
+  <rect class="box" x="350" y="215" width="230" height="125" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="465" y="258"><tspan x="465">NewPredicateWithTerm</tspan><tspan class="small" x="465" dy="30">add parsed term</tspan></text>
+  <polygon points="777,200 900,277 777,355 655,277" fill="#fff2cc" stroke="#d6b656" stroke-width="2"/>
+  <text class="label" x="777" y="270"><tspan x="777">MatchKeyword</tspan><tspan class="small" x="777" dy="25">('and')?</tspan></text>
+  <rect class="box" x="960" y="125" width="205" height="125" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="1062" y="164"><tspan x="1062">ParsePredicate()</tspan><tspan class="small" x="1062" dy="29">ConjoinWith(rest)</tspan></text>
+  <rect class="box" x="960" y="315" width="205" height="125" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="1062" y="354"><tspan x="1062">return predicate</tspan><tspan class="small" x="1062" dy="29">next token remains</tspan></text>
+  <rect class="box" x="350" y="425" width="330" height="100" fill="#f8cecc" stroke="#b85450"/>
+  <text class="small" x="515" y="454"><tspan x="515">invalid term after AND</tspan><tspan x="515" dy="24">contextual byte offset</tspan><tspan x="515" dy="24">prior consumption remains</tspan></text>
+  <path class="edge" d="M275 277 H340"/><text class="small" x="307" y="260">term</text>
+  <path class="edge" d="M580 277 H645"/>
+  <path class="edge" d="M853 243 L950 190"/><text class="small" x="901" y="202">yes</text>
+  <path class="edge" d="M853 312 L950 368"/><text class="small" x="901" y="356">no</text>
+  <path class="edge" d="M960 225 L690 440"/><text class="small" x="830" y="348">recursive parse failure</text>
+</svg>

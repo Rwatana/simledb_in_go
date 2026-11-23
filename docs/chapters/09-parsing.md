@@ -173,6 +173,22 @@ Tests first failed because `Parser.ParseTerm` was undefined. They cover field-to
 field-to-field terms, preserved trailing input, missing delimiters, invalid left and right operands, stable byte
 offsets, whitespace, and a nil parser receiver.
 
+## Feature 10: Parse SQL predicates
+
+`Parser.ParsePredicate` maps to Java `Parser.predicate`. It begins with one equality term and recursively parses each
+following term after an `and` keyword, joining them in source order with `query.Predicate.ConjoinWith`. The first
+non-`and` token remains available to the enclosing query grammar. A malformed first term or an incomplete conjunction
+returns contextual byte-positioned errors; tokens consumed before the failure remain consumed, matching the Java
+parser's sequential behavior. The [predicate-parsing diagram](../diagrams/ch09-parse-predicate.svg) shows recursive term
+composition and termination at the next grammar token; its editable source is
+[`ch09-parse-predicate.drawio`](../diagrams/ch09-parse-predicate.drawio).
+
+### Test-first record
+
+Tests first failed because `Parser.ParsePredicate` was undefined. They cover a single term, ordered multi-term
+conjunction, a following delimiter or keyword, invalid first and later terms, missing terms after `and`, stable byte
+offsets, and a nil parser receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
