@@ -16,3 +16,12 @@ func TestNewStatInfoRetainsObservedCounts(t *testing.T) {
 		t.Fatalf("empty counts = (%d, %d), want (0, 0)", empty.blocks, empty.records)
 	}
 }
+
+func TestStatInfoBlocksAccessedReturnsObservedBlocks(t *testing.T) {
+	if got := NewStatInfo(7, 23).BlocksAccessed(); got != 7 {
+		t.Fatalf("BlocksAccessed() = %d, want 7", got)
+	}
+	if got := NewStatInfo(0, 23).BlocksAccessed(); got != 0 {
+		t.Fatalf("empty BlocksAccessed() = %d, want 0", got)
+	}
+}
