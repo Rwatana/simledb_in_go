@@ -162,6 +162,25 @@ func TestTablePlanRecordsOutputHandlesNilPlanAndStatistics(t *testing.T) {
 	}
 }
 
+func TestTablePlanDistinctValuesReturnsStatistic(t *testing.T) {
+	stats := metadata.NewStatInfo(12, 30)
+	var schema record.Schema
+	tablePlan := NewTablePlan(nil, "student", record.NewLayout(&schema), stats)
+	if got := tablePlan.DistinctValues("student_id"); got != 11 {
+		t.Fatalf("DistinctValues(student_id) = %d, want 11", got)
+	}
+}
+
+func TestTablePlanDistinctValuesHandlesNilPlanAndStatistics(t *testing.T) {
+	var nilPlan *TablePlan
+	if got := nilPlan.DistinctValues("student_id"); got != 0 {
+		t.Fatalf("nil TablePlan.DistinctValues(student_id) = %d, want 0", got)
+	}
+	if got := NewTablePlan(nil, "student", nil, nil).DistinctValues("student_id"); got != 0 {
+		t.Fatalf("TablePlan without statistics DistinctValues(student_id) = %d, want 0", got)
+	}
+}
+
 type tablePlanTransaction struct {
 	size    int
 	sizeErr error
