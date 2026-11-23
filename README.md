@@ -26,6 +26,7 @@
 | 8 | Query Processing | 実装中 | [query scanと関係演算子の解説・実装記録](docs/chapters/08-query-processing.md) |
 | 9 | Parsing | 実装完了（PR stack上） | [SQL tokenizationとupdate-command dispatchの解説・実装記録](docs/chapters/09-parsing.md) |
 | 10 | Planning | 実装中 | [query plan contract、TablePlan/SelectPlan/ProductPlan/ProjectPlanのscan・schema・estimateの解説・実装記録](docs/chapters/10-planning.md) |
+| 11 | Indexing | 実装中 | [index traversal contractと索引実装の解説・実装記録](docs/chapters/11-indexing.md) |
 
 第1章は概念導入、第2章はJDBCによるクライアント境界の説明であり、書籍もSimpleDBの
 内部実装の解説を第3章から始めています。そのため、第1章と第2章のPRにはGo実装を含めません。
@@ -73,7 +74,7 @@
 
 ## 次の一歩
 
-Chapter 9のparsingを終え、Chapter 10 PlanningのQueryPlanner、UpdatePlanner契約、BasicQueryPlannerによるテーブル・ビューSELECT計画、BetterQueryPlannerによるブロックアクセス見積もりに基づく結合順序の選択、BasicUpdatePlannerによるDELETE・UPDATE・INSERT・CREATE TABLE・CREATE VIEW・CREATE INDEX、TablePlan/SelectPlan/ProductPlan/ProjectPlanを追加しています。
+Chapter 9のparsingを終え、Chapter 10 PlanningのQueryPlanner、UpdatePlanner契約、BasicQueryPlannerによるテーブル・ビューSELECT計画、BetterQueryPlannerによるブロックアクセス見積もりに基づく結合順序の選択、BasicUpdatePlannerによるDELETE・UPDATE・INSERT・CREATE TABLE・CREATE VIEW・CREATE INDEX、TablePlan/SelectPlan/ProductPlan/ProjectPlanを追加しています。Chapter 11 Indexingでは、まず値/RIDベースの索引走査契約をGoのerror戻り値とともに定義しています。
 
 ## 参照元
 
