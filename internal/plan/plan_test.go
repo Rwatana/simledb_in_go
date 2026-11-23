@@ -626,6 +626,74 @@ func TestBasicUpdatePlannerExecuteCreateViewValidatesInputsAndMetadataErrors(t *
 	}
 }
 
+func TestBasicUpdatePlannerExecuteCreateIndexForwardsNamesAndTransaction(t *testing.T) {
+	data := parse.NewCreateIndexData("student_id_idx", "student", "id")
+	transaction := &tablePlanTransaction{}
+	metadata := &basicUpdatePlannerMetadataProbe{}
+
+	count, err := NewBasicUpdatePlanner(metadata).ExecuteCreateIndex(data, transaction)
+	if err != nil {
+		t.Fatalf("ExecuteCreateIndex() error = %v", err)
+	}
+	if count != 0 {
+		t.Errorf("ExecuteCreateIndex() affected = %d, want 0", count)
+	}
+	if !reflect.DeepEqual(metadata.createIndexNames, []string{"student_id_idx"}) {
+		t.Errorf("CreateIndex names = %v, want [student_id_idx]", metadata.createIndexNames)
+	}
+	if !reflect.DeepEqual(metadata.createIndexTables, []string{"student"}) {
+		t.Errorf("CreateIndex tables = %v, want [student]", metadata.createIndexTables)
+	}
+	if !reflect.DeepEqual(metadata.createIndexFields, []string{"id"}) {
+		t.Errorf("CreateIndex fields = %v, want [id]", metadata.createIndexFields)
+	}
+	if len(metadata.createIndexTransactions) != 1 || metadata.createIndexTransactions[0] != transaction {
+		t.Errorf("CreateIndex transactions = %v, want original transaction", metadata.createIndexTransactions)
+	}
+}
+
+func TestBasicUpdatePlannerExecuteCreateIndexValidatesInputsAndMetadataErrors(t *testing.T) {
+	data := parse.NewCreateIndexData("student_id_idx", "student", "id")
+	transaction := &tablePlanTransaction{}
+	var nilPlanner *BasicUpdatePlanner
+	if count, err := nilPlanner.ExecuteCreateIndex(data, transaction); count != 0 || err == nil {
+		t.Errorf("nil planner ExecuteCreateIndex() = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(nil).ExecuteCreateIndex(data, transaction); count != 0 || err == nil {
+		t.Errorf("planner without metadata ExecuteCreateIndex() = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{}).ExecuteCreateIndex(data, nil); count != 0 || err == nil {
+		t.Errorf("ExecuteCreateIndex() with nil transaction = (%d, %v), want an error", count, err)
+	}
+	metadata := &basicUpdatePlannerMetadataProbe{}
+	for _, invalid := range []struct {
+		name string
+		data parse.CreateIndexData
+	}{
+		{name: "empty index name", data: parse.NewCreateIndexData("", "student", "id")},
+		{name: "empty table name", data: parse.NewCreateIndexData("student_id_idx", "", "id")},
+		{name: "empty field name", data: parse.NewCreateIndexData("student_id_idx", "student", "")},
+	} {
+		t.Run(invalid.name, func(t *testing.T) {
+			if count, err := NewBasicUpdatePlanner(metadata).ExecuteCreateIndex(invalid.data, transaction); count != 0 || err == nil {
+				t.Errorf("ExecuteCreateIndex() with invalid names = (%d, %v), want an error", count, err)
+			}
+		})
+	}
+	if len(metadata.createIndexNames) != 0 {
+		t.Errorf("CreateIndex calls for invalid names = %v, want none", metadata.createIndexNames)
+	}
+
+	metadataErr := errors.New("create index failed")
+	metadata = &basicUpdatePlannerMetadataProbe{createIndexErr: metadataErr}
+	if count, err := NewBasicUpdatePlanner(metadata).ExecuteCreateIndex(data, transaction); count != 0 || !errors.Is(err, metadataErr) {
+		t.Errorf("ExecuteCreateIndex() with metadata error = (%d, %v), want wrapped metadata error", count, err)
+	}
+	if len(metadata.createIndexNames) != 1 {
+		t.Errorf("CreateIndex calls after metadata failure = %v, want one attempted create", metadata.createIndexNames)
+	}
+}
+
 func TestDeleteRowsFromScanHandlesReadOnlyAndNilScans(t *testing.T) {
 	closeErr := errors.New("read-only scan close failed")
 	scan := &productPlanScanStub{closeErr: closeErr}
@@ -2075,6 +2143,11 @@ type basicUpdatePlannerMetadataProbe struct {
 	createViewRequests      []string
 	createViewDefinitions   []string
 	createViewTransactions  []record.TableScanTransaction
+	createIndexErr          error
+	createIndexNames        []string
+	createIndexTables       []string
+	createIndexFields       []string
+	createIndexTransactions []record.TableScanTransaction
 }
 
 func (probe *basicUpdatePlannerMetadataProbe) Layout(tableName string, _ record.TableScanTransaction) (*record.Layout, error) {
@@ -2095,8 +2168,12 @@ func (probe *basicUpdatePlannerMetadataProbe) CreateView(viewName, definition st
 	probe.createViewTransactions = append(probe.createViewTransactions, transaction)
 	return probe.createViewErr
 }
-func (*basicUpdatePlannerMetadataProbe) CreateIndex(string, string, string, record.TableScanTransaction) error {
-	return nil
+func (probe *basicUpdatePlannerMetadataProbe) CreateIndex(indexName, tableName, fieldName string, transaction record.TableScanTransaction) error {
+	probe.createIndexNames = append(probe.createIndexNames, indexName)
+	probe.createIndexTables = append(probe.createIndexTables, tableName)
+	probe.createIndexFields = append(probe.createIndexFields, fieldName)
+	probe.createIndexTransactions = append(probe.createIndexTransactions, transaction)
+	return probe.createIndexErr
 }
 
 type basicUpdatePlannerTransaction struct {
