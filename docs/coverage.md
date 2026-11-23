@@ -491,6 +491,8 @@ At the Issue #871 select-plan-schema checkpoint, `/tmp/simpledb-coverage-871.out
 
 At the Issue #873 select-plan-block-estimate checkpoint, `/tmp/simpledb-coverage-873.out` measures 100.0% statement coverage in the full module and all twelve packages with executable statements. `SelectPlan.BlocksAccessed` covers forwarding the child estimate plus nil receiver and missing-child cases, with no zero-count statement regions. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
 
+At the Issue #891 product-plan-distinct-estimate checkpoint, `/tmp/simpledb-coverage-891.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProductPlan.DistinctValues` covers left/right field routing, left-side duplicate-name precedence, nil dependencies, missing schemas, and unknown fields. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
+
 At the Issue #889 product-plan-output-estimate checkpoint, `/tmp/simpledb-coverage-889.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProductPlan.RecordsOutput` covers the multiplication, nil inputs, and signed 32-bit overflow. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
 
 At the Issue #887 product-plan-block-estimate checkpoint, `/tmp/simpledb-coverage-887.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProductPlan.BlocksAccessed` covers the nested-loop formula, nil inputs, and signed 32-bit multiplication/addition overflow. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.

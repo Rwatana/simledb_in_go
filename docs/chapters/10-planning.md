@@ -10,7 +10,7 @@ and planner composition remains a separate observable behavior and Issue.
 | --- | --- | --- |
 | `internal/plan.Plan` | `simpledb/plan/Plan.java` | Describe opening a scan, estimating its cost and output, and exposing its schema |
 | `internal/plan.TablePlan` | `simpledb/plan/TablePlan.java` | Retain one table's resolved layout and expose its logical schema |
-| `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas, open the Cartesian-product scan, and estimate its output and block reads |
+| `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas, open the Cartesian-product scan, and estimate its output |
 
 ## Feature 1: Define the query plan contract
 
@@ -217,6 +217,19 @@ zero. The [plan diagram](../diagrams/ch10-plan-contract.svg) records the product
 The first focused test run failed because `ProductPlan.RecordsOutput` was undefined. Tests verify the multiplication,
 nil receiver and child handling, and signed 32-bit overflow.
 
+## Feature 16: Estimate product distinct values
+
+`ProductPlan.DistinctValues(fieldName)` maps to Java `ProductPlan.distinctValues(String)`. It finds which child schema
+contains the field and forwards that child's estimate. When both schemas contain the same name, the left child wins,
+matching product-scan field reads. A nil product, missing child/schema, or field absent from both schemas returns zero.
+The [plan diagram](../diagrams/ch10-plan-contract.svg) records distinct-value ownership; its editable source is
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `ProductPlan.DistinctValues` was undefined. Tests verify left and right
+delegation, left precedence for duplicate names, absent fields, and nil/missing schemas.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -229,3 +242,4 @@ nil receiver and child handling, and signed 32-bit overflow.
 - `ProductPlan.Open` initializes both child scans before returning and closes partial scan resources when composition fails.
 - `ProductPlan.BlocksAccessed` explicitly retains Java's signed 32-bit arithmetic instead of the host-sized Go `int` calculation.
 - `ProductPlan.RecordsOutput` uses Java-compatible signed 32-bit multiplication rather than host-sized arithmetic.
+- `ProductPlan.DistinctValues` resolves by the child's schema and gives duplicate field names to the left child.
