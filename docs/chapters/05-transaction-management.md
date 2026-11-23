@@ -1531,6 +1531,7 @@ capacity failure, and logged-path rejection were tested first. The initial build
 | --- | --- |
 | `TestTransactionSetStringWithoutLoggingUpdatesPinnedPageExclusively` | The no-log path writes the string, marks the transaction dirty, retains exclusive ownership, and appends nothing |
 | `TestTransactionSetStringWithoutLoggingReturnsPreconditionAndPageFailures` | Missing ownership and insufficient capacity fail without dirtying the frame, while logged writes cannot bypass WAL |
+| `TestTransactionSetStringPreservesExclusiveLockFailure` | An exclusive-lock failure preserves the stored string and clean metadata |
 
 This maps to Java `Transaction.setString(..., false)` and supplies the `StringUndoTarget` signature used by SETSTRING undo.
 
