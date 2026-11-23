@@ -1,6 +1,8 @@
 package hash
 
 import (
+	"fmt"
+
 	"github.com/Rwatana/simledb_in_go/internal/query"
 	"github.com/Rwatana/simledb_in_go/internal/record"
 )
@@ -21,4 +23,16 @@ func NewHashIndex(transaction record.TableScanTransaction, indexName string, lay
 		indexName:   indexName,
 		layout:      layout,
 	}
+}
+
+// Close releases the current bucket scan and clears it after successful release.
+func (index *HashIndex) Close() error {
+	if index.scan == nil {
+		return nil
+	}
+	if err := index.scan.Close(); err != nil {
+		return fmt.Errorf("close hash index %q: close bucket scan: %w", index.indexName, err)
+	}
+	index.scan = nil
+	return nil
 }
