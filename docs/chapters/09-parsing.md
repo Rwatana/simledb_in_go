@@ -126,6 +126,21 @@ The tests first failed to compile because `NewParser` and `Parser` were undefine
 values, preserving following input, wrong token kinds, unterminated strings, integer overflow, stable byte offsets,
 repeated failures without consumption, empty input, whitespace, and a nil parser receiver.
 
+## Feature 7: Parse SQL field names
+
+`Parser.ParseField` maps to Java `Parser.field`. It consumes one legal identifier using the lexer's identifier rules
+and returns the lower-case name. Reserved words and other token kinds are rejected with the lexer byte offset and
+remain available after failure. The parser wraps the lexer error with field context and does not introduce a second
+identifier type. The [field-parsing diagram](../diagrams/ch09-parse-field.svg) shows normalization, preserved following
+input, and the non-consuming error path; its editable source is
+[`ch09-parse-field.drawio`](../diagrams/ch09-parse-field.drawio).
+
+### Test-first record
+
+Tests first failed because `Parser.ParseField` was undefined. They cover mixed-case normalization, following delimiters
+and strings, reserved-word and non-identifier rejection, stable byte offsets, repeated failures without consumption,
+empty input, whitespace, and a nil parser receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
