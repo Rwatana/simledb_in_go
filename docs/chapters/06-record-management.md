@@ -783,6 +783,24 @@ The tests first failed to compile because `TableScan.Insert` did not exist.
 This completes Java `TableScan.insert` by composing the separately tested current-block insertion, existing-block
 movement, final-block decision, and `moveToNewBlock` behaviors.
 
+## Feature 45: Delete the current table scan record
+
+`TableScan.Delete` requires an open page and a cursor positioned on a record, then delegates one logged empty-flag
+write to the current record page. Success and failure both preserve the page and cursor, allowing the caller to continue
+from the deleted coordinate or reuse it as the starting point for a later insertion.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.Delete` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanDeleteMarksTheCurrentSlotEmptyWithLogging` | The current slot receives one logged empty-flag write without cursor movement |
+| `TestTableScanDeleteWrapsWriteFailureAndPreservesPosition` | Storage failure retains its cause and table coordinates while preserving position |
+| `TestTableScanDeleteRequiresACurrentRecord` | Before-first and closed scans reject deletion before transaction access |
+
+This maps Java `TableScan.delete`; record field bytes remain unchanged because slot occupancy alone controls visibility.
+
 ## Next behavior
 
-Delete the table scan's current record.
+Return the current record identifier from a table scan.
