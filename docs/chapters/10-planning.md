@@ -282,6 +282,18 @@ source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
 The first focused test run failed because `ProjectPlan.RecordsOutput` was undefined. Tests verify a nonzero child row
 estimate and nil receiver/missing-child behavior.
 
+## Feature 21: Delegate projected-plan distinct-value estimates
+
+`ProjectPlan.DistinctValues(fieldName)` maps to Java `ProjectPlan.distinctValues(String)` and forwards the requested field
+to the child plan unchanged. A nil receiver or missing child returns zero, matching the other nil-safe Go estimates. The
+[plan diagram](../diagrams/ch10-plan-contract.svg) records this delegation; its editable source is
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `ProjectPlan.DistinctValues` was undefined. Tests verify forwarding the
+projected field name and a nonzero child estimate, plus nil receiver/missing-child behavior.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -299,3 +311,4 @@ estimate and nil receiver/missing-child behavior.
 - `ProjectPlan.Open` keeps the child's before-first position rather than resetting it a second time.
 - `ProjectPlan.BlocksAccessed` delegates directly to its child because projection does not change child block access.
 - `ProjectPlan.RecordsOutput` delegates directly to its child because projection does not change row count.
+- `ProjectPlan.DistinctValues` delegates field estimates to the child, preserving the child's statistics model.
