@@ -495,6 +495,8 @@ At the Issue #895 project-plan-open checkpoint, `/tmp/simpledb-coverage-895.out`
 
 At the Issue #897 project-plan-block-estimate checkpoint, `/tmp/simpledb-coverage-897.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProjectPlan.BlocksAccessed` covers child delegation and nil receiver/missing-child behavior. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
 
+At the Issue #899 project-plan-output-estimate checkpoint, `/tmp/simpledb-coverage-899.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProjectPlan.RecordsOutput` covers child delegation and nil receiver/missing-child behavior. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
+
 At the Issue #893 project-plan-schema checkpoint, `/tmp/simpledb-coverage-893.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `NewProjectPlan` covers nil dependencies, valid ordered fields, empty projections, and missing-field errors; `ProjectPlan.Schema` covers both ordinary and nil receivers. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
 
 At the Issue #891 product-plan-distinct-estimate checkpoint, `/tmp/simpledb-coverage-891.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProductPlan.DistinctValues` covers left/right field routing, left-side duplicate-name precedence, nil dependencies, missing schemas, and unknown fields. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
