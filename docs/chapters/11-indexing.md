@@ -11,6 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
+| `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a table scan and expose the selected record's fields |
 
 ## Feature 1: Define the index traversal contract
 
@@ -178,6 +179,19 @@ so no duplicate illustration is added.
 The focused test run first failed because `IndexSelectScan.Next` was undefined. Tests cover multiple returned RIDs,
 exhaustion without movement, index-next and RID-read failures, table-page movement failure, and nil or incomplete state.
 
+## Feature 13: Read an integer from the selected data row
+
+`IndexSelectScan.GetInt` delegates to its retained `record.TableScan` and returns the integer value unchanged. A nil
+adapter or missing table scan produces a contextual error; table-read errors are wrapped so callers retain the original
+cause. The existing index traversal diagram already establishes that the adapter reads fields from the data table, so
+this accessor does not need a duplicate diagram.
+
+### Test-first record
+
+The focused tests first failed because `IndexSelectScan.GetInt` was undefined. They verify forwarding of the current
+record's integer value, contextual errors for a nil receiver or missing table scan, and preservation of a table-read
+failure through error wrapping.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -187,3 +201,4 @@ exhaustion without movement, index-next and RID-read failures, table-page moveme
 - Go deletion reports storage failures as errors while preserving the Java behavior of removing the first matching RID and treating a missing entry as a successful no-op.
 - `IndexSelectScan` reports index-position failures as Go errors and leaves index lifetime management to its caller.
 - `IndexSelectScan.Next` reports index and table-scan failures as errors, and avoids moving the data scan after exhaustion.
+- `IndexSelectScan.GetInt` reports data-scan read failures as Go errors while preserving their wrapped causes.
