@@ -16,7 +16,7 @@ and planner composition remains a separate observable behavior and Issue.
 | `internal/plan.BasicQueryPlanner` | `simpledb/plan/BasicQueryPlanner.java` | Resolve tables and recursively expand views before composing product, selection, and projection plans |
 | `internal/plan.BetterQueryPlanner` | `simpledb/plan/BetterQueryPlanner.java` | Choose the lower estimated block-access order as each source joins the left-deep product |
 | `internal/plan.UpdatePlanner` | `simpledb/plan/UpdatePlanner.java` | Define separate execution methods for parsed DML and DDL commands |
-| `internal/plan.BasicUpdatePlanner` | `simpledb/plan/BasicUpdatePlanner.java` | Plan DELETE with a table scan and selection, delete matching rows, and return the count |
+| `internal/plan.BasicUpdatePlanner` | `simpledb/plan/BasicUpdatePlanner.java` | Execute parsed DML and DDL using metadata and table scans |
 
 ## Feature 1: Define the query plan contract
 
@@ -412,6 +412,21 @@ The first focused test run failed because `BasicUpdatePlanner.ExecuteInsert` was
 and its field value, invalid command data, nil dependencies, metadata/layout and scan-open errors, unsupported and nil
 scans, insert/value-write failures, and close-error preservation.
 
+## Feature 30: Execute CREATE TABLE with the basic update planner
+
+`BasicUpdatePlanner.ExecuteCreateTable` passes the parsed table name, an independent copy of its schema, and the same
+transaction to the metadata manager. It returns zero affected rows because CREATE TABLE does not modify table records.
+Nil planner/metadata/transaction dependencies, an empty table name, and metadata errors return contextual errors while
+preserving the original metadata cause. The [planning diagram](../diagrams/ch10-plan-contract.svg) now shows CREATE TABLE
+as a metadata-backed operation alongside the row-oriented update commands; the editable source remains
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `BasicUpdatePlanner.ExecuteCreateTable` was undefined. Tests verify metadata
+delegation, field order/type/length, transaction identity, zero affected rows, nil dependencies, empty names, and wrapped
+metadata errors.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -437,3 +452,4 @@ scans, insert/value-write failures, and close-error preservation.
 - `BasicUpdatePlanner.ExecuteDelete` returns an error with its affected count and closes the scan on all operation paths.
 - `BasicUpdatePlanner.ExecuteModify` evaluates replacement expressions per matching row and reports the number of successful writes.
 - `BasicUpdatePlanner.ExecuteInsert` returns a successful count only after inserting one row and writing all parsed field values.
+- `BasicUpdatePlanner.ExecuteCreateTable` delegates schema creation to metadata and returns zero affected rows because DDL does not change table records.

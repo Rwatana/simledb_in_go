@@ -134,6 +134,28 @@ func (planner *BasicUpdatePlanner) ExecuteInsert(data parse.InsertData, transact
 	return insertRowIntoScan(tableName, fields, values, scan)
 }
 
+// ExecuteCreateTable creates the table described by data and returns no row count.
+func (planner *BasicUpdatePlanner) ExecuteCreateTable(data parse.CreateTableData, transaction record.TableScanTransaction) (int, error) {
+	if planner == nil {
+		return 0, fmt.Errorf("execute create table: planner is nil")
+	}
+	if planner.metadata == nil {
+		return 0, fmt.Errorf("execute create table: metadata is nil")
+	}
+	if transaction == nil {
+		return 0, fmt.Errorf("execute create table: transaction is nil")
+	}
+	tableName := data.TableName()
+	if tableName == "" {
+		return 0, fmt.Errorf("execute create table: table name is empty")
+	}
+	schema := data.Schema()
+	if err := planner.metadata.CreateTable(tableName, &schema, transaction); err != nil {
+		return 0, fmt.Errorf("execute create table %q: create metadata: %w", tableName, err)
+	}
+	return 0, nil
+}
+
 func insertRowIntoScan(tableName string, fields []string, values []query.Constant, scan query.Scan) (int, error) {
 	updateScan, err := requireUpdateScan(scan)
 	if err != nil {
