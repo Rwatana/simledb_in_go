@@ -221,6 +221,9 @@ a deterministic test, while the existing deadline tests continue to cover active
 
 `log.Manager.Iterator` now has a Darwin/Linux FIFO regression test for current-tail flush failure. It confirms that
 iterator creation returns no partial iterator and retains both the `ESPIPE` cause and operation context.
+
+The log iterator boundary parser now directly covers a Page too short to hold its four-byte boundary, retaining both
+the block identifier and field-read stage in the returned error.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

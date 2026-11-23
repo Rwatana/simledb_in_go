@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 func TestIteratorReadsCurrentBlockNewestToOldest(t *testing.T) {
@@ -117,5 +119,25 @@ func TestIteratorRejectsInvalidCurrentBlockBoundary(t *testing.T) {
 	}
 	if diskBoundary != 64 {
 		t.Errorf("disk boundary = %d, want unchanged initial boundary 64", diskBoundary)
+	}
+}
+
+func TestBlockBoundaryRejectsPageWithoutCompleteInteger(t *testing.T) {
+	page, err := storage.NewPage(boundarySize - 1)
+	if err != nil {
+		t.Fatalf("NewPage() error = %v", err)
+	}
+	block := storage.NewBlockID("simpledb.log", 4)
+	boundary, err := blockBoundary(page, block)
+	if boundary != 0 {
+		t.Errorf("blockBoundary() = %d, want 0 on a short page", boundary)
+	}
+	if err == nil {
+		t.Fatal("blockBoundary() error = nil, want a short-page read error")
+	}
+	for _, context := range []string{block.String(), "read boundary", "get integer at offset 0"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("blockBoundary() error = %q, want context %q", err, context)
+		}
 	}
 }
