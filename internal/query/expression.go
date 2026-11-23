@@ -1,6 +1,10 @@
 package query
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Rwatana/simledb_in_go/internal/record"
+)
 
 // ValueScan is the portion of a scan required to evaluate a field expression.
 type ValueScan interface {
@@ -41,6 +45,18 @@ func (expression Expression) Evaluate(scan ValueScan) (Constant, error) {
 		return value, nil
 	}
 	return Constant{}, fmt.Errorf("evaluate expression: no literal or field reference")
+}
+
+// AppliesTo reports whether this expression's referenced field is present in schema.
+// Literal expressions apply to every schema. An unset expression or nil schema does not apply.
+func (expression Expression) AppliesTo(schema *record.Schema) bool {
+	if expression.hasConstant {
+		return true
+	}
+	if !expression.hasField || schema == nil {
+		return false
+	}
+	return schema.HasField(expression.fieldName)
 }
 
 // AsConstant returns the literal constant and whether this expression contains one.

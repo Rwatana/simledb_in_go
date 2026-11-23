@@ -2,6 +2,7 @@ package query
 
 import (
 	"errors"
+	"github.com/Rwatana/simledb_in_go/internal/record"
 	"testing"
 )
 
@@ -104,4 +105,39 @@ func TestEvaluateUnsetExpressionReturnsErrorWithoutScan(t *testing.T) {
 	if scan.calls != 0 {
 		t.Fatalf("GetVal calls = %d, want 0 for an unset expression", scan.calls)
 	}
+}
+
+func TestExpressionAppliesToSchema(t *testing.T) {
+	var empty record.Schema
+	var nilSchema *record.Schema
+
+	tests := []struct {
+		name       string
+		expression Expression
+		schema     *record.Schema
+		want       bool
+	}{
+		{name: "literal applies without fields", expression: NewConstantExpression(NewIntConstant(3)), schema: &empty, want: true},
+		{name: "literal applies to nil schema", expression: NewConstantExpression(NewStringConstant("x")), schema: nilSchema, want: true},
+		{name: "present field", expression: NewFieldExpression("name"), schema: schemaWithField("name"), want: true},
+		{name: "absent field", expression: NewFieldExpression("age"), schema: schemaWithField("name"), want: false},
+		{name: "empty field name can be present", expression: NewFieldExpression(""), schema: schemaWithField(""), want: true},
+		{name: "field with nil schema", expression: NewFieldExpression("name"), schema: nilSchema, want: false},
+		{name: "unset expression", expression: Expression{}, schema: schemaWithField(""), want: false},
+		{name: "unset expression with nil schema", expression: Expression{}, schema: nilSchema, want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.expression.AppliesTo(test.schema); got != test.want {
+				t.Fatalf("AppliesTo() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func schemaWithField(name string) *record.Schema {
+	var schema record.Schema
+	schema.AddIntegerField(name)
+	return &schema
 }
