@@ -74,6 +74,19 @@ clears the reference, making repeated closes harmless.
 The focused close tests first failed to compile because `HashIndex.Close` was undefined. They cover the no-scan path,
 successful unpin and scan clearing, repeated close, contextual error wrapping, and retry after an unpin failure.
 
+## Feature 6: Position before a hash search key
+
+`HashIndex.BeforeFirst` closes the previous bucket scan, uses `BucketNumber` to choose the static bucket table, and opens
+a `record.TableScan` at its first record. Repositioning closes the prior pin before opening the new table. Invalid
+receivers/dependencies and unset keys return explicit errors; if closing or opening fails, the previous scan is retained
+only when it could not be released, and an unopened bucket is never installed as the current scan.
+
+### Test-first record
+
+The first focused test run failed because `HashIndex.BeforeFirst` was undefined. Tests verify integer/string bucket
+selection, close-before-open order, invalid inputs without I/O, preservation after close failure, and contextual size/pin
+failures with an unset search state.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
