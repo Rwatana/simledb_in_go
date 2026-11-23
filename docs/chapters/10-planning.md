@@ -15,6 +15,7 @@ and planner composition remains a separate observable behavior and Issue.
 | `internal/plan.QueryPlanner` | `simpledb/plan/QueryPlanner.java` | Convert parsed query data and a transaction into an executable plan |
 | `internal/plan.BasicQueryPlanner` | `simpledb/plan/BasicQueryPlanner.java` | Resolve tables and recursively expand views before composing product, selection, and projection plans |
 | `internal/plan.BetterQueryPlanner` | `simpledb/plan/BetterQueryPlanner.java` | Choose the lower estimated block-access order as each source joins the left-deep product |
+| `internal/plan.UpdatePlanner` | `simpledb/plan/UpdatePlanner.java` | Define separate execution methods for parsed DML and DDL commands |
 
 ## Feature 1: Define the query plan contract
 
@@ -350,6 +351,20 @@ to the basic planner; its editable source remains [`ch10-plan-contract.drawio`](
 The first focused test run failed because `NewBetterQueryPlanner` and `BetterQueryPlanner` were undefined. Tests verify
 both cost choices, stable order on ties, left-deep products for multiple sources, final selection/projection placement,
 and invalid planner inputs.
+
+## Feature 26: Define the update-planner contract
+
+`UpdatePlanner` maps to Java `simpledb.plan.UpdatePlanner` and defines one method for each parsed INSERT, DELETE, UPDATE,
+CREATE TABLE, CREATE VIEW, and CREATE INDEX command. Each method receives the transaction boundary needed by scans and
+metadata and returns an affected-row count plus an explicit error. This feature establishes the contract only; command
+execution stays in separate `BasicUpdatePlanner` behaviors. The [planning diagram](../diagrams/ch10-plan-contract.svg)
+shows update commands on their own contract; its editable source remains
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `UpdatePlanner` was undefined. A compile-time probe implements all six
+command methods, and focused calls verify the parsed input types and `(affected rows, error)` result shape.
 
 ## Intentional differences from Java
 
