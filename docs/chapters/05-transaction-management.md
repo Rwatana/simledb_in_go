@@ -913,10 +913,27 @@ The competing-holder rejection and state preservation were tested first. The ini
 The `count > 1` predicate maps directly to Java `LockTable.hasOtherSLocks`. Go exposes the temporary non-waiting result
 as a sentinel so the later waiting behavior can distinguish contention from other failures.
 
+## Feature 40: Release one of multiple shared holders
+
+`Unlock` decrements a shared-holder count greater than one under the table mutex. The block remains represented because
+at least one compatible holder still exists, and other block state is unchanged. Counts of one and the exclusive
+sentinel are intentionally left for the separate final-release behavior.
+
+### Test-first record
+
+One release from three shared holders was tested first. The initial build failed because `Unlock` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableReleasesOneOfMultipleSharedHolders` | Releasing one shared hold changes three holders to two without affecting another block |
+
+This maps to the `val > 1` decrement branch of Java `LockTable.unlock`. Removing the final lock and waking waiters are
+kept out of this behavior.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by releasing one shared holder while retaining the remaining holders, then
-separately add final-release notification, conflict waiting, timeout, and transaction-local lock tracking.
+Continue with Chapter 5 concurrency control by removing a block's final lock without notification, then separately add
+waiter notification, conflict waiting, timeout, and transaction-local lock tracking.
 
 ## Sources
 
