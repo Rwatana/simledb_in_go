@@ -877,10 +877,28 @@ acquisition replaced the holder count with one.
 This completes the compatible path of Java `LockTable.sLock`: the integer value represents the number of shared
 holders. Exclusive state and its conflict policy remain separate behaviors.
 
+## Feature 38: Upgrade a sole shared holder to exclusive
+
+`LockExclusive` changes a block held by one shared holder to the exclusive sentinel `-1`. The transition is serialized
+by the table mutex and leaves other blocks untouched. This behavior covers only the uncontended success path; callers
+must already hold the sole shared lock.
+
+### Test-first record
+
+The sole-holder transition and independent block state were tested first. The initial build failed because
+`LockExclusive` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableUpgradesSoleSharedHolderToExclusive` | One shared holder becomes exclusive while other blocks remain unchanged |
+
+This maps to the non-waiting assignment in Java `LockTable.xLock`, where `-1` denotes exclusive ownership. Detection of
+other shared holders and its wait policy remain separate behaviors.
+
 ## Next behavior
 
-Continue with Chapter 5 concurrency control by upgrading a sole shared holder to an exclusive lock, then add conflict
-waiting, unlock notification, timeout, and transaction-local lock tracking as separate behaviors.
+Continue with Chapter 5 concurrency control by detecting competing shared holders before exclusive acquisition, then
+add conflict waiting, unlock notification, timeout, and transaction-local lock tracking as separate behaviors.
 
 ## Sources
 

@@ -24,3 +24,11 @@ func (t *LockTable) LockShared(block storage.BlockID) error {
 	t.locks[block]++
 	return nil
 }
+
+// LockExclusive upgrades the sole shared holder on block to exclusive.
+func (t *LockTable) LockExclusive(block storage.BlockID) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.locks[block] = -1
+	return nil
+}
