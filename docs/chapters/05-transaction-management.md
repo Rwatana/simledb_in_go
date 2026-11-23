@@ -760,10 +760,30 @@ failure propagation were tested first. The initial build failed because `Recover
 This composes Java `RecoveryMgr.doRecover` without reproducing its class structure. Buffer flush and checkpoint
 durability remain separate.
 
+## Feature 32: Flush restart-recovered buffers
+
+`RecoverRestartChanges` completes the checkpoint-bounded history phase before invoking the existing
+`TransactionBufferFlusher` once for the recovery transaction. History failure prevents flush; persistence failure keeps
+its cause and recovery transaction context. No CHECKPOINT record is written here.
+
+### Test-first record
+
+Successful ordering and transaction identity, history-failure cutoff, and flush failure were tested first. The initial
+build failed because `RecoverRestartChanges` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecoverRestartChangesFlushesAfterHistoryUndo` | Flush the recovery transaction only after every undo |
+| `TestRecoverRestartChangesDoesNotFlushAfterHistoryFailure` | Incomplete recovery cannot persist a partial phase here |
+| `TestRecoverRestartChangesReturnsFlushFailure` | Recovery buffer persistence failure remains explicit |
+
+This maps to `bm.flushAll(txnum)` immediately after `doRecover()` in Java `RecoveryMgr.recover`. CHECKPOINT append and
+LSN flush remain separate.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.3 restart recovery by flushing recovered buffers, then append CHECKPOINT and flush its LSN as
-separate behaviors.
+Continue with Sect. 5.3.9.3 restart recovery by appending CHECKPOINT after recovered-buffer flush, then flush its LSN as
+a separate behavior.
 
 ## Sources
 
