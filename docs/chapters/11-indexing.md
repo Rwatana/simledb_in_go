@@ -219,6 +219,17 @@ The focused test run first failed because `IndexSelectScan.GetVal` was undefined
 only a low-level record scan without schema-driven value conversion. Tests verify integer and varchar constants, nil
 receiver/table-scan state, and wrapped read failures.
 
+## Feature 16: Check a field in the selected data row
+
+`IndexSelectScan.HasField` delegates field membership to its retained `query.RecordScan`. A nil adapter, missing record
+scan, or absent underlying table scan reports false without panicking. The query adapter reads membership from the table
+schema, so this check does not advance either the index or the current record.
+
+### Test-first record
+
+The focused tests first failed because `IndexSelectScan.HasField` was undefined. They verify integer and varchar fields,
+an absent field, and false results for nil adapter or missing table-scan state.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -231,3 +242,4 @@ receiver/table-scan state, and wrapped read failures.
 - `IndexSelectScan.GetInt` reports data-scan read failures as Go errors while preserving their wrapped causes.
 - `IndexSelectScan.GetString` reports data-scan read failures as Go errors while preserving their wrapped causes.
 - `IndexSelectScan.GetVal` uses the query-level record adapter to return schema-typed constants without making the record package depend on query types.
+- `IndexSelectScan.HasField` reports false for invalid scan state and otherwise delegates to the table schema.
