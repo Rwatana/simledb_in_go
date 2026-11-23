@@ -9,6 +9,7 @@ planner composition remains a separate observable behavior and Issue.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/plan.Plan` | `simpledb/plan/Plan.java` | Describe opening a scan, estimating its cost and output, and exposing its schema |
+| `internal/plan.TablePlan` | `simpledb/plan/TablePlan.java` | Retain one table's resolved layout and expose its logical schema |
 
 ## Feature 1: Define the query plan contract
 
@@ -25,6 +26,21 @@ query tree, its estimates/schema, and the scan it opens; its editable source is
 The first test run failed because `internal/plan.Plan` did not exist. A compile-time test double exercises each method
 signature, including scan/error return values, the three estimates, and schema access.
 
+## Feature 2: Add table plan schema
+
+`TablePlan` is the concrete leaf for a single table. This feature retains the transaction, table name, and already
+resolved `record.Layout`, then implements the `Plan.Schema` behavior by returning the layout's logical schema. A nil
+plan or a plan without a layout safely returns nil. Scan creation and the statistics-backed estimates are deliberately
+separate features so each observable behavior can be reviewed and covered independently. The updated
+[plan diagram](../diagrams/ch10-plan-contract.svg) shows `TablePlan` supplying the schema from its layout; the editable
+source remains [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first test run failed to compile because `NewTablePlan` and `TablePlan` were undefined. Tests then verify that the
+schema exposed by the table plan is the layout's schema and that nil plans/layouts return nil.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
+- `NewTablePlan` receives a resolved layout rather than a metadata manager. This keeps metadata lookup outside the leaf plan and makes the table plan's schema dependency explicit.
