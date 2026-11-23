@@ -332,3 +332,20 @@ membership, delegated reads and traversal, an unprojected source read, empty and
 ownership, nil input, zero-value errors, and wrapped failures from each delegated operation. The
 [project-scan diagram](../diagrams/ch08-project-scan.svg) shows field visibility; its editable source is
 [`ch08-project-scan.drawio`](../diagrams/ch08-project-scan.drawio).
+
+## Feature 31: Estimate equality-term selectivity
+
+`Term.ReductionFactor` maps to Java `Term.reductionFactor(Plan)`. A field-to-field equality uses the larger of the
+two distinct-value estimates; a field-to-constant equality uses that field's estimate. Equal literal values reduce
+by a factor of one, while unequal literals use Java's `Integer.MAX_VALUE`. The query package owns a narrow
+`DistinctValueEstimator` interface rather than importing planning code. A missing estimator returns zero for a field
+term, and a zero-value Go term conservatively returns the maximum factor. Predicate multiplication and selection-plan
+row-count estimation remain separate behaviors. The [term-estimate diagram](../diagrams/ch08-term-reduction-factor.svg)
+shows the dependency from plan statistics to one equality term; its editable source is
+[`ch08-term-reduction-factor.drawio`](../diagrams/ch08-term-reduction-factor.drawio).
+
+### Test-first record
+
+The first focused test run failed because `Term.ReductionFactor` was undefined. It verifies field estimates in both
+operand orders, the maximum estimate for two fields, equal and unequal constants, a missing estimator, and a zero-value
+term.

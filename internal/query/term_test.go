@@ -2,6 +2,7 @@ package query
 
 import (
 	"errors"
+	"math"
 	"reflect"
 	"testing"
 
@@ -219,6 +220,72 @@ func TestTermEquatesWithField(t *testing.T) {
 	}
 }
 
+func TestTermReductionFactorEstimatesEqualitySelectivity(t *testing.T) {
+	estimator := distinctValueEstimatorStub{"left": 2, "right": 5, "age": 7}
+	tests := []struct {
+		name string
+		term Term
+		want int
+	}{
+		{
+			name: "field equality uses larger distinct estimate",
+			term: NewTerm(NewFieldExpression("left"), NewFieldExpression("right")),
+			want: 5,
+		},
+		{
+			name: "field equality uses larger left estimate",
+			term: NewTerm(NewFieldExpression("right"), NewFieldExpression("left")),
+			want: 5,
+		},
+		{
+			name: "field on left",
+			term: NewTerm(NewFieldExpression("age"), NewConstantExpression(NewIntConstant(4))),
+			want: 7,
+		},
+		{
+			name: "field on right",
+			term: NewTerm(NewConstantExpression(NewIntConstant(4)), NewFieldExpression("age")),
+			want: 7,
+		},
+		{
+			name: "equal constants",
+			term: NewTerm(NewConstantExpression(NewStringConstant("same")), NewConstantExpression(NewStringConstant("same"))),
+			want: 1,
+		},
+		{
+			name: "unequal constants",
+			term: NewTerm(NewConstantExpression(NewIntConstant(4)), NewConstantExpression(NewIntConstant(5))),
+			want: math.MaxInt32,
+		},
+		{
+			name: "zero value term",
+			term: Term{},
+			want: math.MaxInt32,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.term.ReductionFactor(estimator); got != test.want {
+				t.Fatalf("ReductionFactor() = %d, want %d", got, test.want)
+			}
+		})
+	}
+}
+
+func TestTermReductionFactorWithoutEstimator(t *testing.T) {
+	tests := []Term{
+		NewTerm(NewFieldExpression("age"), NewConstantExpression(NewIntConstant(4))),
+		NewTerm(NewConstantExpression(NewIntConstant(4)), NewFieldExpression("age")),
+		NewTerm(NewFieldExpression("left"), NewFieldExpression("right")),
+	}
+	for _, term := range tests {
+		if got := term.ReductionFactor(nil); got != 0 {
+			t.Fatalf("ReductionFactor(nil) = %d, want 0 for an unavailable estimate", got)
+		}
+	}
+}
+
 func TestTermAppliesToSchema(t *testing.T) {
 	var nilSchema *record.Schema
 	tests := []struct {
@@ -330,4 +397,10 @@ func schemaWithFields(names ...string) *record.Schema {
 		schema.AddIntegerField(name)
 	}
 	return &schema
+}
+
+type distinctValueEstimatorStub map[string]int
+
+func (estimator distinctValueEstimatorStub) DistinctValues(fieldName string) int {
+	return estimator[fieldName]
 }

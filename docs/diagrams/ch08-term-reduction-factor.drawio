@@ -1,0 +1,15 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ch08-term-reduction-factor" name="Term reduction factor">
+    <mxGraphModel dx="1120" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1120" pageHeight="600" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 8 / Feature 31: Equality-term selectivity" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="80" y="25" width="960" height="50" as="geometry"/></mxCell>
+        <mxCell id="estimator" value="Plan statistics&#xa;DistinctValues(field)&#xa;&#xa;left=field and right=field&#xa;use the larger estimate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="70" y="190" width="310" height="180" as="geometry"/></mxCell>
+        <mxCell id="term" value="query.Term&#xa;ReductionFactor(estimator)&#xa;&#xa;field = field: max(left, right)&#xa;field = constant: field estimate&#xa;equal constants: 1&#xa;unequal constants: Integer.MAX_VALUE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1"><mxGeometry x="690" y="170" width="360" height="220" as="geometry"/></mxCell>
+        <mxCell id="boundary" value="query owns the small estimation interface&#xa;and does not import the planning package" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;" vertex="1" parent="1"><mxGeometry x="330" y="450" width="460" height="80" as="geometry"/></mxCell>
+        <mxCell id="edge" value="field cardinality estimates" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="estimator" target="term"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="edge2" value="dependency boundary" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="term" target="boundary"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
