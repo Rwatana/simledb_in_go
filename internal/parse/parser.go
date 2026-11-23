@@ -28,6 +28,23 @@ func (parser *Parser) ParseField() (string, error) {
 	return field, nil
 }
 
+// ParseExpression reads a field reference or a literal query expression.
+func (parser *Parser) ParseExpression() (query.Expression, error) {
+	if parser == nil {
+		return query.Expression{}, fmt.Errorf("parse expression: parser is nil")
+	}
+	if parser.lexer.MatchIdentifier() {
+		// A successful match guarantees this consume succeeds before the lexer changes.
+		field, _ := parser.lexer.EatIdentifier()
+		return query.NewFieldExpression(field), nil
+	}
+	constant, err := parser.ParseConstant()
+	if err != nil {
+		return query.Expression{}, fmt.Errorf("parse expression: %w", err)
+	}
+	return query.NewConstantExpression(constant), nil
+}
+
 // ParseConstant reads a string or non-negative integer query constant.
 func (parser *Parser) ParseConstant() (query.Constant, error) {
 	if parser == nil {

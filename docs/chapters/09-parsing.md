@@ -141,6 +141,23 @@ Tests first failed because `Parser.ParseField` was undefined. They cover mixed-c
 and strings, reserved-word and non-identifier rejection, stable byte offsets, repeated failures without consumption,
 empty input, whitespace, and a nil parser receiver.
 
+## Feature 8: Parse SQL expressions
+
+`Parser.ParseExpression` maps to Java `Parser.expression`. It treats a valid identifier as a field reference and
+otherwise parses an integer or string literal as a constant expression. Field names use the lexer's lower-case
+normalization. Each successful path consumes one token and preserves following input; reserved words, delimiters,
+empty input, and other invalid tokens return a byte-positioned error without consuming. Go reuses the existing
+`query.Expression` constructors rather than introducing another expression representation. The
+[expression-parsing diagram](../diagrams/ch09-parse-expression.svg) shows the identifier branch and literal branch
+converging on the query expression value; its editable source is
+[`ch09-parse-expression.drawio`](../diagrams/ch09-parse-expression.drawio).
+
+### Test-first record
+
+Tests first failed because `Parser.ParseExpression` was undefined. They cover normalized field references, integer and
+decoded string constants, following tokens, reserved-word and delimiter failures, stable byte offsets, repeated
+non-consuming errors, empty input, whitespace, and a nil parser receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
