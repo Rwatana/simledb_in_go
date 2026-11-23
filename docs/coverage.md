@@ -309,6 +309,10 @@ The SETINT encoder now has a synthetic filename-limit test through its error-wra
 It confirms the encoder context and no partial record. The new bounded encoder helper is 94.4% covered, recovery package
 coverage is 99.7%, and full-module statement coverage remains 99.0%.
 
+A separate synthetic host-int boundary now exercises the SETINT encoder's record-size error wrapper and verifies that
+no partial encoding is returned. The bounded encoder helper and recovery package are now 100.0% covered, and full-module
+statement coverage is 99.1%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
