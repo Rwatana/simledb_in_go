@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="760" viewBox="0 0 1320 760" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 10 Feature 1: Define the query plan contract</title>
+  <desc id="description">The Plan contract represents a relational query tree, opens its executable Scan with an error result, and exposes cost, output, distinct-value, and schema metadata.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>.title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}</style>
+  </defs>
+  <text class="title" x="660" y="62" text-anchor="middle">Chapter 10 / Feature 1: Define the query plan contract</text>
+  <rect class="box" x="60" y="245" width="280" height="130" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="200" y="286"><tspan x="200">Relational query tree</tspan><tspan x="200" dy="30">plan implementation</tspan><tspan x="200" dy="27">(later issue)</tspan></text>
+  <rect class="box" x="485" y="190" width="350" height="240" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="660" y="230"><tspan x="660">plan.Plan</tspan><tspan x="660" dy="31">Open</tspan><tspan x="660" dy="27">BlocksAccessed · RecordsOutput</tspan><tspan x="660" dy="27">DistinctValues(field)</tspan><tspan x="660" dy="27">Schema</tspan></text>
+  <rect class="box" x="980" y="125" width="280" height="135" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="1120" y="168"><tspan x="1120">query.Scan</tspan><tspan x="1120" dy="30">executable row traversal</tspan><tspan x="1120" dy="27">Open returns (Scan, error)</tspan></text>
+  <rect class="box" x="980" y="390" width="280" height="170" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="1120" y="430"><tspan x="1120">Plan metadata</tspan><tspan x="1120" dy="30">block-access estimate</tspan><tspan x="1120" dy="27">output-row estimate</tspan><tspan x="1120" dy="27">distinct estimate · Schema</tspan></text>
+  <rect class="box" x="420" y="565" width="470" height="90" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="655" y="600"><tspan x="655">Plan separates choosing a query tree</tspan><tspan x="655" dy="30">from executing its scan</tspan></text>
+  <path class="edge" d="M340 310 H477"/><text class="small" x="405" y="295">represented by</text>
+  <path class="edge" d="M835 250 H900 V192 H972"/><text class="small" x="892" y="180">Open()</text>
+  <path class="edge" d="M835 365 H900 V475 H972"/><text class="small" x="905" y="350">estimates and schema</text>
+  <path class="edge" d="M980 520 H930 V610 H898" stroke-dasharray="7 6"/><text class="small" x="946" y="590">plan-time metadata</text>
+</svg>
