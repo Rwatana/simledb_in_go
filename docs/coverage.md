@@ -155,6 +155,10 @@ full-module coverage is 96.9%.
 visible, and the stored string and page metadata stay unchanged. Method coverage is 95.0%, transaction coverage is
 98.3%, and full-module coverage remains 96.9%.
 
+`Transaction.Rollback` now tests its missing recovery-iterator guard. It returns the configuration error before flushing
+buffers or appending a rollback marker. The method is now 100.0% covered, transaction coverage is 98.8%, and full-module
+coverage is 97.0%.
+
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
 also cover early rejection of index lookups with missing table- or statistics-manager dependencies and an index

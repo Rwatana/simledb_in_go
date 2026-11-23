@@ -1577,6 +1577,7 @@ first. The initial build failed because the constructor did not accept the facto
 | --- | --- |
 | `TestTransactionRollbackInvokesDurabilityForOwnID` | Logged updates are restored and a durable own-ID ROLLBACK is returned while resources remain owned |
 | `TestTransactionRollbackFailureKeepsLocksAndPins` | Iterator failure prevents durability and preserves transaction locks and pins |
+| `TestTransactionRollbackRequiresRecoveryIterator` | Missing recovery iteration is rejected before buffer flush or log append |
 
 This implements the recovery portion of Java `Transaction.rollback`; cleanup follows in independent features.
 

@@ -1666,6 +1666,27 @@ func TestTransactionAvailableBuffersDelegatesWithoutChangingOwnership(t *testing
 	}
 }
 
+func TestTransactionRollbackRequiresRecoveryIterator(t *testing.T) {
+	buffers := &recordingBufferPinner{}
+	logs := &recordingTransactionLog{}
+	tx := &Transaction{bufferManager: buffers, logs: logs}
+
+	lsn, err := tx.Rollback()
+	if lsn != 0 {
+		t.Errorf("Rollback() LSN = %d, want zero without a recovery iterator", lsn)
+	}
+	wantErr := "rollback transaction 0: recovery iterator factory is not configured"
+	if err == nil || err.Error() != wantErr {
+		t.Errorf("Rollback() error = %v, want %q", err, wantErr)
+	}
+	if len(buffers.flushes) != 0 {
+		t.Errorf("buffer flushes = %v, want none without a recovery iterator", buffers.flushes)
+	}
+	if len(logs.records) != 0 {
+		t.Errorf("log records = %d, want none without a recovery iterator", len(logs.records))
+	}
+}
+
 func TestTransactionRollbackInvokesDurabilityForOwnID(t *testing.T) {
 	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
 	var allocator IDAllocator
