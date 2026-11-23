@@ -50,3 +50,34 @@ func (scan *IndexSelectScan) BeforeFirst() error {
 	}
 	return nil
 }
+
+// Next advances the index and moves the data scan to the matching record.
+func (scan *IndexSelectScan) Next() (bool, error) {
+	if scan == nil {
+		return false, fmt.Errorf("advance nil index select scan")
+	}
+	if scan.index == nil {
+		return false, fmt.Errorf("advance index select scan: index is nil")
+	}
+	if scan.dataScan == nil {
+		return false, fmt.Errorf("advance index select scan: table scan is nil")
+	}
+	if _, ok := scan.searchKey.HashCode(); !ok {
+		return false, fmt.Errorf("advance index select scan: search key is unset")
+	}
+	found, err := scan.index.Next()
+	if err != nil {
+		return false, fmt.Errorf("advance index select scan index: %w", err)
+	}
+	if !found {
+		return false, nil
+	}
+	rid, err := scan.index.GetDataRID()
+	if err != nil {
+		return false, fmt.Errorf("read index select scan data RID: %w", err)
+	}
+	if err := scan.dataScan.MoveToRID(rid); err != nil {
+		return false, fmt.Errorf("move index select scan data table to RID %v: %w", rid, err)
+	}
+	return true, nil
+}
