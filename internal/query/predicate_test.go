@@ -130,3 +130,46 @@ func TestPredicateSelectSubPredicate(t *testing.T) {
 		t.Fatalf("empty predicate selection = (%v, %v), want (empty predicate, false)", selectedEmpty.terms, ok)
 	}
 }
+
+func TestPredicateJoinSubPredicate(t *testing.T) {
+	crossSchema := NewTerm(NewFieldExpression("left"), NewFieldExpression("right"))
+	leftOnly := NewTerm(NewFieldExpression("left"), NewConstantExpression(NewIntConstant(1)))
+	rightOnly := NewTerm(NewFieldExpression("right"), NewConstantExpression(NewIntConstant(2)))
+	missingFromUnion := NewTerm(NewFieldExpression("left"), NewFieldExpression("missing"))
+	literalOnly := NewTerm(NewConstantExpression(NewIntConstant(1)), NewConstantExpression(NewIntConstant(1)))
+	predicate := Predicate{terms: []Term{crossSchema, leftOnly, rightOnly, missingFromUnion, literalOnly, crossSchema}}
+	leftSchema := schemaWithFields("left")
+	rightSchema := schemaWithFields("right")
+
+	selected, ok := predicate.JoinSubPredicate(leftSchema, rightSchema)
+	if !ok {
+		t.Fatal("JoinSubPredicate(leftSchema, rightSchema) returned no predicate, want cross-schema terms")
+	}
+	if want := []Term{crossSchema, crossSchema}; !reflect.DeepEqual(selected.terms, want) {
+		t.Fatalf("selected terms = %v, want %v", selected.terms, want)
+	}
+	if want := []string{"left"}; !reflect.DeepEqual(leftSchema.Fields(), want) {
+		t.Fatalf("left schema fields = %v, want unchanged %v", leftSchema.Fields(), want)
+	}
+	if want := []string{"right"}; !reflect.DeepEqual(rightSchema.Fields(), want) {
+		t.Fatalf("right schema fields = %v, want unchanged %v", rightSchema.Fields(), want)
+	}
+	if want := []Term{crossSchema, leftOnly, rightOnly, missingFromUnion, literalOnly, crossSchema}; !reflect.DeepEqual(predicate.terms, want) {
+		t.Fatalf("source terms = %v, want unchanged %v", predicate.terms, want)
+	}
+
+	noMatch, ok := NewPredicateWithTerm(leftOnly).JoinSubPredicate(leftSchema, rightSchema)
+	if ok || len(noMatch.terms) != 0 {
+		t.Fatalf("no-match selection = (%v, %v), want (empty predicate, false)", noMatch.terms, ok)
+	}
+	var empty Predicate
+	if selectedEmpty, ok := empty.JoinSubPredicate(leftSchema, rightSchema); ok || len(selectedEmpty.terms) != 0 {
+		t.Fatalf("empty predicate selection = (%v, %v), want (empty predicate, false)", selectedEmpty.terms, ok)
+	}
+	if selectedNil, ok := NewPredicateWithTerm(crossSchema).JoinSubPredicate(nil, nil); ok || len(selectedNil.terms) != 0 {
+		t.Fatalf("nil schema selection = (%v, %v), want (empty predicate, false)", selectedNil.terms, ok)
+	}
+	if selectedLiteral, ok := NewPredicateWithTerm(literalOnly).JoinSubPredicate(nil, nil); ok || len(selectedLiteral.terms) != 0 {
+		t.Fatalf("nil schema literal selection = (%v, %v), want (empty predicate, false)", selectedLiteral.terms, ok)
+	}
+}
