@@ -424,9 +424,58 @@ stat操作のprivate seamでerror pathを決定的に検証し、公開filesyste
 - open file cache
 - buffer pool、log、transaction、recovery
 
-## 次の機能
+## Feature 5: FileManager append
 
-次はzero-filled block appendを実装し、file末尾へ新しいlogical blockを安全に追加する。
+編集可能な図は[Draw.io版](../diagrams/ch03-file-append-length.drawio)、表示用の図は
+[SVG版](../diagrams/ch03-file-append-length.svg)を参照する。図は2 blocksのfileへblock 2を追加し、
+file sizeとlogical lengthが1 block分増える状態を示す。
+
+### 問い
+
+既存blockを変えずに、次のzero-filled blockをfile末尾へ追加するにはどうするか。
+
+### 概念
+
+完全なblock数がappend前のlogical lengthであり、それが新しい`BlockID`の0始まり番号になる。
+file size検査、番号決定、zero bytesの書き込みをManagerのmutex内で行い、最後に`Sync`する。
+
+```text
+new block number = current logical length
+new file size    = old file size + block size
+```
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Append(fileName)` | zero-filled blockを末尾へ追加し、その`BlockID`を返す |
+
+### Test-firstの記録
+
+空fileからのappend、連続番号、zero fill、partial file、open/stat/write/sync errorを既存の`manager_test.go`へ追加した。
+
+### Javaソースリーディング
+
+対象は`simpledb.file.FileMgr.append`である。Java版と同様に固定長のzero-filled bytesをfile末尾へ書く。
+Go版はpartial blockを拒否し、成功前に`Sync`して永続化の時点を明確にする。
+
+### Clean Architecture上の判断
+
+AppendはLengthと同じfilesystem adapterに置き、内側の`storage.BlockID`を返す。
+同一Manager内でLength相当のsize検査とappendを直列化する。
+
+### 意図的に含めなかったもの
+
+- temporary table cleanupとdatabaseのnew/existing判定
+- block truncateとdelete
+- open file cache
+- concurrent process間のfile lock
+- buffer pool、log、transaction、recovery
+
+## Chapter 3の到達点
+
+`BlockID`、`Page`、fixed-size block read/write、length、zero-filled appendが揃い、memory上の値をlogical blockへ
+対応させて永続化する最小file layerが完成した。次はChapter 4で`LogManager`のrecord appendとblock rolloverを実装する。
 
 ## 参照元
 

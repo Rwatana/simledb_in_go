@@ -26,6 +26,7 @@ type fileOperations interface {
 }
 
 type fileHandle interface {
+	Stat() (os.FileInfo, error)
 	ReadAt([]byte, int64) (int, error)
 	WriteAt([]byte, int64) (int, error)
 	Sync() error
@@ -87,6 +88,40 @@ func (m *Manager) Length(fileName string) (int, error) {
 		return 0, fmt.Errorf("get length of %q: %w", fileName, err)
 	}
 	return blocks, nil
+}
+
+// Append adds one zero-filled block to fileName and returns its identifier.
+func (m *Manager) Append(fileName string) (storage.BlockID, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	path, err := m.filePath(fileName)
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("append block to %q: %w", fileName, err)
+	}
+	file, err := m.ops.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("append block to %q: open %q: %w", fileName, path, err)
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("append block to %q: stat %q: %w", fileName, path, err)
+	}
+	blockNumber, err := m.blocksForSize(fileName, info.Size())
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("append block to %q: %w", fileName, err)
+	}
+	zeroBlock := make([]byte, m.blockSize)
+	written, err := file.WriteAt(zeroBlock, info.Size())
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("append block %d to %q: wrote %d of %d bytes: %w", blockNumber, fileName, written, len(zeroBlock), err)
+	}
+	if err := file.Sync(); err != nil {
+		return storage.BlockID{}, fmt.Errorf("append block %d to %q: sync %q: %w", blockNumber, fileName, path, err)
+	}
+	return storage.NewBlockID(fileName, blockNumber), nil
 }
 
 // Read returns a Page containing the complete block identified by block.

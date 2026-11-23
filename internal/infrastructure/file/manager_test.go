@@ -191,6 +191,84 @@ func TestManagerLengthRejectsInvalidSizesAndStatFailures(t *testing.T) {
 	}
 }
 
+func TestManagerAppendsZeroFilledBlocks(t *testing.T) {
+	t.Parallel()
+
+	const blockSize = 16
+	manager := newManager(t, filepath.Join(t.TempDir(), "database"), blockSize)
+	const fileName = "student.tbl"
+	for wantNumber := 0; wantNumber < 3; wantNumber++ {
+		block, err := manager.Append(fileName)
+		if err != nil {
+			t.Fatalf("Append() block %d error = %v", wantNumber, err)
+		}
+		if want, got := storage.NewBlockID(fileName, wantNumber), block; got != want {
+			t.Fatalf("Append() block = %v, want %v", got, want)
+		}
+		page, err := manager.Read(block)
+		if err != nil {
+			t.Fatalf("Read(%v) error = %v", block, err)
+		}
+		if got, want := page.Snapshot(), make([]byte, blockSize); !bytes.Equal(got, want) {
+			t.Errorf("Read(%v) = %v, want zero-filled block", block, got)
+		}
+		if got, err := manager.Length(fileName); err != nil || got != wantNumber+1 {
+			t.Fatalf("Length() after append = (%d, %v), want (%d, nil)", got, err, wantNumber+1)
+		}
+	}
+}
+
+func TestManagerAppendRejectsPartialBlockFile(t *testing.T) {
+	t.Parallel()
+
+	const blockSize = 16
+	directory := filepath.Join(t.TempDir(), "database")
+	manager := newManager(t, directory, blockSize)
+	path := filepath.Join(directory, "partial.tbl")
+	if err := os.WriteFile(path, make([]byte, blockSize+1), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if _, err := manager.Append("partial.tbl"); err == nil {
+		t.Fatal("Append() partial block error = nil, want corruption error")
+	}
+	if _, err := manager.Append("../escape.tbl"); err == nil {
+		t.Fatal("Append() path traversal error = nil, want invalid file name error")
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if got, want := info.Size(), int64(blockSize+1); got != want {
+		t.Errorf("file size after rejected append = %d, want %d", got, want)
+	}
+}
+
+func TestManagerAppendWrapsFilesystemFailures(t *testing.T) {
+	boom := errors.New("injected filesystem failure")
+	tests := []struct {
+		name string
+		ops  testFileOperations
+	}{
+		{name: "open", ops: testFileOperations{openFileErr: boom}},
+		{name: "stat", ops: testFileOperations{writeHandle: &fakeBlockFile{statErr: boom}}},
+		{name: "partial size", ops: testFileOperations{writeHandle: &fakeBlockFile{statInfo: testFileInfo{size: 1}}}},
+		{name: "write", ops: testFileOperations{writeHandle: &fakeBlockFile{statInfo: testFileInfo{}, writeErr: boom}}},
+		{name: "sync", ops: testFileOperations{writeHandle: &fakeBlockFile{statInfo: testFileInfo{}, syncErr: boom}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := &Manager{directory: "/database", blockSize: 4, ops: tt.ops}
+			_, err := manager.Append("data")
+			if err == nil {
+				t.Fatal("Append() error = nil, want filesystem failure")
+			}
+			if tt.name != "partial size" && !errors.Is(err, boom) {
+				t.Errorf("Append() error = %v, want wrapped filesystem failure", err)
+			}
+		})
+	}
+}
+
 func TestBlocksForSizeRejectsLimitOverflow(t *testing.T) {
 	manager := &Manager{blockSize: 1}
 	if _, err := manager.blocksForSizeWithLimit("data", 3, 2); err == nil {
@@ -295,6 +373,8 @@ func (f testFileOperations) OpenFile(string, int, os.FileMode) (fileHandle, erro
 }
 
 type fakeBlockFile struct {
+	statInfo   os.FileInfo
+	statErr    error
 	readCount  int
 	readErr    error
 	writeCount int
@@ -302,6 +382,15 @@ type fakeBlockFile struct {
 	syncErr    error
 }
 
+func (f *fakeBlockFile) Stat() (os.FileInfo, error) {
+	if f.statErr != nil {
+		return nil, f.statErr
+	}
+	if f.statInfo == nil {
+		return testFileInfo{}, nil
+	}
+	return f.statInfo, nil
+}
 func (f *fakeBlockFile) ReadAt(p []byte, _ int64) (int, error) {
 	for i := range p {
 		p[i] = byte(i)
