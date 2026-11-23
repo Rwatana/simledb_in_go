@@ -13,6 +13,7 @@ implementation can preserve the same interface.
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/metadata.IndexInfo` | `simpledb/metadata/IndexInfo.java` | Open the configured static hash index using the retained transaction and index-record layout |
+| `internal/plan.IndexSelectPlan` | `simpledb/index/planner/IndexSelectPlan.java` | Retain the child plan, index metadata, and search key for indexed selection |
 | `internal/query.RecordScan` | `simpledb/record/TableScan.java` | Go adapter that converts typed record fields into query constants without coupling records to query values |
 
 ## Feature 1: Define the index traversal contract
@@ -254,6 +255,18 @@ opening step from Chapter 7 without introducing B-tree behavior.
 
 The focused test first failed because `IndexInfo.Open` was undefined. It verifies construction without bucket I/O, then
 positions integer and varchar indexes, inserts an entry, and reads its RID back to validate bucket and layout wiring.
+
+## Feature 19: Preserve the child schema in an index-select plan
+
+`plan.NewIndexSelectPlan` retains the child plan, `metadata.IndexInfo`, and search key. Its `Schema` delegates to the
+child and returns the same schema pointer because indexed selection changes row access, not the table's logical fields.
+A nil plan or missing child reports no schema, matching the other plan adapters. Opening the scan and cost estimates
+remain separate behaviors.
+
+### Test-first record
+
+The focused test first failed because `IndexSelectPlan` and `NewIndexSelectPlan` were undefined. Tests verify retained
+dependencies/search key, unchanged child-schema identity, and nil results for a nil plan or child.
 
 ## Intentional differences from Java
 
