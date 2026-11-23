@@ -593,6 +593,11 @@ every executable package and function. `IndexInfo.Open` is exercised with intege
 that construction itself does not open a bucket, then round-trips a RID through the correctly named static hash bucket.
 The full uncached test suite, race tests, vet, docs, gofmt, and diff checks pass.
 
+At the Issue #961 index-select-plan-schema checkpoint, `/tmp/simpledb-coverage-961.out` measures 100.0% statement
+coverage in every executable package and function. `IndexSelectPlan.Schema` covers schema identity delegation and nil
+plan/child states; constructor tests also verify the retained index metadata and search key. The full uncached test
+suite, race tests, vet, docs, gofmt, and diff checks pass.
+
 At the Issue #893 project-plan-schema checkpoint, `/tmp/simpledb-coverage-893.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `NewProjectPlan` covers nil dependencies, valid ordered fields, empty projections, and missing-field errors; `ProjectPlan.Schema` covers both ordinary and nil receivers. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
 
 At the Issue #891 product-plan-distinct-estimate checkpoint, `/tmp/simpledb-coverage-891.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProductPlan.DistinctValues` covers left/right field routing, left-side duplicate-name precedence, nil dependencies, missing schemas, and unknown fields. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
