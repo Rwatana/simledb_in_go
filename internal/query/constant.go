@@ -1,5 +1,7 @@
 package query
 
+import "cmp"
+
 type constantKind uint8
 
 const (
@@ -44,4 +46,20 @@ func (constant Constant) AsString() (string, bool) {
 // An unset constant never matches.
 func (constant Constant) Equal(other Constant) bool {
 	return constant.kind != 0 && constant == other
+}
+
+// Compare orders two constants of the same kind and reports whether they are comparable.
+// The order is negative, zero, or positive when constant is less than, equal to, or greater than other.
+func (constant Constant) Compare(other Constant) (int, bool) {
+	if constant.kind != other.kind {
+		return 0, false
+	}
+	switch constant.kind {
+	case intConstantKind:
+		return cmp.Compare(constant.integer, other.integer), true
+	case stringConstantKind:
+		return cmp.Compare(constant.str, other.str), true
+	default:
+		return 0, false
+	}
 }
