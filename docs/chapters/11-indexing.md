@@ -25,7 +25,22 @@ The first focused test run failed because the `internal/index` package and `Inde
 probe implements the six methods, and a focused contract test exercises search positioning, traversal results, RID
 retrieval, insertion, deletion, close, and error propagation.
 
+## Feature 2: Map search keys to static hash buckets
+
+`index/hash.BucketNumber` selects one of 100 fixed buckets. Integer values use their signed 32-bit value as the hash;
+string values use Java `String.hashCode` over UTF-16 code units, including surrogate pairs for supplementary Unicode
+characters. The remainder is normalized into `[0, 100)` so negative keys cannot select an invalid bucket. An unset
+`query.Constant` returns an error instead of silently choosing a bucket. The [hash bucket diagram](../diagrams/ch11-hash-bucket.svg)
+shows how a query value becomes a bucket number; its editable source is
+[`ch11-hash-bucket.drawio`](../diagrams/ch11-hash-bucket.drawio).
+
+### Test-first record
+
+The first focused test run failed because `BucketNumber` and `BucketCount` were undefined. Tests verify positive and
+negative integers, ASCII/BMP/supplementary Unicode strings, the empty-string hash, bucket bounds, and unset-value errors.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
 - The contract uses the existing `query.Constant` and `record.RID` value types; concrete hash and B-tree indexes remain separate implementations.
+- Static hash bucket selection normalizes Java hash remainders to a nonnegative range, avoiding Java's negative-remainder invalid-index case.

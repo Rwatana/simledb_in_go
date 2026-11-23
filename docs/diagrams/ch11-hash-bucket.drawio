@@ -1,0 +1,19 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ch11-hash-bucket" name="Static hash bucket selection">
+    <mxGraphModel dx="1200" dy="650" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="650" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 11 / Feature 2: Static hash bucket selection" style="text;html=1;align=center;fontSize=24;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="160" y="25" width="880" height="50" as="geometry"/></mxCell>
+        <mxCell id="value" value="query.Constant&#xa;int32 key&#xa;string key" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="50" y="210" width="230" height="120" as="geometry"/></mxCell>
+        <mxCell id="hash" value="Java-compatible hash&#xa;integer: signed value&#xa;string: String.hashCode()&#xa;iterate UTF-16 code units" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=16;" vertex="1" parent="1"><mxGeometry x="370" y="175" width="300" height="180" as="geometry"/></mxCell>
+        <mxCell id="mod" value="BucketNumber&#xa;hash % 100&#xa;normalize negative remainder&#xa;result is in [0, 100)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1"><mxGeometry x="760" y="175" width="300" height="180" as="geometry"/></mxCell>
+        <mxCell id="buckets" value="Static hash index&#xa;bucket 0 · bucket 1 · … · bucket 99&#xa;one bucket is scanned for the search key" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=16;" vertex="1" parent="1"><mxGeometry x="690" y="445" width="440" height="120" as="geometry"/></mxCell>
+        <mxCell id="invalid" value="Unset Constant&#xa;returns an explicit error" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;" vertex="1" parent="1"><mxGeometry x="50" y="455" width="230" height="90" as="geometry"/></mxCell>
+        <mxCell id="e1" value="value hash" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="value" target="hash"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="signed hash code" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="hash" target="mod"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="bucket number" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="mod" target="buckets"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="invalid key" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="value" target="invalid"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
