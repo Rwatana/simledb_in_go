@@ -257,6 +257,7 @@ The test first failed to compile because `ViewManager.InitializeCatalog` did not
 | --- | --- |
 | `TestViewManagerInitializeCatalogRegistersViewMetadata` | The existing catalogs gain one `viewcat` table row and two ordered field rows without appending unrelated files |
 | `TestViewManagerInitializeCatalogWrapsCatalogCloseFailure` | A view-catalog registration close failure preserves its cause and view-specific initialization context |
+| `TestViewManagerInitializeCatalogRequiresTableManager` | A missing table-manager dependency returns initialization context before transaction access |
 
 Creating and reading individual view definitions remain separate behaviors.
 

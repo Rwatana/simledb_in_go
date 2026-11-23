@@ -65,6 +65,13 @@ func TestViewManagerInitializeCatalogRegistersViewMetadata(t *testing.T) {
 	}
 }
 
+func TestViewManagerInitializeCatalogRequiresTableManager(t *testing.T) {
+	err := NewViewManager(nil).InitializeCatalog(nil)
+	if err == nil || err.Error() != "initialize view catalog: table manager is nil" {
+		t.Fatalf("InitializeCatalog() error = %v, want missing table manager context", err)
+	}
+}
+
 func TestViewManagerInitializeCatalogWrapsCatalogCloseFailure(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()
