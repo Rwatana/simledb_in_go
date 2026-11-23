@@ -1,0 +1,24 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-parse-update" name="Chapter 9 - Parse UPDATE">
+    <mxGraphModel page="1" pageWidth="1240" pageHeight="590">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 18: Parse SQL UPDATE statements" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="170" y="25" width="900" height="55" as="geometry"/></mxCell>
+        <mxCell id="start" value="update&#xa;&#xa;keyword" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="35" y="210" width="150" height="105" as="geometry"/></mxCell>
+        <mxCell id="target" value="table&#xa;&#xa;target field" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="230" y="210" width="185" height="105" as="geometry"/></mxCell>
+        <mxCell id="assignment" value="set field = expression&#xa;&#xa;field, constant, or literal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;" vertex="1" parent="1"><mxGeometry x="460" y="195" width="250" height="135" as="geometry"/></mxCell>
+        <mxCell id="where" value="optional where predicate&#xa;&#xa;ordered terms joined by and" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;" vertex="1" parent="1"><mxGeometry x="760" y="195" width="240" height="135" as="geometry"/></mxCell>
+        <mxCell id="result" value="ModifyData&#xa;&#xa;table · target field&#xa;new expression · predicate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="1050" y="195" width="175" height="135" as="geometry"/></mxCell>
+        <mxCell id="next" value="following token&#xa;remains for caller" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=16;" vertex="1" parent="1"><mxGeometry x="760" y="405" width="240" height="90" as="geometry"/></mxCell>
+        <mxCell id="error" value="missing clause, name, delimiter, or expression&#xa;→ contextual error with byte offset" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;" vertex="1" parent="1"><mxGeometry x="230" y="405" width="480" height="90" as="geometry"/></mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="start" target="target"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="target" target="assignment"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="where or next token" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="assignment" target="where"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="where" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="no where" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="assignment" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="after command" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="where" target="next"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="syntax failure" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="assignment" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

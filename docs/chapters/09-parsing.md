@@ -15,6 +15,7 @@ Request.
 | `internal/parse.InsertData` | `simpledb/parse/InsertData.java` | Hold the target table, ordered fields, and corresponding values of an INSERT statement |
 | `Parser.ParseInsert` | `simpledb/parse/Parser.java` (`insert`) | Parse the INSERT target, field list, and matching constant list |
 | `internal/parse.ModifyData` | `simpledb/parse/ModifyData.java` | Hold the target table and field, new expression, and predicate of an UPDATE statement |
+| `Parser.ParseUpdate` | `simpledb/parse/Parser.java` (`modify`) | Parse the UPDATE target, assignment, and optional predicate |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -305,6 +306,24 @@ read-only accessors; its editable source is
 Tests first failed to compile because `ModifyData` and `NewModifyData` were undefined. They cover storing and reading
 each command value and the safe zero-value accessors.
 
+## Feature 18: Parse SQL UPDATE statements
+
+`Parser.ParseUpdate` maps to Java `Parser.modify`. It consumes `update`, reads the normalized table and target field,
+parses the assignment expression after `set` and `=`, then optionally parses a `where` predicate. The resulting
+`ModifyData` keeps the table, target field, expression, and predicate together; when `where` is omitted, the predicate
+is empty. The first token after the command remains available to the caller.
+
+Go wraps each lexer or parser error with its grammar position while preserving the original byte offset. The
+[UPDATE-parser diagram](../diagrams/ch09-parse-update.svg) shows the assignment path, optional predicate, returned data,
+and error branches; its editable source is
+[`ch09-parse-update.drawio`](../diagrams/ch09-parse-update.drawio).
+
+### Test-first record
+
+Tests first failed because `Parser.ParseUpdate` was undefined. They cover a mixed-case assignment with an ordered
+predicate, a constant assignment without `where`, preservation of a following keyword, missing grammar elements,
+malformed predicates, byte offsets, and a nil receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -320,3 +339,4 @@ each command value and the safe zero-value accessors.
 - `InsertData` copies its field and value slices for clear ownership; Java exposes its internal mutable lists directly.
 - `ParseInsert` uses iterative list parsing and leaves the next token to its caller; Java recurses through each list.
 - `ModifyData` returns the query predicate by value and retains an unset-expression zero value; Java provides accessors but no Go-style zero-value contract.
+- `ParseUpdate` is a concrete command parser separate from top-level dispatch; it leaves trailing tokens to its caller.
