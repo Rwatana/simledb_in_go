@@ -137,9 +137,25 @@ existing and newly created bucket tables, RID fields, the retained search key/sc
 range overflow, table size/append/pin failures, scan insertion and field-write failures, and preservation of a previous
 scan when repositioning cannot release it.
 
+## Feature 10: Delete a hash-index entry by RID
+
+`HashIndex.Delete` positions the active bucket scan at the supplied key and walks only entries whose `dataval` matches.
+It reads each matching entry's data RID, deletes the first exact RID match, and returns successfully without mutation
+when the key or RID is absent. The positioned scan remains available after success or a later scan error, matching the
+stateful Java index contract. Positioning, iteration, RID-read, and slot-delete errors identify the index operation and
+retain their causes. The existing [hash-index traversal diagram](../diagrams/ch11-hash-traversal.svg) shows the bucket
+filter loop that deletion reuses, so a second diagram would duplicate that behavior.
+
+### Test-first record
+
+The focused test run first failed because `HashIndex.Delete` was undefined. Tests cover skipping hash collisions,
+removing only the first key/RID match, leaving entries unchanged for absent keys or RIDs, retaining the positioned
+scan, rejecting invalid state, and wrapping bucket-open, iteration, RID-read, and slot-delete failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
 - The contract uses the existing `query.Constant` and `record.RID` value types; concrete hash and B-tree indexes remain separate implementations.
 - Static hash bucket selection normalizes Java hash remainders to a nonnegative range, avoiding Java's negative-remainder invalid-index case.
 - Go insertion validates the index-record schema and signed 32-bit RID storage before changing scan state, and wraps storage failures as explicit errors.
+- Go deletion reports storage failures as errors while preserving the Java behavior of removing the first matching RID and treating a missing entry as a successful no-op.

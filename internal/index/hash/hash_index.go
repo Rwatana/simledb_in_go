@@ -225,6 +225,79 @@ func (index *HashIndex) Insert(dataValue query.Constant, dataRID record.RID) err
 	return nil
 }
 
+// Delete removes the first matching data record identifier from a hash bucket.
+func (index *HashIndex) Delete(dataValue query.Constant, dataRID record.RID) error {
+	if index == nil {
+		return fmt.Errorf("delete from nil hash index")
+	}
+	if index.transaction == nil {
+		return fmt.Errorf("delete from hash index %q: transaction is nil", index.indexName)
+	}
+	if index.layout == nil {
+		return fmt.Errorf("delete from hash index %q: record layout is nil", index.indexName)
+	}
+	if index.layout.SlotSize() <= 0 {
+		return fmt.Errorf("delete from hash index %q: record slot size %d must be positive", index.indexName, index.layout.SlotSize())
+	}
+	schema := index.layout.Schema()
+	if schema == nil {
+		return fmt.Errorf("delete from hash index %q: record layout schema is nil", index.indexName)
+	}
+	for _, fieldName := range []string{"block", "id"} {
+		fieldType, ok := schema.TypeOf(fieldName)
+		if !ok {
+			return fmt.Errorf("delete from hash index %q: record layout has no %q field", index.indexName, fieldName)
+		}
+		if fieldType != record.IntegerField {
+			return fmt.Errorf("delete from hash index %q: %q field has non-integer type %d", index.indexName, fieldName, fieldType)
+		}
+		if _, ok := index.layout.Offset(fieldName); !ok {
+			return fmt.Errorf("delete from hash index %q: record layout has no offset for %q", index.indexName, fieldName)
+		}
+	}
+	datavalType, ok := schema.TypeOf("dataval")
+	if !ok {
+		return fmt.Errorf("delete from hash index %q: record layout has no dataval field", index.indexName)
+	}
+	if _, ok := index.layout.Offset("dataval"); !ok {
+		return fmt.Errorf("delete from hash index %q: record layout has no offset for dataval", index.indexName)
+	}
+	if datavalType != record.IntegerField && datavalType != record.VarcharField {
+		return fmt.Errorf("delete from hash index %q: dataval field has unsupported type %d", index.indexName, datavalType)
+	}
+	_, isInteger := dataValue.AsInt()
+	_, isString := dataValue.AsString()
+	if !isInteger && !isString {
+		return fmt.Errorf("delete from hash index %q: data value is unset", index.indexName)
+	}
+	if datavalType == record.IntegerField && !isInteger || datavalType == record.VarcharField && !isString {
+		return fmt.Errorf("delete from hash index %q: data value type does not match dataval field", index.indexName)
+	}
+	if err := index.BeforeFirst(dataValue); err != nil {
+		return fmt.Errorf("delete from hash index %q: position bucket: %w", index.indexName, err)
+	}
+	for {
+		found, err := index.Next()
+		if err != nil {
+			return fmt.Errorf("delete from hash index %q: find matching entry: %w", index.indexName, err)
+		}
+		if !found {
+			return nil
+		}
+		currentRID, err := index.GetDataRID()
+		if err != nil {
+			return fmt.Errorf("delete from hash index %q: read matching entry RID: %w", index.indexName, err)
+		}
+		if !currentRID.Equal(dataRID) {
+			continue
+		}
+		if err := index.scan.Delete(); err != nil {
+			return fmt.Errorf("delete from hash index %q bucket entry: %w", index.indexName, err)
+		}
+		return nil
+	}
+}
+
 // Close releases the current bucket scan and clears it after successful release.
 func (index *HashIndex) Close() error {
 	if index.scan == nil {
