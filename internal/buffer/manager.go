@@ -164,7 +164,10 @@ func (m *Manager) pinCacheMissLocked(block storage.BlockID) (*Buffer, bool, erro
 func (m *Manager) tryToPin(block storage.BlockID) (*Buffer, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.tryToPinLocked(block)
+}
 
+func (m *Manager) tryToPinLocked(block storage.BlockID) (*Buffer, bool, error) {
 	if frame, found := m.findExistingBufferLocked(block); found {
 		if frame.pin() {
 			m.available--
@@ -172,4 +175,21 @@ func (m *Manager) tryToPin(block storage.BlockID) (*Buffer, bool, error) {
 		return frame, true, nil
 	}
 	return m.pinCacheMissLocked(block)
+}
+
+// Pin returns a Buffer pinned to block, waiting until a frame is available.
+func (m *Manager) Pin(block storage.BlockID) (*Buffer, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for {
+		frame, pinned, err := m.tryToPinLocked(block)
+		if err != nil {
+			return nil, fmt.Errorf("pin buffer %v: %w", block, err)
+		}
+		if pinned {
+			return frame, nil
+		}
+		m.availableChanged.Wait()
+	}
 }
