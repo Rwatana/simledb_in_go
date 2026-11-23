@@ -13,6 +13,7 @@ dependency order. Each observable behavior remains a separate Issue, branch, com
 | `internal/query.Scan` | `simpledb/query/Scan.java` | Shared traversal, field access, and cleanup contract |
 | `internal/query.UpdateScan` | `simpledb/query/UpdateScan.java` | A scan with record mutation and RID positioning |
 | `internal/query.RecordScan` | `simpledb/record/TableScan.java` | Adapter from record storage scans to query values |
+| `internal/query.SelectScan` | `simpledb/query/SelectScan.java` | Filters rows with a predicate and delegates scan operations |
 
 ## Feature 1: Initialize an integer query constant
 
@@ -286,3 +287,17 @@ adapter depends on record types, so the dependency remains one-way and avoids an
 The integration tests first failed to compile because `query.NewRecordScan` was undefined. An in-memory transaction
 fake verifies typed values, updates, iteration, insertion/deletion, RID positioning, cleanup, invalid fields and
 constant kinds, and wrapped storage errors.
+
+## Feature 28: Filter rows with a selection scan
+
+`NewSelectScan` and `SelectScan` map to Java `SelectScan`. `BeforeFirst` resets the source; `Next` advances until the
+source ends or `Predicate.IsSatisfied` accepts a row. Reads, field membership, and close are delegated to the source.
+The selection scan implements `UpdateScan` and forwards writes and RID operations when the source supports updates;
+otherwise those operations return a contextual error. Go also rejects a nil source at construction and reports
+uninitialized zero values through errors, rather than relying on Java null failures.
+
+The tests first failed to compile because `NewSelectScan` and `SelectScan` were undefined. They cover matching and
+rejected rows, restarting iteration, the empty predicate, predicate and source errors, scan delegation, all update
+operations, and update attempts over a read-only source. The [selection-scan diagram](../diagrams/ch08-select-scan.svg)
+shows the predicate loop and delegated operations; its editable source is
+[`ch08-select-scan.drawio`](../diagrams/ch08-select-scan.drawio).

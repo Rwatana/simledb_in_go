@@ -410,3 +410,7 @@ go tool cover -func=coverage.out
 ```
 
 At the 2026-11-23 scheduled recheck on the Chapter 8 adapter tip, `/tmp/simpledb-coverage-793-recheck.out` measured 100.0% full-module statement coverage, with no uncovered functions. A separate `go test ./... -cover -count=1` also reported 100.0% for buffer, concurrency, file, log, metadata, query, record, recovery, storage, and transaction. Race tests, vet, documentation validation, and diff checks passed.
+
+At the 2026-11-23 selection-scan checkpoint, `/tmp/simpledb-coverage-795.out` measured 100.0% statement coverage for the full module and all ten packages. The selection scan and its tests add no uncovered statements. The complete suite, race tests, vet, documentation validation, and diff checks passed.
+
+At the 2026-11-23 scheduled regression recheck on PR #796's current stack tip, `/tmp/simpledb-coverage-796-current.out` measured 100.0% full-module statement coverage. Each package is also at 100.0%: buffer, concurrency, file, log, metadata, query, record, recovery, storage, and transaction. `go tool cover -func` reports no uncovered functions. Full tests, per-package coverage, race tests, vet, documentation validation, and diff checks passed; no regression or error-path defect was confirmed.
