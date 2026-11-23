@@ -325,6 +325,11 @@ A separate refresh test now covers a registered table-name read failure after la
 cause and catalog context, releases the scan pin, and retains the existing statistics snapshot. `refreshLocked` is now
 92.6% covered, metadata package coverage is 99.2%, and full-module statement coverage is 99.3%.
 
+Statistics refresh now also covers an invalid slot size while loading a registered table's layout. The test confirms
+that the bad catalog value is reported with table context and the old cache and lookup count remain intact.
+`refreshLocked` is now 96.3% covered, metadata package coverage is 99.5%, and full-module statement coverage remains
+99.3%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

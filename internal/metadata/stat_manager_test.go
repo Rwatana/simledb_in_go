@@ -268,6 +268,49 @@ func TestStatManagerRefreshPreservesRegisteredTableNameFailure(t *testing.T) {
 	}
 }
 
+func TestStatManagerRefreshPreservesRegisteredTableLayoutFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	if err := tables.CreateTable("broken", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+	slotSizeOffset, ok := tables.tableCatalogLayout.Offset("slotsize")
+	if !ok {
+		t.Fatal("table catalog layout has no slotsize field")
+	}
+	block := storage.NewBlockID("tblcat.tbl", 0)
+	brokenSlot := 2
+	if err := transaction.pages[block].SetInt(brokenSlot*tables.tableCatalogLayout.SlotSize()+slotSizeOffset, 3); err != nil {
+		t.Fatalf("SetInt(broken slot size) error = %v", err)
+	}
+
+	manager := NewStatManager(tables)
+	stale := NewStatInfo(8, 9)
+	manager.stats["stale"] = stale
+	manager.calls = 37
+
+	err := manager.Refresh(transaction)
+	if err == nil {
+		t.Fatal("Refresh() error = nil, want registered table layout failure")
+	}
+	for _, context := range []string{"refresh table statistics", `load layout for table "broken"`, "invalid slot size 3"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Refresh() error = %q, want context %q", err, context)
+		}
+	}
+	if manager.calls != 37 {
+		t.Errorf("lookup calls = %d, want unchanged value 37", manager.calls)
+	}
+	if len(manager.stats) != 1 || manager.stats["stale"] != stale {
+		t.Errorf("statistics cache = %v, want the prior stale snapshot retained", manager.stats)
+	}
+}
+
 func TestStatManagerStatisticsCachesFirstLookup(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(256)
 	var schema record.Schema
