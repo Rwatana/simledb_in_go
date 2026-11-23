@@ -303,6 +303,7 @@ The test first failed to compile because `ViewManager.ViewDefinition` did not ex
 | --- | --- |
 | `TestViewManagerViewDefinitionFindsMatchAndReportsAbsence` | Lookup skips earlier non-matches, returns the matching SQL definition, and reports catalog exhaustion without an error |
 | `TestViewManagerViewDefinitionRequiresTableManager` | Missing table metadata returns an empty not-found result and view context before transaction access |
+| `TestViewManagerViewDefinitionPreservesScanAdvanceFailure` | A `viewcat` occupancy read failure preserves its cause and view context and closes the scan |
 
 Go uses an explicit `(string, bool, error)` result instead of Java's nullable string, separating absence from failures.
 Java `ViewMgr`'s public behavior column is now complete.

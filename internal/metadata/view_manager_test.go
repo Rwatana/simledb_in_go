@@ -82,6 +82,46 @@ func TestViewManagerViewDefinitionRequiresTableManager(t *testing.T) {
 	}
 }
 
+func TestViewManagerViewDefinitionPreservesScanAdvanceFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewViewManager(tables)
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateView("seniors", "select sid from student", transaction); err != nil {
+		t.Fatalf("CreateView() error = %v", err)
+	}
+
+	wantErr := errors.New("view catalog row read failed")
+	transaction.getIntErr = wantErr
+	transaction.getIntOffset = 0
+	transaction.getIntErrFile = "viewcat.tbl"
+	transaction.getIntErrAfter = 1
+	transaction.getIntOffsetCalls = 0
+	transaction.unpins = nil
+
+	definition, found, err := manager.ViewDefinition("seniors", transaction)
+	if definition != "" || found {
+		t.Fatalf("ViewDefinition() = (%q, %v), want empty result after scan failure", definition, found)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("ViewDefinition() error = %v, want wrapped scan cause", err)
+	}
+	for _, context := range []string{`look up view "seniors"`, "scan view catalog"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("ViewDefinition() error = %q, want context %q", err, context)
+		}
+	}
+	viewBlock := storage.NewBlockID("viewcat.tbl", 0)
+	if len(transaction.unpins) == 0 || transaction.unpins[len(transaction.unpins)-1] != viewBlock {
+		t.Errorf("last catalog scan unpin = %v, want %v", transaction.unpins, viewBlock)
+	}
+}
+
 func TestViewManagerInitializeCatalogWrapsCatalogCloseFailure(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()
