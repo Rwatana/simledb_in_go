@@ -73,7 +73,7 @@
 
 ## 次の一歩
 
-Chapter 9のparsingを終え、Chapter 10 PlanningのPlan contract、TablePlan/SelectPlan/ProductPlanの実装、ProjectPlanの射影schemaとscanを追加しています。
+Chapter 9のparsingを終え、Chapter 10 PlanningのPlan contract、TablePlan/SelectPlan/ProductPlanの実装、ProjectPlanの射影schema、scan、block estimateを追加しています。
 
 ## 参照元
 
