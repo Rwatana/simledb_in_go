@@ -651,6 +651,24 @@ The tests first failed to compile because `TableScan.GetInt` did not exist.
 
 This maps Java `TableScan.getInt` while making invalid cursor state and read errors explicit.
 
+## Feature 38: Read a string field from a table scan
+
+`TableScan.GetString` requires an open page and a cursor positioned on a record, then delegates one string read to the
+current record page. UTF-8 content is returned unchanged. Successful and failed reads preserve scan position, and
+failures add table, block, slot, and field context around the record-page error.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.GetString` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanGetStringReadsTheCurrentRecordField` | The cursor slot and layout produce one string read and the exact stored UTF-8 value |
+| `TestTableScanGetStringWrapsFieldAndReadFailures` | Lookup and storage failures retain their causes and scan coordinates without moving the cursor |
+| `TestTableScanGetStringRequiresACurrentRecord` | Before-first and closed scans reject reads before transaction access |
+
+This maps Java `TableScan.getString` while making invalid cursor state and read errors explicit.
+
 ## Next behavior
 
-Read a string field from the table scan's current record.
+Report whether the table scan's layout contains a field.
