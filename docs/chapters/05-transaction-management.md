@@ -983,10 +983,33 @@ because `LockShared` incremented `-1` and returned success.
 The negative-state predicate maps to Java `LockTable.hasXlock`. The sentinel result gives the later waiting wrapper a
 precise contention signal.
 
+## Feature 44: Notify lock waiters after final release
+
+`LockTable` lazily creates a condition variable bound to the same mutex that protects lock state. Removing a final
+shared or exclusive entry broadcasts after the state mutation, allowing every registered waiter to reacquire the mutex
+and recheck its predicate. Decrementing a shared count that remains positive does not broadcast.
+
+The [editable Draw.io diagram](../diagrams/ch05-lock-release-notification.drawio) and
+[rendered SVG](../diagrams/ch05-lock-release-notification.svg) show why state mutation and notification share one mutex,
+and why a partial shared release stays on the no-notification path.
+
+### Test-first record
+
+Final shared/exclusive wakeup and partial-release silence were tested first. The initial build failed because
+`waitForChangeLocked` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestLockTableNotifiesWaitersAfterFinalRelease` | Final shared and exclusive release wake a registered waiter |
+| `TestLockTableDoesNotNotifyWaitersAfterPartialSharedRelease` | A remaining shared holder prevents notification |
+
+This maps to Java `LockTable.unlock`'s `notifyAll` after entry removal. Actual shared/exclusive wait loops and bounded
+timeouts remain separate behaviors.
+
 ## Next behavior
 
 Continue with Chapter 5 concurrency control by waiting for an exclusive holder to release before granting a shared
-lock, then add release notification, timeout, exclusive waiting, and transaction-local lock tracking separately.
+lock, then add timeout, exclusive waiting, and transaction-local lock tracking separately.
 
 ## Sources
 
