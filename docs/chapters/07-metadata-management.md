@@ -76,3 +76,42 @@ The test first failed to compile because `NewTableManager` did not exist.
 | `TestNewTableManagerRetainsCatalogLayouts` | A new manager owns the exact table- and field-catalog schemas, offsets, and slot sizes produced by their focused constructors |
 
 Persistent creation of `tblcat` and `fldcat`, user table metadata insertion, and catalog lookup remain later behaviors.
+
+## Feature 4: Store table metadata in the catalogs
+
+`TableManager.CreateTable` derives a physical layout from the caller's schema, inserts one `tblcat` row containing the
+table name and slot size, then inserts one `fldcat` row for each field in declaration order. Each field row stores the
+table name, field name, logical type, conceptual length, and derived physical offset, matching Java
+`TableMgr.createTable`.
+
+The Go implementation opens and closes the two catalog scans independently. Every write and close failure receives
+catalog, table, and field context; if an operation and cleanup both fail, `errors.Join` preserves both causes. Integer
+metadata is range-checked before conversion to the catalogs' four-byte representation. A nil schema is rejected before
+any catalog I/O.
+
+This behavior assumes the catalog tables already exist. New-database catalog creation, duplicate-name policy, and DDL
+rollback remain separate concerns.
+
+### Test-first record
+
+After the in-memory catalog transaction was in place, the test failed to compile because `TableManager.CreateTable` did
+not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableManagerCreateTableStoresCatalogRows` | One table row and declaration-ordered field rows retain the schema's logical and derived physical metadata, and both scans close |
+| `TestTableManagerCreateTablePreservesOperationAndCloseFailures` | A catalog write failure still closes its scan, preserves both causes when cleanup also fails, and stops before the next catalog |
+| `TestTableManagerCreateTableRejectsNilSchemaBeforeTransactionAccess` | A nil schema returns table-specific context before a nil transaction can be accessed |
+| `TestMetadataIntegerPreservesInt32Bounds` | Metadata integer conversion accepts both signed 32-bit endpoints |
+| `TestMetadataIntegerRejectsValuesOutsideInt32` | Values immediately outside the signed 32-bit range return a contextual error |
+| `TestTableManagerCreateTableReportsCloseFailureAfterSuccessfulTableWrite` | A successful table write followed by scan cleanup failure returns the cleanup cause |
+| `TestTableManagerCreateTablePreservesCatalogScanOpenFailure` | Catalog size failure keeps its cause and stops before pinning or writing |
+| `TestTableManagerCreateTableRejectsUnencodableSlotSizeBeforeTransactionAccess` | An oversized derived slot is rejected before transaction access |
+| `TestTableManagerCreateTablePreservesTableSlotSizeWriteFailure` | A table catalog slot-size write failure retains context and releases the scan |
+| `TestTableManagerCreateTablePreservesTableCatalogInsertFailure` | A table row occupancy failure stops before field catalog access |
+| `TestTableManagerCreateTablePreservesFieldCatalogInsertFailure` | A field row occupancy failure retains context and leaves the row unused |
+| `TestTableManagerCreateTablePreservesFieldCatalogTableNameWriteFailure` | A field row table-name write failure stops later writes and closes both scans |
+| `TestTableManagerCreateTablePreservesFieldCatalogFieldNameWriteFailure` | A field-name write failure retains field context and closes both scans |
+| `TestTableManagerCreateTablePreservesFieldCatalogTypeWriteFailure` | A field type write failure retains context and stops subsequent metadata writes |
+| `TestTableManagerCreateTablePreservesFieldCatalogLengthWriteFailure` | A field length write failure retains context and stops before offset storage |
+| `TestTableManagerCreateTablePreservesFieldCatalogOffsetWriteFailure` | A field offset write failure retains context after earlier metadata is stored |
