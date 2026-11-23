@@ -81,3 +81,18 @@ func (scan *IndexSelectScan) Next() (bool, error) {
 	}
 	return true, nil
 }
+
+// GetInt reads an integer field from the current data record.
+func (scan *IndexSelectScan) GetInt(fieldName string) (int32, error) {
+	if scan == nil {
+		return 0, fmt.Errorf("read integer field %q through nil index select scan", fieldName)
+	}
+	if scan.dataScan == nil {
+		return 0, fmt.Errorf("read integer field %q through index select scan: table scan is nil", fieldName)
+	}
+	value, err := scan.dataScan.GetInt(fieldName)
+	if err != nil {
+		return 0, fmt.Errorf("read integer field %q through index select scan: %w", fieldName, err)
+	}
+	return value, nil
+}

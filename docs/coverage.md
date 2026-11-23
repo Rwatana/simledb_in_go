@@ -563,6 +563,11 @@ coverage in every executable package and function. `IndexSelectScan.Next` covers
 movement, nil/incomplete state, index-next/RID-read failures, and table-page movement errors. Uncached tests, race,
 vet, docs, existing Draw.io/SVG XML, gofmt, and diff checks pass.
 
+At the Issue #949 index-select-scan-integer-accessor checkpoint, `/tmp/simpledb-coverage-949.out` measures 100.0%
+statement coverage in every executable package and function. `IndexSelectScan.GetInt` covers successful forwarding,
+nil receiver/table-scan validation, and wrapped table-read errors. The full uncached test suite, race tests, vet, docs,
+gofmt, and diff checks pass.
+
 At the Issue #893 project-plan-schema checkpoint, `/tmp/simpledb-coverage-893.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `NewProjectPlan` covers nil dependencies, valid ordered fields, empty projections, and missing-field errors; `ProjectPlan.Schema` covers both ordinary and nil receivers. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
 
 At the Issue #891 product-plan-distinct-estimate checkpoint, `/tmp/simpledb-coverage-891.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProductPlan.DistinctValues` covers left/right field routing, left-side duplicate-name precedence, nil dependencies, missing schemas, and unknown fields. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.

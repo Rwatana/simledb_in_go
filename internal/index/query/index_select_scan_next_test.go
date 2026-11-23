@@ -53,6 +53,8 @@ func (*indexSelectNextIndex) Close() error                            { return n
 type indexSelectNextTransaction struct {
 	pinErr   error
 	unpinErr error
+	intValue int32
+	intErr   error
 	pinned   []storage.BlockID
 	unpinned []storage.BlockID
 }
@@ -62,8 +64,8 @@ func (transaction *indexSelectNextTransaction) Pin(block storage.BlockID) error 
 	return transaction.pinErr
 }
 func (*indexSelectNextTransaction) BlockSize() (int, error) { return 32, nil }
-func (*indexSelectNextTransaction) GetInt(storage.BlockID, int) (int32, error) {
-	return 0, nil
+func (transaction *indexSelectNextTransaction) GetInt(storage.BlockID, int) (int32, error) {
+	return transaction.intValue, transaction.intErr
 }
 func (*indexSelectNextTransaction) GetString(storage.BlockID, int) (string, error) {
 	return "", nil
