@@ -72,7 +72,7 @@
 
 ## 次の一歩
 
-Chapter 9ではSQLの字句解析とSELECT文、DELETE文、INSERT文、UPDATE文の解析、およびINSERT・UPDATE・CREATE TABLE・CREATE VIEW command dataを実装しています。次はCREATE INDEX command data、CREATE VIEW/INDEXの構文解析、update command dispatchを個別のIssueへ分けます。
+Chapter 9ではSQLの字句解析とSELECT文、DELETE文、INSERT文、UPDATE文の解析、およびINSERT・UPDATE・CREATE TABLE・CREATE VIEW・CREATE INDEX command dataを実装しています。次はCREATE VIEW/INDEXの構文解析とupdate command dispatchを個別のIssueへ分けます。
 
 ## 参照元
 
