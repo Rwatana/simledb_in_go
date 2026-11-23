@@ -72,8 +72,8 @@ pin increment、unpin、modifying transaction、recovery LSN、最初のBlockID�
 再割当、dirty frameのWAL順replacement、fixed-size BufferManager pool初期化、existing assignment lookupまで
 進み、最初のunpinned victim候補を選び、cache済みframeをpinして0→1遷移だけをavailable countへ反映できます。
 Manager経由のunpinも1→0遷移だけをavailable countへ反映し、cache missでは既存のinitial assignment、clean
-reassignment、dirty WAL replacementへdispatchして成功後にpinできます。次はcache hitとmissを1つの
-non-waiting operationへ合成します。
+reassignment、dirty WAL replacementへdispatchして成功後にpinできます。cache hitとmissは1つのatomicな
+non-waiting attemptへ合成済みです。次はfinal unpinから待機clientへ通知する同期を追加します。
 
 ## 参照元
 
