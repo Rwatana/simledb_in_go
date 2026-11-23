@@ -720,6 +720,26 @@ The tests first failed to compile because `TableScan.SetString` did not exist.
 
 This maps Java `TableScan.setString`; the existing record-page boundary preserves transaction logging for the update.
 
+## Feature 42: Insert within the current table scan block
+
+`TableScan.InsertInBlock` asks the current record page to find and occupy the next empty slot after the cursor. A match
+becomes the new cursor and returns true. Current-block exhaustion sets the cursor to `-1` and returns false without
+changing pages. Search or occupation failure preserves the previous cursor, and occupation remains transaction-logged.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.InsertInBlock` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanInsertInBlockOccupiesTheNextEmptySlot` | Search skips an occupied slot, logs the selected flag update, and moves the cursor |
+| `TestTableScanInsertInBlockReportsCurrentBlockExhaustion` | No later empty slot resets the cursor without changing blocks or writing |
+| `TestTableScanInsertInBlockPreservesCursorOnSearchOrOccupyFailure` | Search and logged occupation failures retain their causes and the previous cursor |
+| `TestTableScanInsertInBlockRejectsClosedScan` | A scan without a current page cannot insert |
+
+This isolates the current-block portion of Java `TableScan.insert` before existing-block movement and new-block
+rollover are added.
+
 ## Next behavior
 
-Insert into the next empty slot in the current table block.
+Append and format a new table block for insertion rollover.
