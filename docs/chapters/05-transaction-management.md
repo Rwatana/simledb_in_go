@@ -1287,6 +1287,7 @@ were tested first. The initial build failed because `New` did not accept a log o
 | --- | --- |
 | `TestNewInitializesIsolatedTransactionLocalState` | Each successful construction appends one START carrying the same ID exposed by the transaction |
 | `TestNewReturnsNoTransactionWhenStartAppendFails` | START append failure returns its cause and no transaction instance |
+| `TestNewRejectsMultipleRecoveryIteratorFactories` | Rejects two optional factories before allocating transaction state or appending START |
 
 This maps to Java `RecoveryMgr` construction invoked from the `Transaction` constructor. Go makes the fallible side effect
 part of the constructor result instead of relying on an unchecked exception. START flush remains intentionally absent.
@@ -1753,10 +1754,32 @@ no exclusive-lock acquisition, and no additional recovery append. All four cases
 
 All transaction page access now shares one terminal-state rule while cleanup release remains possible.
 
+## Feature 81: Invoke durable restart recovery from a transaction
+
+`Transaction.Recover` now exposes startup recovery through the same transaction object used as the undo target. It first
+flushes buffers modified by the recovery transaction, matching Java `Transaction.recover`, then delegates to the existing
+Go restart-recovery composition: scan history, undo unfinished updates, flush restored buffers, append CHECKPOINT, and
+flush the returned CHECKPOINT LSN.
+
+The iterator dependency is validated before the initial flush, and an initial flush failure stops before history
+iteration. This keeps startup failure ordering explicit without duplicating recovery algorithms in the transaction
+package.
+
+### Test-first record
+
+The tests first failed to compile because `Transaction.Recover` did not exist. They cover the complete successful event
+order, returned durable LSN, CHECKPOINT identity, missing iterator, and pre-scan flush failure.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTransactionRecoverInvokesDurableRestartRecovery` | Transaction startup recovery performs both buffer flush phases and makes CHECKPOINT durable |
+| `TestTransactionRecoverStopsBeforeHistoryWithoutIteratorOrAfterPreflushFailure` | Missing dependencies and initial flush failure stop before history iteration |
+
+Go keeps restart recovery as composable functions and adds only the Java-facing orchestration boundary here.
+
 ## Next behavior
 
-Continue with Chapter 5 by exposing startup recovery through the transaction boundary, then add transactional file-size
-and append operations in separate behaviors.
+Continue with Chapter 5 by adding transactional file-size and append operations in separate behaviors.
 
 ## Sources
 
