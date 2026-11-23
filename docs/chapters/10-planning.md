@@ -132,6 +132,20 @@ the inherited estimate; its editable source remains [`ch10-plan-contract.drawio`
 The first test run failed because `SelectPlan.BlocksAccessed` was undefined. Tests verify forwarding a nonzero child
 estimate and nil-safe zero results.
 
+## Feature 10: Estimate rows returned by a selection
+
+`SelectPlan.RecordsOutput` maps to Java `SelectPlan.recordsOutput()`. It divides the child's estimated output rows by
+`Predicate.ReductionFactor(child)`, using the term-level cardinality estimates already exposed by the child plan. An
+empty predicate has factor one and preserves the child's row estimate. A nil plan, missing child, or zero factor returns
+zero rather than panicking. Select-plan distinct-value estimates remain a separate behavior. The updated
+[plan diagram](../diagrams/ch10-plan-contract.svg) shows the row estimate passing through predicate selectivity; its
+editable source remains [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `SelectPlan.RecordsOutput` was undefined. Tests verify selective and empty
+predicates, nil plans and children, and a zero reduction-factor estimate.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.

@@ -293,6 +293,45 @@ func TestSelectPlanBlocksAccessedHandlesNilPlanAndChild(t *testing.T) {
 	}
 }
 
+func TestSelectPlanRecordsOutputAppliesPredicateReductionFactor(t *testing.T) {
+	var schema record.Schema
+	child := NewTablePlan(nil, "student", record.NewLayout(&schema), metadata.NewStatInfo(3, 30))
+	predicate := query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("student_id"),
+		query.NewConstantExpression(query.NewIntConstant(42)),
+	))
+
+	if got := NewSelectPlan(child, predicate).RecordsOutput(); got != 2 {
+		t.Fatalf("RecordsOutput() = %d, want 2 from 30 rows divided by an estimated factor of 11", got)
+	}
+}
+
+func TestSelectPlanRecordsOutputPreservesRowsForEmptyPredicate(t *testing.T) {
+	if got := NewSelectPlan(contractProbe{}, query.Predicate{}).RecordsOutput(); got != 3 {
+		t.Fatalf("RecordsOutput() = %d, want the child estimate 3 for an empty predicate", got)
+	}
+}
+
+func TestSelectPlanRecordsOutputHandlesNilPlansAndZeroFactor(t *testing.T) {
+	var nilPlan *SelectPlan
+	if got := nilPlan.RecordsOutput(); got != 0 {
+		t.Fatalf("nil SelectPlan.RecordsOutput() = %d, want 0", got)
+	}
+	if got := NewSelectPlan(nil, query.Predicate{}).RecordsOutput(); got != 0 {
+		t.Fatalf("SelectPlan without child RecordsOutput() = %d, want 0", got)
+	}
+
+	var schema record.Schema
+	child := NewTablePlan(nil, "student", record.NewLayout(&schema), nil)
+	predicate := query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("student_id"),
+		query.NewConstantExpression(query.NewIntConstant(42)),
+	))
+	if got := NewSelectPlan(child, predicate).RecordsOutput(); got != 0 {
+		t.Fatalf("RecordsOutput() with a zero reduction factor = %d, want 0", got)
+	}
+}
+
 type tablePlanTransaction struct {
 	size    int
 	sizeErr error

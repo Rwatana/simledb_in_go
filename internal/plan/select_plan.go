@@ -52,3 +52,15 @@ func (p *SelectPlan) BlocksAccessed() int {
 	}
 	return p.child.BlocksAccessed()
 }
+
+// RecordsOutput estimates the rows that survive the predicate filter.
+func (p *SelectPlan) RecordsOutput() int {
+	if p == nil || p.child == nil {
+		return 0
+	}
+	factor := p.predicate.ReductionFactor(p.child)
+	if factor == 0 {
+		return 0
+	}
+	return p.child.RecordsOutput() / factor
+}
