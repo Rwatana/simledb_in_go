@@ -1,0 +1,21 @@
+<mxfile host="app.diagrams.net" modified="2026-11-23T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-parse-term" name="Chapter 9 - Parse Term">
+    <mxGraphModel page="1" pageWidth="1200" pageHeight="560">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 9: Parse an equality term" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="210" y="25" width="780" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="SQL input&#xa;&#xa;Customer = 42, next" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;" vertex="1" parent="1"><mxGeometry x="25" y="215" width="220" height="125" as="geometry"/></mxCell>
+        <mxCell id="lhs" value="ParseExpression()&#xa;&#xa;left side" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;" vertex="1" parent="1"><mxGeometry x="290" y="210" width="190" height="130" as="geometry"/></mxCell>
+        <mxCell id="equals" value="EatDelimiter('=')" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;" vertex="1" parent="1"><mxGeometry x="520" y="210" width="190" height="130" as="geometry"/></mxCell>
+        <mxCell id="rhs" value="ParseExpression()&#xa;&#xa;right side" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;" vertex="1" parent="1"><mxGeometry x="750" y="210" width="190" height="130" as="geometry"/></mxCell>
+        <mxCell id="result" value="query.NewTerm(lhs, rhs)&#xa;&#xa;next token remains" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=18;" vertex="1" parent="1"><mxGeometry x="980" y="210" width="195" height="130" as="geometry"/></mxCell>
+        <mxCell id="error" value="left, equals, or right parse error&#xa;&#xa;byte-positioned context&#xa;prior consumption is retained" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=17;" vertex="1" parent="1"><mxGeometry x="410" y="410" width="390" height="105" as="geometry"/></mxCell>
+        <mxCell id="e1" value="input" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="input" target="lhs"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="lhs" target="equals"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="equals" target="rhs"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="rhs" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="failure" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="equals" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
