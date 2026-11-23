@@ -391,6 +391,11 @@ each of the same ten packages remains at 100.0%, and `go tool cover -func` repor
 vet, documentation validation, and diff checks passed again. No additional existing error-path defect was found by this
 regression pass.
 
+The Issue #793 record-scan adapter checkpoint measures 100.0% statement coverage in the full module and each package
+in `/tmp/simpledb-coverage-793.out`: buffer, concurrency, file, log, metadata, query, record, recovery, storage, and
+transaction. `go tool cover -func` reports no uncovered functions. The tests exercise the adapter's schema, constant-kind,
+and wrapped storage-error paths without changing the 100.0% CI threshold.
+
 For a local full-module measurement, run:
 
 ```sh
@@ -403,3 +408,5 @@ Inspect individual uncovered functions with:
 ```sh
 go tool cover -func=coverage.out
 ```
+
+At the 2026-11-23 scheduled recheck on the Chapter 8 adapter tip, `/tmp/simpledb-coverage-793-recheck.out` measured 100.0% full-module statement coverage, with no uncovered functions. A separate `go test ./... -cover -count=1` also reported 100.0% for buffer, concurrency, file, log, metadata, query, record, recovery, storage, and transaction. Race tests, vet, documentation validation, and diff checks passed.
