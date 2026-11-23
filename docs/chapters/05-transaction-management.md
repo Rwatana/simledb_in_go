@@ -1794,6 +1794,7 @@ length, EOF sentinel contention, repeated-lock reuse, and file-manager error pro
 | --- | --- |
 | `TestTransactionSizeReadsLengthUnderReusableEOFSharedLock` | File length reads retain and reuse one shared EOF lock |
 | `TestTransactionSizeReturnsFileLengthFailure` | File length failures retain file context and preserve the lock ordering |
+| `TestTransactionSizeRequiresFileSizer` | A zero-value transaction reports the unconfigured file-sizer error without lock access |
 | `TestNewWithFileSizerRejectsNilSizerBeforeStartingTransaction` | Missing file metadata is rejected before allocating an ID or appending START |
 | `TestNewWithFileSizerReturnsStartAppendFailure` | A START append failure returns no transaction and preserves its cause and transaction ID context |
 

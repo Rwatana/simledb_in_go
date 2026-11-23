@@ -1318,6 +1318,18 @@ func TestNewWithFileSizerReturnsStartAppendFailure(t *testing.T) {
 	}
 }
 
+func TestTransactionSizeRequiresFileSizer(t *testing.T) {
+	var transaction Transaction
+
+	length, err := transaction.Size("tbl")
+	if length != 0 {
+		t.Errorf("Size() length = %d, want 0 without a configured file sizer", length)
+	}
+	if err == nil || err.Error() != `get transaction file size for "tbl": file sizer is not configured` {
+		t.Errorf("Size() error = %v, want file-sizer configuration error", err)
+	}
+}
+
 func TestTransactionSizeReturnsFileLengthFailure(t *testing.T) {
 	wantErr := errors.New("length failed")
 	var allocator IDAllocator
