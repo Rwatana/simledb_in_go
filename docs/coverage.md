@@ -202,6 +202,9 @@ remains 97.4%.
 The SETINT encoder's signed filename-length bound now has a synthetic boundary test through a small internal validator,
 so the rejection is verified without allocating a filename larger than two gigabytes. Encoded output for ordinary
 filenames is unchanged.
+
+The SETINT encoded-size overflow guard now accepts a synthetic host-int maximum in a small internal sizing helper.
+Its overflow path is tested without depending on the machine architecture or allocating a large record.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

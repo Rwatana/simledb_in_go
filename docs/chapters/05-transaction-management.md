@@ -334,6 +334,7 @@ failed because the SETINT operation, encoder, and decoder did not exist.
 | `TestSetIntRecordRoundTripsUTF8FilenameAndSignedFields` | Filename bytes and signed values survive round-trip |
 | `TestEncodeSetIntRecordRejectsBlockOutsideInt32` | Host-width block cannot silently truncate on disk |
 | `TestSetIntFilenameLengthValidationRejectsValuesAboveInt32` | Oversized synthetic filename lengths reject before allocation |
+| `TestSetIntRecordSizeRejectsHostIntOverflow` | Encoding size is checked against a synthetic host-int maximum before allocation |
 | `TestDecodeSetIntRecordRejectsInvalidEncoding` | Wrong op, length corruption, truncation, and trailing bytes fail |
 
 Java `SetIntRecord` uses `Page` offsets to write the same six values. Go owns the recovery wire layout directly with

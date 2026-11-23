@@ -44,14 +44,14 @@ func EncodeSetIntRecord(transaction TransactionID, block storage.BlockID, offset
 	if err := validateSetIntFilenameLength(len(fileName)); err != nil {
 		return nil, fmt.Errorf("encode setint record: %w", err)
 	}
-	maxInt := int(^uint(0) >> 1)
-	if len(fileName) > maxInt-setIntFixedSize {
-		return nil, fmt.Errorf("encode setint record: filename length %d overflows record size", len(fileName))
+	encodedSize, err := setIntRecordSize(len(fileName), int(^uint(0)>>1))
+	if err != nil {
+		return nil, fmt.Errorf("encode setint record: %w", err)
 	}
 	if block.Number() < math.MinInt32 || block.Number() > math.MaxInt32 {
 		return nil, fmt.Errorf("encode setint record: block number %d exceeds int32", block.Number())
 	}
-	encoded := make([]byte, setIntFixedSize+len(fileName))
+	encoded := make([]byte, encodedSize)
 	binary.BigEndian.PutUint32(encoded[0:4], uint32(OperationSetInt))
 	binary.BigEndian.PutUint32(encoded[4:8], uint32(transaction))
 	binary.BigEndian.PutUint32(encoded[8:12], uint32(len(fileName)))
@@ -68,6 +68,13 @@ func validateSetIntFilenameLength(length int) error {
 		return fmt.Errorf("filename length %d exceeds int32", length)
 	}
 	return nil
+}
+
+func setIntRecordSize(filenameLength, maxInt int) (int, error) {
+	if filenameLength > maxInt-setIntFixedSize {
+		return 0, fmt.Errorf("filename length %d overflows record size", filenameLength)
+	}
+	return setIntFixedSize + filenameLength, nil
 }
 
 // DecodeSetIntRecord interprets an exact SETINT record encoding.

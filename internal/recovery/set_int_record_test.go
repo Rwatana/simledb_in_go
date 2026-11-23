@@ -74,6 +74,14 @@ func TestSetIntFilenameLengthValidationRejectsValuesAboveInt32(t *testing.T) {
 	}
 }
 
+func TestSetIntRecordSizeRejectsHostIntOverflow(t *testing.T) {
+	maxInt := setIntFixedSize + 5
+	_, err := setIntRecordSize(6, maxInt)
+	if err == nil || !strings.Contains(err.Error(), "overflows record size") {
+		t.Fatalf("setIntRecordSize(6, %d) error = %v, want record-size overflow", maxInt, err)
+	}
+}
+
 func TestDecodeSetIntRecordRejectsInvalidEncoding(t *testing.T) {
 	valid, err := EncodeSetIntRecord(7, storage.NewBlockID("tbl", 2), 16, -5)
 	if err != nil {
