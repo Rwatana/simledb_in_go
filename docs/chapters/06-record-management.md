@@ -413,6 +413,21 @@ The tests first failed to compile because `RecordPage.InsertAfter` did not exist
 
 This maps Java `RecordPage.insertAfter`. The Go implementation makes its selection and mutation composition explicit.
 
+## Feature 24: Expose the record page block identity
+
+`RecordPage.Block` returns the immutable `storage.BlockID` value retained when the page was initialized. It performs no
+transaction operation, so callers can identify or later release the page without introducing an additional storage read.
+
+### Test-first record
+
+The test first failed to compile because `RecordPage.Block` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageBlockReturnsRetainedIdentityWithoutTransactionAccess` | The original block identity is returned as a value without transaction access |
+
+This maps Java `RecordPage.block`.
+
 ## Next behavior
 
-Expose the record page's block identity as the next stacked PR.
+Release the record page's retained block pin as the next stacked PR.
