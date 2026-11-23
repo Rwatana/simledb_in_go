@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Rwatana/simledb_in_go/internal/metadata"
 	"github.com/Rwatana/simledb_in_go/internal/query"
 	"github.com/Rwatana/simledb_in_go/internal/record"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
@@ -45,7 +46,7 @@ func TestTablePlanSchemaReturnsResolvedTableSchema(t *testing.T) {
 	schema.AddVarcharField("student_name", 24)
 	layout := record.NewLayout(&schema)
 
-	tablePlan := NewTablePlan(nil, "student", layout)
+	tablePlan := NewTablePlan(nil, "student", layout, nil)
 	if got := tablePlan.Schema(); got != &schema {
 		t.Fatalf("Schema() = %p, want the schema stored in the layout %p", got, &schema)
 	}
@@ -57,7 +58,7 @@ func TestTablePlanSchemaHandlesNilPlanAndLayout(t *testing.T) {
 		t.Fatalf("nil TablePlan.Schema() = %p, want nil", got)
 	}
 
-	if got := NewTablePlan(nil, "student", nil).Schema(); got != nil {
+	if got := NewTablePlan(nil, "student", nil, nil).Schema(); got != nil {
 		t.Fatalf("TablePlan with nil layout Schema() = %p, want nil", got)
 	}
 }
@@ -66,7 +67,7 @@ func TestTablePlanOpenCreatesTableScan(t *testing.T) {
 	transaction := &tablePlanTransaction{size: 1}
 	var schema record.Schema
 	schema.AddIntegerField("student_id")
-	tablePlan := NewTablePlan(transaction, "student", record.NewLayout(&schema))
+	tablePlan := NewTablePlan(transaction, "student", record.NewLayout(&schema), nil)
 
 	scan, err := tablePlan.Open()
 	if err != nil {
@@ -98,7 +99,7 @@ func TestTablePlanOpenWrapsScanInitializationError(t *testing.T) {
 	var schema record.Schema
 	schema.AddIntegerField("student_id")
 
-	scan, err := NewTablePlan(transaction, "student", record.NewLayout(&schema)).Open()
+	scan, err := NewTablePlan(transaction, "student", record.NewLayout(&schema), nil).Open()
 	if scan != nil || !errors.Is(err, openErr) {
 		t.Fatalf("Open() = (%v, %v), want (nil, wrapped file-size error)", scan, err)
 	}
@@ -115,11 +116,30 @@ func TestTablePlanOpenRejectsNilPlanAndDependencies(t *testing.T) {
 
 	var schema record.Schema
 	layout := record.NewLayout(&schema)
-	if scan, err := NewTablePlan(nil, "student", layout).Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "transaction") {
+	if scan, err := NewTablePlan(nil, "student", layout, nil).Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "transaction") {
 		t.Fatalf("plan with nil transaction Open() = (%v, %v), want transaction error", scan, err)
 	}
-	if scan, err := NewTablePlan(&tablePlanTransaction{size: 1}, "student", nil).Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "layout") {
+	if scan, err := NewTablePlan(&tablePlanTransaction{size: 1}, "student", nil, nil).Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "layout") {
 		t.Fatalf("plan with nil layout Open() = (%v, %v), want layout error", scan, err)
+	}
+}
+
+func TestTablePlanBlocksAccessedReturnsStatistic(t *testing.T) {
+	stats := metadata.NewStatInfo(12, 30)
+	var schema record.Schema
+	tablePlan := NewTablePlan(nil, "student", record.NewLayout(&schema), stats)
+	if got := tablePlan.BlocksAccessed(); got != 12 {
+		t.Fatalf("BlocksAccessed() = %d, want 12", got)
+	}
+}
+
+func TestTablePlanBlocksAccessedHandlesNilPlanAndStatistics(t *testing.T) {
+	var nilPlan *TablePlan
+	if got := nilPlan.BlocksAccessed(); got != 0 {
+		t.Fatalf("nil TablePlan.BlocksAccessed() = %d, want 0", got)
+	}
+	if got := NewTablePlan(nil, "student", nil, nil).BlocksAccessed(); got != 0 {
+		t.Fatalf("TablePlan with nil statistics BlocksAccessed() = %d, want 0", got)
 	}
 }
 

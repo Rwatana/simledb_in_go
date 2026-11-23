@@ -3,6 +3,7 @@ package plan
 import (
 	"fmt"
 
+	"github.com/Rwatana/simledb_in_go/internal/metadata"
 	"github.com/Rwatana/simledb_in_go/internal/query"
 	"github.com/Rwatana/simledb_in_go/internal/record"
 )
@@ -12,11 +13,12 @@ type TablePlan struct {
 	transaction record.TableScanTransaction
 	tableName   string
 	layout      *record.Layout
+	statistics  *metadata.StatInfo
 }
 
-// NewTablePlan creates a plan for tableName using its transaction and resolved layout.
-func NewTablePlan(transaction record.TableScanTransaction, tableName string, layout *record.Layout) *TablePlan {
-	return &TablePlan{transaction: transaction, tableName: tableName, layout: layout}
+// NewTablePlan creates a plan for tableName using its transaction, resolved layout, and statistics.
+func NewTablePlan(transaction record.TableScanTransaction, tableName string, layout *record.Layout, statistics *metadata.StatInfo) *TablePlan {
+	return &TablePlan{transaction: transaction, tableName: tableName, layout: layout, statistics: statistics}
 }
 
 // Schema returns the logical schema resolved for the table, or nil if no layout is available.
@@ -43,4 +45,12 @@ func (p *TablePlan) Open() (query.Scan, error) {
 		return nil, fmt.Errorf("open table plan for %q: %w", p.tableName, err)
 	}
 	return scan, nil
+}
+
+// BlocksAccessed estimates the block accesses required to scan the table.
+func (p *TablePlan) BlocksAccessed() int {
+	if p == nil || p.statistics == nil {
+		return 0
+	}
+	return p.statistics.BlocksAccessed()
 }

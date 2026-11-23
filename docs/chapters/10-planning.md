@@ -55,8 +55,22 @@ The first test run failed because `TablePlan.Open` did not exist. After adding i
 record-layer `TableScan` did not satisfy `query.Scan` because it lacks `GetVal`; the tests now assert that Open returns
 a `query.RecordScan`, starts at the first occupied slot, wraps initialization errors, and rejects nil dependencies.
 
+## Feature 4: Estimate table plan block accesses
+
+`TablePlan.BlocksAccessed` delegates to the retained `metadata.StatInfo` so the optimizer can compare the cost of
+scanning this table against other plans. A missing statistic or nil receiver reports zero without panicking. The plan
+constructor accepts the already-computed statistics; lookup and refresh stay in metadata management rather than being
+hidden inside the estimate. The updated [plan diagram](../diagrams/ch10-plan-contract.svg) links the block estimate to
+`StatInfo`; its editable source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first test run failed because `NewTablePlan` did not retain a statistics argument and `BlocksAccessed` was
+undefined. Tests verify forwarding a nonzero block estimate and nil-safe zero estimates.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
 - `NewTablePlan` receives a resolved layout rather than a metadata manager. This keeps metadata lookup outside the leaf plan and makes the table plan's schema dependency explicit.
 - `TablePlan.Open` returns a query-layer `RecordScan` adapter, rather than exposing the record-layer `TableScan`, because query plans require `GetVal`.
+- `NewTablePlan` receives precomputed `metadata.StatInfo` so obtaining statistics remains a separate metadata behavior; `BlocksAccessed` only forwards the estimate.
