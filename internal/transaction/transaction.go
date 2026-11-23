@@ -248,6 +248,10 @@ func recordRecoveryLSN(record func(logmanager.LSN) error, lsn logmanager.LSN, op
 	return nil
 }
 
+func recordStringRecoveryLSN(record func(logmanager.LSN) error, lsn logmanager.LSN, block storage.BlockID, offset int32) error {
+	return recordRecoveryLSN(record, lsn, "set string", block, offset)
+}
+
 // SetString writes a length-prefixed string to a pinned block and optionally records its old value.
 func (t *Transaction) SetString(block storage.BlockID, offset int32, value string, logUpdate bool) error {
 	if t.state != transactionActive {
@@ -272,12 +276,7 @@ func (t *Transaction) SetString(block storage.BlockID, offset int32, value strin
 		return fmt.Errorf("set string in transaction buffer %v at offset %d: %w", block, offset, err)
 	}
 	frame.MarkModified(buffer.TransactionID(t.id))
-	if lsn > 0 {
-		if err := frame.RecordRecoveryLSN(lsn); err != nil {
-			return fmt.Errorf("set string in transaction buffer %v at offset %d: record recovery LSN %d: %w", block, offset, lsn, err)
-		}
-	}
-	return nil
+	return recordStringRecoveryLSN(frame.RecordRecoveryLSN, lsn, block, offset)
 }
 
 // Recover flushes this transaction's dirty buffers and makes restart recovery's CHECKPOINT durable.

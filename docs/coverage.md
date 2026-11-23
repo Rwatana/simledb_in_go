@@ -374,9 +374,12 @@ coverage is 99.9%. The only remaining package below 100.0% is transaction.
 with a failing recorder. The test checks the wrapped cause and integer block/offset/LSN context. `SetInt` is now
 100.0% covered, transaction package coverage is 99.4%, and full-module statement coverage remains 99.9%.
 
-The CI step reports
-coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
-threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
+`Transaction.SetString` now uses the same recovery-LSN error helper with string-specific context. The focused failure
+test verifies the wrapped cause and block/offset/LSN details. All ten Go packages and the full module now measure
+100.0% statement coverage (`/tmp/simpledb-coverage-788.out`). The CI workflow still reports coverage without enforcing
+the threshold; add the required 100.0% check in a separate CI change.
+
+The CI coverage summary should remain visible while enforcing this threshold so regressions are easy to locate.
 
 For a local full-module measurement, run:
 

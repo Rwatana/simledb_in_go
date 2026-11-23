@@ -32,3 +32,27 @@ func TestSetIntRecoveryLSNPreservesRecorderFailure(t *testing.T) {
 		}
 	}
 }
+
+func TestSetStringRecoveryLSNPreservesRecorderFailure(t *testing.T) {
+	t.Parallel()
+
+	block := storage.NewBlockID("student.tbl", 7)
+	wantErr := errors.New("recovery LSN rejected")
+	var gotLSN logmanager.LSN
+	err := recordStringRecoveryLSN(func(lsn logmanager.LSN) error {
+		gotLSN = lsn
+		return wantErr
+	}, 23, block, 12)
+
+	if gotLSN != 23 {
+		t.Errorf("recorded LSN = %d, want 23", gotLSN)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("recordRecoveryLSN() error = %v, want wrapped recorder failure", err)
+	}
+	for _, context := range []string{"set string", block.String(), "offset 12", "LSN 23"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("recordRecoveryLSN() error = %q, want context %q", err, context)
+		}
+	}
+}
