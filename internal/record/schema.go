@@ -60,6 +60,12 @@ func (s *Schema) AddAllFrom(source *Schema) {
 	}
 }
 
+// HasField reports whether name has a registered definition.
+func (s *Schema) HasField(name string) bool {
+	_, ok := s.definitions[name]
+	return ok
+}
+
 // Fields returns field names in declaration order.
 func (s *Schema) Fields() []string {
 	return append([]string(nil), s.fields...)
