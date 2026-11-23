@@ -22,6 +22,7 @@ Request.
 | `Parser.ParseCreateView` | `simpledb/parse/Parser.java` (`createView`) | Parse the view name and SELECT definition after CREATE VIEW |
 | `Parser.ParseCreateIndex` | `simpledb/parse/Parser.java` (`createIndex`) | Parse the index name, table, and indexed field after CREATE INDEX |
 | `Parser.ParseCreateTable` | `simpledb/parse/Parser.java` (`createTable`, `fieldDefs`, `fieldDef`, `fieldType`) | Parse a table name and ordered integer/varchar field definitions |
+| `Parser.ParseUpdateCommand` | `simpledb/parse/Parser.java` (`updateCmd`, `create`) | Dispatch INSERT, DELETE, UPDATE, and CREATE TABLE/VIEW/INDEX into concrete command data |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -409,6 +410,22 @@ shows the field-type choice, list loop, result, and error paths; its editable so
 Tests first failed because `Parser.ParseCreateTable` was undefined. They cover integer and varchar field metadata,
 ordered lists, trailing-token preservation, every grammar and type failure, byte offsets, and a nil receiver.
 
+## Feature 25: Dispatch SQL update commands
+
+`Parser.ParseUpdateCommand` maps to Java `Parser.updateCmd` and `Parser.create`. It selects the concrete INSERT,
+DELETE, UPDATE, CREATE TABLE, CREATE VIEW, or CREATE INDEX parser from the leading keywords and returns the existing
+command-data value as `any`. A caller can use a type switch without duplicating the Java command hierarchy. The
+dispatcher consumes only its command and leaves the next token to the enclosing parser. Errors include the selected
+command context and retain the lexer's byte offset. The [update-command dispatch diagram](../diagrams/ch09-update-command-dispatch.svg)
+shows the top-level choice, nested CREATE choice, concrete results, preserved token, and error paths; its editable
+source is [`ch09-update-command-dispatch.drawio`](../diagrams/ch09-update-command-dispatch.drawio).
+
+### Test-first record
+
+Tests first failed because `Parser.ParseUpdateCommand` was undefined. They cover all six concrete results,
+following-token preservation, malformed commands for every route, an unsupported CREATE subtype, an unrelated query
+statement, byte-offset retention, and a nil receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -431,3 +448,4 @@ ordered lists, trailing-token preservation, every grammar and type failure, byte
 - `ParseCreateView` uses the Go `ParseQuery` method and preserves trailing input for its caller, matching Java's query delegation without consuming an extra token.
 - `ParseCreateIndex` returns contextual errors and preserves the following token, while Java mutates a parser's shared stream and throws on grammar failure.
 - `ParseCreateTable` parses field definitions iteratively and rejects unknown types with a contextual error; Java recurses through definitions and treats any non-`int` type as `varchar`.
+- `ParseUpdateCommand` returns one of six existing command-data types through `any` instead of constructing Java's command subclasses; parsing remains separate from command execution.

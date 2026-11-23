@@ -72,7 +72,7 @@
 
 ## 次の一歩
 
-Chapter 9ではSQLの字句解析とSELECT文、DELETE文、INSERT文、UPDATE文、CREATE TABLE/VIEW/INDEX文の解析、および各command dataを実装しています。次はupdate command dispatchを個別のIssueへ分けます。
+Chapter 9ではSQLの字句解析とSELECT文、DELETE文、INSERT文、UPDATE文、CREATE TABLE/VIEW/INDEX文の解析、および各command dataとトップレベルのcommand dispatchまで実装しています。次は書籍のChapter 10 Planningへ進みます。
 
 ## 参照元
 

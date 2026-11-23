@@ -1,0 +1,24 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ch09-update-command-dispatch" name="Update command dispatch">
+    <mxGraphModel dx="1400" dy="780" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="780" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 25: Dispatch SQL update commands" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="180" y="25" width="1040" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="SQL input&#xa;INSERT / DELETE / UPDATE&#xa;CREATE TABLE / VIEW / INDEX" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="40" y="220" width="250" height="150" as="geometry"/></mxCell>
+        <mxCell id="dispatch" value="ParseUpdateCommand&#xa;&#xa;match leading keyword" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;" vertex="1" parent="1"><mxGeometry x="360" y="220" width="270" height="150" as="geometry"/></mxCell>
+        <mxCell id="simple" value="INSERT → InsertData&#xa;DELETE → DeleteData&#xa;UPDATE → ModifyData" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1"><mxGeometry x="720" y="120" width="300" height="150" as="geometry"/></mxCell>
+        <mxCell id="create" value="CREATE branch&#xa;&#xa;TABLE / VIEW / otherwise INDEX" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=16;" vertex="1" parent="1"><mxGeometry x="720" y="390" width="300" height="150" as="geometry"/></mxCell>
+        <mxCell id="createResult" value="CreateTableData&#xa;CreateViewData&#xa;CreateIndexData" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=16;" vertex="1" parent="1"><mxGeometry x="1090" y="390" width="270" height="150" as="geometry"/></mxCell>
+        <mxCell id="tail" value="Concrete value returned as any&#xa;following token remains available" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=16;" vertex="1" parent="1"><mxGeometry x="360" y="590" width="430" height="100" as="geometry"/></mxCell>
+        <mxCell id="error" value="Contextual parse error&#xa;original byte offset retained" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;" vertex="1" parent="1"><mxGeometry x="870" y="590" width="360" height="100" as="geometry"/></mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="input" target="dispatch"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="direct route" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="dispatch" target="simple"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="CREATE" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="dispatch" target="create"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="TABLE / VIEW / INDEX" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="create" target="createResult"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="success" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="simple" target="tail"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="success" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="createResult" target="tail"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="any grammar failure" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="dispatch" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
