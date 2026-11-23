@@ -4,12 +4,16 @@ package concurrency
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 // ErrLockConflict reports that another lock holder prevents the requested transition.
 var ErrLockConflict = errors.New("lock conflict")
+
+// ErrLockTimeout reports that a lock request remained blocked until its deadline.
+var ErrLockTimeout = errors.New("lock wait timed out")
 
 // LockTable stores the shared lock state for database blocks.
 // Its zero value is ready for use.
@@ -39,6 +43,43 @@ func (t *LockTable) WaitShared(block storage.BlockID) error {
 	defer t.mu.Unlock()
 	for t.locks[block] < 0 {
 		t.waitForChangeLocked()
+	}
+	if t.locks == nil {
+		t.locks = make(map[storage.BlockID]int)
+	}
+	t.locks[block]++
+	return nil
+}
+
+// WaitSharedFor waits up to timeout for an exclusive holder to release block, then acquires one shared hold.
+func (t *LockTable) WaitSharedFor(block storage.BlockID, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for t.locks[block] < 0 {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return ErrLockTimeout
+		}
+		expired := false
+		finished := false
+		timer := time.AfterFunc(remaining, func() {
+			t.mu.Lock()
+			defer t.mu.Unlock()
+			if finished {
+				return
+			}
+			expired = true
+			if t.changed != nil {
+				t.changed.Broadcast()
+			}
+		})
+		t.waitForChangeLocked()
+		finished = true
+		timer.Stop()
+		if expired && t.locks[block] < 0 {
+			return ErrLockTimeout
+		}
 	}
 	if t.locks == nil {
 		t.locks = make(map[storage.BlockID]int)
