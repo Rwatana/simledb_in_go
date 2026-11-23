@@ -152,6 +152,19 @@ The focused test run first failed because `HashIndex.Delete` was undefined. Test
 removing only the first key/RID match, leaving entries unchanged for absent keys or RIDs, retaining the positioned
 scan, rejecting invalid state, and wrapping bucket-open, iteration, RID-read, and slot-delete failures.
 
+## Feature 11: Position an index-select scan
+
+`indexquery.NewIndexSelectScan` retains a table scan, index, and search key, then positions the index before the first
+matching entry as Java `IndexSelectScan` does during construction. Its `BeforeFirst` operation repeats that positioning
+for the retained key. Missing scans/indexes, unset keys, and index errors return contextual errors with wrapped causes;
+the index remains caller-owned and is not closed by the adapter. The existing [hash-index traversal diagram](../diagrams/ch11-hash-traversal.svg)
+already documents bucket positioning, so this adapter initialization does not need another diagram.
+
+### Test-first record
+
+The focused test run first failed because `NewIndexSelectScan` was undefined. Tests verify constructor positioning,
+repositioning with the stored key, nil dependencies/receivers, unset keys, and initial/repeated index-position errors.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -159,3 +172,4 @@ scan, rejecting invalid state, and wrapping bucket-open, iteration, RID-read, an
 - Static hash bucket selection normalizes Java hash remainders to a nonnegative range, avoiding Java's negative-remainder invalid-index case.
 - Go insertion validates the index-record schema and signed 32-bit RID storage before changing scan state, and wraps storage failures as explicit errors.
 - Go deletion reports storage failures as errors while preserving the Java behavior of removing the first matching RID and treating a missing entry as a successful no-op.
+- `IndexSelectScan` reports index-position failures as Go errors and leaves index lifetime management to its caller.
