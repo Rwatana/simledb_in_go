@@ -2,16 +2,22 @@ package transaction
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
+	"github.com/Rwatana/simledb_in_go/internal/buffer"
 	"github.com/Rwatana/simledb_in_go/internal/concurrency"
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
 	"github.com/Rwatana/simledb_in_go/internal/recovery"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 type recordingTransactionLog struct {
-	records [][]byte
-	err     error
+	records  [][]byte
+	err      error
+	flushed  []logmanager.LSN
+	flushErr error
+	events   *[]string
 }
 
 func (l *recordingTransactionLog) Append(record []byte) (logmanager.LSN, error) {
@@ -19,7 +25,18 @@ func (l *recordingTransactionLog) Append(record []byte) (logmanager.LSN, error) 
 		return 0, l.err
 	}
 	l.records = append(l.records, append([]byte(nil), record...))
+	if l.events != nil {
+		*l.events = append(*l.events, "append record")
+	}
 	return logmanager.LSN(len(l.records)), nil
+}
+
+func (l *recordingTransactionLog) Flush(lsn logmanager.LSN) error {
+	l.flushed = append(l.flushed, lsn)
+	if l.events != nil {
+		*l.events = append(*l.events, "flush log")
+	}
+	return l.flushErr
 }
 
 func TestNewInitializesIsolatedTransactionLocalState(t *testing.T) {
@@ -78,5 +95,76 @@ func TestNewReturnsNoTransactionWhenStartAppendFails(t *testing.T) {
 	}
 	if got != nil {
 		t.Fatalf("New() transaction = %#v, want nil", got)
+	}
+}
+
+func TestTransactionCommitInvokesDurabilityForOwnID(t *testing.T) {
+	events := []string{}
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	bufferManager := &recordingBufferPinner{frame: &buffer.Buffer{}, events: &events}
+	logs := &recordingTransactionLog{events: &events}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	events = events[:0]
+
+	lsn, err := tx.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lsn != 2 {
+		t.Fatalf("Commit() LSN = %d, want 2", lsn)
+	}
+	wantEvents := []string{"flush buffers", "append record", "flush log"}
+	if !reflect.DeepEqual(events, wantEvents) {
+		t.Fatalf("commit events = %v, want %v", events, wantEvents)
+	}
+	if len(bufferManager.flushes) != 1 || bufferManager.flushes[0] != buffer.TransactionID(tx.ID()) {
+		t.Fatalf("buffer flush IDs = %v, want [%d]", bufferManager.flushes, tx.ID())
+	}
+	if len(logs.records) != 2 {
+		t.Fatalf("log records = %d, want START and COMMIT", len(logs.records))
+	}
+	record, err := recovery.DecodeCommitRecord(logs.records[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := record.TransactionID(); got != tx.ID() {
+		t.Fatalf("COMMIT transaction = %d, want %d", got, tx.ID())
+	}
+	if len(logs.flushed) != 1 || logs.flushed[0] != lsn {
+		t.Fatalf("log flushes = %v, want [%d]", logs.flushed, lsn)
+	}
+}
+
+func TestTransactionCommitFailureKeepsPinnedBuffers(t *testing.T) {
+	wantErr := errors.New("flush failed")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	frame := &buffer.Buffer{}
+	bufferManager := &recordingBufferPinner{frame: frame, flushErr: wantErr}
+	logs := &recordingTransactionLog{}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := storage.NewBlockID("tbl", 1)
+	if err := tx.buffers.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tx.Commit(); !errors.Is(err, wantErr) {
+		t.Fatalf("Commit() error = %v, want %v", err, wantErr)
+	}
+	if got, ok := tx.buffers.Buffer(block); !ok || got != frame {
+		t.Fatalf("pinned buffer after failed commit = (%p, %v), want (%p, true)", got, ok, frame)
+	}
+	if len(logs.records) != 1 {
+		t.Fatalf("records after failed commit = %d, want START only", len(logs.records))
+	}
+	if len(logs.flushed) != 0 {
+		t.Fatalf("log flushes after failed commit = %v, want none", logs.flushed)
 	}
 }

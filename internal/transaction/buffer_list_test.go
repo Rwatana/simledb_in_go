@@ -15,6 +15,9 @@ type recordingBufferPinner struct {
 	unpinErr error
 	blocks   []storage.BlockID
 	unpins   []*buffer.Buffer
+	flushes  []buffer.TransactionID
+	flushErr error
+	events   *[]string
 }
 
 func (p *recordingBufferPinner) Pin(block storage.BlockID) (*buffer.Buffer, error) {
@@ -28,6 +31,14 @@ func (p *recordingBufferPinner) Pin(block storage.BlockID) (*buffer.Buffer, erro
 func (p *recordingBufferPinner) Unpin(frame *buffer.Buffer) error {
 	p.unpins = append(p.unpins, frame)
 	return p.unpinErr
+}
+
+func (p *recordingBufferPinner) FlushAll(transaction buffer.TransactionID) error {
+	p.flushes = append(p.flushes, transaction)
+	if p.events != nil {
+		*p.events = append(*p.events, "flush buffers")
+	}
+	return p.flushErr
 }
 
 func TestBufferListPinsAndTracksBlock(t *testing.T) {
