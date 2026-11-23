@@ -301,6 +301,10 @@ A separate synthetic layout now tests `RecordPage.Format` rejecting a field offs
 field context and confirms no field write follows the valid slot-flag write. `Format` is now 96.3% covered, record
 package coverage is 99.7%, and full-module statement coverage remains 98.9%.
 
+`RecordPage.Format` now also verifies failure to initialize an integer field after its slot flag is written. The test
+checks the wrapped cause and block/slot/field/offset context, with no later format operation. `Format` and the record
+package are now 100.0% covered, while full-module statement coverage is 99.0%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

@@ -23,6 +23,7 @@ type recordingRecordTransaction struct {
 	stringValue     string
 	stringErr       error
 	writes          []integerWrite
+	writeErrors     []error
 	writeErr        error
 	stringWrites    []stringWrite
 	stringWriteErr  error
@@ -85,7 +86,11 @@ func (t *recordingRecordTransaction) GetString(block storage.BlockID, offset int
 func (t *recordingRecordTransaction) SetInt(block storage.BlockID, offset, value int32, logUpdate bool) error {
 	t.writes = append(t.writes, integerWrite{block: block, offset: offset, value: value, logUpdate: logUpdate})
 	t.writeOperations = append(t.writeOperations, writeOperation{kind: "int", offset: offset, integer: value, logUpdate: logUpdate})
-	return t.writeErr
+	writeErr := t.writeErr
+	if len(t.writeErrors) >= len(t.writes) {
+		writeErr = t.writeErrors[len(t.writes)-1]
+	}
+	return writeErr
 }
 
 func (t *recordingRecordTransaction) SetString(block storage.BlockID, offset int32, value string, logUpdate bool) error {
@@ -512,6 +517,43 @@ func TestRecordPageFormatRejectsFieldOffsetBeyondInt32(t *testing.T) {
 	}
 	if len(transaction.writeOperations) != 1 || transaction.writeOperations[0] != (writeOperation{kind: "int", offset: 0, integer: recordSlotEmpty}) {
 		t.Errorf("Format() writes = %v, want only valid slot zero flag", transaction.writeOperations)
+	}
+}
+
+func TestRecordPageFormatWrapsIntegerFieldWriteFailure(t *testing.T) {
+	writeErr := errors.New("integer field initialization failed")
+	transaction := &recordingRecordTransaction{
+		blockSize:   8,
+		writeErrors: []error{nil, writeErr},
+	}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddIntegerField("id")
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	err = page.Format()
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("Format() error = %v, want wrapped integer field write failure", err)
+	}
+	for _, want := range []string{block.String(), "slot 0", `field "id"`, "offset 4"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Format() error = %q, want context %q", err, want)
+		}
+	}
+	wantOperations := []writeOperation{
+		{kind: "int", offset: 0, integer: recordSlotEmpty},
+		{kind: "int", offset: 4, integer: 0},
+	}
+	if len(transaction.writeOperations) != len(wantOperations) {
+		t.Fatalf("Format() writes after field failure = %v, want %v", transaction.writeOperations, wantOperations)
+	}
+	for index := range wantOperations {
+		if transaction.writeOperations[index] != wantOperations[index] {
+			t.Errorf("Format() write %d = %v, want %v", index, transaction.writeOperations[index], wantOperations[index])
+		}
 	}
 }
 
