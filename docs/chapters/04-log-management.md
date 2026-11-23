@@ -366,6 +366,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | --- | --- |
 | `TestAppendRollsOverAFullTailBlock` | old tail durability、new block initialization、連続LSN、memory-only new record |
 | `TestAppendRejectsARecordThatCannotFitAnEmptyBlockBeforeRollover` | oversized recordをI/O前にrejectしPage、BlockID、LSN、lengthを維持 |
+| `TestAppendPreservesRolloverTailFlushFailure` | rollover前のold-tail flush failureをcause/context付きで返しstateを維持 |
 
 ## Javaソースリーディング
 

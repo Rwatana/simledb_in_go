@@ -244,6 +244,10 @@ and offset context and confirms both the tail Page and latest LSN remain unchang
 The log record length guard now accepts a synthetic signed-int32 maximum in an internal append helper. Its
 rejection path is covered without allocating a multi-gigabyte record, while the public Append path keeps the same
 production limit and error text.
+
+On Darwin and Linux, a FIFO regression test now forces `Append` into a full-tail rollover whose flush fails. It
+checks the wrapped `ESPIPE` cause and append/rollover/block context, and verifies that the current Page, BlockID, and
+LSN remain unchanged after the failed transition.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
