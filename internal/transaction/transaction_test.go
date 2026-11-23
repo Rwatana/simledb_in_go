@@ -752,6 +752,37 @@ func TestTransactionGetStringReturnsMissingPinAndPageFailures(t *testing.T) {
 	}
 }
 
+func TestTransactionGetStringPreservesSharedLockFailure(t *testing.T) {
+	bufferManager, logs, block := newTransactionStringBlock(t, 8, "値")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	wantErr := concurrency.ErrLockConflict
+	locks := &recordingTransactionLockManager{sharedErr: wantErr}
+	tx.locks = locks
+
+	value, err := tx.GetString(block, 64)
+	if value != "" {
+		t.Errorf("GetString() value = %q, want empty string after lock failure", value)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("GetString() error = %v, want lock conflict", err)
+	}
+	wantContext := "get string from transaction buffer " + block.String() + " at offset 64: acquire shared lock"
+	if err == nil || !strings.Contains(err.Error(), wantContext) {
+		t.Errorf("GetString() error = %v, want context %q", err, wantContext)
+	}
+	if locks.sharedCalls != 1 {
+		t.Errorf("shared lock calls = %d, want 1", locks.sharedCalls)
+	}
+}
+
 func TestTransactionRejectsGetStringAfterCompletion(t *testing.T) {
 	tests := []struct {
 		name     string

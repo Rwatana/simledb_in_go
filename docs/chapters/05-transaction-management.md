@@ -1458,6 +1458,7 @@ page-boundary failure were tested first. The initial build failed because `Trans
 | --- | --- |
 | `TestTransactionGetStringReadsPinnedPageAndReusesSharedLock` | Two reads return the stored UTF-8 string while retaining exactly one transaction-local shared hold |
 | `TestTransactionGetStringReturnsMissingPinAndPageFailures` | Missing ownership, negative lengths, and invalid offsets return explicit errors |
+| `TestTransactionGetStringPreservesSharedLockFailure` | A shared-lock failure preserves its cause and prevents reading string bytes |
 
 This maps to Java `Transaction.getString`; mutation remains in later, independently tested behaviors.
 

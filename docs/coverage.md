@@ -143,6 +143,10 @@ the conflict and file-operation context, returns a zero block, and prevents the 
 the conflict and block/offset context, and stops before page access. The method is now 100.0% covered, transaction
 coverage is 96.5%, and full-module coverage is 96.8%.
 
+`Transaction.GetString` now tests the existing shared-lock failure branch for a pinned block. It returns an empty
+string, preserves the conflict and block/offset context, and stops before page access. The method is now 100.0%
+covered, transaction coverage is 97.1%, and full-module coverage remains 96.8%.
+
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
 also cover early rejection of index lookups with missing table- or statistics-manager dependencies and an index
