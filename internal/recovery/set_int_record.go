@@ -41,8 +41,8 @@ func (r SetIntRecord) OldValue() int32 { return r.oldValue }
 // EncodeSetIntRecord returns the SETINT record's variable-length on-disk form.
 func EncodeSetIntRecord(transaction TransactionID, block storage.BlockID, offset, oldValue int32) ([]byte, error) {
 	fileName := []byte(block.FileName())
-	if len(fileName) > math.MaxInt32 {
-		return nil, fmt.Errorf("encode setint record: filename length %d exceeds int32", len(fileName))
+	if err := validateSetIntFilenameLength(len(fileName)); err != nil {
+		return nil, fmt.Errorf("encode setint record: %w", err)
 	}
 	maxInt := int(^uint(0) >> 1)
 	if len(fileName) > maxInt-setIntFixedSize {
@@ -61,6 +61,13 @@ func EncodeSetIntRecord(transaction TransactionID, block storage.BlockID, offset
 	binary.BigEndian.PutUint32(encoded[fixed+4:fixed+8], uint32(offset))
 	binary.BigEndian.PutUint32(encoded[fixed+8:fixed+12], uint32(oldValue))
 	return encoded, nil
+}
+
+func validateSetIntFilenameLength(length int) error {
+	if length > math.MaxInt32 {
+		return fmt.Errorf("filename length %d exceeds int32", length)
+	}
+	return nil
 }
 
 // DecodeSetIntRecord interprets an exact SETINT record encoding.

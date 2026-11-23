@@ -63,6 +63,17 @@ func TestEncodeSetIntRecordRejectsBlockOutsideInt32(t *testing.T) {
 	}
 }
 
+func TestSetIntFilenameLengthValidationRejectsValuesAboveInt32(t *testing.T) {
+	if strconv.IntSize < 64 {
+		t.Skip("host int cannot represent a value above int32")
+	}
+	length := int(int64(math.MaxInt32) + 1)
+	err := validateSetIntFilenameLength(length)
+	if err == nil || !strings.Contains(err.Error(), "filename length") {
+		t.Fatalf("validateSetIntFilenameLength(%d) error = %v, want filename length error", length, err)
+	}
+}
+
 func TestDecodeSetIntRecordRejectsInvalidEncoding(t *testing.T) {
 	valid, err := EncodeSetIntRecord(7, storage.NewBlockID("tbl", 2), 16, -5)
 	if err != nil {

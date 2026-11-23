@@ -198,6 +198,10 @@ grants exactly one shared hold. Concurrency package coverage is 97.3%, and full-
 `DecodeSetStringRecord` now has a separate truncated-filename-length case. It verifies rejection occurs before reading
 the later fixed fields; the decoder is 100.0% covered, recovery package coverage is 98.8%, and full-module coverage
 remains 97.4%.
+
+The SETINT encoder's signed filename-length bound now has a synthetic boundary test through a small internal validator,
+so the rejection is verified without allocating a filename larger than two gigabytes. Encoded output for ordinary
+filenames is unchanged.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
