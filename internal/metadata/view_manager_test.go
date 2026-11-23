@@ -127,6 +127,13 @@ func TestViewManagerCreateViewStoresDefinitionInNewViewFile(t *testing.T) {
 	}
 }
 
+func TestViewManagerCreateViewRequiresTableManager(t *testing.T) {
+	err := NewViewManager(nil).CreateView("seniors", "select sid from student", nil)
+	if err == nil || err.Error() != `create view "seniors": table manager is nil` {
+		t.Fatalf("CreateView() error = %v, want view-specific missing table manager context", err)
+	}
+}
+
 func TestViewManagerCreateViewWrapsCatalogLayoutFailure(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()

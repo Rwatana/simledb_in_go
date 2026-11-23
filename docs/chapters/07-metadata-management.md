@@ -277,6 +277,7 @@ The test first failed to compile because `ViewManager.CreateView` did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestViewManagerCreateViewStoresDefinitionInNewViewFile` | A first view creates one formatted `viewcat` block and stores its name and SQL definition in the first occupied slot |
+| `TestViewManagerCreateViewRequiresTableManager` | A missing table metadata dependency returns view-specific context before transaction access |
 | `TestViewManagerCreateViewWrapsCatalogLayoutFailure` | A failed view-catalog layout lookup returns the cause with view-name and layout context |
 | `TestViewManagerCreateViewPreservesViewNameWriteFailure` | A `viewname` write error preserves its cause and context and still closes the scan |
 | `TestViewManagerCreateViewPreservesViewDefinitionWriteFailure` | A `viewdef` write error is returned after the name write and still closes the scan |
