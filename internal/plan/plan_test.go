@@ -181,6 +181,81 @@ func TestTablePlanDistinctValuesHandlesNilPlanAndStatistics(t *testing.T) {
 	}
 }
 
+func TestSelectPlanOpenFiltersRowsFromChildPlan(t *testing.T) {
+	var schema record.Schema
+	schema.AddIntegerField("student_id")
+	child := NewTablePlan(&tablePlanTransaction{size: 1}, "student", record.NewLayout(&schema), nil)
+	predicate := query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("student_id"),
+		query.NewConstantExpression(query.NewIntConstant(42)),
+	))
+
+	scan, err := NewSelectPlan(child, predicate).Open()
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	if _, ok := scan.(*query.SelectScan); !ok {
+		t.Fatalf("Open() scan has type %T, want *query.SelectScan", scan)
+	}
+	if next, err := scan.Next(); err != nil || !next {
+		t.Fatalf("Next() = (%t, %v), want one matching row", next, err)
+	}
+	if got, err := scan.GetInt("student_id"); err != nil || got != 42 {
+		t.Fatalf("GetInt(student_id) = (%d, %v), want (42, nil)", got, err)
+	}
+	if next, err := scan.Next(); err != nil || next {
+		t.Fatalf("Next() after matching row = (%t, %v), want end of scan", next, err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+}
+
+func TestSelectPlanOpenFiltersOutNonmatchingRows(t *testing.T) {
+	var schema record.Schema
+	schema.AddIntegerField("student_id")
+	child := NewTablePlan(&tablePlanTransaction{size: 1}, "student", record.NewLayout(&schema), nil)
+	predicate := query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("student_id"),
+		query.NewConstantExpression(query.NewIntConstant(99)),
+	))
+
+	scan, err := NewSelectPlan(child, predicate).Open()
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	if next, err := scan.Next(); err != nil || next {
+		t.Fatalf("Next() = (%t, %v), want no matching rows", next, err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+}
+
+func TestSelectPlanOpenWrapsChildScanErrors(t *testing.T) {
+	openErr := errors.New("file size unavailable")
+	var schema record.Schema
+	child := NewTablePlan(&tablePlanTransaction{sizeErr: openErr}, "student", record.NewLayout(&schema), nil)
+
+	scan, err := NewSelectPlan(child, query.Predicate{}).Open()
+	if scan != nil || !errors.Is(err, openErr) || !strings.Contains(err.Error(), "select plan") {
+		t.Fatalf("Open() = (%v, %v), want nil scan and contextual wrapped error", scan, err)
+	}
+}
+
+func TestSelectPlanOpenRejectsNilPlansAndChildScans(t *testing.T) {
+	var nilPlan *SelectPlan
+	if scan, err := nilPlan.Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "nil plan") {
+		t.Fatalf("nil SelectPlan.Open() = (%v, %v), want nil scan and nil-plan error", scan, err)
+	}
+	if scan, err := NewSelectPlan(nil, query.Predicate{}).Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "child plan") {
+		t.Fatalf("SelectPlan without child Open() = (%v, %v), want nil scan and child-plan error", scan, err)
+	}
+	if scan, err := NewSelectPlan(contractProbe{}, query.Predicate{}).Open(); scan != nil || err == nil || !strings.Contains(err.Error(), "select scan") {
+		t.Fatalf("SelectPlan with nil child scan Open() = (%v, %v), want nil scan and select-scan error", scan, err)
+	}
+}
+
 type tablePlanTransaction struct {
 	size    int
 	sizeErr error

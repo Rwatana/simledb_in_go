@@ -94,6 +94,20 @@ source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
 The first test run failed because `TablePlan.DistinctValues` was undefined. Tests cover the current nonzero statistic
 estimate and nil-safe zero results.
 
+## Feature 7: Open a predicate-filtered scan
+
+`SelectPlan.Open` opens its child plan and wraps that scan in the existing `query.SelectScan`, which evaluates the
+stored `query.Predicate` while advancing. The constructor retains the child plan and predicate. Child-open errors keep
+their cause and gain selection-plan context; missing plans and a child that returns no scan produce explicit errors.
+This follows Java `SelectPlan.open()` while using Go's `(query.Scan, error)` result. Selection estimates and schema
+delegation remain separate behaviors. The [plan diagram](../diagrams/ch10-plan-contract.svg) now records the
+`SelectPlan` to `SelectScan` path; its editable source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first test run failed because `SelectPlan` and `NewSelectPlan` were undefined. Tests verify matching and
+nonmatching rows, the returned scan adapter, child-error wrapping, nil plans, and a child that supplies no scan.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
