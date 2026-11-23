@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="620" viewBox="0 0 1280 620" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 12: Parse a SELECT query</title>
+  <desc id="description">The parser reads ordered field and table lists, an optional predicate, and returns QueryData while leaving the first following token available. Missing clauses and malformed input return byte-positioned errors.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}.error{stroke-dasharray:8 6}
+    </style>
+  </defs>
+  <rect width="1280" height="620" fill="#fff"/>
+  <text class="title" x="640" y="58" text-anchor="middle">Chapter 9 / Feature 12: Parse a SELECT query</text>
+  <rect class="box" x="25" y="215" width="230" height="165" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="140" y="252"><tspan x="140">SQL input</tspan><tspan class="small" x="140" dy="28">select name, age</tspan><tspan class="small" x="140" dy="24">from student, course</tspan><tspan class="small" x="140" dy="24">where age = 18 order</tspan></text>
+  <rect class="box" x="315" y="105" width="220" height="125" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="425" y="144"><tspan x="425">Parse SELECT</tspan><tspan class="small" x="425" dy="28">one or more fields</tspan><tspan class="small" x="425" dy="23">preserve order</tspan></text>
+  <rect class="box" x="315" y="300" width="220" height="125" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="425" y="339"><tspan x="425">Parse FROM</tspan><tspan class="small" x="425" dy="28">one or more tables</tspan><tspan class="small" x="425" dy="23">preserve order</tspan></text>
+  <rect class="box" x="610" y="195" width="240" height="140" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="730" y="237"><tspan x="730">Optional WHERE</tspan><tspan class="small" x="730" dy="29">reuse ParsePredicate</tspan><tspan class="small" x="730" dy="24">empty when absent</tspan></text>
+  <rect class="box" x="930" y="150" width="240" height="125" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="1050" y="190"><tspan x="1050">QueryData</tspan><tspan class="small" x="1050" dy="29">ordered fields + tables</tspan><tspan class="small" x="1050" dy="24">predicate value</tspan></text>
+  <rect class="box" x="930" y="355" width="240" height="90" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="1050" y="389"><tspan x="1050">Next token remains</tspan><tspan class="small" x="1050" dy="24">for enclosing grammar</tspan></text>
+  <rect class="box" x="315" y="490" width="535" height="75" fill="#f5f5f5" stroke="#666"/>
+  <text class="small" x="582" y="520"><tspan x="582">Missing keyword, name, or predicate</tspan><tspan x="582" dy="24">contextual byte-positioned error</tspan></text>
+  <path class="edge" d="M255 260 L305 200"/><text class="small" x="274" y="216">read clauses</text>
+  <path class="edge" d="M425 230 V290"/><text class="small" x="473" y="268">then from</text>
+  <path class="edge" d="M535 355 L600 285"/><text class="small" x="565" y="322">optional where</text>
+  <path class="edge" d="M850 235 L920 210"/><text class="small" x="884" y="205">build result</text>
+  <path class="edge" d="M1050 275 V345"/><text class="small" x="1099" y="319">do not require EOF</text>
+  <path class="edge error" d="M730 335 L730 480"/><text class="small" x="784" y="426">parse failures</text>
+</svg>

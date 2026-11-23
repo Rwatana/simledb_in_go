@@ -204,6 +204,25 @@ Tests first failed because `NewQueryData` and `QueryData` were undefined. They c
 list isolation, independent accessor slices, predicate retention, optional `where` rendering, and safe zero or
 incomplete values.
 
+## Feature 12: Parse SQL SELECT statements
+
+`Parser.ParseQuery` maps to Java `Parser.query`. It consumes `select`, a comma-separated field list, `from`, and a
+comma-separated table list, then parses an optional `where` predicate with the existing parser. The result is the
+existing `QueryData` value. Field and table order are preserved, and the first token after the query remains available
+to an enclosing grammar instead of requiring end-of-input.
+
+Go parses the comma-separated lists iteratively rather than using Java's recursive list methods, avoiding recursion
+for long projections or table lists. Missing keywords, names, and malformed predicates return contextual errors with
+the lexer's byte offset; earlier tokens remain consumed, matching the Java parser's sequential behavior. The
+[SELECT-query diagram](../diagrams/ch09-parse-query.svg) shows the clause order, optional predicate, preserved trailing
+token, and error exits; its editable source is [`ch09-parse-query.drawio`](../diagrams/ch09-parse-query.drawio).
+
+### Test-first record
+
+Tests first failed to compile because `Parser.ParseQuery` was undefined. They cover ordered multi-field and multi-table
+lists, a multi-term `where` clause, queries without `where`, preservation of a following keyword, missing `select` or
+`from`, missing names at either list position, incomplete predicates, byte offsets, and a nil parser receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -213,3 +232,4 @@ incomplete values.
 - SQL identifiers use an explicit ASCII grammar instead of `StreamTokenizer`'s additional non-ASCII word-byte behavior.
 - Delimiters are visible ASCII punctuation bytes; multi-character operators are matched one byte at a time, and quoted values are not delimiters.
 - Keyword matching compares the normalized input word to the expected argument exactly, as Java does; callers provide the canonical lower-case spelling.
+- SELECT field and table lists are parsed iteratively rather than recursively, and query parsing leaves any trailing token for its caller.

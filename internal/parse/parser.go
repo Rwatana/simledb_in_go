@@ -86,6 +86,55 @@ func (parser *Parser) ParsePredicate() (query.Predicate, error) {
 	return predicate.ConjoinWith(rest), nil
 }
 
+// ParseQuery reads a SELECT field list, table list, and optional predicate.
+func (parser *Parser) ParseQuery() (QueryData, error) {
+	if parser == nil {
+		return QueryData{}, fmt.Errorf("parse query: parser is nil")
+	}
+	if err := parser.lexer.EatKeyword("select"); err != nil {
+		return QueryData{}, fmt.Errorf("parse query SELECT keyword: %w", err)
+	}
+	fields, err := parser.parseQueryNameList("field list")
+	if err != nil {
+		return QueryData{}, err
+	}
+	if err := parser.lexer.EatKeyword("from"); err != nil {
+		return QueryData{}, fmt.Errorf("parse query FROM keyword: %w", err)
+	}
+	tables, err := parser.parseQueryNameList("table list")
+	if err != nil {
+		return QueryData{}, err
+	}
+	var predicate query.Predicate
+	if parser.lexer.MatchKeyword("where") {
+		// A successful match guarantees this consume succeeds before the lexer changes.
+		_ = parser.lexer.EatKeyword("where")
+		predicate, err = parser.ParsePredicate()
+		if err != nil {
+			return QueryData{}, fmt.Errorf("parse query WHERE predicate: %w", err)
+		}
+	}
+	return NewQueryData(fields, tables, predicate), nil
+}
+
+func (parser *Parser) parseQueryNameList(kind string) ([]string, error) {
+	name, err := parser.ParseField()
+	if err != nil {
+		return nil, fmt.Errorf("parse query %s: %w", kind, err)
+	}
+	names := []string{name}
+	for parser.lexer.MatchDelimiter(',') {
+		// A successful match guarantees this consume succeeds before the lexer changes.
+		_ = parser.lexer.EatDelimiter(',')
+		name, err := parser.ParseField()
+		if err != nil {
+			return nil, fmt.Errorf("parse query %s: %w", kind, err)
+		}
+		names = append(names, name)
+	}
+	return names, nil
+}
+
 // ParseConstant reads a string or non-negative integer query constant.
 func (parser *Parser) ParseConstant() (query.Constant, error) {
 	if parser == nil {

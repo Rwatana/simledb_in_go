@@ -72,15 +72,9 @@
 
 ## 次の一歩
 
-Chapter 3の基礎file layerと、Chapter 4のlog manager基本機能が揃いました。buffer管理は未割当frame、
-pin increment、unpin、modifying transaction、recovery LSN、最初のBlockID割当、WAL順flush、clean frameの
-再割当、dirty frameのWAL順replacement、fixed-size BufferManager pool初期化、existing assignment lookupまで
-進み、最初のunpinned victim候補を選び、cache済みframeをpinして0→1遷移だけをavailable countへ反映できます。
-Manager経由のunpinも1→0遷移だけをavailable countへ反映し、cache missでは既存のinitial assignment、clean
-reassignment、dirty WAL replacementへdispatchして成功後にpinできます。cache hitとmissは1つのatomicな
-non-waiting attemptへ合成済みで、public `Pin`はall-pinned時にcondition variableで待ち、final unpin後に
-再試行します。待機は10秒でboundedされ、期限超過は`ErrPinTimeout`になります。transaction別`FlushAll`も
-指定transactionのdirty frameだけをWAL順に保存できます。次はChapter 5へ進みます。
+Chapter 9ではSQLの字句解析、式・predicate、SELECT query dataとSELECT文の解析まで進みました。次はJava
+`Parser.updateCmd()`のdispatchを実装し、INSERT、DELETE、UPDATE、CREATEの各構文を小さなIssueへ分けて
+追加します。
 
 ## 参照元
 
