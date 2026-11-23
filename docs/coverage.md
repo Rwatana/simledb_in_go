@@ -205,6 +205,10 @@ filenames is unchanged.
 
 The SETINT encoded-size overflow guard now accepts a synthetic host-int maximum in a small internal sizing helper.
 Its overflow path is tested without depending on the machine architecture or allocating a large record.
+
+SETSTRING's signed int32 component-length guard now tests both the filename and old-value inputs through the same
+encoder path using a small synthetic limit. Both are rejected before record allocation, with the production limit and
+wire bytes unchanged.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

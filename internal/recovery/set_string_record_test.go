@@ -40,6 +40,26 @@ func TestEncodeSetStringRecordRejectsBlockOutsideInt32(t *testing.T) {
 	}
 }
 
+func TestEncodeSetStringRecordRejectsOversizedLengthComponentsBeforeAllocation(t *testing.T) {
+	tests := []struct {
+		name      string
+		fileName  string
+		oldValue  string
+		maxLength int
+	}{
+		{name: "filename", fileName: "tbl", oldValue: "", maxLength: 2},
+		{name: "old value", fileName: "tbl", oldValue: "previous", maxLength: 7},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			encoded, err := encodeSetStringRecordWithLengthLimit(7, storage.NewBlockID(test.fileName, 2), 16, test.oldValue, test.maxLength)
+			if encoded != nil || err == nil || !strings.Contains(err.Error(), "string length exceeds int32") {
+				t.Fatalf("encodeSetStringRecordWithLengthLimit() = (%v, %v), want nil record and length error", encoded, err)
+			}
+		})
+	}
+}
+
 func TestSetStringRecordRoundTripsUTF8AndSignedFields(t *testing.T) {
 	block := storage.NewBlockID("表.tbl", -2)
 	encoded, err := EncodeSetStringRecord(-1, block, -8, "以前")

@@ -39,8 +39,12 @@ func (r SetStringRecord) OldValue() string { return r.oldValue }
 
 // EncodeSetStringRecord returns the SETSTRING record's variable-length on-disk form.
 func EncodeSetStringRecord(transaction TransactionID, block storage.BlockID, offset int32, oldValue string) ([]byte, error) {
+	return encodeSetStringRecordWithLengthLimit(transaction, block, offset, oldValue, math.MaxInt32)
+}
+
+func encodeSetStringRecordWithLengthLimit(transaction TransactionID, block storage.BlockID, offset int32, oldValue string, maxLength int) ([]byte, error) {
 	fileName, oldBytes := []byte(block.FileName()), []byte(oldValue)
-	if len(fileName) > math.MaxInt32 || len(oldBytes) > math.MaxInt32 {
+	if len(fileName) > maxLength || len(oldBytes) > maxLength {
 		return nil, fmt.Errorf("encode setstring record: string length exceeds int32: filename %d old value %d", len(fileName), len(oldBytes))
 	}
 	maxInt := int(^uint(0) >> 1)
