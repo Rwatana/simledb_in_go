@@ -14,6 +14,7 @@ Request.
 | `internal/parse.DeleteData` | `simpledb/parse/DeleteData.java` | Hold the target table and predicate of a DELETE statement |
 | `internal/parse.InsertData` | `simpledb/parse/InsertData.java` | Hold the target table, ordered fields, and corresponding values of an INSERT statement |
 | `Parser.ParseInsert` | `simpledb/parse/Parser.java` (`insert`) | Parse the INSERT target, field list, and matching constant list |
+| `internal/parse.ModifyData` | `simpledb/parse/ModifyData.java` | Hold the target table and field, new expression, and predicate of an UPDATE statement |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -290,6 +291,20 @@ Tests first failed because `Parser.ParseInsert` was undefined. They cover mixed-
 string/integer values, a preserved following keyword, each required keyword and delimiter, missing list elements,
 malformed constants, byte offsets, and a nil receiver.
 
+## Feature 17: Store parsed UPDATE command data
+
+`parse.ModifyData` maps to Java `parse.ModifyData`. It stores the target table and field, the expression that produces
+the new field value, and the predicate selecting records to change. Go keeps these fields private and exposes them
+through value-returning accessors. Its zero value safely exposes empty names, an unset expression, and an empty
+predicate. The [UPDATE-data diagram](../diagrams/ch09-modify-data.svg) shows the target, expression, predicate, and
+read-only accessors; its editable source is
+[`ch09-modify-data.drawio`](../diagrams/ch09-modify-data.drawio).
+
+### Test-first record
+
+Tests first failed to compile because `ModifyData` and `NewModifyData` were undefined. They cover storing and reading
+each command value and the safe zero-value accessors.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -304,3 +319,4 @@ malformed constants, byte offsets, and a nil receiver.
 - `ParseDelete` is a concrete-command parser separate from Go's future update-command dispatcher; it leaves trailing tokens to its caller.
 - `InsertData` copies its field and value slices for clear ownership; Java exposes its internal mutable lists directly.
 - `ParseInsert` uses iterative list parsing and leaves the next token to its caller; Java recurses through each list.
+- `ModifyData` returns the query predicate by value and retains an unset-expression zero value; Java provides accessors but no Go-style zero-value contract.
