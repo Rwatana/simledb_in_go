@@ -172,3 +172,82 @@ func TestLexerEmptyInputHasNoStringConstant(t *testing.T) {
 		}
 	}
 }
+
+func TestLexerMatchesAndConsumesIdentifiers(t *testing.T) {
+	lexer := NewLexer(" \tStuDent_4 9")
+	if !lexer.MatchIdentifier() {
+		t.Fatal("MatchIdentifier() = false, want true")
+	}
+	if !lexer.MatchIdentifier() {
+		t.Fatal("MatchIdentifier() consumed the identifier")
+	}
+	identifier, err := lexer.EatIdentifier()
+	if err != nil {
+		t.Fatalf("EatIdentifier() error = %v", err)
+	}
+	if identifier != "student_4" {
+		t.Fatalf("EatIdentifier() = %q, want lower-case identifier", identifier)
+	}
+	if !lexer.MatchIntConstant() {
+		t.Fatal("integer after identifier was not preserved")
+	}
+}
+
+func TestLexerRejectsReservedWordsAsIdentifiers(t *testing.T) {
+	keywords := []string{
+		"select", "from", "where", "and", "insert", "into", "values", "delete", "update",
+		"set", "create", "table", "int", "varchar", "view", "as", "index", "on",
+	}
+	for _, keyword := range keywords {
+		t.Run(keyword, func(t *testing.T) {
+			lexer := NewLexer(strings.ToUpper(keyword))
+			if lexer.MatchIdentifier() {
+				t.Fatalf("MatchIdentifier() = true for reserved word %q", keyword)
+			}
+			for i := 0; i < 2; i++ {
+				if _, err := lexer.EatIdentifier(); err == nil || !strings.Contains(err.Error(), "byte 0") {
+					t.Fatalf("EatIdentifier() error = %v, want stable byte offset 0", err)
+				}
+			}
+		})
+	}
+}
+
+func TestLexerRejectsNonIdentifiersWithoutConsumingThem(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		byteOffset int
+	}{
+		{name: "empty", input: ""},
+		{name: "whitespace", input: " \t\n", byteOffset: 3},
+		{name: "integer", input: "123"},
+		{name: "punctuation", input: "$name"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lexer := NewLexer(test.input)
+			if lexer.MatchIdentifier() {
+				t.Fatalf("MatchIdentifier() = true for input %q", test.input)
+			}
+			for i := 0; i < 2; i++ {
+				if _, err := lexer.EatIdentifier(); err == nil || !strings.Contains(err.Error(), "byte "+strconv.Itoa(test.byteOffset)) {
+					t.Fatalf("EatIdentifier() error = %v, want stable byte offset %d", err, test.byteOffset)
+				}
+			}
+			if test.input == "123" && !lexer.MatchIntConstant() {
+				t.Fatal("rejected identifier attempt consumed the integer")
+			}
+		})
+	}
+}
+
+func TestLexerNilReceiverIsSafeForIdentifiers(t *testing.T) {
+	var lexer *Lexer
+	if lexer.MatchIdentifier() {
+		t.Fatal("nil MatchIdentifier() = true, want false")
+	}
+	if _, err := lexer.EatIdentifier(); err == nil {
+		t.Fatal("nil EatIdentifier() error = nil")
+	}
+}
