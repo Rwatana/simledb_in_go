@@ -2,15 +2,20 @@
 package transaction
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Rwatana/simledb_in_go/internal/buffer"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
-// BufferPinner acquires a shared buffer frame for a disk block.
+// ErrBufferNotPinned reports that a transaction tried to release a block it does not own.
+var ErrBufferNotPinned = errors.New("transaction buffer is not pinned")
+
+// BufferPinner acquires and releases shared buffer frames for disk blocks.
 type BufferPinner interface {
 	Pin(block storage.BlockID) (*buffer.Buffer, error)
+	Unpin(frame *buffer.Buffer) error
 }
 
 // BufferList tracks the buffer pins owned by one transaction.
@@ -43,4 +48,22 @@ func (l *BufferList) Pin(block storage.BlockID) error {
 func (l *BufferList) Buffer(block storage.BlockID) (*buffer.Buffer, bool) {
 	frame, ok := l.buffers[block]
 	return frame, ok
+}
+
+// Unpin releases one local pin occurrence for block while retaining any remaining ownership.
+func (l *BufferList) Unpin(block storage.BlockID) error {
+	frame, ok := l.buffers[block]
+	if !ok {
+		return fmt.Errorf("unpin transaction buffer %v: %w", block, ErrBufferNotPinned)
+	}
+	if err := l.pinner.Unpin(frame); err != nil {
+		return fmt.Errorf("unpin transaction buffer %v: %w", block, err)
+	}
+	for index, pinned := range l.pins {
+		if pinned == block {
+			l.pins = append(l.pins[:index], l.pins[index+1:]...)
+			break
+		}
+	}
+	return nil
 }
