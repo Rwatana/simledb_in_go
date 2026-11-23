@@ -276,6 +276,10 @@ A second `TableScan.Next` test exercises failure to pin the next existing block 
 It checks that the error retains the next-block context and the current block has already been unpinned. `Next` is
 now 100.0% covered; record package coverage is 97.6%, and full-module statement coverage is 98.6%.
 
+`TableScan.Insert` now has a regression test for a slot-search failure in the current existing block. It verifies
+the outer scan context, preserves the cause and cursor, and confirms no slot write occurs after the failed search.
+Record package coverage is 97.9%, and full-module statement coverage remains 98.6%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

@@ -1001,6 +1001,33 @@ func TestTableScanInsertInBlockRejectsClosedScan(t *testing.T) {
 	}
 }
 
+func TestTableScanInsertWrapsExistingBlockSearchFailure(t *testing.T) {
+	readErr := errors.New("slot search failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16, readErr: readErr},
+		size:                       1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	err = scan.Insert()
+	if !errors.Is(err, readErr) {
+		t.Fatalf("Insert() error = %v, want wrapped slot-search failure", err)
+	}
+	for _, want := range []string{"student.tbl", "search block 0", "after slot -1"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Insert() error = %q, want context %q", err, want)
+		}
+	}
+	if scan.currentSlot != -1 || scan.recordPage == nil || scan.recordPage.Block().Number() != 0 || len(transaction.writes) != 0 {
+		t.Errorf("scan state after search failure: page=%v slot=%d writes=%v", scan.recordPage, scan.currentSlot, transaction.writes)
+	}
+}
+
 func TestTableScanMoveToNewBlockClosesAppendsPinsAndFormats(t *testing.T) {
 	newBlock := storage.NewBlockID("student.tbl", 1)
 	transaction := &recordingTableTransaction{
