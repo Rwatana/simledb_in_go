@@ -33,3 +33,4 @@
 
 - Run `python3 scripts/check_docs.py` for every change.
 - Do not bypass the branch-name or one-commit Pull Request CI checks.
+- Keep each independent GitHub Actions check in its own descriptive workflow YAML; do not bundle unrelated checks in a single `ci.yml`.

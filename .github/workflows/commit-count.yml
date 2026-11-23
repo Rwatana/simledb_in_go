@@ -1,0 +1,25 @@
+name: Commit count
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  exactly-one-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require exactly one commit
+        env:
+          COMMIT_COUNT: ${{ github.event.pull_request.commits }}
+        run: |
+          if [[ "$COMMIT_COUNT" != "1" ]]; then
+            echo "A pull request must contain exactly one commit; found $COMMIT_COUNT."
+            exit 1
+          fi
