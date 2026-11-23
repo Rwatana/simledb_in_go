@@ -381,6 +381,16 @@ test verifies the wrapped cause and block/offset/LSN details. All ten Go package
 100.0% statement coverage (`/tmp/simpledb-coverage-788.out`). CI keeps the total percentage in the step summary and
 fails when full-module statement coverage falls below 100.0%.
 
+At the Issue #792 checkpoint, the full module and each package remain at 100.0% statement coverage: buffer, concurrency,
+file, log, metadata, query, record, recovery, storage, and transaction. The Issue #790 CI threshold passed on this stack;
+the update-scan contract adds no executable statements. The full suite, race tests, vet, and documentation checks were
+rerun for this checkpoint.
+
+The scheduled recheck for Issue #792 also measured 100.0% full-module coverage in `/tmp/simpledb-coverage-792-current.out`;
+each of the same ten packages remains at 100.0%, and `go tool cover -func` reports no uncovered functions. Race tests,
+vet, documentation validation, and diff checks passed again. No additional existing error-path defect was found by this
+regression pass.
+
 For a local full-module measurement, run:
 
 ```sh

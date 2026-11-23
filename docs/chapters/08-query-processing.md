@@ -11,6 +11,7 @@ dependency order. Each observable behavior remains a separate Issue, branch, com
 | `internal/query.Expression` | `simpledb/query/Expression.java` | Literal values and field references used by relational operators |
 | `internal/query.Term` | `simpledb/query/Term.java` | Equality between two expressions |
 | `internal/query.Scan` | `simpledb/query/Scan.java` | Shared traversal, field access, and cleanup contract |
+| `internal/query.UpdateScan` | `simpledb/query/UpdateScan.java` | A scan with record mutation and RID positioning |
 
 ## Feature 1: Initialize an integer query constant
 
@@ -262,3 +263,13 @@ interface is declared in the consumer package; record scans can satisfy it witho
 `TestScanContractProvidesTraversalAndValueOperations` first failed to compile because `query.Scan` did not exist.
 The test uses a representative implementation to exercise every method through the interface. Concrete table-scan
 adaptation and relational operators remain separate behaviors.
+
+## Feature 26: Define the update scan contract
+
+`UpdateScan` extends `Scan` with typed integer, string, and `Constant` writes; record insertion and deletion; and RID
+retrieval and positioning. These operations map to Java's `UpdateScan` contract. Go methods that can touch transaction
+or storage state return errors, while `record.RID` supplies the record identity type already used by the record layer.
+This PR defines only the query-side contract; adding a concrete scan implementation remains a separate behavior.
+
+`TestUpdateScanContractProvidesMutationAndRIDOperations` first failed to compile because `UpdateScan` was undefined.
+It assigns an instrumented implementation to the interface and exercises every added operation through that boundary.
