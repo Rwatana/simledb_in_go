@@ -20,6 +20,7 @@ type Manager struct {
 }
 
 type fileOperations interface {
+	Stat(string) (os.FileInfo, error)
 	Open(string) (fileHandle, error)
 	OpenFile(string, int, os.FileMode) (fileHandle, error)
 }
@@ -32,6 +33,10 @@ type fileHandle interface {
 }
 
 type osFileOperations struct{}
+
+func (osFileOperations) Stat(name string) (os.FileInfo, error) {
+	return os.Stat(name)
+}
 
 func (osFileOperations) Open(name string) (fileHandle, error) {
 	return os.Open(name)
@@ -58,6 +63,30 @@ func NewManager(directory string, blockSize int) (*Manager, error) {
 // BlockSize returns the number of bytes in each database block.
 func (m *Manager) BlockSize() int {
 	return m.blockSize
+}
+
+// Length returns the number of complete logical blocks in fileName.
+// A file that does not exist has length zero.
+func (m *Manager) Length(fileName string) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	path, err := m.filePath(fileName)
+	if err != nil {
+		return 0, fmt.Errorf("get length of %q: %w", fileName, err)
+	}
+	info, err := m.ops.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("get length of %q: stat %q: %w", fileName, path, err)
+	}
+	blocks, err := m.blocksForSize(fileName, info.Size())
+	if err != nil {
+		return 0, fmt.Errorf("get length of %q: %w", fileName, err)
+	}
+	return blocks, nil
 }
 
 // Read returns a Page containing the complete block identified by block.
@@ -117,9 +146,9 @@ func (m *Manager) Write(block storage.BlockID, page *storage.Page) error {
 }
 
 func (m *Manager) location(block storage.BlockID) (string, int64, error) {
-	fileName := block.FileName()
-	if fileName == "" || filepath.Base(fileName) != fileName || fileName == "." {
-		return "", 0, fmt.Errorf("invalid database file name %q", fileName)
+	path, err := m.filePath(block.FileName())
+	if err != nil {
+		return "", 0, err
 	}
 	blockNumber := block.Number()
 	if blockNumber < 0 {
@@ -128,5 +157,27 @@ func (m *Manager) location(block storage.BlockID) (string, int64, error) {
 	if int64(blockNumber) > math.MaxInt64/int64(m.blockSize) {
 		return "", 0, fmt.Errorf("block number %d overflows byte offset for block size %d", blockNumber, m.blockSize)
 	}
-	return filepath.Join(m.directory, fileName), int64(blockNumber) * int64(m.blockSize), nil
+	return path, int64(blockNumber) * int64(m.blockSize), nil
+}
+
+func (m *Manager) filePath(fileName string) (string, error) {
+	if fileName == "" || filepath.Base(fileName) != fileName || fileName == "." {
+		return "", fmt.Errorf("invalid database file name %q", fileName)
+	}
+	return filepath.Join(m.directory, fileName), nil
+}
+
+func (m *Manager) blocksForSize(fileName string, size int64) (int, error) {
+	return m.blocksForSizeWithLimit(fileName, size, int64(math.MaxInt))
+}
+
+func (m *Manager) blocksForSizeWithLimit(fileName string, size, maxInt int64) (int, error) {
+	if size < 0 || size%int64(m.blockSize) != 0 {
+		return 0, fmt.Errorf("database file %q size %d is not a multiple of block size %d", fileName, size, m.blockSize)
+	}
+	blocks := size / int64(m.blockSize)
+	if blocks > maxInt {
+		return 0, fmt.Errorf("database file %q has %d blocks, exceeding platform int capacity", fileName, blocks)
+	}
+	return int(blocks), nil
 }
