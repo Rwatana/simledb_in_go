@@ -1063,6 +1063,37 @@ func TestTableScanInsertReportsNextBlockPinFailure(t *testing.T) {
 	}
 }
 
+func TestTableScanInsertWrapsNewBlockAppendFailure(t *testing.T) {
+	appendErr := errors.New("append block failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16, value: recordSlotUsed},
+		size:                       1,
+		appendErr:                  appendErr,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	err = scan.Insert()
+	if !errors.Is(err, appendErr) {
+		t.Fatalf("Insert() error = %v, want wrapped new-block append failure", err)
+	}
+	for _, want := range []string{"student.tbl", "roll over after block 0", "new block"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Insert() error = %q, want context %q", err, want)
+		}
+	}
+	if scan.recordPage != nil || scan.currentSlot != -1 || len(transaction.writes) != 0 {
+		t.Errorf("scan state after append failure: page=%v slot=%d writes=%v", scan.recordPage, scan.currentSlot, transaction.writes)
+	}
+	if len(transaction.unpinCalls) != 1 || transaction.unpinCalls[0].Number() != 0 || len(transaction.appendCalls) != 1 {
+		t.Errorf("cleanup/append calls: unpins=%v appends=%v", transaction.unpinCalls, transaction.appendCalls)
+	}
+}
+
 func TestTableScanMoveToNewBlockClosesAppendsPinsAndFormats(t *testing.T) {
 	newBlock := storage.NewBlockID("student.tbl", 1)
 	transaction := &recordingTableTransaction{
