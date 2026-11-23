@@ -324,3 +324,111 @@ func TestLexerNilReceiverIsSafeForDelimiters(t *testing.T) {
 		t.Fatal("nil EatDelimiter(',') error = nil")
 	}
 }
+
+func TestLexerMatchesAndConsumesExpectedKeywords(t *testing.T) {
+	lexer := NewLexer("  SELECT users FROM")
+	if !lexer.MatchKeyword("select") {
+		t.Fatal("MatchKeyword(\"select\") = false, want true")
+	}
+	if !lexer.MatchKeyword("select") {
+		t.Fatal("MatchKeyword() consumed the keyword")
+	}
+	if err := lexer.EatKeyword("select"); err != nil {
+		t.Fatalf("EatKeyword(\"select\") error = %v", err)
+	}
+	if !lexer.MatchIdentifier() {
+		t.Fatal("identifier after keyword was not preserved")
+	}
+	if _, err := lexer.EatIdentifier(); err != nil {
+		t.Fatalf("EatIdentifier() after keyword error = %v", err)
+	}
+	if !lexer.MatchKeyword("from") {
+		t.Fatal("keyword after identifier was not preserved")
+	}
+}
+
+func TestLexerMatchesExpectedKeywordAtWholeWordBoundary(t *testing.T) {
+	lexer := NewLexer("selectx")
+	if lexer.MatchKeyword("select") {
+		t.Fatal("MatchKeyword(\"select\") = true for the longer word selectx")
+	}
+	if err := lexer.EatKeyword("select"); err == nil || !strings.Contains(err.Error(), "byte 0") {
+		t.Fatalf("EatKeyword(\"select\") error = %v, want byte offset 0", err)
+	}
+	if !lexer.MatchIdentifier() {
+		t.Fatal("failed keyword match consumed the identifier")
+	}
+}
+
+func TestLexerMatchesExpectedOrdinaryWord(t *testing.T) {
+	lexer := NewLexer("customer,")
+	if !lexer.MatchKeyword("customer") {
+		t.Fatal("MatchKeyword(\"customer\") = false for an ordinary word requested by the grammar")
+	}
+	if err := lexer.EatKeyword("customer"); err != nil {
+		t.Fatalf("EatKeyword(\"customer\") error = %v", err)
+	}
+	if !lexer.MatchDelimiter(',') {
+		t.Fatal("delimiter after the expected word was not preserved")
+	}
+}
+
+func TestLexerRejectsDifferentExpectedKeywordWithoutConsuming(t *testing.T) {
+	lexer := NewLexer("  where")
+	if lexer.MatchKeyword("from") {
+		t.Fatal("MatchKeyword(\"from\") = true for where")
+	}
+	if err := lexer.EatKeyword("from"); err == nil || !strings.Contains(err.Error(), "byte 2") {
+		t.Fatalf("EatKeyword(\"from\") error = %v, want byte offset 2", err)
+	}
+	if !lexer.MatchKeyword("where") {
+		t.Fatal("mismatched keyword attempt consumed where")
+	}
+}
+
+func TestLexerComparesExpectedKeywordAsSupplied(t *testing.T) {
+	lexer := NewLexer("SELECT")
+	if lexer.MatchKeyword("SELECT") {
+		t.Fatal("MatchKeyword(\"SELECT\") = true; expected arguments are compared as supplied")
+	}
+	if !lexer.MatchKeyword("select") {
+		t.Fatal("MatchKeyword(\"select\") = false for an uppercase SQL keyword")
+	}
+}
+
+func TestLexerRejectsNonWordAsExpectedKeywordWithoutConsuming(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		byteOffset int
+	}{
+		{name: "empty", input: ""},
+		{name: "whitespace", input: " \t", byteOffset: 2},
+		{name: "integer", input: "42"},
+		{name: "string", input: "'select'"},
+		{name: "delimiter", input: ","},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lexer := NewLexer(test.input)
+			if lexer.MatchKeyword("select") {
+				t.Fatalf("MatchKeyword(\"select\") = true for %q", test.input)
+			}
+			for i := 0; i < 2; i++ {
+				if err := lexer.EatKeyword("select"); err == nil || !strings.Contains(err.Error(), "byte "+strconv.Itoa(test.byteOffset)) {
+					t.Fatalf("EatKeyword(\"select\") error = %v, want stable byte offset %d", err, test.byteOffset)
+				}
+			}
+		})
+	}
+}
+
+func TestLexerNilReceiverIsSafeForKeywords(t *testing.T) {
+	var lexer *Lexer
+	if lexer.MatchKeyword("select") {
+		t.Fatal("nil MatchKeyword(\"select\") = true, want false")
+	}
+	if err := lexer.EatKeyword("select"); err == nil {
+		t.Fatal("nil EatKeyword(\"select\") error = nil")
+	}
+}

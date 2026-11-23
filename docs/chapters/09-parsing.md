@@ -87,6 +87,26 @@ The tests first failed to compile because `MatchDelimiter` and `EatDelimiter` we
 punctuation, repeated lookahead, adjacent identifiers, mismatched expected delimiters, wrong token kinds, byte offsets,
 empty input, whitespace, and nil receivers.
 
+## Feature 5: Match expected SQL keywords
+
+`MatchKeyword` and `EatKeyword` map to Java `Lexer.matchKeyword` and `eatKeyword`. The lexer compares the next complete
+word with the expected spelling. Input words are normalized to lower case by the existing word scanner, while the
+expected argument is compared as supplied, matching Java's API contract. Lookahead does not consume; a successful eat
+advances past only that word. An unexpected token or spelling returns a byte-positioned error without advancing.
+
+This operation intentionally checks the requested word, rather than requiring it to be a member of the reserved-word
+list. That preserves Java's behavior when callers use it for a known grammar word while `MatchIdentifier` remains the
+separate reserved-word check. The [keyword-token diagram](../diagrams/ch09-keyword-token.svg) shows exact word matching,
+consumption, and the unchanged cursor on failure; its editable source is
+[`ch09-keyword-token.drawio`](../diagrams/ch09-keyword-token.drawio).
+
+### Test-first record
+
+Tests first failed to compile because `MatchKeyword` and `EatKeyword` were undefined. They cover a reserved SQL word,
+an ordinary expected word, uppercase input normalization, the Java expected-argument comparison rule, word boundaries,
+repeated lookahead, following identifiers and keywords, mismatches, wrong token kinds, stable byte offsets, empty input,
+whitespace, and nil receivers.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -95,3 +115,4 @@ empty input, whitespace, and nil receivers.
 - SQL string literals support doubled single quotes; backslash escapes follow the simpler Go SQL lexer policy and are not decoded as Java `StreamTokenizer` escapes.
 - SQL identifiers use an explicit ASCII grammar instead of `StreamTokenizer`'s additional non-ASCII word-byte behavior.
 - Delimiters are visible ASCII punctuation bytes; multi-character operators are matched one byte at a time, and quoted values are not delimiters.
+- Keyword matching compares the normalized input word to the expected argument exactly, as Java does; callers provide the canonical lower-case spelling.
