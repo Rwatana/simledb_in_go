@@ -533,6 +533,11 @@ At the Issue #933 static-hash-index-close checkpoint, `/tmp/simpledb-coverage-93
 
 At the Issue #935 static-hash-index-position checkpoint, `/tmp/simpledb-coverage-935.out` measures 100.0% statement coverage in every executable package and function. `HashIndex.BeforeFirst` covers nil receiver/dependencies, unset key, Java-compatible bucket table naming, close-before-open ordering, close failure preservation, and table size/pin failures. Uncached tests, race, vet, docs, gofmt, and diff checks pass.
 
+At the Issue #937 static-hash-index-iteration checkpoint, `/tmp/simpledb-coverage-937.out` measures 100.0% statement
+coverage in every executable package and function. `HashIndex.Next` covers integer and varchar entry reads, collision
+skipping, repeated matches, exhaustion, mixed key types, invalid scan/key/layout/schema/field state, and wrapped scan,
+slot-flag, and field-read errors. Uncached tests, race, vet, docs, Draw.io/SVG XML, gofmt, and diff checks pass.
+
 At the Issue #893 project-plan-schema checkpoint, `/tmp/simpledb-coverage-893.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `NewProjectPlan` covers nil dependencies, valid ordered fields, empty projections, and missing-field errors; `ProjectPlan.Schema` covers both ordinary and nil receivers. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
 
 At the Issue #891 product-plan-distinct-estimate checkpoint, `/tmp/simpledb-coverage-891.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProductPlan.DistinctValues` covers left/right field routing, left-side duplicate-name precedence, nil dependencies, missing schemas, and unknown fields. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.

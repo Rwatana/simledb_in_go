@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 11 Feature 7: Matching hash-bucket entries</title>
+  <desc id="description">HashIndex.Next advances a bucket table scan, reads dataval using the schema type, and compares it with the search key. A collision loops to the next entry, a match returns true, and exhaustion returns false; scan and field errors are returned with context.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>.title{font:700 24px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:16;ry:16}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}.dashed{stroke-dasharray:8 6}</style>
+  </defs>
+  <rect width="1200" height="760" fill="#fff"/>
+  <text class="title" x="600" y="58" text-anchor="middle">Chapter 11 / Feature 7: Matching hash-bucket entries</text>
+  <rect class="box" x="380" y="100" width="440" height="90" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="600" y="137"><tspan x="600">Positioned HashIndex</tspan><tspan x="600" dy="29">scan · search key · dataval schema</tspan></text>
+  <rect class="box" x="380" y="250" width="440" height="90" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="600" y="287"><tspan x="600">TableScan.Next()</tspan><tspan x="600" dy="29">advance to next occupied slot</tspan></text>
+  <rect class="box" x="380" y="400" width="440" height="120" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="600" y="437"><tspan x="600">Read dataval by schema type</tspan><tspan x="600" dy="29">integer → GetInt · varchar → GetString</tspan></text>
+  <polygon points="600,580 760,645 600,710 440,645" fill="#e1d5e7" stroke="#9673a6" stroke-width="2"/>
+  <text class="label" x="600" y="652">Equal(searchKey)?</text>
+  <rect class="box" x="865" y="605" width="250" height="85" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="990" y="641"><tspan x="990">Match</tspan><tspan x="990" dy="27">return true, nil</tspan></text>
+  <rect class="box" x="55" y="250" width="250" height="90" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="180" y="287"><tspan x="180">Bucket exhausted</tspan><tspan x="180" dy="29">return false, nil</tspan></text>
+  <rect class="box" x="865" y="400" width="280" height="105" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="1005" y="439"><tspan x="1005">Scan or field read fails</tspan><tspan x="1005" dy="29">return wrapped error</tspan></text>
+  <path class="edge" d="M600 190 V242"/><text class="small" x="656" y="222">begin</text>
+  <path class="edge" d="M600 340 V392"/><text class="small" x="663" y="372">record found</text>
+  <path class="edge" d="M600 520 V573"/><text class="small" x="657" y="555">typed value</text>
+  <path class="edge" d="M760 645 H857"/><text class="small" x="809" y="630">equal</text>
+  <path class="edge" d="M440 645 H330 V295 H372"/><text class="small" x="387" y="628">collision: not equal</text>
+  <path class="edge" d="M380 295 H313"/><text class="small" x="344" y="275">no record</text>
+  <path class="edge dashed" d="M820 295 H857 V452"/><text class="small" x="865" y="350">scan/read error</text>
+</svg>
