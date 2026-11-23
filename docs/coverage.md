@@ -215,6 +215,9 @@ verify each contribution is rejected before allocation when it exceeds the remai
 
 `LockTable.WaitExclusiveFor` now also covers a blocked request whose timeout is already zero. The test verifies the
 shared holders remain unchanged and the request returns before registering an exclusive waiter.
+
+Bounded shared and exclusive waits now share a timeout callback helper. Its completed-wait branch is called directly in
+a deterministic test, while the existing deadline tests continue to cover active expiry and condition notification.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

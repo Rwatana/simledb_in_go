@@ -470,6 +470,16 @@ func TestLockTableBoundedSharedRequestAcquiresBeforeDeadline(t *testing.T) {
 	}
 }
 
+func TestLockTableIgnoresLateBoundedWaitTimerCallback(t *testing.T) {
+	var table LockTable
+	finished := true
+	expired := false
+	table.expireWait(&finished, &expired)
+	if expired {
+		t.Fatal("late timer callback marked a completed wait as expired")
+	}
+}
+
 func TestLockTableWaitsForCompetingSharedHolderBeforeAcquiringExclusive(t *testing.T) {
 	var table LockTable
 	block := storage.NewBlockID("tbl", 1)
