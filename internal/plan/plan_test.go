@@ -495,6 +495,71 @@ func TestInsertRowIntoScanHandlesReadOnlyAndCloseErrors(t *testing.T) {
 	}
 }
 
+func TestBasicUpdatePlannerExecuteCreateTableForwardsSchemaAndTransaction(t *testing.T) {
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 32)
+	data := parse.NewCreateTableData("student", schema)
+	transaction := &tablePlanTransaction{}
+	metadata := &basicUpdatePlannerMetadataProbe{}
+
+	count, err := NewBasicUpdatePlanner(metadata).ExecuteCreateTable(data, transaction)
+	if err != nil {
+		t.Fatalf("ExecuteCreateTable() error = %v", err)
+	}
+	if count != 0 {
+		t.Errorf("ExecuteCreateTable() affected = %d, want 0", count)
+	}
+	if !reflect.DeepEqual(metadata.createTableRequests, []string{"student"}) {
+		t.Errorf("CreateTable requests = %v, want [student]", metadata.createTableRequests)
+	}
+	if len(metadata.createTableTransactions) != 1 || metadata.createTableTransactions[0] != transaction {
+		t.Errorf("CreateTable transactions = %v, want the original transaction", metadata.createTableTransactions)
+	}
+	if len(metadata.createTableSchemas) != 1 || !reflect.DeepEqual(metadata.createTableSchemas[0].Fields(), []string{"id", "name"}) {
+		t.Fatalf("CreateTable schemas = %v, want fields [id name]", metadata.createTableSchemas)
+	}
+	createdSchema := metadata.createTableSchemas[0]
+	if definition, ok := createdSchema.Field("id"); !ok || definition.Type != record.IntegerField {
+		t.Errorf("created id field = (%+v, %v), want integer", definition, ok)
+	}
+	if definition, ok := createdSchema.Field("name"); !ok || definition.Type != record.VarcharField || definition.Length != 32 {
+		t.Errorf("created name field = (%+v, %v), want varchar(32)", definition, ok)
+	}
+}
+
+func TestBasicUpdatePlannerExecuteCreateTableValidatesInputsAndMetadataErrors(t *testing.T) {
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	data := parse.NewCreateTableData("student", schema)
+	transaction := &tablePlanTransaction{}
+	var nilPlanner *BasicUpdatePlanner
+	if count, err := nilPlanner.ExecuteCreateTable(data, transaction); count != 0 || err == nil {
+		t.Errorf("nil planner ExecuteCreateTable() = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(nil).ExecuteCreateTable(data, transaction); count != 0 || err == nil {
+		t.Errorf("planner without metadata ExecuteCreateTable() = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{}).ExecuteCreateTable(data, nil); count != 0 || err == nil {
+		t.Errorf("ExecuteCreateTable() with nil transaction = (%d, %v), want an error", count, err)
+	}
+	metadataErr := errors.New("create table failed")
+	metadata := &basicUpdatePlannerMetadataProbe{createTableErr: metadataErr}
+	if count, err := NewBasicUpdatePlanner(metadata).ExecuteCreateTable(data, transaction); count != 0 || !errors.Is(err, metadataErr) {
+		t.Errorf("ExecuteCreateTable() with metadata error = (%d, %v), want wrapped metadata error", count, err)
+	}
+	if len(metadata.createTableRequests) != 1 {
+		t.Errorf("CreateTable requests after metadata failure = %v, want one attempted create", metadata.createTableRequests)
+	}
+	metadata = &basicUpdatePlannerMetadataProbe{}
+	if count, err := NewBasicUpdatePlanner(metadata).ExecuteCreateTable(parse.CreateTableData{}, transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteCreateTable() with empty table name = (%d, %v), want an error", count, err)
+	}
+	if len(metadata.createTableRequests) != 0 {
+		t.Errorf("CreateTable requests for invalid data = %v, want none", metadata.createTableRequests)
+	}
+}
+
 func TestDeleteRowsFromScanHandlesReadOnlyAndNilScans(t *testing.T) {
 	closeErr := errors.New("read-only scan close failed")
 	scan := &productPlanScanStub{closeErr: closeErr}
@@ -1933,17 +1998,26 @@ type tablePlanTransaction struct {
 }
 
 type basicUpdatePlannerMetadataProbe struct {
-	layout         *record.Layout
-	layoutErr      error
-	layoutRequests []string
+	layout                  *record.Layout
+	layoutErr               error
+	layoutRequests          []string
+	createTableErr          error
+	createTableRequests     []string
+	createTableSchemas      []record.Schema
+	createTableTransactions []record.TableScanTransaction
 }
 
 func (probe *basicUpdatePlannerMetadataProbe) Layout(tableName string, _ record.TableScanTransaction) (*record.Layout, error) {
 	probe.layoutRequests = append(probe.layoutRequests, tableName)
 	return probe.layout, probe.layoutErr
 }
-func (*basicUpdatePlannerMetadataProbe) CreateTable(string, *record.Schema, record.TableScanTransaction) error {
-	return nil
+func (probe *basicUpdatePlannerMetadataProbe) CreateTable(tableName string, schema *record.Schema, transaction record.TableScanTransaction) error {
+	probe.createTableRequests = append(probe.createTableRequests, tableName)
+	if schema != nil {
+		probe.createTableSchemas = append(probe.createTableSchemas, *schema)
+	}
+	probe.createTableTransactions = append(probe.createTableTransactions, transaction)
+	return probe.createTableErr
 }
 func (*basicUpdatePlannerMetadataProbe) CreateView(string, string, record.TableScanTransaction) error {
 	return nil
