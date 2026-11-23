@@ -14,6 +14,7 @@ dependency order. Each observable behavior remains a separate Issue, branch, com
 | `internal/query.UpdateScan` | `simpledb/query/UpdateScan.java` | A scan with record mutation and RID positioning |
 | `internal/query.RecordScan` | `simpledb/record/TableScan.java` | Adapter from record storage scans to query values |
 | `internal/query.SelectScan` | `simpledb/query/SelectScan.java` | Filters rows with a predicate and delegates scan operations |
+| `internal/query.ProductScan` | `simpledb/query/ProductScan.java` | Enumerates row pairs from two scans in left-major order |
 
 ## Feature 1: Initialize an integer query constant
 
@@ -301,3 +302,18 @@ rejected rows, restarting iteration, the empty predicate, predicate and source e
 operations, and update attempts over a read-only source. The [selection-scan diagram](../diagrams/ch08-select-scan.svg)
 shows the predicate loop and delegated operations; its editable source is
 [`ch08-select-scan.drawio`](../diagrams/ch08-select-scan.drawio).
+
+## Feature 29: Combine scans with a product operator
+
+`NewProductScan` and `ProductScan` map to Java `ProductScan`. Each left row is paired with every right row before the
+left input advances, so iteration is left-major. `BeforeFirst` resets both inputs; `Next` restarts the right input
+when it is exhausted. Field membership is the union of both schemas, and ambiguous names read from the left input
+first, matching Java's lookup rule. Reads delegate to the selected input. `Close` attempts both inputs and joins
+context-wrapped errors so a failure closing one side does not skip cleanup of the other. Go rejects nil inputs and
+returns wrapped errors from reset, traversal, and reads instead of relying on Java runtime exceptions.
+
+The tests first failed to compile because `NewProductScan` was undefined. They cover left-major row ordering,
+reiteration, empty inputs, duplicate-field precedence, field routing, nil inputs, both reset failures, left/right
+traversal and right-restart errors, and closing both scans when either fails. The [product-scan diagram](../diagrams/ch08-product-scan.svg)
+shows the nested iteration; its editable source is
+[`ch08-product-scan.drawio`](../diagrams/ch08-product-scan.drawio).
