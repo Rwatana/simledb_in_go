@@ -73,3 +73,13 @@ func (l *BufferList) Unpin(block storage.BlockID) error {
 	delete(l.buffers, block)
 	return nil
 }
+
+// UnpinAll releases every pin occurrence tracked by this transaction in acquisition order.
+func (l *BufferList) UnpinAll() error {
+	for len(l.pins) > 0 {
+		if err := l.Unpin(l.pins[0]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
