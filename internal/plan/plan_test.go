@@ -190,6 +190,175 @@ func TestBasicUpdatePlannerExecuteDeleteReportsScanOpenAndCloseErrors(t *testing
 	}
 }
 
+func TestBasicUpdatePlannerExecuteModifyUpdatesOnlyMatchingRows(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		predicate  query.Predicate
+		expression query.Expression
+		wantCount  int
+		wantIDs    []int32
+	}{
+		{
+			name:       "modify matching row",
+			predicate:  query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(10)))),
+			expression: query.NewConstantExpression(query.NewIntConstant(99)),
+			wantCount:  1,
+			wantIDs:    []int32{99, 20},
+		},
+		{
+			name:       "evaluate a field expression against the matching row",
+			predicate:  query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(10)))),
+			expression: query.NewFieldExpression("id"),
+			wantCount:  1,
+			wantIDs:    []int32{10, 20},
+		},
+		{
+			name:       "leave unmatched rows unchanged",
+			predicate:  query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(99)))),
+			expression: query.NewConstantExpression(query.NewIntConstant(99)),
+			wantCount:  0,
+			wantIDs:    []int32{10, 20},
+		},
+		{
+			name:       "modify every row for an empty predicate",
+			predicate:  query.Predicate{},
+			expression: query.NewConstantExpression(query.NewIntConstant(99)),
+			wantCount:  2,
+			wantIDs:    []int32{99, 99},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			layout := record.NewLayout(newPlannerTestSchema("id"))
+			transaction := newBasicUpdatePlannerTransaction(layout, []int32{1, 1}, []int32{10, 20})
+			planner := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout})
+			data := parse.NewModifyData("student", "id", test.expression, test.predicate)
+
+			count, err := planner.ExecuteModify(data, transaction)
+			if err != nil {
+				t.Fatalf("ExecuteModify() error = %v", err)
+			}
+			if count != test.wantCount {
+				t.Errorf("ExecuteModify() affected = %d, want %d", count, test.wantCount)
+			}
+			if !reflect.DeepEqual(transaction.values, test.wantIDs) {
+				t.Errorf("record values = %v, want %v", transaction.values, test.wantIDs)
+			}
+			if len(transaction.unpins) != 1 {
+				t.Errorf("unpin calls = %v, want one closed scan block", transaction.unpins)
+			}
+		})
+	}
+}
+
+func TestBasicUpdatePlannerExecuteModifyValidatesDependenciesAndMetadata(t *testing.T) {
+	data := parse.NewModifyData("student", "id", query.NewConstantExpression(query.NewIntConstant(99)), query.Predicate{})
+	transaction := &tablePlanTransaction{size: 1}
+	var nilPlanner *BasicUpdatePlanner
+	if count, err := nilPlanner.ExecuteModify(data, transaction); count != 0 || err == nil {
+		t.Errorf("nil planner ExecuteModify() = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(nil).ExecuteModify(data, transaction); count != 0 || err == nil {
+		t.Errorf("planner without metadata ExecuteModify() = (%d, %v), want an error", count, err)
+	}
+	metadataErr := errors.New("layout unavailable")
+	metadata := &basicUpdatePlannerMetadataProbe{layoutErr: metadataErr}
+	if count, err := NewBasicUpdatePlanner(metadata).ExecuteModify(data, transaction); count != 0 || !errors.Is(err, metadataErr) {
+		t.Errorf("ExecuteModify() with metadata error = (%d, %v), want wrapped layout error", count, err)
+	}
+	if !reflect.DeepEqual(metadata.layoutRequests, []string{"student"}) {
+		t.Errorf("layout requests = %v, want [student]", metadata.layoutRequests)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{}).ExecuteModify(data, transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteModify() with nil layout = (%d, %v), want an error", count, err)
+	}
+	layout := record.NewLayout(newPlannerTestSchema("id"))
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteModify(data, nil); count != 0 || err == nil {
+		t.Errorf("ExecuteModify() with nil transaction = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteModify(parse.ModifyData{}, transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteModify() with empty table name = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteModify(parse.NewModifyData("student", "", query.NewConstantExpression(query.NewIntConstant(99)), query.Predicate{}), transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteModify() with empty target field = (%d, %v), want an error", count, err)
+	}
+	transactionWithRows := newBasicUpdatePlannerTransaction(layout, []int32{1}, []int32{10})
+	unknownTarget := parse.NewModifyData("student", "missing", query.NewConstantExpression(query.NewIntConstant(99)), query.Predicate{})
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteModify(unknownTarget, transactionWithRows); count != 0 || err == nil {
+		t.Errorf("ExecuteModify() with unknown target field = (%d, %v), want an error", count, err)
+	}
+}
+
+func TestBasicUpdatePlannerExecuteModifyJoinsEvaluationWriteIterationAndCloseErrors(t *testing.T) {
+	layout := record.NewLayout(newPlannerTestSchema("id"))
+	closeErr := errors.New("scan close failed")
+	readErr := errors.New("record flag read failed")
+	transaction := newBasicUpdatePlannerTransaction(layout, []int32{1}, []int32{10})
+	transaction.readErrOffset = 0
+	transaction.readErr = readErr
+	transaction.unpinErr = closeErr
+	data := parse.NewModifyData("student", "id", query.NewConstantExpression(query.NewIntConstant(99)), query.Predicate{})
+	count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteModify(data, transaction)
+	if count != 0 || !errors.Is(err, readErr) || !errors.Is(err, closeErr) {
+		t.Errorf("ExecuteModify() with iteration/close errors = (%d, %v), want both causes", count, err)
+	}
+
+	transaction = newBasicUpdatePlannerTransaction(layout, []int32{1}, []int32{10})
+	transaction.unpinErr = closeErr
+	data = parse.NewModifyData("student", "id", query.NewFieldExpression("missing"), query.Predicate{})
+	count, err = NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteModify(data, transaction)
+	if count != 0 || err == nil || !errors.Is(err, closeErr) {
+		t.Errorf("ExecuteModify() with expression/close errors = (%d, %v), want evaluation and close errors", count, err)
+	}
+
+	valueOffset, ok := layout.Offset("id")
+	if !ok {
+		t.Fatal("layout does not contain id field")
+	}
+	writeErr := errors.New("record update failed")
+	transaction = newBasicUpdatePlannerTransaction(layout, []int32{1}, []int32{10})
+	transaction.writeErrOffset = valueOffset
+	transaction.writeErr = writeErr
+	transaction.unpinErr = closeErr
+	data = parse.NewModifyData("student", "id", query.NewConstantExpression(query.NewIntConstant(99)), query.Predicate{})
+	count, err = NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteModify(data, transaction)
+	if count != 0 || !errors.Is(err, writeErr) || !errors.Is(err, closeErr) {
+		t.Errorf("ExecuteModify() with write/close errors = (%d, %v), want both causes", count, err)
+	}
+}
+
+func TestBasicUpdatePlannerExecuteModifyReportsScanOpenAndCloseErrors(t *testing.T) {
+	layout := record.NewLayout(newPlannerTestSchema("id"))
+	openErr := errors.New("table size unavailable")
+	transaction := &basicUpdatePlannerTransaction{tablePlanTransaction: tablePlanTransaction{sizeErr: openErr}, slotSize: layout.SlotSize()}
+	data := parse.NewModifyData("student", "id", query.NewConstantExpression(query.NewIntConstant(99)), query.Predicate{})
+	count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteModify(data, transaction)
+	if count != 0 || !errors.Is(err, openErr) {
+		t.Errorf("ExecuteModify() with scan-open error = (%d, %v), want wrapped size error", count, err)
+	}
+
+	transaction = newBasicUpdatePlannerTransaction(layout, []int32{0}, []int32{10})
+	closeErr := errors.New("scan close failed")
+	transaction.unpinErr = closeErr
+	count, err = NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteModify(data, transaction)
+	if count != 0 || !errors.Is(err, closeErr) {
+		t.Errorf("ExecuteModify() with close error = (%d, %v), want wrapped close error", count, err)
+	}
+}
+
+func TestModifyRowsFromScanHandlesReadOnlyAndNilScans(t *testing.T) {
+	closeErr := errors.New("read-only scan close failed")
+	scan := &productPlanScanStub{closeErr: closeErr}
+	if count, err := modifyRowsFromScan("student", "id", query.NewConstantExpression(query.NewIntConstant(99)), scan); count != 0 || err == nil || !errors.Is(err, closeErr) {
+		t.Errorf("modifyRowsFromScan() with read-only scan = (%d, %v), want unsupported and close errors", count, err)
+	}
+	if scan.closeCalls != 1 {
+		t.Errorf("read-only scan close calls = %d, want 1", scan.closeCalls)
+	}
+	if count, err := modifyRowsFromScan("student", "id", query.NewConstantExpression(query.NewIntConstant(99)), nil); count != 0 || err == nil {
+		t.Errorf("modifyRowsFromScan() with nil scan = (%d, %v), want an error", count, err)
+	}
+}
+
 func TestDeleteRowsFromScanHandlesReadOnlyAndNilScans(t *testing.T) {
 	closeErr := errors.New("read-only scan close failed")
 	scan := &productPlanScanStub{closeErr: closeErr}
