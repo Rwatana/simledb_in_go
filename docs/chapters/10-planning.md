@@ -40,7 +40,23 @@ source remains [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.draw
 The first test run failed to compile because `NewTablePlan` and `TablePlan` were undefined. Tests then verify that the
 schema exposed by the table plan is the layout's schema and that nil plans/layouts return nil.
 
+## Feature 3: Open a table scan
+
+`TablePlan.Open` creates the executable scan for the table. The Go implementation uses `query.NewRecordScan`, which
+wraps the record-layer `TableScan` with the `GetVal` operation required by `query.Scan`; this preserves the package
+dependency direction. The returned scan starts before its first row. Initialization errors retain table-plan context,
+and nil plan dependencies return errors rather than panicking. Estimate methods remain separate features. The updated
+[plan diagram](../diagrams/ch10-plan-contract.svg) shows the table plan opening the query-layer adapter; its editable
+source is [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first test run failed because `TablePlan.Open` did not exist. After adding it, a compile-time check showed that the
+record-layer `TableScan` did not satisfy `query.Scan` because it lacks `GetVal`; the tests now assert that Open returns
+a `query.RecordScan`, starts at the first occupied slot, wraps initialization errors, and rejects nil dependencies.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
 - `NewTablePlan` receives a resolved layout rather than a metadata manager. This keeps metadata lookup outside the leaf plan and makes the table plan's schema dependency explicit.
+- `TablePlan.Open` returns a query-layer `RecordScan` adapter, rather than exposing the record-layer `TableScan`, because query plans require `GetVal`.
