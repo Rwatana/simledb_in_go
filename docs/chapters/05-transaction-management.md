@@ -1194,10 +1194,28 @@ tested first. The initial build failed because `Unpin` and `ErrBufferNotPinned` 
 This maps to the repeated-pin path of Java `BufferList.unpin`, including removing one list occurrence while retaining the
 block-to-buffer mapping. Removing that mapping after the final occurrence remains the next separate behavior.
 
+## Feature 54: Remove transaction buffer lookup after final unpin
+
+After a successful shared-manager release and removal of one pin occurrence, `BufferList.Unpin` scans the remaining local
+occurrences for that block. It deletes the block-to-buffer mapping only when none remain. If the shared manager rejects the
+unpin, the method returns that cause before changing either the occurrence sequence or lookup map.
+
+### Test-first record
+
+Final lookup removal, empty occurrence state, and failure atomicity were tested first. The initial test failed because the
+lookup mapping remained after the final occurrence was removed.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestBufferListRemovesBufferAfterFinalUnpin` | Releasing the only local pin removes both its occurrence and block lookup |
+| `TestBufferListPreservesOwnershipWhenUnpinFails` | A shared-manager unpin failure leaves local occurrence and lookup unchanged |
+
+This completes the final-pin path of Java `BufferList.unpin` while preserving the repeated-pin behavior from Feature 53.
+Bulk unpin remains separate because it has different iteration and partial-failure behavior.
+
 ## Next behavior
 
-Continue with Chapter 5 by removing buffer lookup after the final pin release, then add unpin-all separately before
-composing the transaction lifecycle.
+Continue with Chapter 5 by adding unpin-all as a separate behavior before composing the transaction lifecycle.
 
 ## Sources
 
