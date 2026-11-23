@@ -188,3 +188,32 @@ func TestCreateTableDataZeroValueHasSafeAccessors(t *testing.T) {
 		t.Errorf("Schema().Fields() = %v, want nil", got)
 	}
 }
+
+func TestCreateViewDataStoresNameAndRenderedDefinition(t *testing.T) {
+	queryData := NewQueryData(
+		[]string{"id", "name"},
+		[]string{"student"},
+		query.NewPredicateWithTerm(query.NewTerm(
+			query.NewFieldExpression("active"),
+			query.NewConstantExpression(query.NewIntConstant(1)),
+		)),
+	)
+	data := NewCreateViewData("active_students", queryData)
+
+	if got, want := data.ViewName(), "active_students"; got != want {
+		t.Errorf("ViewName() = %q, want %q", got, want)
+	}
+	if got, want := data.ViewDefinition(), "select id, name from student where active=1"; got != want {
+		t.Errorf("ViewDefinition() = %q, want %q", got, want)
+	}
+}
+
+func TestCreateViewDataZeroValueHasSafeAccessors(t *testing.T) {
+	var data CreateViewData
+	if got := data.ViewName(); got != "" {
+		t.Errorf("ViewName() = %q, want empty", got)
+	}
+	if got := data.ViewDefinition(); got != "<unset-query>" {
+		t.Errorf("ViewDefinition() = %q, want <unset-query>", got)
+	}
+}

@@ -17,6 +17,7 @@ Request.
 | `internal/parse.ModifyData` | `simpledb/parse/ModifyData.java` | Hold the target table and field, new expression, and predicate of an UPDATE statement |
 | `Parser.ParseUpdate` | `simpledb/parse/Parser.java` (`modify`) | Parse the UPDATE target, assignment, and optional predicate |
 | `internal/parse.CreateTableData` | `simpledb/parse/CreateTableData.java` | Hold the table name and schema of a CREATE TABLE statement |
+| `internal/parse.CreateViewData` | `simpledb/parse/CreateViewData.java` | Hold the view name and rendered query definition of a CREATE VIEW statement |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -338,6 +339,19 @@ editable source is [`ch09-create-table-data.drawio`](../diagrams/ch09-create-tab
 Tests first failed to compile because `CreateTableData` and `NewCreateTableData` were undefined. They cover schema
 field order and definitions, constructor-copy isolation, accessor-copy isolation, and the zero value.
 
+## Feature 20: Store parsed CREATE VIEW command data
+
+`parse.CreateViewData` maps to Java `parse.CreateViewData`. It stores the view name and a `QueryData` definition, and
+`ViewDefinition` renders the query through its stable `String` representation. Go exposes read-only accessors and keeps
+the unset zero value safe: its name is empty and its definition is `<unset-query>`. Parsing the CREATE VIEW syntax is a
+separate behavior. The [CREATE VIEW-data diagram](../diagrams/ch09-create-view-data.svg) shows the stored name, query,
+and returned definition; its editable source is [`ch09-create-view-data.drawio`](../diagrams/ch09-create-view-data.drawio).
+
+### Test-first record
+
+Tests first failed to compile because `CreateViewData` and `NewCreateViewData` were undefined. They cover the stored
+view name, rendering a query definition with its predicate, and safe zero-value accessors.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -355,3 +369,4 @@ field order and definitions, constructor-copy isolation, accessor-copy isolation
 - `ModifyData` returns the query predicate by value and retains an unset-expression zero value; Java provides accessors but no Go-style zero-value contract.
 - `ParseUpdate` is a concrete command parser separate from top-level dispatch; it leaves trailing tokens to its caller.
 - `CreateTableData` copies schema values to avoid shared internal slices and maps; Java stores and returns the same mutable schema reference.
+- `CreateViewData` exposes the query definition as rendered text rather than returning `QueryData`; the stored query value remains read-only through its public API.

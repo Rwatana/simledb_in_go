@@ -1,0 +1,17 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-create-view-data" name="Chapter 9 - CREATE VIEW Data">
+    <mxGraphModel page="1" pageWidth="1160" pageHeight="520">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 20: Store CREATE VIEW command data" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="130" y="25" width="900" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="Constructor input&#xa;&#xa;view name: active_students&#xa;QueryData" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;" vertex="1" parent="1"><mxGeometry x="45" y="205" width="270" height="135" as="geometry"/></mxCell>
+        <mxCell id="data" value="CreateViewData&#xa;&#xa;private viewName&#xa;stored QueryData" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;" vertex="1" parent="1"><mxGeometry x="405" y="195" width="290" height="155" as="geometry"/></mxCell>
+        <mxCell id="accessors" value="Read-only accessors&#xa;&#xa;ViewName()&#xa;ViewDefinition() → query text" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="785" y="195" width="330" height="155" as="geometry"/></mxCell>
+        <mxCell id="zero" value="Zero value&#xa;&#xa;empty view name&#xa;&lt;unset-query&gt; definition" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=17;" vertex="1" parent="1"><mxGeometry x="405" y="400" width="290" height="90" as="geometry"/></mxCell>
+        <mxCell id="e1" value="store" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="input" target="data"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="render query" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="data" target="accessors"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="safe default" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="zero" target="data"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
