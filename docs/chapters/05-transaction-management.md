@@ -1291,10 +1291,29 @@ were tested first. The initial build failed because `New` did not accept a log o
 This maps to Java `RecoveryMgr` construction invoked from the `Transaction` constructor. Go makes the fallible side effect
 part of the constructor result instead of relying on an unchecked exception. START flush remains intentionally absent.
 
+## Feature 59: Flush transaction buffers before durable COMMIT
+
+`recovery.CommitTransaction` first invokes the transaction-scoped buffer flusher. Only after that succeeds does it reuse
+`AppendAndFlushCommitRecord` to append COMMIT and flush through the returned LSN. The result is the durable COMMIT LSN.
+A buffer-flush failure is wrapped with transaction context and stops before any log append or flush.
+
+### Test-first record
+
+Buffer-before-log ordering, durable LSN return, COMMIT transaction identity, and early stop after buffer-flush failure
+were tested first. The initial build failed because `CommitTransaction` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestCommitTransactionFlushesBuffersBeforeDurableMarker` | Modified buffers are flushed before COMMIT append and COMMIT LSN flush |
+| `TestCommitTransactionStopsAfterBufferFlushFailure` | Buffer flush failure prevents both COMMIT append and log flush |
+
+This maps to Java `RecoveryMgr.commit`: `BufferMgr.flushAll(txnum)` precedes `CommitRecord.writeToLog` and log flush.
+Transaction lock release and buffer unpin remain outer lifecycle behaviors and are intentionally not included here.
+
 ## Next behavior
 
-Continue with Chapter 5 by composing transaction commit in separately testable durability, lock-release, and buffer-unpin
-steps without mixing rollback.
+Continue with Chapter 5 by having the transaction object invoke durable commit, then add lock release and buffer unpin as
+separate lifecycle behaviors without mixing rollback.
 
 ## Sources
 
