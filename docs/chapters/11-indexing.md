@@ -165,6 +165,19 @@ already documents bucket positioning, so this adapter initialization does not ne
 The focused test run first failed because `NewIndexSelectScan` was undefined. Tests verify constructor positioning,
 repositioning with the stored key, nil dependencies/receivers, unset keys, and initial/repeated index-position errors.
 
+## Feature 12: Advance to the next indexed data row
+
+`IndexSelectScan.Next` advances the index once. Exhaustion returns `(false, nil)` without moving the data table scan;
+for an entry, the method reads its `record.RID`, moves the table scan to that row, and returns `(true, nil)`. Index,
+RID-read, and table-movement failures return contextual errors with wrapped causes while retaining both scan references.
+The existing [hash-index traversal diagram](../diagrams/ch11-hash-traversal.svg) already shows the entry-to-RID step,
+so no duplicate illustration is added.
+
+### Test-first record
+
+The focused test run first failed because `IndexSelectScan.Next` was undefined. Tests cover multiple returned RIDs,
+exhaustion without movement, index-next and RID-read failures, table-page movement failure, and nil or incomplete state.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -173,3 +186,4 @@ repositioning with the stored key, nil dependencies/receivers, unset keys, and i
 - Go insertion validates the index-record schema and signed 32-bit RID storage before changing scan state, and wraps storage failures as explicit errors.
 - Go deletion reports storage failures as errors while preserving the Java behavior of removing the first matching RID and treating a missing entry as a successful no-op.
 - `IndexSelectScan` reports index-position failures as Go errors and leaves index lifetime management to its caller.
+- `IndexSelectScan.Next` reports index and table-scan failures as errors, and avoids moving the data scan after exhaustion.
