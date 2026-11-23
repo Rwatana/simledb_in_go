@@ -12,6 +12,7 @@ const recordSlotEmpty int32 = 0
 // RecordTransaction provides the transaction operations used by a record page.
 type RecordTransaction interface {
 	Pin(storage.BlockID) error
+	BlockSize() (int, error)
 	GetInt(storage.BlockID, int) (int32, error)
 	GetString(storage.BlockID, int) (string, error)
 	SetInt(storage.BlockID, int32, int32, bool) error
@@ -101,6 +102,50 @@ func (p *RecordPage) Delete(slot int) error {
 	}
 	if err := p.transaction.SetInt(p.block, int32(position), recordSlotEmpty, true); err != nil {
 		return fmt.Errorf("delete record from block %v slot %d at offset %d: %w", p.block, slot, position, err)
+	}
+	return nil
+}
+
+// Format initializes every complete record slot in the block without logging.
+func (p *RecordPage) Format() error {
+	slotSize := p.layout.SlotSize()
+	if slotSize <= 0 {
+		return fmt.Errorf("format record block %v: slot size %d must be positive", p.block, slotSize)
+	}
+	blockSize, err := p.transaction.BlockSize()
+	if err != nil {
+		return fmt.Errorf("format record block %v: read block size: %w", p.block, err)
+	}
+
+	for slot := 0; slot < blockSize/slotSize; slot++ {
+		slotPosition := slot * slotSize
+		if slotPosition < math.MinInt32 || slotPosition > math.MaxInt32 {
+			return fmt.Errorf("format record block %v slot %d flag: offset %d exceeds int32 range", p.block, slot, slotPosition)
+		}
+		if err := p.transaction.SetInt(p.block, int32(slotPosition), recordSlotEmpty, false); err != nil {
+			return fmt.Errorf("format record block %v slot %d flag at offset %d: %w", p.block, slot, slotPosition, err)
+		}
+
+		for _, fieldName := range p.layout.Schema().Fields() {
+			fieldOffset, ok := p.layout.Offset(fieldName)
+			if !ok {
+				return fmt.Errorf("format record block %v slot %d: field %q is not in layout", p.block, slot, fieldName)
+			}
+			fieldPosition := slotPosition + fieldOffset
+			if fieldPosition < math.MinInt32 || fieldPosition > math.MaxInt32 {
+				return fmt.Errorf("format record block %v slot %d field %q: offset %d exceeds int32 range", p.block, slot, fieldName, fieldPosition)
+			}
+			fieldType, _ := p.layout.Schema().TypeOf(fieldName)
+			if fieldType == IntegerField {
+				if err := p.transaction.SetInt(p.block, int32(fieldPosition), 0, false); err != nil {
+					return fmt.Errorf("format record block %v slot %d field %q at offset %d: %w", p.block, slot, fieldName, fieldPosition, err)
+				}
+				continue
+			}
+			if err := p.transaction.SetString(p.block, int32(fieldPosition), "", false); err != nil {
+				return fmt.Errorf("format record block %v slot %d field %q at offset %d: %w", p.block, slot, fieldName, fieldPosition, err)
+			}
+		}
 	}
 	return nil
 }
