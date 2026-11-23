@@ -328,3 +328,20 @@ The test first failed to compile because `StatInfo.RecordsOutput` did not exist.
 | `TestStatInfoRecordsOutputReturnsObservedRecords` | Positive and zero observed record counts are returned exactly |
 
 This maps Java `StatInfo.recordsOutput` directly.
+
+## Feature 15: Estimate distinct field values
+
+`StatInfo.DistinctValues` implements the book's intentionally rough `1 + records / 3` estimate with integer division.
+It therefore returns at least one for zero through two records and increases once per three observed records. The field
+name does not affect the guess.
+
+### Test-first record
+
+The test first failed to compile because `StatInfo.DistinctValues` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestStatInfoDistinctValuesUsesBookEstimate` | Integer-division boundaries and field-name independence produce the book's lower-bounded estimate |
+
+This maps Java `StatInfo.distinctValues`. Real per-field cardinality collection remains intentionally outside this
+educational manager. Java `StatInfo`'s public behavior column is now complete.

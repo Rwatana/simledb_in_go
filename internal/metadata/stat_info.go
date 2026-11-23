@@ -20,3 +20,8 @@ func (s *StatInfo) BlocksAccessed() int {
 func (s *StatInfo) RecordsOutput() int {
 	return s.records
 }
+
+// DistinctValues returns the book's simple estimate of distinct values for a field.
+func (s *StatInfo) DistinctValues(_ string) int {
+	return 1 + s.records/3
+}
