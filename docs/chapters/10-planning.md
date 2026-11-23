@@ -10,6 +10,7 @@ planner composition remains a separate observable behavior and Issue.
 | --- | --- | --- |
 | `internal/plan.Plan` | `simpledb/plan/Plan.java` | Describe opening a scan, estimating its cost and output, and exposing its schema |
 | `internal/plan.TablePlan` | `simpledb/plan/TablePlan.java` | Retain one table's resolved layout and expose its logical schema |
+| `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine the schemas of two child plans |
 
 ## Feature 1: Define the query plan contract
 
@@ -161,6 +162,20 @@ predicate's explicit presence results so even a zero-value constant is recognize
 The first focused test run failed because `SelectPlan.DistinctValues` was undefined. Tests verify either constant
 operand order, a zero-value constant, both requested fields in a field equality, delegation without a matching term,
 and nil dependencies.
+
+## Feature 12: Combine product child schemas
+
+`ProductPlan.Schema` maps to the schema construction in Java `ProductPlan(Plan, Plan)` and `schema()`. The product
+copies the left child's fields followed by the right child's fields into its own schema, retaining field types and
+conceptual lengths. Missing children and nil child schemas contribute no fields; a nil receiver returns nil. Product
+scan creation and product-cost estimates remain separate behaviors. The updated [plan diagram](../diagrams/ch10-plan-contract.svg)
+shows the product node joining child schemas; its editable source remains
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `ProductPlan` and `NewProductPlan` were undefined. Tests verify ordered field
+definitions, stable schema identity, and construction with missing children.
 
 ## Intentional differences from Java
 

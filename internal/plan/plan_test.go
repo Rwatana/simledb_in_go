@@ -2,6 +2,7 @@ package plan
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -407,6 +408,63 @@ func TestSelectPlanDistinctValuesHandlesNilPlansAndChildren(t *testing.T) {
 	}
 	if got := NewSelectPlan(nil, query.Predicate{}).DistinctValues("age"); got != 0 {
 		t.Fatalf("SelectPlan without child DistinctValues(age) = %d, want 0", got)
+	}
+}
+
+func TestProductPlanSchemaCombinesChildFieldsInOrder(t *testing.T) {
+	var leftSchema record.Schema
+	leftSchema.AddIntegerField("student_id")
+	leftSchema.AddVarcharField("student_name", 24)
+	var rightSchema record.Schema
+	rightSchema.AddIntegerField("course_id")
+	rightSchema.AddVarcharField("course_name", 48)
+
+	left := NewTablePlan(nil, "student", record.NewLayout(&leftSchema), nil)
+	right := NewTablePlan(nil, "course", record.NewLayout(&rightSchema), nil)
+	product := NewProductPlan(left, right)
+	schema := product.Schema()
+	if schema == nil {
+		t.Fatal("Schema() = nil, want the combined schema")
+	}
+	if got, want := schema.Fields(), []string{"student_id", "student_name", "course_id", "course_name"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Schema().Fields() = %v, want %v", got, want)
+	}
+	if definition, ok := schema.Field("student_name"); !ok || definition != (record.FieldDefinition{Type: record.VarcharField, Length: 24}) {
+		t.Fatalf("student_name definition = (%v, %v), want varchar length 24", definition, ok)
+	}
+	if definition, ok := schema.Field("course_name"); !ok || definition != (record.FieldDefinition{Type: record.VarcharField, Length: 48}) {
+		t.Fatalf("course_name definition = (%v, %v), want varchar length 48", definition, ok)
+	}
+	if product.Schema() != schema {
+		t.Fatal("Schema() returned a different schema pointer on subsequent calls")
+	}
+}
+
+func TestProductPlanSchemaHandlesNilPlanAndChildren(t *testing.T) {
+	var nilPlan *ProductPlan
+	if got := nilPlan.Schema(); got != nil {
+		t.Fatalf("nil ProductPlan.Schema() = %p, want nil", got)
+	}
+
+	var schema record.Schema
+	schema.AddIntegerField("student_id")
+	child := NewTablePlan(nil, "student", record.NewLayout(&schema), nil)
+	for _, test := range []struct {
+		name  string
+		left  Plan
+		right Plan
+		want  []string
+	}{
+		{name: "both children missing"},
+		{name: "only left child", left: child, want: []string{"student_id"}},
+		{name: "only right child", right: child, want: []string{"student_id"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			product := NewProductPlan(test.left, test.right)
+			if got := product.Schema(); got == nil || !reflect.DeepEqual(got.Fields(), test.want) {
+				t.Fatalf("Schema() = %v, want fields %v", got, test.want)
+			}
+		})
 	}
 }
 
