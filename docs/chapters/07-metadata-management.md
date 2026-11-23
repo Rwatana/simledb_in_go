@@ -281,6 +281,7 @@ The test first failed to compile because `ViewManager.CreateView` did not exist.
 | `TestViewManagerCreateViewWrapsCatalogLayoutFailure` | A failed view-catalog layout lookup returns the cause with view-name and layout context |
 | `TestViewManagerCreateViewPreservesViewNameWriteFailure` | A `viewname` write error preserves its cause and context and still closes the scan |
 | `TestViewManagerCreateViewPreservesViewDefinitionWriteFailure` | A `viewdef` write error is returned after the name write and still closes the scan |
+| `TestViewManagerCreateViewPreservesCatalogInsertFailure` | A row-occupancy write error preserves its cause and view context and closes the scan before field writes |
 
 This maps Java `ViewMgr.createView` while adding explicit layout, scan, and cleanup error propagation.
 

@@ -134,6 +134,53 @@ func TestViewManagerCreateViewRequiresTableManager(t *testing.T) {
 	}
 }
 
+func TestViewManagerCreateViewPreservesCatalogInsertFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	manager := NewViewManager(tables)
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	layout, err := tables.Layout("viewcat", transaction)
+	if err != nil {
+		t.Fatalf("Layout(viewcat) error = %v", err)
+	}
+	scan, err := record.NewTableScan(transaction, "viewcat", layout)
+	if err != nil {
+		t.Fatalf("NewTableScan(viewcat) error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close(viewcat setup) error = %v", err)
+	}
+
+	wantErr := errors.New("view catalog row occupancy failed")
+	transaction.setIntErr = wantErr
+	transaction.setIntOffset = 0
+	transaction.setIntErrAfter = 1
+	transaction.setIntOffsetCalls = 0
+	transaction.unpins = nil
+
+	err = manager.CreateView("seniors", "select sid from student", transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("CreateView() error = %v, want wrapped row-insert cause", err)
+	}
+	for _, context := range []string{`create view "seniors"`, "insert view catalog row"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("CreateView() error = %q, want context %q", err, context)
+		}
+	}
+	viewBlock := storage.NewBlockID("viewcat.tbl", 0)
+	if len(transaction.unpins) == 0 || transaction.unpins[len(transaction.unpins)-1] != viewBlock {
+		t.Errorf("last catalog scan unpin = %v, want %v", transaction.unpins, viewBlock)
+	}
+	viewPage := transaction.pages[viewBlock]
+	assertPageString(t, viewPage, 4, "")
+	assertPageString(t, viewPage, 72, "")
+}
+
 func TestViewManagerCreateViewWrapsCatalogLayoutFailure(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()
