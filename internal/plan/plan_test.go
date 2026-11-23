@@ -256,6 +256,26 @@ func TestSelectPlanOpenRejectsNilPlansAndChildScans(t *testing.T) {
 	}
 }
 
+func TestSelectPlanSchemaReturnsChildSchema(t *testing.T) {
+	var schema record.Schema
+	schema.AddIntegerField("student_id")
+	layout := record.NewLayout(&schema)
+	selectPlan := NewSelectPlan(NewTablePlan(nil, "student", layout, nil), query.Predicate{})
+	if got := selectPlan.Schema(); got != &schema {
+		t.Fatalf("Schema() = %p, want child schema %p", got, &schema)
+	}
+}
+
+func TestSelectPlanSchemaHandlesNilPlanAndChild(t *testing.T) {
+	var nilPlan *SelectPlan
+	if got := nilPlan.Schema(); got != nil {
+		t.Fatalf("nil SelectPlan.Schema() = %p, want nil", got)
+	}
+	if got := NewSelectPlan(nil, query.Predicate{}).Schema(); got != nil {
+		t.Fatalf("SelectPlan without child Schema() = %p, want nil", got)
+	}
+}
+
 type tablePlanTransaction struct {
 	size    int
 	sizeErr error
