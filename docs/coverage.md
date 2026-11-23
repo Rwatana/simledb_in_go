@@ -342,6 +342,10 @@ now covered, while full-module statement coverage remains 99.4%.
 the wrapped cause and path context, ensures the file is closed, and confirms no write or sync follows. The file package
 is now 98.0% covered, `Append` is 95.5% covered, and full-module statement coverage is 99.5%.
 
+A separate `Append` test now covers a sync failure after the complete zero-filled block write. It verifies block/path
+context, the wrapped cause, and handle cleanup. `Append` is now 100.0% covered, file package coverage is 99.0%, and
+full-module statement coverage remains 99.5%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
