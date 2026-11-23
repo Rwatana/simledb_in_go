@@ -1259,6 +1259,26 @@ func TestNewWithFileManagerRejectsNilManagerBeforeStartingTransaction(t *testing
 	}
 }
 
+func TestNewWithFileManagerReturnsStartAppendFailure(t *testing.T) {
+	wantErr := errors.New("start failed")
+	var allocator IDAllocator
+	logs := &recordingTransactionLog{err: wantErr}
+
+	transaction, err := NewWithFileManager(&allocator, &concurrency.LockTable{}, &recordingFileSizer{}, &recordingBufferPinner{}, logs)
+	if transaction != nil {
+		t.Fatalf("NewWithFileManager() transaction = %v, want nil", transaction)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("NewWithFileManager() error = %v, want wrapped START append failure", err)
+	}
+	if got, want := err.Error(), "start transaction 1: append start record for transaction 1: start failed"; got != want {
+		t.Errorf("NewWithFileManager() error = %q, want transaction context %q", got, want)
+	}
+	if got := allocator.last.Load(); got != 1 {
+		t.Errorf("allocated transaction IDs = %d, want 1 before START append", got)
+	}
+}
+
 func TestNewWithFileSizerRejectsNilSizerBeforeStartingTransaction(t *testing.T) {
 	var allocator IDAllocator
 	logs := &recordingTransactionLog{}

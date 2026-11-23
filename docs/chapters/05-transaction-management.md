@@ -1820,6 +1820,7 @@ propagation.
 | `TestTransactionAppendUpgradesAndReusesEOFExclusiveLock` | File growth holds one reusable exclusive EOF lock after size reads |
 | `TestTransactionAppendReturnsFileFailure` | Physical append failures retain transaction and file context |
 | `TestNewWithFileManagerRejectsNilManagerBeforeStartingTransaction` | Missing file operations are rejected before allocating an ID or appending START |
+| `TestNewWithFileManagerReturnsStartAppendFailure` | A START append failure returns no transaction and preserves its cause and transaction ID context |
 
 This mirrors Java `Transaction.append` without allowing the EOF sentinel to reach physical file addressing.
 
