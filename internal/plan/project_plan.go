@@ -3,6 +3,7 @@ package plan
 import (
 	"fmt"
 
+	"github.com/Rwatana/simledb_in_go/internal/query"
 	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
@@ -36,4 +37,23 @@ func (p *ProjectPlan) Schema() *record.Schema {
 		return nil
 	}
 	return &p.schema
+}
+
+// Open opens the child and wraps its scan with the requested projection.
+func (p *ProjectPlan) Open() (query.Scan, error) {
+	if p == nil {
+		return nil, fmt.Errorf("open project plan: nil plan")
+	}
+	if p.child == nil {
+		return nil, fmt.Errorf("open project plan: child plan is nil")
+	}
+	childScan, err := p.child.Open()
+	if err != nil {
+		return nil, fmt.Errorf("open project plan child: %w", err)
+	}
+	projectScan, err := query.NewProjectScan(childScan, p.schema.Fields())
+	if err != nil {
+		return nil, fmt.Errorf("open project plan scan: %w", err)
+	}
+	return projectScan, nil
 }
