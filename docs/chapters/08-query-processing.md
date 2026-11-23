@@ -9,6 +9,7 @@ dependency order. Each observable behavior remains a separate Issue, branch, com
 | --- | --- | --- |
 | `internal/query.Constant` | `simpledb/query/Constant.java` | Typed values read, compared, and written by query scans |
 | `internal/query.Expression` | `simpledb/query/Expression.java` | Literal values and field references used by relational operators |
+| `internal/query.Term` | `simpledb/query/Term.java` | Equality between two expressions |
 
 ## Feature 1: Initialize an integer query constant
 
@@ -114,3 +115,13 @@ operation needs precisely its membership behavior.
 
 `TestExpressionAppliesToSchema` first failed to compile because `AppliesTo` was undefined. It verifies literal,
 present and absent field, empty-name field, nil-schema, and zero-value expression cases.
+
+## Feature 11: Evaluate a query equality term
+
+`NewTerm` and `Term.IsSatisfied` map to Java `Term(Expression, Expression)` and `Term.isSatisfied(Scan)`. The term
+evaluates its left expression before its right expression and compares the resulting constants with `Constant.Equal`.
+This keeps scan access behind the existing `ValueScan` boundary. Go returns lookup errors unchanged; if the left side
+fails, the right side is not evaluated.
+
+The tests first failed because `NewTerm` was undefined. They cover equal and unequal literal values, mixed value kinds,
+left-to-right field lookup, and propagation of either evaluation error without evaluating later expressions.
