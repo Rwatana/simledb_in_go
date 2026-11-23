@@ -9,8 +9,16 @@ import (
 )
 
 type recordingRecordTransaction struct {
-	pins   []storage.BlockID
-	pinErr error
+	pins    []storage.BlockID
+	pinErr  error
+	reads   []integerRead
+	value   int32
+	readErr error
+}
+
+type integerRead struct {
+	block  storage.BlockID
+	offset int
 }
 
 func (t *recordingRecordTransaction) Pin(block storage.BlockID) error {
@@ -18,8 +26,49 @@ func (t *recordingRecordTransaction) Pin(block storage.BlockID) error {
 	return t.pinErr
 }
 
-func (t *recordingRecordTransaction) GetInt(storage.BlockID, int) (int32, error) {
-	return 0, nil
+func (t *recordingRecordTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
+	t.reads = append(t.reads, integerRead{block: block, offset: offset})
+	return t.value, t.readErr
+}
+
+func TestRecordPageGetIntReadsCalculatedFieldPosition(t *testing.T) {
+	transaction := &recordingRecordTransaction{value: 42}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddIntegerField("id")
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	got, err := page.GetInt(2, "id")
+	if err != nil || got != 42 {
+		t.Fatalf("GetInt(2, id) = (%d, %v), want (42, nil)", got, err)
+	}
+	wantRead := integerRead{block: block, offset: 20}
+	if len(transaction.reads) != 1 || transaction.reads[0] != wantRead {
+		t.Fatalf("GetInt calls = %v, want [%v]", transaction.reads, wantRead)
+	}
+}
+
+func TestRecordPageGetIntReportsLookupAndReadFailures(t *testing.T) {
+	readErr := errors.New("read failed")
+	transaction := &recordingRecordTransaction{readErr: readErr}
+	block := storage.NewBlockID("records.tbl", 3)
+	var schema Schema
+	schema.AddIntegerField("id")
+	page, err := NewRecordPage(transaction, block, NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	if _, err := page.GetInt(1, "missing"); err == nil || len(transaction.reads) != 0 {
+		t.Fatalf("GetInt(missing) = %v with reads %v, want lookup failure before read", err, transaction.reads)
+	}
+	_, err = page.GetInt(1, "id")
+	if !errors.Is(err, readErr) || !strings.Contains(err.Error(), "slot 1 field \"id\"") || !strings.Contains(err.Error(), "offset 12") {
+		t.Fatalf("GetInt read error = %v, want contextual wrapped failure", err)
+	}
 }
 
 func TestNewRecordPagePinsTargetBlock(t *testing.T) {
