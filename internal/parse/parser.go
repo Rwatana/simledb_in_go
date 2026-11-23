@@ -224,6 +224,60 @@ func (parser *Parser) ParseUpdate() (ModifyData, error) {
 	return NewModifyData(tableName, targetField, newValue, predicate), nil
 }
 
+// ParseUpdateCommand dispatches an update statement and returns its concrete command-data value.
+func (parser *Parser) ParseUpdateCommand() (any, error) {
+	if parser == nil {
+		return nil, fmt.Errorf("parse update command: parser is nil")
+	}
+	if parser.lexer.MatchKeyword("insert") {
+		command, err := parser.ParseInsert()
+		if err != nil {
+			return nil, fmt.Errorf("parse update command INSERT: %w", err)
+		}
+		return command, nil
+	}
+	if parser.lexer.MatchKeyword("delete") {
+		command, err := parser.ParseDelete()
+		if err != nil {
+			return nil, fmt.Errorf("parse update command DELETE: %w", err)
+		}
+		return command, nil
+	}
+	if parser.lexer.MatchKeyword("update") {
+		command, err := parser.ParseUpdate()
+		if err != nil {
+			return nil, fmt.Errorf("parse update command UPDATE: %w", err)
+		}
+		return command, nil
+	}
+	return parser.parseCreateCommand()
+}
+
+func (parser *Parser) parseCreateCommand() (any, error) {
+	if err := parser.lexer.EatKeyword("create"); err != nil {
+		return nil, fmt.Errorf("parse update command CREATE keyword: %w", err)
+	}
+	if parser.lexer.MatchKeyword("table") {
+		command, err := parser.parseCreateTableAfterKeyword()
+		if err != nil {
+			return nil, fmt.Errorf("parse update command CREATE TABLE: %w", err)
+		}
+		return command, nil
+	}
+	if parser.lexer.MatchKeyword("view") {
+		command, err := parser.parseCreateViewAfterKeyword()
+		if err != nil {
+			return nil, fmt.Errorf("parse update command CREATE VIEW: %w", err)
+		}
+		return command, nil
+	}
+	command, err := parser.parseCreateIndexAfterKeyword()
+	if err != nil {
+		return nil, fmt.Errorf("parse update command CREATE INDEX: %w", err)
+	}
+	return command, nil
+}
+
 // ParseCreateView reads a CREATE VIEW name and its SELECT query definition.
 func (parser *Parser) ParseCreateView() (CreateViewData, error) {
 	if parser == nil {
@@ -232,6 +286,10 @@ func (parser *Parser) ParseCreateView() (CreateViewData, error) {
 	if err := parser.lexer.EatKeyword("create"); err != nil {
 		return CreateViewData{}, fmt.Errorf("parse create view CREATE keyword: %w", err)
 	}
+	return parser.parseCreateViewAfterKeyword()
+}
+
+func (parser *Parser) parseCreateViewAfterKeyword() (CreateViewData, error) {
 	if err := parser.lexer.EatKeyword("view"); err != nil {
 		return CreateViewData{}, fmt.Errorf("parse create view VIEW keyword: %w", err)
 	}
@@ -257,6 +315,10 @@ func (parser *Parser) ParseCreateIndex() (CreateIndexData, error) {
 	if err := parser.lexer.EatKeyword("create"); err != nil {
 		return CreateIndexData{}, fmt.Errorf("parse create index CREATE keyword: %w", err)
 	}
+	return parser.parseCreateIndexAfterKeyword()
+}
+
+func (parser *Parser) parseCreateIndexAfterKeyword() (CreateIndexData, error) {
 	if err := parser.lexer.EatKeyword("index"); err != nil {
 		return CreateIndexData{}, fmt.Errorf("parse create index INDEX keyword: %w", err)
 	}
@@ -292,6 +354,10 @@ func (parser *Parser) ParseCreateTable() (CreateTableData, error) {
 	if err := parser.lexer.EatKeyword("create"); err != nil {
 		return CreateTableData{}, fmt.Errorf("parse create table CREATE keyword: %w", err)
 	}
+	return parser.parseCreateTableAfterKeyword()
+}
+
+func (parser *Parser) parseCreateTableAfterKeyword() (CreateTableData, error) {
 	if err := parser.lexer.EatKeyword("table"); err != nil {
 		return CreateTableData{}, fmt.Errorf("parse create table TABLE keyword: %w", err)
 	}

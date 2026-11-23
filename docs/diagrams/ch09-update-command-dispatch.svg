@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="780" viewBox="0 0 1400 780" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 25: Dispatch SQL update commands</title>
+  <desc id="description">ParseUpdateCommand dispatches INSERT, DELETE, UPDATE, and CREATE statements to six concrete command data values. It preserves following input and wraps errors with byte offsets.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>.title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}</style>
+  </defs>
+  <text class="title" x="700" y="62" text-anchor="middle">Chapter 9 / Feature 25: Dispatch SQL update commands</text>
+  <rect class="box" x="40" y="220" width="250" height="150" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="165" y="260"><tspan x="165">SQL input</tspan><tspan x="165" dy="30">INSERT / DELETE / UPDATE</tspan><tspan x="165" dy="27">CREATE TABLE / VIEW / INDEX</tspan></text>
+  <rect class="box" x="360" y="220" width="270" height="150" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="495" y="270"><tspan x="495">ParseUpdateCommand</tspan><tspan x="495" dy="32">match leading keyword</tspan></text>
+  <rect class="box" x="720" y="120" width="300" height="150" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="870" y="163"><tspan x="870">Direct routes</tspan><tspan x="870" dy="30">INSERT → InsertData</tspan><tspan x="870" dy="27">DELETE → DeleteData</tspan><tspan x="870" dy="27">UPDATE → ModifyData</tspan></text>
+  <polygon points="870,390 1020,465 870,540 720,465" fill="#ffe6cc" stroke="#d79b00" stroke-width="2"/>
+  <text class="label" x="870" y="445"><tspan x="870">CREATE branch</tspan><tspan x="870" dy="30">TABLE / VIEW /</tspan><tspan x="870" dy="27">otherwise INDEX</tspan></text>
+  <rect class="box" x="1090" y="390" width="270" height="150" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="1225" y="432"><tspan x="1225">CREATE results</tspan><tspan x="1225" dy="30">CreateTableData</tspan><tspan x="1225" dy="27">CreateViewData</tspan><tspan x="1225" dy="27">CreateIndexData</tspan></text>
+  <rect class="box" x="360" y="590" width="430" height="100" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="575" y="628"><tspan x="575">Concrete value returned as any</tspan><tspan x="575" dy="30">following token remains available</tspan></text>
+  <rect class="box" x="870" y="590" width="360" height="100" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="1050" y="628"><tspan x="1050">Contextual parse error</tspan><tspan x="1050" dy="30">original byte offset retained</tspan></text>
+  <path class="edge" d="M290 295 H352"/>
+  <path class="edge" d="M630 245 H690 V195 H712"/><text class="small" x="682" y="184">direct route</text>
+  <path class="edge" d="M630 330 H675 V465 H712"/><text class="small" x="683" y="390">CREATE</text>
+  <path class="edge" d="M1020 465 H1082"/><text class="small" x="1050" y="450">subtype</text>
+  <path class="edge" d="M870 270 V340 H620 V582"/><text class="small" x="656" y="328">success</text>
+  <path class="edge" d="M1225 540 V565 H760 V582"/><text class="small" x="989" y="560">success</text>
+  <path class="edge" d="M575 370 V555 H1040 V582" stroke-dasharray="7 6"/><text class="small" x="845" y="548">grammar failure</text>
+</svg>
