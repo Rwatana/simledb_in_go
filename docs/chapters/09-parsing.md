@@ -189,6 +189,21 @@ Tests first failed because `Parser.ParsePredicate` was undefined. They cover a s
 conjunction, a following delimiter or keyword, invalid first and later terms, missing terms after `and`, stable byte
 offsets, and a nil parser receiver.
 
+## Feature 11: Store parsed SELECT query data
+
+`parse.QueryData` maps to Java `parse.QueryData` and carries the selected fields, source tables, and query predicate.
+Go stores the lists in their supplied order but copies them on construction and when returned by accessors, so later
+caller mutation cannot change a parsed query. The predicate is returned as a value; its query API exposes no mutable
+term storage. The zero value and incomplete field/table lists render as `<unset-query>` rather than panicking. The
+[query-data diagram](../diagrams/ch09-query-data.svg) shows owned lists, the predicate value, list accessors, and
+rendering; its editable source is [`ch09-query-data.drawio`](../diagrams/ch09-query-data.drawio).
+
+### Test-first record
+
+Tests first failed because `NewQueryData` and `QueryData` were undefined. They cover ordered fields and tables, stored
+list isolation, independent accessor slices, predicate retention, optional `where` rendering, and safe zero or
+incomplete values.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.

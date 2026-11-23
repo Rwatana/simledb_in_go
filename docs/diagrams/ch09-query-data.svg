@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 11: Store SELECT query data</title>
+  <desc id="description">QueryData owns copies of ordered field and table lists and a predicate value. Accessors return independent list copies, String renders the SELECT statement, and incomplete values use a safe marker.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="560" fill="#fff"/>
+  <text class="title" x="600" y="60" text-anchor="middle">Chapter 9 / Feature 11: Store SELECT query data</text>
+  <rect class="box" x="35" y="220" width="240" height="120" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="155" y="262"><tspan x="155">Constructor input</tspan><tspan class="small" x="155" dy="30">fields · tables · predicate</tspan></text>
+  <rect class="box" x="350" y="200" width="260" height="160" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="480" y="239"><tspan x="480">QueryData</tspan><tspan class="small" x="480" dy="29">copy ordered lists</tspan><tspan class="small" x="480" dy="25">store predicate value</tspan></text>
+  <rect class="box" x="710" y="115" width="250" height="125" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="835" y="154"><tspan x="835">Fields() / Tables()</tspan><tspan class="small" x="835" dy="29">return independent copies</tspan></text>
+  <rect class="box" x="710" y="300" width="250" height="125" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="835" y="339"><tspan x="835">String()</tspan><tspan class="small" x="835" dy="29">select ... from ...</tspan><tspan class="small" x="835" dy="24">optional where ...</tspan></text>
+  <rect class="box" x="350" y="430" width="260" height="90" fill="#f8cecc" stroke="#b85450"/>
+  <text class="small" x="480" y="459"><tspan x="480">zero or incomplete value</tspan><tspan x="480" dy="24">safe marker: &lt;unset-query&gt;</tspan></text>
+  <path class="edge" d="M275 280 H340"/><text class="small" x="307" y="264">copy input</text>
+  <path class="edge" d="M610 240 L700 190"/><text class="small" x="654" y="202">read lists</text>
+  <path class="edge" d="M610 320 L700 360"/><text class="small" x="656" y="354">render query</text>
+  <path class="edge" d="M480 360 V420"/><text class="small" x="540" y="400">missing fields or tables</text>
+</svg>
