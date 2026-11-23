@@ -215,3 +215,78 @@ func TestTransactionCommitFailureKeepsLocksHeld(t *testing.T) {
 		t.Fatalf("shared acquisition after failed commit error = %v, want ErrLockConflict", err)
 	}
 }
+
+func TestTransactionCommitUnpinsBuffersAfterLockRelease(t *testing.T) {
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	block := storage.NewBlockID("tbl", 1)
+	frame := &buffer.Buffer{}
+	var lockErrorAtUnpin error
+	bufferManager := &recordingBufferPinner{frame: frame}
+	bufferManager.onUnpin = func(*buffer.Buffer) {
+		lockErrorAtUnpin = table.LockShared(block)
+	}
+	tx, err := New(&allocator, &table, bufferManager, &recordingTransactionLog{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.locks.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.buffers.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if lockErrorAtUnpin != nil {
+		t.Fatalf("shared acquisition during unpin = %v, want released lock", lockErrorAtUnpin)
+	}
+	if len(bufferManager.unpins) != 1 || bufferManager.unpins[0] != frame {
+		t.Fatalf("unpin requests = %v, want [%p]", bufferManager.unpins, frame)
+	}
+	if _, ok := tx.buffers.Buffer(block); ok {
+		t.Fatal("buffer remains tracked after committed cleanup")
+	}
+	if len(tx.buffers.pins) != 0 {
+		t.Fatalf("pin occurrences after committed cleanup = %v, want none", tx.buffers.pins)
+	}
+}
+
+func TestTransactionCommitReturnsDurableLSNWhenUnpinFails(t *testing.T) {
+	wantErr := errors.New("unpin failed")
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	block := storage.NewBlockID("tbl", 1)
+	frame := &buffer.Buffer{}
+	bufferManager := &recordingBufferPinner{frame: frame, unpinErr: wantErr}
+	logs := &recordingTransactionLog{}
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.locks.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.buffers.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+
+	lsn, err := tx.Commit()
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Commit() error = %v, want %v", err, wantErr)
+	}
+	if lsn != 2 {
+		t.Fatalf("Commit() LSN after cleanup failure = %d, want durable LSN 2", lsn)
+	}
+	if len(logs.flushed) != 1 || logs.flushed[0] != lsn {
+		t.Fatalf("log flushes = %v, want [%d]", logs.flushed, lsn)
+	}
+	if got, ok := tx.buffers.Buffer(block); !ok || got != frame {
+		t.Fatalf("buffer after failed cleanup = (%p, %v), want (%p, true)", got, ok, frame)
+	}
+	if err := table.LockShared(block); err != nil {
+		t.Fatalf("shared acquisition after cleanup failure: %v", err)
+	}
+}
