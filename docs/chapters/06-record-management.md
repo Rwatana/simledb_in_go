@@ -267,6 +267,23 @@ The tests first failed to compile because `RecordPage.GetString` did not exist.
 
 This maps Java `RecordPage.getString` with explicit Go error boundaries.
 
+## Feature 16: Write an integer field in a record slot
+
+`RecordPage.SetInt` calculates the slot-relative field position and performs exactly one transaction integer write with
+logging enabled. Unknown fields and positions outside the transaction's signed 32-bit offset contract stop before the
+write. Transaction failures retain the block, slot, field, and byte position.
+
+### Test-first record
+
+The tests first failed to compile because `RecordPage.SetInt` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRecordPageSetIntWritesCalculatedFieldPositionWithLogging` | One logged transaction write receives the retained block, calculated position, and value |
+| `TestRecordPageSetIntRejectsInvalidPositionAndWrapsFailures` | Unknown fields and offset overflow prevent writes, while transaction failures retain context |
+
+This maps Java `RecordPage.setInt`; the explicit range guard prevents Go `int` to `int32` truncation.
+
 ## Next behavior
 
-Write one integer field in a specified record slot as the next stacked PR.
+Write one string field in a specified record slot as the next stacked PR.
