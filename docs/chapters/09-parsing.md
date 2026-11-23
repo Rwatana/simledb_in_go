@@ -13,6 +13,7 @@ Request.
 | `internal/parse.Parser` | `simpledb/parse/Parser.java` | Turn token sequences into query values |
 | `internal/parse.DeleteData` | `simpledb/parse/DeleteData.java` | Hold the target table and predicate of a DELETE statement |
 | `internal/parse.InsertData` | `simpledb/parse/InsertData.java` | Hold the target table, ordered fields, and corresponding values of an INSERT statement |
+| `Parser.ParseInsert` | `simpledb/parse/Parser.java` (`insert`) | Parse the INSERT target, field list, and matching constant list |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -270,6 +271,25 @@ shows the aligned field/value lists and defensive-copy boundary; its editable so
 Tests first failed to compile because `InsertData` and `NewInsertData` were undefined. They cover the table name,
 field/value order, constructor-copy isolation, accessor-copy isolation, and the zero value.
 
+## Feature 16: Parse SQL INSERT statements
+
+`Parser.ParseInsert` maps to Java `Parser.insert`. It consumes `insert into`, reads a normalized table name, parses a
+parenthesized ordered field list, then parses the matching parenthesized list of integer or string constants after
+`values`. It returns `InsertData`, which preserves the source order and owns copies of both lists. Any token following
+the closing parenthesis remains available to the caller.
+
+Go parses each comma-separated list iteratively and does not add a field/value count check that the Java parser does
+not perform. Contextual errors wrap the existing lexer failures so their byte offsets remain available. The
+[INSERT-parser diagram](../diagrams/ch09-parse-insert.svg) shows the required sequence, ordered lists, preserved
+following token, and error paths; its editable source is
+[`ch09-parse-insert.drawio`](../diagrams/ch09-parse-insert.drawio).
+
+### Test-first record
+
+Tests first failed because `Parser.ParseInsert` was undefined. They cover mixed-case keywords and fields, ordered
+string/integer values, a preserved following keyword, each required keyword and delimiter, missing list elements,
+malformed constants, byte offsets, and a nil receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -283,3 +303,4 @@ field/value order, constructor-copy isolation, accessor-copy isolation, and the 
 - `DeleteData` keeps its fields private and exposes a safe zero value; Java exposes its command data only through accessor methods but does not define Go's zero-value behavior.
 - `ParseDelete` is a concrete-command parser separate from Go's future update-command dispatcher; it leaves trailing tokens to its caller.
 - `InsertData` copies its field and value slices for clear ownership; Java exposes its internal mutable lists directly.
+- `ParseInsert` uses iterative list parsing and leaves the next token to its caller; Java recurses through each list.

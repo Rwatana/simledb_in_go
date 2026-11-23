@@ -1,0 +1,23 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-parse-insert" name="Chapter 9 - Parse INSERT">
+    <mxGraphModel page="1" pageWidth="1220" pageHeight="600">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 16: Parse SQL INSERT statements" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="170" y="25" width="880" height="55" as="geometry"/></mxCell>
+        <mxCell id="start" value="insert into&#xa;&#xa;case-insensitive keywords" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="35" y="205" width="190" height="125" as="geometry"/></mxCell>
+        <mxCell id="target" value="table&#xa;&#xa;normalized field name" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="275" y="205" width="190" height="125" as="geometry"/></mxCell>
+        <mxCell id="fields" value="(field list)&#xa;&#xa;ordered identifiers&#xa;comma-separated" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;" vertex="1" parent="1"><mxGeometry x="515" y="190" width="205" height="155" as="geometry"/></mxCell>
+        <mxCell id="values" value="values (constant list)&#xa;&#xa;ordered strings / integers&#xa;comma-separated" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;" vertex="1" parent="1"><mxGeometry x="770" y="190" width="230" height="155" as="geometry"/></mxCell>
+        <mxCell id="result" value="InsertData&#xa;&#xa;table · fields[] · values[]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="1040" y="205" width="160" height="125" as="geometry"/></mxCell>
+        <mxCell id="next" value="first following token&#xa;remains for caller" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=16;" vertex="1" parent="1"><mxGeometry x="770" y="415" width="230" height="90" as="geometry"/></mxCell>
+        <mxCell id="error" value="missing keyword, delimiter, field, or value&#xa;→ contextual error with byte offset" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;" vertex="1" parent="1"><mxGeometry x="275" y="415" width="445" height="90" as="geometry"/></mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="start" target="target"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="target" target="fields"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value=") values (" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="fields" target="values"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="values" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="after closing )" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="values" target="next"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="syntax failure" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="fields" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -144,6 +144,83 @@ func (parser *Parser) ParseDelete() (DeleteData, error) {
 	return NewDeleteData(tableName, predicate), nil
 }
 
+// ParseInsert reads an INSERT target, field list, and matching constant list.
+func (parser *Parser) ParseInsert() (InsertData, error) {
+	if parser == nil {
+		return InsertData{}, fmt.Errorf("parse insert: parser is nil")
+	}
+	if err := parser.lexer.EatKeyword("insert"); err != nil {
+		return InsertData{}, fmt.Errorf("parse insert INSERT keyword: %w", err)
+	}
+	if err := parser.lexer.EatKeyword("into"); err != nil {
+		return InsertData{}, fmt.Errorf("parse insert INTO keyword: %w", err)
+	}
+	tableName, err := parser.ParseField()
+	if err != nil {
+		return InsertData{}, fmt.Errorf("parse insert table name: %w", err)
+	}
+	if err := parser.lexer.EatDelimiter('('); err != nil {
+		return InsertData{}, fmt.Errorf("parse insert field-list opening delimiter: %w", err)
+	}
+	fields, err := parser.parseInsertFieldList()
+	if err != nil {
+		return InsertData{}, err
+	}
+	if err := parser.lexer.EatDelimiter(')'); err != nil {
+		return InsertData{}, fmt.Errorf("parse insert field-list closing delimiter: %w", err)
+	}
+	if err := parser.lexer.EatKeyword("values"); err != nil {
+		return InsertData{}, fmt.Errorf("parse insert VALUES keyword: %w", err)
+	}
+	if err := parser.lexer.EatDelimiter('('); err != nil {
+		return InsertData{}, fmt.Errorf("parse insert value-list opening delimiter: %w", err)
+	}
+	values, err := parser.parseInsertConstantList()
+	if err != nil {
+		return InsertData{}, err
+	}
+	if err := parser.lexer.EatDelimiter(')'); err != nil {
+		return InsertData{}, fmt.Errorf("parse insert value-list closing delimiter: %w", err)
+	}
+	return NewInsertData(tableName, fields, values), nil
+}
+
+func (parser *Parser) parseInsertFieldList() ([]string, error) {
+	field, err := parser.ParseField()
+	if err != nil {
+		return nil, fmt.Errorf("parse insert field list: %w", err)
+	}
+	fields := []string{field}
+	for parser.lexer.MatchDelimiter(',') {
+		// A successful match guarantees this consume succeeds before the lexer changes.
+		_ = parser.lexer.EatDelimiter(',')
+		field, err := parser.ParseField()
+		if err != nil {
+			return nil, fmt.Errorf("parse insert field list: %w", err)
+		}
+		fields = append(fields, field)
+	}
+	return fields, nil
+}
+
+func (parser *Parser) parseInsertConstantList() ([]query.Constant, error) {
+	value, err := parser.ParseConstant()
+	if err != nil {
+		return nil, fmt.Errorf("parse insert value list: %w", err)
+	}
+	values := []query.Constant{value}
+	for parser.lexer.MatchDelimiter(',') {
+		// A successful match guarantees this consume succeeds before the lexer changes.
+		_ = parser.lexer.EatDelimiter(',')
+		value, err := parser.ParseConstant()
+		if err != nil {
+			return nil, fmt.Errorf("parse insert value list: %w", err)
+		}
+		values = append(values, value)
+	}
+	return values, nil
+}
+
 func (parser *Parser) parseQueryNameList(kind string) ([]string, error) {
 	name, err := parser.ParseField()
 	if err != nil {

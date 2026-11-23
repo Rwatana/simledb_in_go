@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="600" viewBox="0 0 1220 600" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 16: Parse SQL INSERT statements</title>
+  <desc id="description">The parser reads insert into, a table, an ordered parenthesized field list, then values and an ordered constant list. It returns InsertData, preserves the next token, and reports contextual errors with byte offsets.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:16;ry:16}.label{font:16px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:14px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1220" height="600" fill="#fff"/>
+  <text class="title" x="610" y="62" text-anchor="middle">Chapter 9 / Feature 16: Parse SQL INSERT statements</text>
+  <rect class="box" x="35" y="205" width="190" height="125" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="130" y="247"><tspan x="130">insert into</tspan><tspan class="small" x="130" dy="30">case-insensitive</tspan><tspan class="small" x="130" dy="23">keywords</tspan></text>
+  <rect class="box" x="275" y="205" width="190" height="125" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="370" y="247"><tspan x="370">table</tspan><tspan class="small" x="370" dy="30">normalized field</tspan><tspan class="small" x="370" dy="23">name</tspan></text>
+  <rect class="box" x="515" y="190" width="205" height="155" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="617" y="235"><tspan x="617">(field list)</tspan><tspan class="small" x="617" dy="30">ordered identifiers</tspan><tspan class="small" x="617" dy="24">comma-separated</tspan></text>
+  <rect class="box" x="770" y="190" width="230" height="155" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="885" y="235"><tspan x="885">values (constant list)</tspan><tspan class="small" x="885" dy="30">ordered strings / integers</tspan><tspan class="small" x="885" dy="24">comma-separated</tspan></text>
+  <rect class="box" x="1040" y="205" width="160" height="125" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="1120" y="248"><tspan x="1120">InsertData</tspan><tspan class="small" x="1120" dy="30">table · fields[]</tspan><tspan class="small" x="1120" dy="23">values[]</tspan></text>
+  <rect class="box" x="770" y="415" width="230" height="90" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="885" y="450"><tspan x="885">first following token</tspan><tspan class="small" x="885" dy="25">remains for caller</tspan></text>
+  <rect class="box" x="275" y="415" width="445" height="90" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="497" y="451"><tspan x="497">missing keyword, delimiter, field, or value</tspan><tspan class="small" x="497" dy="25">contextual error with byte offset</tspan></text>
+  <path class="edge" d="M225 267 H265"/><path class="edge" d="M465 267 H505"/>
+  <path class="edge" d="M720 267 H760"/><text class="small" x="740" y="248">) values (</text>
+  <path class="edge" d="M1000 267 H1030"/>
+  <path class="edge" d="M885 345 V405"/><text class="small" x="944" y="383">after closing )</text>
+  <path class="edge" d="M617 345 V385 H720 V460"/><text class="small" x="682" y="380">syntax failure</text>
+</svg>
