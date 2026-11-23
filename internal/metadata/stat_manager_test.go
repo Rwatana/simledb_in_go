@@ -311,6 +311,63 @@ func TestStatManagerRefreshPreservesRegisteredTableLayoutFailure(t *testing.T) {
 	}
 }
 
+func TestStatManagerRefreshPreservesTableStatisticsScanFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	if err := tables.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+
+	manager := NewStatManager(tables)
+	stale := NewStatInfo(8, 9)
+	manager.stats["stale"] = stale
+	manager.calls = 37
+	transaction.unpins = nil
+
+	wantErr := errors.New("student record flag unavailable")
+	transaction.getIntErr = wantErr
+	transaction.getIntOffset = 0
+	transaction.getIntErrFile = "student.tbl"
+	transaction.getIntErrAfter = 1
+
+	err := manager.Refresh(transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Refresh() error = %v, want wrapped table-statistics scan failure", err)
+	}
+	for _, context := range []string{
+		"refresh table statistics",
+		`calculate table "student"`,
+		`calculate statistics for table "student"`,
+		"scan records",
+	} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Refresh() error = %q, want context %q", err, context)
+		}
+	}
+	wantBlock := storage.NewBlockID("student.tbl", 0)
+	studentBlockUnpinned := false
+	for _, block := range transaction.unpins {
+		if block == wantBlock {
+			studentBlockUnpinned = true
+			break
+		}
+	}
+	if !studentBlockUnpinned {
+		t.Errorf("unpins = %v, want failed table-statistics scan block %v to be released", transaction.unpins, wantBlock)
+	}
+	if manager.calls != 37 {
+		t.Errorf("lookup calls = %d, want unchanged value 37", manager.calls)
+	}
+	if len(manager.stats) != 1 || manager.stats["stale"] != stale {
+		t.Errorf("statistics cache = %v, want the prior stale snapshot retained", manager.stats)
+	}
+}
+
 func TestStatManagerStatisticsCachesFirstLookup(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(256)
 	var schema record.Schema
