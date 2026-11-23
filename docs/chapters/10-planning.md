@@ -12,6 +12,7 @@ and planner composition remains a separate observable behavior and Issue.
 | `internal/plan.TablePlan` | `simpledb/plan/TablePlan.java` | Retain one table's resolved layout and expose its logical schema |
 | `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas, open the Cartesian-product scan, and estimate its output |
 | `internal/plan.ProjectPlan` | `simpledb/plan/ProjectPlan.java` | Build the projected schema, open its `ProjectScan`, and delegate estimates |
+| `internal/plan.QueryPlanner` | `simpledb/plan/QueryPlanner.java` | Convert parsed query data and a transaction into an executable plan |
 
 ## Feature 1: Define the query plan contract
 
@@ -294,6 +295,19 @@ to the child plan unchanged. A nil receiver or missing child returns zero, match
 The first focused test run failed because `ProjectPlan.DistinctValues` was undefined. Tests verify forwarding the
 projected field name and a nonzero child estimate, plus nil receiver/missing-child behavior.
 
+## Feature 22: Define the query-planner contract
+
+`QueryPlanner` maps to Java `simpledb.plan.QueryPlanner`. Its `CreatePlan` method accepts `parse.QueryData` and the
+transaction boundary needed by planning, then returns a `Plan`. Go also returns an error so metadata and scan failures can
+be handled without Java exceptions. The [plan diagram](../diagrams/ch10-plan-contract.svg) shows the planner turning
+parsed query data into a plan tree; its editable source is
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `QueryPlanner` was undefined. A compile-time conformance assertion verifies
+that an implementation with the declared input and result types satisfies the interface.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -312,3 +326,4 @@ projected field name and a nonzero child estimate, plus nil receiver/missing-chi
 - `ProjectPlan.BlocksAccessed` delegates directly to its child because projection does not change child block access.
 - `ProjectPlan.RecordsOutput` delegates directly to its child because projection does not change row count.
 - `ProjectPlan.DistinctValues` delegates field estimates to the child, preserving the child's statistics model.
+- `QueryPlanner.CreatePlan` returns `(Plan, error)` so Go planning failures remain explicit.
