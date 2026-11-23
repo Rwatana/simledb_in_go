@@ -146,6 +146,22 @@ editable source remains [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-cont
 The first focused test run failed because `SelectPlan.RecordsOutput` was undefined. Tests verify selective and empty
 predicates, nil plans and children, and a zero reduction-factor estimate.
 
+## Feature 11: Estimate distinct values after selection
+
+`SelectPlan.DistinctValues(fieldName)` maps to Java `SelectPlan.distinctValues(String)`. If the predicate equates the
+requested field to a constant, the output has one distinct value. If it equates the field to another field, the
+selection cannot expose more distinct values than either side, so the estimate is the smaller child estimate.
+Otherwise, the child estimate is forwarded unchanged. Nil selections and missing children return zero. This uses the
+predicate's explicit presence results so even a zero-value constant is recognized. The updated
+[plan diagram](../diagrams/ch10-plan-contract.svg) shows predicate-aware distinct estimates; its editable source remains
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `SelectPlan.DistinctValues` was undefined. Tests verify either constant
+operand order, a zero-value constant, both requested fields in a field equality, delegation without a matching term,
+and nil dependencies.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.

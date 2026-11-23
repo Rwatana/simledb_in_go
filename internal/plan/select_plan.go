@@ -64,3 +64,22 @@ func (p *SelectPlan) RecordsOutput() int {
 	}
 	return p.child.RecordsOutput() / factor
 }
+
+// DistinctValues estimates distinct values for fieldName after applying the predicate.
+func (p *SelectPlan) DistinctValues(fieldName string) int {
+	if p == nil || p.child == nil {
+		return 0
+	}
+	if _, ok := p.predicate.EquatesWithConstant(fieldName); ok {
+		return 1
+	}
+	if otherField, ok := p.predicate.EquatesWithField(fieldName); ok {
+		fieldEstimate := p.child.DistinctValues(fieldName)
+		otherEstimate := p.child.DistinctValues(otherField)
+		if fieldEstimate < otherEstimate {
+			return fieldEstimate
+		}
+		return otherEstimate
+	}
+	return p.child.DistinctValues(fieldName)
+}
