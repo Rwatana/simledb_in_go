@@ -474,6 +474,21 @@ The test first failed to compile because `RID.Equal` did not exist.
 
 This maps Java `RID.equals` with a type-safe Go signature.
 
+## Feature 28: Format a record identifier
+
+`RID.String` implements `fmt.Stringer` and renders the retained coordinates exactly as `[blockNumber, slot]`, including
+signed values, without additional labels.
+
+### Test-first record
+
+The test first failed to compile because `RID.String` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestRIDStringFormatsCoordinatePair` | RID text contains the exact block and slot coordinate pair |
+
+This maps Java `RID.toString`. Java `RID` and the Go value now have matching public behavior.
+
 ## Next behavior
 
-Format a record identifier as text as the next stacked PR.
+Initialize a table scan for an existing table file as the next stacked PR.
