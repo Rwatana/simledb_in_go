@@ -19,3 +19,22 @@ func TestZeroValueExpressionHasNoConstant(t *testing.T) {
 		t.Fatalf("AsConstant() = (%v, %v), want (zero, false)", got, ok)
 	}
 }
+
+func TestFieldExpressionReturnsItsName(t *testing.T) {
+	expression := NewFieldExpression("student name")
+	if got, ok := expression.AsFieldName(); !ok || got != "student name" {
+		t.Fatalf("AsFieldName() = (%q, %v), want (%q, true)", got, ok, "student name")
+	}
+	if _, ok := expression.AsConstant(); ok {
+		t.Fatal("AsConstant() reports a literal for a field expression")
+	}
+	if !expression.IsFieldName() {
+		t.Fatal("IsFieldName() = false for a field expression")
+	}
+}
+
+func TestZeroValueExpressionHasNoFieldName(t *testing.T) {
+	if got, ok := (Expression{}).AsFieldName(); ok || got != "" {
+		t.Fatalf("AsFieldName() = (%q, %v), want (empty, false)", got, ok)
+	}
+}

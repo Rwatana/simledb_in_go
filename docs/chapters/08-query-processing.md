@@ -82,3 +82,13 @@ remain separate behaviors.
 
 `TestLiteralExpressionReturnsItsConstant` initially failed because the constructor and type did not exist.
 `TestZeroValueExpressionHasNoConstant` checks the absent-literal result.
+
+## Feature 8: Construct a field reference expression
+
+`NewFieldExpression`, `IsFieldName`, and `AsFieldName` map to Java `Expression(String)`, `isFieldName`, and
+`asFieldName`. A separate presence bit preserves the distinction between an absent name and a supplied empty
+name. A field expression has no literal constant. Scan evaluation and schema applicability remain separate
+behaviors.
+
+`TestFieldExpressionReturnsItsName` initially failed because the field constructor and accessor did not exist.
+`TestZeroValueExpressionHasNoFieldName` checks the absent field result.
