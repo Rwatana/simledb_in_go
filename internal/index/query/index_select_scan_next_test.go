@@ -85,13 +85,13 @@ func (transaction *indexSelectNextTransaction) Unpin(block storage.BlockID) erro
 	return transaction.unpinErr
 }
 
-func newIndexSelectNextDataScan(t *testing.T) (*record.TableScan, *indexSelectNextTransaction) {
+func newIndexSelectNextDataScan(t *testing.T) (*query.RecordScan, *indexSelectNextTransaction) {
 	t.Helper()
 	schema := &record.Schema{}
 	schema.AddIntegerField("id")
 	schema.AddVarcharField("name", 12)
 	transaction := &indexSelectNextTransaction{}
-	scan, err := record.NewTableScan(transaction, "students", record.NewLayout(schema))
+	scan, err := query.NewRecordScan(transaction, "students", record.NewLayout(schema))
 	if err != nil {
 		t.Fatalf("NewTableScan() error = %v", err)
 	}
@@ -186,9 +186,9 @@ func TestIndexSelectScanNextRejectsInvalidState(t *testing.T) {
 	}
 	for _, scan := range []*IndexSelectScan{
 		{},
-		{dataScan: &record.TableScan{}, searchKey: query.NewIntConstant(42)},
+		{dataScan: &query.RecordScan{}, searchKey: query.NewIntConstant(42)},
 		{index: &indexSelectNextIndex{}, searchKey: query.NewIntConstant(42)},
-		{dataScan: &record.TableScan{}, index: &indexSelectNextIndex{}},
+		{dataScan: &query.RecordScan{}, index: &indexSelectNextIndex{}},
 	} {
 		if found, err := scan.Next(); found || err == nil || !strings.Contains(err.Error(), "index select scan") {
 			t.Errorf("Next() on invalid scan %#v = (%t, %v), want contextual error", scan, found, err)

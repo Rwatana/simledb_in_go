@@ -45,11 +45,11 @@ func (*positioningTransaction) Append(fileName string) (storage.BlockID, error) 
 }
 func (*positioningTransaction) Unpin(storage.BlockID) error { return nil }
 
-func newPositioningTableScan(t *testing.T) *record.TableScan {
+func newPositioningTableScan(t *testing.T) *query.RecordScan {
 	t.Helper()
 	schema := &record.Schema{}
 	schema.AddIntegerField("id")
-	scan, err := record.NewTableScan(&positioningTransaction{}, "students", record.NewLayout(schema))
+	scan, err := query.NewRecordScan(&positioningTransaction{}, "students", record.NewLayout(schema))
 	if err != nil {
 		t.Fatalf("NewTableScan() error = %v", err)
 	}
@@ -94,7 +94,7 @@ func TestNewIndexSelectScanRejectsInvalidInputsBeforePositioning(t *testing.T) {
 	key := query.NewIntConstant(42)
 	tests := []struct {
 		name string
-		scan *record.TableScan
+		scan *query.RecordScan
 		idx  index.Index
 		key  query.Constant
 	}{
