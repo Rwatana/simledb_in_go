@@ -735,6 +735,68 @@ func TestProductPlanDistinctValuesHandlesNilPlanChildrenAndSchemas(t *testing.T)
 	}
 }
 
+func TestProjectPlanSchemaCopiesRequestedFieldsInOrder(t *testing.T) {
+	var childSchema record.Schema
+	childSchema.AddIntegerField("student_id")
+	childSchema.AddVarcharField("student_name", 24)
+	childSchema.AddIntegerField("grade")
+	child := &productPlanProbe{schema: &childSchema}
+	project, err := NewProjectPlan(child, []string{"student_name", "student_id"})
+	if err != nil {
+		t.Fatalf("NewProjectPlan() error = %v", err)
+	}
+	schema := project.Schema()
+	if schema == nil {
+		t.Fatal("Schema() = nil, want projected schema")
+	}
+	if got, want := schema.Fields(), []string{"student_name", "student_id"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Schema().Fields() = %v, want %v", got, want)
+	}
+	if got, want := schema.Field("student_name"); !want || got != (record.FieldDefinition{Type: record.VarcharField, Length: 24}) {
+		t.Errorf("student_name definition = (%v, %t), want varchar length 24", got, want)
+	}
+	if got, want := schema.Field("student_id"); !want || got != (record.FieldDefinition{Type: record.IntegerField}) {
+		t.Errorf("student_id definition = (%v, %t), want integer", got, want)
+	}
+	if project.Schema() != schema {
+		t.Fatal("Schema() returned a different pointer on a later call")
+	}
+	childSchema.AddIntegerField("later_field")
+	if schema.HasField("later_field") {
+		t.Error("projected schema changed after the child schema was extended")
+	}
+}
+
+func TestProjectPlanSchemaHandlesEmptyFieldsAndNilReceiver(t *testing.T) {
+	var childSchema record.Schema
+	childSchema.AddIntegerField("student_id")
+	project, err := NewProjectPlan(&productPlanProbe{schema: &childSchema}, nil)
+	if err != nil {
+		t.Fatalf("NewProjectPlan() with no fields error = %v", err)
+	}
+	if got := project.Schema().Fields(); len(got) != 0 {
+		t.Errorf("empty projection fields = %v, want none", got)
+	}
+	var nilPlan *ProjectPlan
+	if got := nilPlan.Schema(); got != nil {
+		t.Errorf("nil ProjectPlan.Schema() = %p, want nil", got)
+	}
+}
+
+func TestNewProjectPlanRejectsNilDependenciesAndUnknownFields(t *testing.T) {
+	if project, err := NewProjectPlan(nil, []string{"id"}); project != nil || err == nil || !strings.Contains(err.Error(), "child plan") {
+		t.Errorf("NewProjectPlan(nil) = (%v, %v), want child-plan error", project, err)
+	}
+	if project, err := NewProjectPlan(&productPlanProbe{}, []string{"id"}); project != nil || err == nil || !strings.Contains(err.Error(), "schema") {
+		t.Errorf("NewProjectPlan(nil schema) = (%v, %v), want schema error", project, err)
+	}
+	var childSchema record.Schema
+	childSchema.AddIntegerField("id")
+	if project, err := NewProjectPlan(&productPlanProbe{schema: &childSchema}, []string{"missing"}); project != nil || err == nil || !strings.Contains(err.Error(), "missing") {
+		t.Errorf("NewProjectPlan(missing field) = (%v, %v), want field-specific error", project, err)
+	}
+}
+
 type productPlanProbe struct {
 	scan     query.Scan
 	openErr  error

@@ -11,6 +11,7 @@ and planner composition remains a separate observable behavior and Issue.
 | `internal/plan.Plan` | `simpledb/plan/Plan.java` | Describe opening a scan, estimating its cost and output, and exposing its schema |
 | `internal/plan.TablePlan` | `simpledb/plan/TablePlan.java` | Retain one table's resolved layout and expose its logical schema |
 | `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas, open the Cartesian-product scan, and estimate its output |
+| `internal/plan.ProjectPlan` | `simpledb/plan/ProjectPlan.java` | Build the output schema for a requested field projection |
 
 ## Feature 1: Define the query plan contract
 
@@ -230,6 +231,20 @@ The [plan diagram](../diagrams/ch10-plan-contract.svg) records distinct-value ow
 The first focused test run failed because `ProductPlan.DistinctValues` was undefined. Tests verify left and right
 delegation, left precedence for duplicate names, absent fields, and nil/missing schemas.
 
+## Feature 17: Build a projection schema
+
+`NewProjectPlan` maps to Java `ProjectPlan(Plan, List<String>)` and copies the requested field definitions from the child
+schema in caller-specified order. The projection schema is independent of later child-schema changes. A nil child,
+missing child schema, or unknown projected field returns an error rather than panicking; an empty projection is valid.
+Opening the child as a `ProjectScan` and forwarding plan estimates remain separate behaviors. The [plan diagram](../diagrams/ch10-plan-contract.svg)
+shows ProjectPlan exposing a narrower schema; its editable source is
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `ProjectPlan` and `NewProjectPlan` were undefined. Tests verify projection
+order, copied definitions, schema isolation, empty fields, nil dependencies, and field-specific rejection.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -243,3 +258,4 @@ delegation, left precedence for duplicate names, absent fields, and nil/missing 
 - `ProductPlan.BlocksAccessed` explicitly retains Java's signed 32-bit arithmetic instead of the host-sized Go `int` calculation.
 - `ProductPlan.RecordsOutput` uses Java-compatible signed 32-bit multiplication rather than host-sized arithmetic.
 - `ProductPlan.DistinctValues` resolves by the child's schema and gives duplicate field names to the left child.
+- `NewProjectPlan` reports missing schema/field errors because Go callers must handle failures explicitly rather than receive Java exceptions.
