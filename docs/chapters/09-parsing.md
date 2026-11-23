@@ -49,9 +49,30 @@ The tests first failed to compile because `MatchStringConstant` and `EatStringCo
 non-consuming lookahead, preserved case and UTF-8, doubled quotes, an empty value, following integer input,
 unterminated and non-string errors, stable byte offsets, empty input, and nil receivers.
 
+## Feature 3: Read identifiers from SQL text
+
+`MatchIdentifier` and `EatIdentifier` map to Java `Lexer.matchId` and `eatId`. The lexer accepts an ASCII letter or
+underscore followed by ASCII letters, digits, or underscores. It normalizes the result to lower case, matching Java's
+case-insensitive keyword and identifier handling, and rejects the reserved words initialized by the SimpleDB lexer.
+Lookahead does not consume the token; a rejected word or non-word token returns a byte-positioned error without
+advancing the cursor.
+
+The Go scanner retains the normalized word in its existing lookahead cache so the next lexer behavior can distinguish
+keywords without rescanning the input. Go's identifier grammar is intentionally ASCII-only; Java's `StreamTokenizer`
+also treats some non-ASCII bytes as word characters. The [identifier-token diagram](../diagrams/ch09-identifier-token.svg)
+shows normalization and reserved-word rejection; its editable source is
+[`ch09-identifier-token.drawio`](../diagrams/ch09-identifier-token.drawio).
+
+### Test-first record
+
+Tests first failed to compile because `MatchIdentifier` and `EatIdentifier` were undefined. They cover case
+normalization, underscores, digits after the first character, every reserved word in the Java keyword list, byte offsets,
+non-consuming mismatch, empty input, whitespace, nil receivers, and the following integer token.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
 - Integer values are checked against the signed 32-bit range instead of silently narrowing a tokenizer number.
 - Errors include the token's byte offset and do not advance the lexer, making callers able to report a stable location.
 - SQL string literals support doubled single quotes; backslash escapes follow the simpler Go SQL lexer policy and are not decoded as Java `StreamTokenizer` escapes.
+- SQL identifiers use an explicit ASCII grammar instead of `StreamTokenizer`'s additional non-ASCII word-byte behavior.
