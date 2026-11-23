@@ -294,6 +294,17 @@ estimate arithmetic.
 The focused test first failed because `IndexSelectPlan.BlocksAccessed` was undefined. Tests cover the index-plus-row
 formula, nil plan and metadata, metadata block-size errors, and signed 32-bit overflow behavior.
 
+## Feature 22: Estimate index-select plan output rows
+
+`IndexSelectPlan.RecordsOutput` delegates the matching-row estimate to its retained `metadata.IndexInfo`. It returns
+zero when the plan or its index metadata is unavailable; it does not open or consult the child plan because the index
+metadata owns this estimate.
+
+### Test-first record
+
+The focused test first failed because `IndexSelectPlan.RecordsOutput` was undefined. Tests verify metadata delegation
+without a child plan and zero results for nil plan and missing metadata.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

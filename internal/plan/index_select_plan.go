@@ -42,6 +42,14 @@ func (p *IndexSelectPlan) BlocksAccessed() int {
 	return int(int32(indexBlocks) + int32(p.indexInfo.RecordsOutput()))
 }
 
+// RecordsOutput estimates the rows matching the index-select key.
+func (p *IndexSelectPlan) RecordsOutput() int {
+	if p == nil || p.indexInfo == nil {
+		return 0
+	}
+	return p.indexInfo.RecordsOutput()
+}
+
 // Open opens the child table scan and positions its index-select scan before the first match.
 func (p *IndexSelectPlan) Open() (query.Scan, error) {
 	if p == nil {
