@@ -3,15 +3,14 @@ package log
 import (
 	"bytes"
 	"errors"
+	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 	"math"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
-
-	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
-	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 func TestNewManagerInitializesTheFirstLogBlock(t *testing.T) {
@@ -374,5 +373,170 @@ func TestAppendRejectsSyntheticOversizedRecordBeforeStateChanges(t *testing.T) {
 	}
 	if manager.latestLSN != 0 {
 		t.Errorf("latest LSN = %d, want unchanged value 0", manager.latestLSN)
+	}
+}
+
+func TestAppendPreservesRolloverInitializedBlockWriteFailure(t *testing.T) {
+	t.Parallel()
+
+	const fileName = "simpledb.log"
+	manager, files := newLogManager(t, 20)
+	writeErr := errors.New("initialized tail write failed")
+	fileManager := &writeOnNthFailureFileManager{Manager: files, failAt: 2, err: writeErr}
+	manager.files = fileManager
+
+	firstLSN, err := manager.Append([]byte("123456789012"))
+	if err != nil || firstLSN != 1 {
+		t.Fatalf("Append(full tail) = (%d, %v), want (1, nil)", firstLSN, err)
+	}
+	beforePage := manager.page.Snapshot()
+	beforeBlock := manager.block
+
+	lsn, err := manager.Append([]byte("x"))
+	if lsn != 0 {
+		t.Errorf("Append(rollover) LSN = %d, want 0 after initialized block write failure", lsn)
+	}
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("Append(rollover) error = %v, want wrapped initialized block write failure", err)
+	}
+	for _, context := range []string{
+		"append log record of 1 bytes",
+		"roll over full tail [file simpledb.log, block 0]",
+		"write initialized tail block [file simpledb.log, block 1]",
+	} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Append(rollover) error = %q, want context %q", err, context)
+		}
+	}
+	if fileManager.writeCalls != 2 {
+		t.Errorf("file writes = %d, want old-tail flush and failed initialized-tail write", fileManager.writeCalls)
+	}
+	if got := manager.page.Snapshot(); !bytes.Equal(got, beforePage) {
+		t.Errorf("tail Page changed after failed rollover: got %v, want %v", got, beforePage)
+	}
+	if manager.block != beforeBlock {
+		t.Errorf("tail block = %v, want unchanged %v", manager.block, beforeBlock)
+	}
+	if manager.latestLSN != firstLSN || manager.lastSavedLSN != firstLSN {
+		t.Errorf("LSNs after failed rollover = (latest %d, saved %d), want (%d, %d)", manager.latestLSN, manager.lastSavedLSN, firstLSN, firstLSN)
+	}
+}
+
+func TestAppendPreservesRolloverTailPageCreationFailure(t *testing.T) {
+	t.Parallel()
+
+	const fileName = "simpledb.log"
+	manager, files := newInternalLogManager(t, 20)
+	firstLSN, err := manager.Append([]byte("123456789012"))
+	if err != nil || firstLSN != 1 {
+		t.Fatalf("Append(full tail) = (%d, %v), want (1, nil)", firstLSN, err)
+	}
+	beforePage := manager.page.Snapshot()
+	beforeBlock := manager.block
+	pageErr := errors.New("new tail page allocation failed")
+	pageFactoryCalls := 0
+	manager.newPage = func(int) (*storage.Page, error) {
+		pageFactoryCalls++
+		return nil, pageErr
+	}
+
+	lsn, err := manager.Append([]byte("x"))
+	if lsn != 0 {
+		t.Errorf("Append(rollover) LSN = %d, want 0 after new tail page failure", lsn)
+	}
+	if !errors.Is(err, pageErr) {
+		t.Fatalf("Append(rollover) error = %v, want wrapped new tail page failure", err)
+	}
+	for _, context := range []string{"roll over full tail", "create new tail page"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Append(rollover) error = %q, want context %q", err, context)
+		}
+	}
+	if pageFactoryCalls != 1 {
+		t.Errorf("new-page factory calls = %d, want 1", pageFactoryCalls)
+	}
+	assertRolloverPageSetupFailureState(t, manager, files, beforePage, beforeBlock, firstLSN, fileName)
+}
+
+func TestAppendPreservesRolloverTailBoundaryInitializationFailure(t *testing.T) {
+	t.Parallel()
+
+	const fileName = "simpledb.log"
+	manager, files := newInternalLogManager(t, 20)
+	firstLSN, err := manager.Append([]byte("123456789012"))
+	if err != nil || firstLSN != 1 {
+		t.Fatalf("Append(full tail) = (%d, %v), want (1, nil)", firstLSN, err)
+	}
+	beforePage := manager.page.Snapshot()
+	beforeBlock := manager.block
+	manager.newPage = func(int) (*storage.Page, error) {
+		return storage.NewPage(3)
+	}
+
+	lsn, err := manager.Append([]byte("x"))
+	if lsn != 0 {
+		t.Errorf("Append(rollover) LSN = %d, want 0 after boundary initialization failure", lsn)
+	}
+	for _, context := range []string{"roll over full tail", "initialize new tail boundary", "page capacity 3"} {
+		if err == nil || !strings.Contains(err.Error(), context) {
+			t.Errorf("Append(rollover) error = %v, want context %q", err, context)
+		}
+	}
+	assertRolloverPageSetupFailureState(t, manager, files, beforePage, beforeBlock, firstLSN, fileName)
+}
+
+func newInternalLogManager(t *testing.T, blockSize int) (*Manager, *storagefile.Manager) {
+	t.Helper()
+
+	files, err := storagefile.NewManager(filepath.Join(t.TempDir(), "database"), blockSize)
+	if err != nil {
+		t.Fatalf("file.NewManager() error = %v", err)
+	}
+	manager, err := NewManager(files, "simpledb.log")
+	if err != nil {
+		t.Fatalf("NewManager() error = %v", err)
+	}
+	return manager, files
+}
+
+func assertRolloverPageSetupFailureState(t *testing.T, manager *Manager, files *storagefile.Manager, beforePage []byte, beforeBlock storage.BlockID, firstLSN LSN, fileName string) {
+	t.Helper()
+
+	if got := manager.page.Snapshot(); !bytes.Equal(got, beforePage) {
+		t.Errorf("tail Page changed after failed rollover: got %v, want %v", got, beforePage)
+	}
+	if manager.block != beforeBlock {
+		t.Errorf("tail block = %v, want unchanged %v", manager.block, beforeBlock)
+	}
+	if manager.latestLSN != firstLSN || manager.lastSavedLSN != firstLSN {
+		t.Errorf("LSNs after failed rollover = (latest %d, saved %d), want (%d, %d)", manager.latestLSN, manager.lastSavedLSN, firstLSN, firstLSN)
+	}
+	if length, err := files.Length(fileName); err != nil || length != 1 {
+		t.Errorf("log file length after page setup failure = (%d, %v), want (1, nil)", length, err)
+	}
+}
+
+func TestSetAppendBoundaryPreservesPageWriteFailure(t *testing.T) {
+	t.Parallel()
+
+	manager, _ := newInternalLogManager(t, 32)
+	shortPage, err := storage.NewPage(3)
+	if err != nil {
+		t.Fatalf("storage.NewPage() error = %v", err)
+	}
+	manager.page = shortPage
+	beforeLSN := manager.latestLSN
+
+	lsn, err := manager.setAppendBoundary(4)
+	if lsn != 0 {
+		t.Errorf("setAppendBoundary() LSN = %d, want 0", lsn)
+	}
+	for _, context := range []string{"append log record to [file simpledb.log, block 0]", "update boundary to 4", "page capacity 3"} {
+		if err == nil || !strings.Contains(err.Error(), context) {
+			t.Errorf("setAppendBoundary() error = %v, want context %q", err, context)
+		}
+	}
+	if manager.latestLSN != beforeLSN {
+		t.Errorf("latest LSN = %d, want unchanged value %d", manager.latestLSN, beforeLSN)
 	}
 }
