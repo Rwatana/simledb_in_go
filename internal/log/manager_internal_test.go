@@ -2,6 +2,7 @@ package log
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -24,6 +25,11 @@ type lengthFailureFileManager struct {
 	err error
 }
 
+type writeFailureFileManager struct {
+	*storagefile.Manager
+	err error
+}
+
 func (f readFailureFileManager) Read(storage.BlockID) (*storage.Page, error) {
 	return nil, f.err
 }
@@ -34,6 +40,10 @@ func (f shortPageFileManager) Read(storage.BlockID) (*storage.Page, error) {
 
 func (f lengthFailureFileManager) Length(string) (int, error) {
 	return 0, f.err
+}
+
+func (f writeFailureFileManager) Write(storage.BlockID, *storage.Page) error {
+	return f.err
 }
 
 func TestNewManagerPreservesTailBlockReadFailure(t *testing.T) {
@@ -101,5 +111,33 @@ func TestNewManagerPreservesFileLengthFailure(t *testing.T) {
 		if !strings.Contains(err.Error(), context) {
 			t.Errorf("newManager() error = %q, want context %q", err, context)
 		}
+	}
+}
+
+func TestNewManagerPreservesInitialBlockWriteFailure(t *testing.T) {
+	t.Parallel()
+
+	const fileName = "simpledb.log"
+	directory := filepath.Join(t.TempDir(), "database")
+	files, err := storagefile.NewManager(directory, 32)
+	if err != nil {
+		t.Fatalf("file.NewManager() error = %v", err)
+	}
+	writeErr := errors.New("initial block write failed")
+
+	manager, err := newManager(writeFailureFileManager{Manager: files, err: writeErr}, fileName)
+	if manager != nil {
+		t.Errorf("newManager() manager = %v, want nil", manager)
+	}
+	if err == nil || !errors.Is(err, writeErr) {
+		t.Fatalf("newManager() error = %v, want wrapped initial write failure", err)
+	}
+	for _, context := range []string{"create log manager for \"simpledb.log\"", "write first block"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("newManager() error = %q, want context %q", err, context)
+		}
+	}
+	if length, err := files.Length(fileName); err != nil || length != 1 {
+		t.Errorf("file length after append/write failure = (%d, %v), want (1, nil)", length, err)
 	}
 }

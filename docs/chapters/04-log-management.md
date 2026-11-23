@@ -105,6 +105,7 @@ ok github.com/Rwatana/simledb_in_go/internal/log
 | `TestNewManagerPreservesTailBlockReadFailure` | 既存tail blockのread error causeとblock contextを保持する |
 | `TestNewManagerPreservesTailBoundaryReadFailure` | 短いtail Pageのboundary read errorとcontextを保持する |
 | `TestNewManagerPreservesFileLengthFailure` | log file length failureのcauseとfile contextを保持する |
+| `TestNewManagerPreservesInitialBlockWriteFailure` | 初回block append後のwrite failure causeとcontextを保持する |
 
 ## Javaソースリーディング
 

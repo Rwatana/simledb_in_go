@@ -260,6 +260,9 @@ that construction stops before returning a Manager and preserves the Page read e
 
 The internal log-file seam also injects a file-length lookup failure, confirming construction returns no Manager and
 preserves both the underlying cause and the requested filename context.
+
+An initial-page write test fails the first block write after append succeeds. It confirms the initialization error
+retains its cause and operation context and that the appended block remains in the file.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
