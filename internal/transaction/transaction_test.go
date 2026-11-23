@@ -1240,6 +1240,25 @@ func TestTransactionSizeReadsLengthUnderReusableEOFSharedLock(t *testing.T) {
 	}
 }
 
+func TestNewWithFileManagerRejectsNilManagerBeforeStartingTransaction(t *testing.T) {
+	var allocator IDAllocator
+	logs := &recordingTransactionLog{}
+
+	transaction, err := NewWithFileManager(&allocator, &concurrency.LockTable{}, nil, &recordingBufferPinner{}, logs)
+	if transaction != nil {
+		t.Fatalf("NewWithFileManager() transaction = %v, want nil", transaction)
+	}
+	if err == nil || err.Error() != "create transaction with file manager: file manager must not be nil" {
+		t.Fatalf("NewWithFileManager() error = %v, want missing file-manager context", err)
+	}
+	if got := allocator.last.Load(); got != 0 {
+		t.Errorf("allocated transaction IDs = %d, want 0 before dependency rejection", got)
+	}
+	if len(logs.records) != 0 {
+		t.Errorf("START record count = %d, want 0 before dependency rejection", len(logs.records))
+	}
+}
+
 func TestNewWithFileSizerRejectsNilSizerBeforeStartingTransaction(t *testing.T) {
 	var allocator IDAllocator
 	logs := &recordingTransactionLog{}

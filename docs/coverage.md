@@ -3,9 +3,9 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint for Issue #650, the full-module statement coverage is **96.4%** (rounded to one
+At the 2026-11-23 checkpoint for Issue #652, the full-module statement coverage is **96.4%** (rounded to one
 decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 97.6%, query
-100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 91.9%. Recent focused tests closed existing
+100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 92.5%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
 both catalog-initialization failure paths, table- and field-catalog row insertion, field-catalog table-name,
 field-name, type, length, and offset writes, table slot-size write failures, table-catalog layout scan, registered-name,
@@ -114,6 +114,10 @@ full-module coverage is 96.3%.
 
 `NewWithFileSizer` now has a test proving a nil file-size dependency is rejected before allocating a transaction ID or
 writing START. The constructor is 85.7% covered, transaction coverage is 91.9%, and full-module coverage is 96.4%.
+
+`NewWithFileManager` now has the same independent guard test: a nil file manager is rejected before allocating an ID
+or writing START. The constructor is 85.7% covered, transaction coverage is 92.5%, and full-module coverage remains
+96.4%.
 
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
