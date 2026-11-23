@@ -50,29 +50,39 @@ type hashIndexTransactionProbe struct {
 	record.RecordTransaction
 	calls            int
 	size             int
+	sizeErr          error
 	pinErr, unpinErr error
 	pins, unpins     []storage.BlockID
+	sizeFiles        []string
+	appendFiles      []string
+	events           []string
 }
 
 func (transaction *hashIndexTransactionProbe) Pin(block storage.BlockID) error {
 	transaction.calls++
 	transaction.pins = append(transaction.pins, block)
+	transaction.events = append(transaction.events, "pin:"+block.String())
 	return transaction.pinErr
 }
 
-func (transaction *hashIndexTransactionProbe) Size(string) (int, error) {
+func (transaction *hashIndexTransactionProbe) Size(fileName string) (int, error) {
 	transaction.calls++
-	return transaction.size, nil
+	transaction.sizeFiles = append(transaction.sizeFiles, fileName)
+	transaction.events = append(transaction.events, "size:"+fileName)
+	return transaction.size, transaction.sizeErr
 }
 
-func (transaction *hashIndexTransactionProbe) Append(string) (storage.BlockID, error) {
+func (transaction *hashIndexTransactionProbe) Append(fileName string) (storage.BlockID, error) {
 	transaction.calls++
+	transaction.appendFiles = append(transaction.appendFiles, fileName)
+	transaction.events = append(transaction.events, "append:"+fileName)
 	return storage.BlockID{}, nil
 }
 
 func (transaction *hashIndexTransactionProbe) Unpin(block storage.BlockID) error {
 	transaction.calls++
 	transaction.unpins = append(transaction.unpins, block)
+	transaction.events = append(transaction.events, "unpin:"+block.String())
 	return transaction.unpinErr
 }
 
