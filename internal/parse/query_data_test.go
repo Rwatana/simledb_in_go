@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/query"
+	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
 func TestQueryDataRetainsOrderedValuesAndRendersPredicate(t *testing.T) {
@@ -149,5 +150,41 @@ func TestModifyDataZeroValueHasSafeAccessors(t *testing.T) {
 	}
 	if got := data.Predicate().String(); got != "" {
 		t.Errorf("Predicate().String() = %q, want empty", got)
+	}
+}
+
+func TestCreateTableDataCopiesSchemaOnConstructionAndAccess(t *testing.T) {
+	var schema record.Schema
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 12)
+	data := NewCreateTableData("student", schema)
+
+	schema.AddIntegerField("source_mutation")
+	if got, want := data.TableName(), "student"; got != want {
+		t.Errorf("TableName() = %q, want %q", got, want)
+	}
+	stored := data.Schema()
+	if got, want := stored.Fields(), []string{"id", "name"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Schema().Fields() = %v, want %v", got, want)
+	}
+	if got, want := stored.LengthOf("name"); !want || got != 12 {
+		t.Errorf("Schema().LengthOf(name) = (%d, %t), want (12, true)", got, want)
+	}
+
+	stored.AddIntegerField("accessor_mutation")
+	storedAgain := data.Schema()
+	if got, want := storedAgain.Fields(), []string{"id", "name"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Schema().Fields() after accessor mutation = %v, want %v", got, want)
+	}
+}
+
+func TestCreateTableDataZeroValueHasSafeAccessors(t *testing.T) {
+	var data CreateTableData
+	if got := data.TableName(); got != "" {
+		t.Errorf("TableName() = %q, want empty", got)
+	}
+	schema := data.Schema()
+	if got := schema.Fields(); got != nil {
+		t.Errorf("Schema().Fields() = %v, want nil", got)
 	}
 }

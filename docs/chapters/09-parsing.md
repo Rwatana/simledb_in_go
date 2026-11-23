@@ -16,6 +16,7 @@ Request.
 | `Parser.ParseInsert` | `simpledb/parse/Parser.java` (`insert`) | Parse the INSERT target, field list, and matching constant list |
 | `internal/parse.ModifyData` | `simpledb/parse/ModifyData.java` | Hold the target table and field, new expression, and predicate of an UPDATE statement |
 | `Parser.ParseUpdate` | `simpledb/parse/Parser.java` (`modify`) | Parse the UPDATE target, assignment, and optional predicate |
+| `internal/parse.CreateTableData` | `simpledb/parse/CreateTableData.java` | Hold the table name and schema of a CREATE TABLE statement |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -324,6 +325,19 @@ Tests first failed because `Parser.ParseUpdate` was undefined. They cover a mixe
 predicate, a constant assignment without `where`, preservation of a following keyword, missing grammar elements,
 malformed predicates, byte offsets, and a nil receiver.
 
+## Feature 19: Store parsed CREATE TABLE command data
+
+`parse.CreateTableData` maps to Java `parse.CreateTableData`. It stores the new table name and schema. Go copies the
+schema at construction and when returned by its accessor, preventing mutations to the original or a returned schema
+from changing the stored command. The zero value safely returns an empty name and empty schema. The
+[CREATE TABLE-data diagram](../diagrams/ch09-create-table-data.svg) shows the schema-copy boundary and accessors; its
+editable source is [`ch09-create-table-data.drawio`](../diagrams/ch09-create-table-data.drawio).
+
+### Test-first record
+
+Tests first failed to compile because `CreateTableData` and `NewCreateTableData` were undefined. They cover schema
+field order and definitions, constructor-copy isolation, accessor-copy isolation, and the zero value.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -340,3 +354,4 @@ malformed predicates, byte offsets, and a nil receiver.
 - `ParseInsert` uses iterative list parsing and leaves the next token to its caller; Java recurses through each list.
 - `ModifyData` returns the query predicate by value and retains an unset-expression zero value; Java provides accessors but no Go-style zero-value contract.
 - `ParseUpdate` is a concrete command parser separate from top-level dispatch; it leaves trailing tokens to its caller.
+- `CreateTableData` copies schema values to avoid shared internal slices and maps; Java stores and returns the same mutable schema reference.

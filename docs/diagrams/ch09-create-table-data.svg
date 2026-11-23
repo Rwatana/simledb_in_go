@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="520" viewBox="0 0 1160 520" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 19: Store CREATE TABLE command data</title>
+  <desc id="description">CreateTableData stores the table name and an independent copy of its record schema. The schema accessor returns another copy, while the zero value provides an empty table name and schema.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1160" height="520" fill="#fff"/>
+  <text class="title" x="580" y="62" text-anchor="middle">Chapter 9 / Feature 19: Store CREATE TABLE command data</text>
+  <rect class="box" x="45" y="205" width="245" height="135" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="167" y="248"><tspan x="167">Constructor input</tspan><tspan class="small" x="167" dy="30">table name: student</tspan><tspan class="small" x="167" dy="24">record.Schema</tspan></text>
+  <rect class="box" x="390" y="195" width="270" height="155" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="525" y="239"><tspan x="525">CreateTableData</tspan><tspan class="small" x="525" dy="30">private tableName</tspan><tspan class="small" x="525" dy="24">owned schema copy</tspan></text>
+  <rect class="box" x="770" y="195" width="315" height="155" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="927" y="239"><tspan x="927">Read-only accessors</tspan><tspan class="small" x="927" dy="30">TableName()</tspan><tspan class="small" x="927" dy="24">Schema() → independent copy</tspan></text>
+  <rect class="box" x="390" y="400" width="270" height="90" fill="#f5f5f5" stroke="#666"/>
+  <text class="label" x="525" y="435"><tspan x="525">Zero value</tspan><tspan class="small" x="525" dy="25">empty table name · schema</tspan></text>
+  <path class="edge" d="M290 272 H380"/><text class="small" x="335" y="255">copy schema</text>
+  <path class="edge" d="M660 272 H760"/><text class="small" x="710" y="255">copy on read</text>
+  <path class="edge" d="M525 350 V390"/><text class="small" x="580" y="380">safe default</text>
+</svg>
