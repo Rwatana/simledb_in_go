@@ -1,0 +1,26 @@
+name: Branch name
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  feature-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate feature branch name
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ ! "$HEAD_REF" =~ ^feature/#([0-9]+)_[a-z0-9]+(_[a-z0-9]+)*$ ]]; then
+            echo "Invalid branch name: $HEAD_REF"
+            echo "Expected: feature/#<issue-number>_<snake_case_description>"
+            exit 1
+          fi
