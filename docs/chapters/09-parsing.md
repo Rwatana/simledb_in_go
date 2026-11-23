@@ -158,6 +158,21 @@ Tests first failed because `Parser.ParseExpression` was undefined. They cover no
 decoded string constants, following tokens, reserved-word and delimiter failures, stable byte offsets, repeated
 non-consuming errors, empty input, whitespace, and a nil parser receiver.
 
+## Feature 9: Parse SQL equality terms
+
+`Parser.ParseTerm` maps to Java `Parser.term`. It parses the left expression, consumes one `=` delimiter, then parses
+the right expression and constructs the existing `query.Term`. Either side may be a field reference, integer, or
+string constant. Errors identify the failing side or missing delimiter and preserve the lexer byte offset; parsing a
+term does not roll back tokens consumed before the failure, matching the Java parser's sequential behavior. The
+[term-parsing diagram](../diagrams/ch09-parse-term.svg) shows the left-expression, equality-delimiter, and right-expression
+sequence; its editable source is [`ch09-parse-term.drawio`](../diagrams/ch09-parse-term.drawio).
+
+### Test-first record
+
+Tests first failed because `Parser.ParseTerm` was undefined. They cover field-to-literal and literal-to-field terms,
+field-to-field terms, preserved trailing input, missing delimiters, invalid left and right operands, stable byte
+offsets, whitespace, and a nil parser receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.

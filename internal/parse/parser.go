@@ -45,6 +45,25 @@ func (parser *Parser) ParseExpression() (query.Expression, error) {
 	return query.NewConstantExpression(constant), nil
 }
 
+// ParseTerm reads two expressions separated by the SQL equality delimiter.
+func (parser *Parser) ParseTerm() (query.Term, error) {
+	if parser == nil {
+		return query.Term{}, fmt.Errorf("parse term: parser is nil")
+	}
+	lhs, err := parser.ParseExpression()
+	if err != nil {
+		return query.Term{}, fmt.Errorf("parse term left expression: %w", err)
+	}
+	if err := parser.lexer.EatDelimiter('='); err != nil {
+		return query.Term{}, fmt.Errorf("parse term equals delimiter: %w", err)
+	}
+	rhs, err := parser.ParseExpression()
+	if err != nil {
+		return query.Term{}, fmt.Errorf("parse term right expression: %w", err)
+	}
+	return query.NewTerm(lhs, rhs), nil
+}
+
 // ParseConstant reads a string or non-negative integer query constant.
 func (parser *Parser) ParseConstant() (query.Constant, error) {
 	if parser == nil {
