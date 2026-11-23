@@ -120,6 +120,18 @@ its child's schema; the editable source is [`ch10-plan-contract.drawio`](../diag
 The first test run failed because `SelectPlan.Schema` was undefined. Tests verify schema identity and nil-safe results
 for a nil receiver and missing child plan.
 
+## Feature 9: Delegate selection block-access estimates
+
+`SelectPlan.BlocksAccessed` forwards the block-access estimate to its child plan, matching Java
+`SelectPlan.blocksAccessed()`. A nil selection plan or missing child returns zero. The predicate changes the estimated
+row count, not the blocks read by the child scan. The [plan diagram](../diagrams/ch10-plan-contract.svg) now records
+the inherited estimate; its editable source remains [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first test run failed because `SelectPlan.BlocksAccessed` was undefined. Tests verify forwarding a nonzero child
+estimate and nil-safe zero results.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -128,3 +140,4 @@ for a nil receiver and missing child plan.
 - `NewTablePlan` receives precomputed `metadata.StatInfo` so obtaining statistics remains a separate metadata behavior; `BlocksAccessed` only forwards the estimate.
 - `TablePlan.DistinctValues` forwards the current simple `StatInfo` estimate; field-specific statistics remain outside this table-plan behavior.
 - `SelectPlan.Schema` returns the child schema directly because filtering does not change the set of output fields.
+- `SelectPlan.BlocksAccessed` delegates directly to the child; estimates affected by selectivity remain distinct methods.

@@ -44,3 +44,11 @@ func (p *SelectPlan) Schema() *record.Schema {
 	}
 	return p.child.Schema()
 }
+
+// BlocksAccessed returns the block-access estimate of the child plan.
+func (p *SelectPlan) BlocksAccessed() int {
+	if p == nil || p.child == nil {
+		return 0
+	}
+	return p.child.BlocksAccessed()
+}
