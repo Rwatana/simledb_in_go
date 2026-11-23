@@ -1,13 +1,15 @@
-package file_test
+package file
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
-	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
@@ -15,7 +17,7 @@ func TestNewManagerCreatesDatabaseDirectory(t *testing.T) {
 	t.Parallel()
 
 	directory := filepath.Join(t.TempDir(), "database")
-	manager, err := storagefile.NewManager(directory, 32)
+	manager, err := NewManager(directory, 32)
 	if err != nil {
 		t.Fatalf("NewManager() error = %v", err)
 	}
@@ -32,7 +34,7 @@ func TestNewManagerCreatesDatabaseDirectory(t *testing.T) {
 	}
 
 	for _, blockSize := range []int{0, -1} {
-		if _, err := storagefile.NewManager(filepath.Join(t.TempDir(), "invalid"), blockSize); err == nil {
+		if _, err := NewManager(filepath.Join(t.TempDir(), "invalid"), blockSize); err == nil {
 			t.Errorf("NewManager() with block size %d error = nil, want an invalid size error", blockSize)
 		}
 	}
@@ -126,6 +128,9 @@ func TestManagerRejectsInvalidBlockAccess(t *testing.T) {
 	if _, err := manager.Read(negative); err == nil {
 		t.Error("Read() negative block error = nil, want an invalid block error")
 	}
+	if err := manager.Write(storage.NewBlockID("student.tbl", 0), nil); err == nil {
+		t.Error("Write() with nil Page error = nil, want an error")
+	}
 
 	wrongSize := newStoragePage(t, blockSize-1)
 	if err := manager.Write(storage.NewBlockID("student.tbl", 0), wrongSize); err == nil {
@@ -152,10 +157,10 @@ func TestManagerRejectsInvalidBlockAccess(t *testing.T) {
 	}
 }
 
-func newManager(t *testing.T, directory string, blockSize int) *storagefile.Manager {
+func newManager(t *testing.T, directory string, blockSize int) *Manager {
 	t.Helper()
 
-	manager, err := storagefile.NewManager(directory, blockSize)
+	manager, err := NewManager(directory, blockSize)
 	if err != nil {
 		t.Fatalf("NewManager() error = %v", err)
 	}
@@ -170,4 +175,111 @@ func newStoragePage(t *testing.T, capacity int) *storage.Page {
 		t.Fatalf("NewPage() error = %v", err)
 	}
 	return page
+}
+
+func TestManagerReadWrapsOpenAndReadFailures(t *testing.T) {
+	openErr := errors.New("open failure")
+	manager := &Manager{
+		directory: "/database",
+		blockSize: 4,
+		ops:       testFileOperations{openErr: openErr},
+	}
+	_, err := manager.Read(storage.NewBlockID("student.tbl", 0))
+	if !errors.Is(err, openErr) {
+		t.Fatalf("Read() error = %v, want wrapped open failure", err)
+	}
+
+	readErr := io.ErrUnexpectedEOF
+	manager.ops = testFileOperations{readHandle: &fakeBlockFile{readCount: 2, readErr: readErr}}
+	_, err = manager.Read(storage.NewBlockID("student.tbl", 0))
+	if !errors.Is(err, readErr) {
+		t.Fatalf("Read() error = %v, want wrapped read failure", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "read 2 of 4 bytes") {
+		t.Errorf("Read() error = %v, want short-read context", err)
+	}
+}
+
+func TestManagerWriteWrapsOpenWriteAndSyncFailures(t *testing.T) {
+	page, err := storage.NewPage(4)
+	if err != nil {
+		t.Fatalf("NewPage() error = %v", err)
+	}
+	block := storage.NewBlockID("student.tbl", 0)
+
+	openErr := errors.New("open failure")
+	manager := &Manager{
+		directory: "/database",
+		blockSize: 4,
+		ops:       testFileOperations{openFileErr: openErr},
+	}
+	if err := manager.Write(block, page); !errors.Is(err, openErr) {
+		t.Fatalf("Write() error = %v, want wrapped open failure", err)
+	}
+
+	writeErr := io.ErrShortWrite
+	manager.ops = testFileOperations{writeHandle: &fakeBlockFile{writeCount: 2, writeErr: writeErr}}
+	if err := manager.Write(block, page); !errors.Is(err, writeErr) {
+		t.Fatalf("Write() error = %v, want wrapped write failure", err)
+	}
+
+	syncErr := errors.New("sync failure")
+	manager.ops = testFileOperations{writeHandle: &fakeBlockFile{writeCount: page.Capacity(), syncErr: syncErr}}
+	if err := manager.Write(block, page); !errors.Is(err, syncErr) {
+		t.Fatalf("Write() error = %v, want wrapped sync failure", err)
+	}
+}
+
+type testFileOperations struct {
+	openErr     error
+	openFileErr error
+	readHandle  fileHandle
+	writeHandle fileHandle
+}
+
+func (f testFileOperations) Open(string) (fileHandle, error) {
+	if f.openErr != nil {
+		return nil, f.openErr
+	}
+	return f.readHandle, nil
+}
+func (f testFileOperations) OpenFile(string, int, os.FileMode) (fileHandle, error) {
+	if f.openFileErr != nil {
+		return nil, f.openFileErr
+	}
+	return f.writeHandle, nil
+}
+
+type fakeBlockFile struct {
+	readCount  int
+	readErr    error
+	writeCount int
+	writeErr   error
+	syncErr    error
+}
+
+func (f *fakeBlockFile) ReadAt(p []byte, _ int64) (int, error) {
+	for i := range p {
+		p[i] = byte(i)
+	}
+	return f.readCount, f.readErr
+}
+func (f *fakeBlockFile) WriteAt([]byte, int64) (int, error) { return f.writeCount, f.writeErr }
+func (f *fakeBlockFile) Sync() error                        { return f.syncErr }
+func (f *fakeBlockFile) Close() error                       { return nil }
+
+func TestNewManagerRejectsInvalidDirectory(t *testing.T) {
+	t.Parallel()
+
+	if _, err := NewManager("", 16); err == nil {
+		t.Fatal("NewManager(\"\", 16) error = nil, want an empty-directory error")
+	}
+
+	parentFile := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(parentFile, []byte("file"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if _, err := NewManager(filepath.Join(parentFile, "database"), 16); err == nil {
+		t.Fatal("NewManager() error = nil, want a directory-creation error")
+	}
 }

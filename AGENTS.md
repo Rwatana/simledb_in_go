@@ -10,6 +10,10 @@
 - Keep exactly one commit in each Pull Request. Amend that commit for revisions.
 - Add `Closes #<issue-number>` to the Pull Request body, using the same number as the branch.
 - Keep each Pull Request focused on one learning outcome or observable behavior.
+- When a newly enabled repository-wide coverage gate exposes gaps in code already on `main`, collect those baseline fixes in one CI-remediation Pull Request.
+- Keep coverage for new functionality in its corresponding feature Pull Request; do not create standalone coverage-only Pull Requests for feature code.
+- Add coverage tests to the existing package test file for that feature; do not create coverage-specific test files.
+- Close a superseded coverage-only Pull Request after its changes have been integrated into the corresponding feature Pull Request.
 
 ## Implementation
 
