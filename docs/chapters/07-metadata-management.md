@@ -755,6 +755,10 @@ The focused coverage test for `IndexManager.IndexInfo` injects a read failure on
 The transaction fake filters this injected error by file name so catalog-layout reconstruction can complete first.
 This is a test-only improvement; the production error behavior is unchanged.
 
+A second focused check injects failure while reading an index row's `tablename` value, again scoped to `idxcat.tbl` so
+layout reconstruction is unaffected. The lookup preserves the table and field context, wraps the original cause, and
+returns no partial result map.
+
 ## Feature 36: Create an index through the metadata facade
 
 `MetadataManager.CreateIndex` delegates the index, table, and field names plus the transaction to the shared index

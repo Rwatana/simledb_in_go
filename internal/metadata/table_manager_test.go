@@ -39,6 +39,7 @@ type catalogTransaction struct {
 	getIntCalls          int
 	getStringErr         error
 	getStringOffset      int
+	getStringErrFile     string
 	getStringErrAfter    int
 	getStringOffsetCalls int
 	getStringCalls       int
@@ -125,7 +126,7 @@ func (t *catalogTransaction) GetInt(block storage.BlockID, offset int) (int32, e
 
 func (t *catalogTransaction) GetString(block storage.BlockID, offset int) (string, error) {
 	t.getStringCalls++
-	if t.getStringErr != nil && offset == t.getStringOffset {
+	if t.getStringErr != nil && offset == t.getStringOffset && (t.getStringErrFile == "" || block.FileName() == t.getStringErrFile) {
 		t.getStringOffsetCalls++
 		if t.getStringErrAfter == 0 || t.getStringOffsetCalls == t.getStringErrAfter {
 			return "", t.getStringErr
