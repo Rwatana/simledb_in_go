@@ -397,6 +397,21 @@ The first focused test run failed because `BasicUpdatePlanner.ExecuteModify` was
 and empty-predicate rows, expression evaluation, target writes, nil dependencies, metadata and scan-open failures, and
 preservation of iteration/evaluation/write errors when scan cleanup also fails.
 
+## Feature 29: Execute INSERT with the basic update planner
+
+`BasicUpdatePlanner.ExecuteInsert` opens the target `TablePlan`, inserts one row through `query.UpdateScan`, then writes
+the parsed field/value pairs in their original order. It reports one affected row after all writes succeed and closes
+the scan on success, insert/type/write failures, or unsupported-scan errors, joining cleanup errors with the primary
+cause. Empty table names, empty field names, and mismatched or empty field/value lists are rejected before a row is
+opened. The [planning diagram](../diagrams/ch10-plan-contract.svg) shows INSERT alongside the earlier DELETE and UPDATE
+behaviors; its editable source remains [`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `BasicUpdatePlanner.ExecuteInsert` was undefined. Tests verify one inserted row
+and its field value, invalid command data, nil dependencies, metadata/layout and scan-open errors, unsupported and nil
+scans, insert/value-write failures, and close-error preservation.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -421,3 +436,4 @@ preservation of iteration/evaluation/write errors when scan cleanup also fails.
 - `BetterQueryPlanner` uses block-access estimates to choose each product's child order, reversing only when strictly cheaper.
 - `BasicUpdatePlanner.ExecuteDelete` returns an error with its affected count and closes the scan on all operation paths.
 - `BasicUpdatePlanner.ExecuteModify` evaluates replacement expressions per matching row and reports the number of successful writes.
+- `BasicUpdatePlanner.ExecuteInsert` returns a successful count only after inserting one row and writing all parsed field values.

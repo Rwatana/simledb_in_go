@@ -359,6 +359,142 @@ func TestModifyRowsFromScanHandlesReadOnlyAndNilScans(t *testing.T) {
 	}
 }
 
+func TestBasicUpdatePlannerExecuteInsertCreatesAndPopulatesOneRecord(t *testing.T) {
+	layout := record.NewLayout(newPlannerTestSchema("id"))
+	transaction := newBasicUpdatePlannerTransaction(layout, []int32{1, 0}, []int32{10, 0})
+	planner := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout})
+	data := parse.NewInsertData("student", []string{"id"}, []query.Constant{query.NewIntConstant(42)})
+
+	count, err := planner.ExecuteInsert(data, transaction)
+	if err != nil {
+		t.Fatalf("ExecuteInsert() error = %v", err)
+	}
+	if count != 1 {
+		t.Errorf("ExecuteInsert() affected = %d, want 1", count)
+	}
+	if !reflect.DeepEqual(transaction.flags, []int32{1, 1}) {
+		t.Errorf("record flags = %v, want [1 1]", transaction.flags)
+	}
+	if !reflect.DeepEqual(transaction.values, []int32{10, 42}) {
+		t.Errorf("record values = %v, want [10 42]", transaction.values)
+	}
+	if len(transaction.unpins) != 1 {
+		t.Errorf("unpin calls = %v, want one closed scan block", transaction.unpins)
+	}
+}
+
+func TestBasicUpdatePlannerExecuteInsertValidatesDependenciesAndData(t *testing.T) {
+	data := parse.NewInsertData("student", []string{"id"}, []query.Constant{query.NewIntConstant(42)})
+	transaction := &tablePlanTransaction{size: 1}
+	var nilPlanner *BasicUpdatePlanner
+	if count, err := nilPlanner.ExecuteInsert(data, transaction); count != 0 || err == nil {
+		t.Errorf("nil planner ExecuteInsert() = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(nil).ExecuteInsert(data, transaction); count != 0 || err == nil {
+		t.Errorf("planner without metadata ExecuteInsert() = (%d, %v), want an error", count, err)
+	}
+	layout := record.NewLayout(newPlannerTestSchema("id"))
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteInsert(data, nil); count != 0 || err == nil {
+		t.Errorf("ExecuteInsert() with nil transaction = (%d, %v), want an error", count, err)
+	}
+	metadataErr := errors.New("layout unavailable")
+	metadata := &basicUpdatePlannerMetadataProbe{layoutErr: metadataErr}
+	if count, err := NewBasicUpdatePlanner(metadata).ExecuteInsert(data, transaction); count != 0 || !errors.Is(err, metadataErr) {
+		t.Errorf("ExecuteInsert() with metadata error = (%d, %v), want wrapped layout error", count, err)
+	}
+	if !reflect.DeepEqual(metadata.layoutRequests, []string{"student"}) {
+		t.Errorf("layout requests = %v, want [student]", metadata.layoutRequests)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{}).ExecuteInsert(data, transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteInsert() with nil layout = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteInsert(parse.InsertData{}, transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteInsert() with empty table name = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteInsert(parse.NewInsertData("student", nil, nil), transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteInsert() with no fields = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteInsert(parse.NewInsertData("student", []string{"id"}, nil), transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteInsert() with mismatched field/value lists = (%d, %v), want an error", count, err)
+	}
+	if count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteInsert(parse.NewInsertData("student", []string{""}, []query.Constant{query.NewIntConstant(42)}), transaction); count != 0 || err == nil {
+		t.Errorf("ExecuteInsert() with empty field name = (%d, %v), want an error", count, err)
+	}
+}
+
+func TestBasicUpdatePlannerExecuteInsertReportsScanOpenErrors(t *testing.T) {
+	layout := record.NewLayout(newPlannerTestSchema("id"))
+	openErr := errors.New("table size unavailable")
+	transaction := &basicUpdatePlannerTransaction{tablePlanTransaction: tablePlanTransaction{sizeErr: openErr}, slotSize: layout.SlotSize()}
+	data := parse.NewInsertData("student", []string{"id"}, []query.Constant{query.NewIntConstant(42)})
+	count, err := NewBasicUpdatePlanner(&basicUpdatePlannerMetadataProbe{layout: layout}).ExecuteInsert(data, transaction)
+	if count != 0 || !errors.Is(err, openErr) {
+		t.Errorf("ExecuteInsert() with scan-open error = (%d, %v), want wrapped size error", count, err)
+	}
+}
+
+func TestInsertRowIntoScanClosesAfterInsertAndValueErrors(t *testing.T) {
+	layout := record.NewLayout(newPlannerTestSchema("id"))
+	insertErr := errors.New("record insert failed")
+	transaction := newBasicUpdatePlannerTransaction(layout, []int32{0}, []int32{0})
+	transaction.writeErrOffset = 0
+	transaction.writeErr = insertErr
+	scan, err := query.NewRecordScan(transaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewRecordScan() error = %v", err)
+	}
+	count, err := insertRowIntoScan("student", []string{"id"}, []query.Constant{query.NewIntConstant(42)}, scan)
+	if count != 0 || !errors.Is(err, insertErr) {
+		t.Errorf("insertRowIntoScan() with insert error = (%d, %v), want wrapped insert error", count, err)
+	}
+	if len(transaction.unpins) != 1 {
+		t.Errorf("unpin calls = %v, want one close after insert error", transaction.unpins)
+	}
+
+	valueOffset, ok := layout.Offset("id")
+	if !ok {
+		t.Fatal("layout does not contain id field")
+	}
+	transaction = newBasicUpdatePlannerTransaction(layout, []int32{0}, []int32{0})
+	transaction.writeErrOffset = valueOffset
+	transaction.writeErr = errors.New("record value write failed")
+	scan, err = query.NewRecordScan(transaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewRecordScan() for write error = %v", err)
+	}
+	closeErr := errors.New("scan close failed")
+	transaction.unpinErr = closeErr
+	count, err = insertRowIntoScan("student", []string{"id"}, []query.Constant{query.NewIntConstant(42)}, scan)
+	if count != 0 || !errors.Is(err, transaction.writeErr) || !errors.Is(err, closeErr) {
+		t.Errorf("insertRowIntoScan() with value/close errors = (%d, %v), want both causes", count, err)
+	}
+}
+
+func TestInsertRowIntoScanHandlesReadOnlyAndCloseErrors(t *testing.T) {
+	closeErr := errors.New("read-only scan close failed")
+	scan := &productPlanScanStub{closeErr: closeErr}
+	if count, err := insertRowIntoScan("student", []string{"id"}, []query.Constant{query.NewIntConstant(42)}, scan); count != 0 || err == nil || !errors.Is(err, closeErr) {
+		t.Errorf("insertRowIntoScan() with read-only scan = (%d, %v), want unsupported and close errors", count, err)
+	}
+	if scan.closeCalls != 1 {
+		t.Errorf("read-only scan close calls = %d, want 1", scan.closeCalls)
+	}
+	if count, err := insertRowIntoScan("student", []string{"id"}, []query.Constant{query.NewIntConstant(42)}, nil); count != 0 || err == nil {
+		t.Errorf("insertRowIntoScan() with nil scan = (%d, %v), want an error", count, err)
+	}
+
+	layout := record.NewLayout(newPlannerTestSchema("id"))
+	transaction := newBasicUpdatePlannerTransaction(layout, []int32{0}, []int32{0})
+	transaction.unpinErr = closeErr
+	recordScan, err := query.NewRecordScan(transaction, "student", layout)
+	if err != nil {
+		t.Fatalf("NewRecordScan() for close error = %v", err)
+	}
+	if count, err := insertRowIntoScan("student", []string{"id"}, []query.Constant{query.NewIntConstant(42)}, recordScan); count != 1 || !errors.Is(err, closeErr) {
+		t.Errorf("insertRowIntoScan() with close error = (%d, %v), want inserted count and close error", count, err)
+	}
+}
+
 func TestDeleteRowsFromScanHandlesReadOnlyAndNilScans(t *testing.T) {
 	closeErr := errors.New("read-only scan close failed")
 	scan := &productPlanScanStub{closeErr: closeErr}
