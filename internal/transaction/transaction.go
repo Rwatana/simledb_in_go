@@ -39,6 +39,12 @@ type transactionLockManager interface {
 	Release()
 }
 
+// FileManager provides the file metadata and growth operations used by a transaction.
+type FileManager interface {
+	FileSizer
+	Append(fileName string) (storage.BlockID, error)
+}
+
 // Transaction owns the resources and identity of one database transaction.
 type Transaction struct {
 	id            recovery.TransactionID
@@ -48,6 +54,7 @@ type Transaction struct {
 	logs          recovery.DurableLog
 	iterator      recovery.EncodedRecordIteratorFactory
 	fileSizer     FileSizer
+	fileManager   FileManager
 	state         transactionState
 }
 
@@ -88,6 +95,19 @@ func NewWithFileSizer(allocator *IDAllocator, lockTable *concurrency.LockTable, 
 	return transaction, nil
 }
 
+// NewWithFileManager creates a transaction that can read file lengths and append blocks.
+func NewWithFileManager(allocator *IDAllocator, lockTable *concurrency.LockTable, fileManager FileManager, bufferManager BufferManager, logs recovery.DurableLog, iterator ...recovery.EncodedRecordIteratorFactory) (*Transaction, error) {
+	if fileManager == nil {
+		return nil, fmt.Errorf("create transaction with file manager: file manager must not be nil")
+	}
+	transaction, err := NewWithFileSizer(allocator, lockTable, fileManager, bufferManager, logs, iterator...)
+	if err != nil {
+		return nil, err
+	}
+	transaction.fileManager = fileManager
+	return transaction, nil
+}
+
 // ID returns the transaction's canonical recovery identifier.
 func (t *Transaction) ID() recovery.TransactionID {
 	return t.id
@@ -107,6 +127,22 @@ func (t *Transaction) Size(fileName string) (int, error) {
 		return 0, fmt.Errorf("get transaction file size for %q: %w", fileName, err)
 	}
 	return length, nil
+}
+
+// Append adds a block while retaining an exclusive lock on the file's EOF sentinel.
+func (t *Transaction) Append(fileName string) (storage.BlockID, error) {
+	if t.fileManager == nil {
+		return storage.BlockID{}, fmt.Errorf("append transaction file %q: file manager is not configured", fileName)
+	}
+	eof := storage.NewBlockID(fileName, -1)
+	if err := t.locks.LockExclusive(eof); err != nil {
+		return storage.BlockID{}, fmt.Errorf("append transaction file %q: acquire EOF exclusive lock: %w", fileName, err)
+	}
+	block, err := t.fileManager.Append(fileName)
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("append transaction file %q: %w", fileName, err)
+	}
+	return block, nil
 }
 
 // Pin acquires a buffer for block and records it as transaction-local ownership.
