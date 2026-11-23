@@ -12,6 +12,7 @@ implementation can preserve the same interface.
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
+| `internal/metadata.IndexInfo` | `simpledb/metadata/IndexInfo.java` | Open the configured static hash index using the retained transaction and index-record layout |
 | `internal/query.RecordScan` | `simpledb/record/TableScan.java` | Go adapter that converts typed record fields into query constants without coupling records to query values |
 
 ## Feature 1: Define the index traversal contract
@@ -241,6 +242,18 @@ cause. A nil adapter returns an error, while absent resource references are harm
 The focused tests first failed because `IndexSelectScan.Close` was undefined. They verify index-before-table ordering,
 attempting both closes after a failure, preserving both wrapped causes, nil receiver handling, and partial/absent resource
 states.
+
+## Feature 18: Open an index from metadata
+
+`metadata.IndexInfo.Open` returns the static `hash.HashIndex` through the `index.Index` contract, wired with the exact
+transaction, index name, and index-record layout retained by the metadata object. It performs no transaction I/O until
+the caller positions the index; `BeforeFirst` then selects and opens the appropriate bucket. This completes the deferred
+opening step from Chapter 7 without introducing B-tree behavior.
+
+### Test-first record
+
+The focused test first failed because `IndexInfo.Open` was undefined. It verifies construction without bucket I/O, then
+positions integer and varchar indexes, inserts an entry, and reads its RID back to validate bucket and layout wiring.
 
 ## Intentional differences from Java
 

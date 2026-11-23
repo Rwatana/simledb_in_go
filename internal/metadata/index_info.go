@@ -3,6 +3,8 @@ package metadata
 import (
 	"fmt"
 
+	"github.com/Rwatana/simledb_in_go/internal/index"
+	"github.com/Rwatana/simledb_in_go/internal/index/hash"
 	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
@@ -45,6 +47,11 @@ func NewIndexInfo(indexName, fieldName string, tableSchema *record.Schema, trans
 		stats:       stats,
 		indexLayout: record.NewLayout(&indexSchema),
 	}, nil
+}
+
+// Open creates the static hash index described by this metadata.
+func (i *IndexInfo) Open() index.Index {
+	return hash.NewHashIndex(i.transaction, i.indexName, i.indexLayout)
 }
 
 // BlocksAccessed estimates the blocks visited while traversing one static-hash bucket.

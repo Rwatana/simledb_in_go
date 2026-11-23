@@ -483,9 +483,9 @@ changed.
 the physical index-record layout in book order: integer `block`, integer `id`, then `dataval` with the indexed table
 field's exact logical type and varchar length.
 
-Initialization validates the dependencies and field name instead of allowing a later nil dereference. The concrete
-`HashIndex`/`BTreeIndex` opening behavior remains deferred to Chapters 12–13; Chapter 7 needs only metadata and cost
-descriptions, so no future index interface or implementation is introduced here.
+Initialization validates the dependencies and field name instead of allowing a later nil dereference. At this stage,
+the concrete `HashIndex` opening behavior remains deferred until the index implementation exists; the Chapter 11
+follow-up below now resolves that dependency without adding a speculative B-tree implementation.
 
 ### Test-first record
 
@@ -847,3 +847,20 @@ The test first failed to compile because `MetadataManager.Statistics` did not ex
 | --- | --- |
 | `TestMetadataManagerStatisticsReturnsSharedManagerSnapshot` | Facade lookup reports two stored records and returns the exact snapshot installed in the shared statistics manager cache |
 | `TestMetadataManagerStatisticsPreservesRefreshFailure` | A failed refresh returns no partial snapshot, preserves refresh and facade context, counts the lookup, and leaves the cache empty |
+
+## Chapter 11 follow-up: Open an index from its metadata
+
+`IndexInfo.Open` constructs the existing static `HashIndex` from the transaction, index name, and record layout retained
+by the metadata object. Construction itself performs no transaction I/O; bucket selection and table access begin when
+the caller positions the returned `index.Index`. This completes the concrete opening behavior intentionally deferred
+by Feature 21, while keeping B-tree support out of scope until that implementation exists.
+
+### Test-first record
+
+The focused test first failed because `IndexInfo.Open` was undefined. It opens both integer and varchar indexes through
+the returned contract, verifies no bucket I/O occurs at construction, then inserts and reads a RID through the selected
+bucket so incorrect index-name, transaction, or record-layout wiring is observable.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestIndexInfoOpenBuildsConfiguredStaticHashIndexWithoutOpeningBucket` | The method defers bucket I/O until positioning and returns an index configured with the metadata's name, transaction, and typed record layout |
