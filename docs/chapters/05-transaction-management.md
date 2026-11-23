@@ -208,10 +208,40 @@ Exact bytes, unchanged LSN, and the no-retry error path were tested before imple
 | returns append LSN | unchanged `log.LSN` | Preserve ordering identity for the next flush behavior |
 | append has no checked error | wrapped Go error | Make partial I/O uncertainty explicit and avoid retry |
 
+## Feature 6: Flush the appended COMMIT LSN
+
+The [editable Draw.io diagram](../diagrams/ch05-commit-durability.drawio) and
+[rendered SVG](../diagrams/ch05-commit-durability.svg) show the durability boundary. `AppendAndFlushCommitRecord` first
+uses the existing COMMIT append behavior and only then calls `Flush` with exactly that returned LSN.
+
+An append error means there is no LSN to flush, so flush is not called. A flush error includes both transaction ID and LSN,
+preserves the underlying error, and is not retried. Successful completion returns the same LSN, now covered by the log
+manager's durable prefix guarantee.
+
+### Test-first record
+
+Success ordering, append failure, flush failure, and concrete `log.Manager` port conformance were tested first. The initial
+build failed because `DurableLog` and `AppendAndFlushCommitRecord` were undefined.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestAppendAndFlushCommitRecordFlushesReturnedLSN` | Append once, flush the exact LSN once, return it |
+| `TestAppendAndFlushCommitRecordDoesNotFlushAfterAppendFailure` | Append failure cuts off flush |
+| `TestAppendAndFlushCommitRecordReturnsFlushFailureWithContext` | Flush failure carries transaction and LSN context, no retry |
+| `TestLogManagerSatisfiesDurableRecoveryLog` | Existing log manager satisfies append and flush port |
+
+### Java source map and Go decision
+
+| Java recovery path | Go | Decision |
+| --- | --- | --- |
+| `CommitRecord.writeToLog` returns LSN | `AppendCommitRecord` | Keep append independently testable |
+| `RecoveryMgr.commit` calls `lm.flush(lsn)` | `AppendAndFlushCommitRecord` | Isolate the log durability primitive from buffer flush |
+| implicit concrete `LogMgr` | `DurableLog` consumer port | Require only append and flush |
+| unchecked flush failure | contextual wrapped error | Expose the exact failed durability cut point |
+
 ## Next behavior
 
-Continue Sect. 5.3.9.1 by flushing an appended COMMIT LSN in a separate PR because append and durability are distinct
-observable behaviors.
+Continue Sect. 5.3.9.1 with the ROLLBACK record codec as a separate issue and stacked PR.
 
 ## Sources
 
