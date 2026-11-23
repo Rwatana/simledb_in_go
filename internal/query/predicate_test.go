@@ -198,3 +198,30 @@ func TestPredicateEquatesWithConstant(t *testing.T) {
 		t.Fatalf("empty.EquatesWithConstant(age) = (%v, %v), want absent", got, ok)
 	}
 }
+
+func TestPredicateEquatesWithField(t *testing.T) {
+	nonmatching := NewTerm(NewFieldExpression("x"), NewFieldExpression("y"))
+	firstMatch := NewTerm(NewFieldExpression("age"), NewFieldExpression("birth_year"))
+	secondMatch := NewTerm(NewFieldExpression("age"), NewFieldExpression("created_at"))
+	predicate := Predicate{terms: []Term{nonmatching, firstMatch, secondMatch}}
+
+	got, ok := predicate.EquatesWithField("age")
+	if got != "birth_year" || !ok {
+		t.Fatalf("EquatesWithField(age) = (%q, %v), want (birth_year, true)", got, ok)
+	}
+	if want := []Term{nonmatching, firstMatch, secondMatch}; !reflect.DeepEqual(predicate.terms, want) {
+		t.Fatalf("predicate terms = %v, want unchanged %v", predicate.terms, want)
+	}
+
+	emptyName := NewPredicateWithTerm(NewTerm(NewFieldExpression("age"), NewFieldExpression("")))
+	if got, ok := emptyName.EquatesWithField("age"); got != "" || !ok {
+		t.Fatalf("EquatesWithField(age) for empty opposite field = (%q, %v), want (empty, true)", got, ok)
+	}
+	if got, ok := predicate.EquatesWithField("missing"); got != "" || ok {
+		t.Fatalf("EquatesWithField(missing) = (%q, %v), want absent", got, ok)
+	}
+	var empty Predicate
+	if got, ok := empty.EquatesWithField("age"); got != "" || ok {
+		t.Fatalf("empty.EquatesWithField(age) = (%q, %v), want absent", got, ok)
+	}
+}

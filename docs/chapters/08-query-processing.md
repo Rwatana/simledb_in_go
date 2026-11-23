@@ -230,3 +230,12 @@ boolean result distinguishes an absent match from a present zero-value `Constant
 
 `TestPredicateEquatesWithConstant` first failed because the predicate method was undefined. It checks first-match
 ordering, a present zero-value constant, a missing field, an empty predicate, and that lookup leaves terms unchanged.
+
+## Feature 23: Find field equalities implied by a predicate
+
+`Predicate.EquatesWithField` maps to Java `Predicate.equatesWithField(String)`. It scans terms in order and returns
+the opposite field from the first match, delegating operand order to `Term.EquatesWithField`. Go's boolean result
+distinguishes a present empty field name from no match.
+
+`TestPredicateEquatesWithField` first failed because the predicate method was undefined. It covers first-match order,
+an explicitly empty opposite name, absent and empty-predicate results, and source immutability.
