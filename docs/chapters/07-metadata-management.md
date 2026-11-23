@@ -278,6 +278,8 @@ The test first failed to compile because `ViewManager.CreateView` did not exist.
 | --- | --- |
 | `TestViewManagerCreateViewStoresDefinitionInNewViewFile` | A first view creates one formatted `viewcat` block and stores its name and SQL definition in the first occupied slot |
 | `TestViewManagerCreateViewWrapsCatalogLayoutFailure` | A failed view-catalog layout lookup returns the cause with view-name and layout context |
+| `TestViewManagerCreateViewPreservesViewNameWriteFailure` | A `viewname` write error preserves its cause and context and still closes the scan |
+| `TestViewManagerCreateViewPreservesViewDefinitionWriteFailure` | A `viewdef` write error is returned after the name write and still closes the scan |
 
 This maps Java `ViewMgr.createView` while adding explicit layout, scan, and cleanup error propagation.
 
@@ -298,6 +300,7 @@ The test first failed to compile because `ViewManager.ViewDefinition` did not ex
 | Test | Observable behavior |
 | --- | --- |
 | `TestViewManagerViewDefinitionFindsMatchAndReportsAbsence` | Lookup skips earlier non-matches, returns the matching SQL definition, and reports catalog exhaustion without an error |
+| `TestViewManagerViewDefinitionRequiresTableManager` | Missing table metadata returns an empty not-found result and view context before transaction access |
 
 Go uses an explicit `(string, bool, error)` result instead of Java's nullable string, separating absence from failures.
 Java `ViewMgr`'s public behavior column is now complete.

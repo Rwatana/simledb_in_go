@@ -72,6 +72,16 @@ func TestViewManagerInitializeCatalogRequiresTableManager(t *testing.T) {
 	}
 }
 
+func TestViewManagerViewDefinitionRequiresTableManager(t *testing.T) {
+	definition, found, err := NewViewManager(nil).ViewDefinition("seniors", nil)
+	if definition != "" || found {
+		t.Fatalf("ViewDefinition() = (%q, %v), want empty not-found result", definition, found)
+	}
+	if err == nil || !strings.Contains(err.Error(), `look up view "seniors"`) || !strings.Contains(err.Error(), "table manager is nil") {
+		t.Fatalf("ViewDefinition() error = %v, want view-specific missing table manager context", err)
+	}
+}
+
 func TestViewManagerInitializeCatalogWrapsCatalogCloseFailure(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()
