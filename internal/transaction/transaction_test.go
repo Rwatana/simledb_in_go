@@ -4,6 +4,7 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/buffer"
@@ -39,6 +40,28 @@ type recordingFileSizer struct {
 	appendErr   error
 	appendNames []string
 	blockSize   int
+}
+
+type recordingTransactionLockManager struct {
+	sharedErr     error
+	exclusiveErr  error
+	sharedCalls   int
+	exclusiveCall int
+	releaseCalls  int
+}
+
+func (m *recordingTransactionLockManager) LockShared(storage.BlockID) error {
+	m.sharedCalls++
+	return m.sharedErr
+}
+
+func (m *recordingTransactionLockManager) LockExclusive(storage.BlockID) error {
+	m.exclusiveCall++
+	return m.exclusiveErr
+}
+
+func (m *recordingTransactionLockManager) Release() {
+	m.releaseCalls++
 }
 
 func (s *recordingFileSizer) Length(fileName string) (int, error) {
@@ -1327,6 +1350,30 @@ func TestTransactionSizeRequiresFileSizer(t *testing.T) {
 	}
 	if err == nil || err.Error() != `get transaction file size for "tbl": file sizer is not configured` {
 		t.Errorf("Size() error = %v, want file-sizer configuration error", err)
+	}
+}
+
+func TestTransactionSizePreservesEOFSharedLockFailure(t *testing.T) {
+	wantErr := concurrency.ErrLockConflict
+	locks := &recordingTransactionLockManager{sharedErr: wantErr}
+	sizer := &recordingFileSizer{lengths: map[string]int{"tbl": 7}}
+	transaction := &Transaction{locks: locks, fileSizer: sizer}
+
+	length, err := transaction.Size("tbl")
+	if length != 0 {
+		t.Errorf("Size() length = %d, want 0 after lock failure", length)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("Size() error = %v, want lock conflict", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), `get transaction file size for "tbl": acquire EOF shared lock`) {
+		t.Errorf("Size() error = %v, want file and operation context", err)
+	}
+	if locks.sharedCalls != 1 {
+		t.Errorf("shared lock calls = %d, want 1", locks.sharedCalls)
+	}
+	if len(sizer.names) != 0 {
+		t.Errorf("Length() calls = %v, want none after lock failure", sizer.names)
 	}
 }
 

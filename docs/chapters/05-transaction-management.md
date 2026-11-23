@@ -1784,6 +1784,8 @@ keeping the Go dependency limited to the single `Length` operation required now.
 `NewWithFileSizer` preserves the existing constructor for transactions that do not need file metadata. Repeated size
 reads call the file manager again but reuse the same transaction-local shared hold, so they do not inflate the global
 holder count.
+The transaction stores the small shared/exclusive/release lock-manager contract internally, allowing tests to verify
+that acquisition errors stop the file-sizer call without changing the concrete manager used at runtime.
 
 ### Test-first record
 
@@ -1795,6 +1797,7 @@ length, EOF sentinel contention, repeated-lock reuse, and file-manager error pro
 | `TestTransactionSizeReadsLengthUnderReusableEOFSharedLock` | File length reads retain and reuse one shared EOF lock |
 | `TestTransactionSizeReturnsFileLengthFailure` | File length failures retain file context and preserve the lock ordering |
 | `TestTransactionSizeRequiresFileSizer` | A zero-value transaction reports the unconfigured file-sizer error without lock access |
+| `TestTransactionSizePreservesEOFSharedLockFailure` | An EOF shared-lock error preserves its cause and prevents the file-sizer call |
 | `TestNewWithFileSizerRejectsNilSizerBeforeStartingTransaction` | Missing file metadata is rejected before allocating an ID or appending START |
 | `TestNewWithFileSizerReturnsStartAppendFailure` | A START append failure returns no transaction and preserves its cause and transaction ID context |
 

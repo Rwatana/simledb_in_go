@@ -41,10 +41,16 @@ type FileManager interface {
 	BlockSize() int
 }
 
+type transactionLockManager interface {
+	LockShared(block storage.BlockID) error
+	LockExclusive(block storage.BlockID) error
+	Release()
+}
+
 // Transaction owns the resources and identity of one database transaction.
 type Transaction struct {
 	id            recovery.TransactionID
-	locks         *concurrency.Manager
+	locks         transactionLockManager
 	buffers       *BufferList
 	bufferManager BufferManager
 	logs          recovery.DurableLog
