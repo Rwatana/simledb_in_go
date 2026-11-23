@@ -67,3 +67,49 @@ func TestIncompleteQueryDataAndZeroValueRenderSafely(t *testing.T) {
 		})
 	}
 }
+
+func TestInsertDataRetainsOrderedFieldsAndValues(t *testing.T) {
+	fields := []string{"name", "age"}
+	values := []query.Constant{query.NewStringConstant("Ada"), query.NewIntConstant(37)}
+	data := NewInsertData("student", fields, values)
+
+	fields[0] = "changed"
+	values[0] = query.NewStringConstant("changed")
+	if got, want := data.TableName(), "student"; got != want {
+		t.Fatalf("TableName() = %q, want %q", got, want)
+	}
+	if got, want := data.Fields(), []string{"name", "age"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Fields() = %v, want %v", got, want)
+	}
+	if got, want := data.Values(), []query.Constant{query.NewStringConstant("Ada"), query.NewIntConstant(37)}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Values() = %v, want %v", got, want)
+	}
+}
+
+func TestInsertDataAccessorsReturnIndependentSlices(t *testing.T) {
+	data := NewInsertData("student", []string{"name"}, []query.Constant{query.NewStringConstant("Ada")})
+	fields := data.Fields()
+	values := data.Values()
+	fields[0] = "other"
+	values[0] = query.NewStringConstant("other")
+
+	if got := data.Fields()[0]; got != "name" {
+		t.Errorf("Fields()[0] after accessor mutation = %q, want name", got)
+	}
+	if got := data.Values()[0]; got != query.NewStringConstant("Ada") {
+		t.Errorf("Values()[0] after accessor mutation = %v, want Ada", got)
+	}
+}
+
+func TestInsertDataZeroValueHasEmptyAccessors(t *testing.T) {
+	var data InsertData
+	if got := data.TableName(); got != "" {
+		t.Errorf("TableName() = %q, want empty", got)
+	}
+	if got := data.Fields(); got != nil {
+		t.Errorf("Fields() = %v, want nil", got)
+	}
+	if got := data.Values(); got != nil {
+		t.Errorf("Values() = %v, want nil", got)
+	}
+}

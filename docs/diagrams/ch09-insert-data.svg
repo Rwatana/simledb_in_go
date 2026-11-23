@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="520" viewBox="0 0 1160 520" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 15: Store INSERT command data</title>
+  <desc id="description">InsertData stores the target table, ordered field names, and matching query constants. Construction and accessors copy both lists, and the zero value safely returns empty data.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1160" height="520" fill="#fff"/>
+  <text class="title" x="580" y="62" text-anchor="middle">Chapter 9 / Feature 15: Store INSERT command data</text>
+  <rect class="box" x="35" y="195" width="250" height="145" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="160" y="235"><tspan x="160">Constructor input</tspan><tspan class="small" x="160" dy="30">fields: name, age</tspan><tspan class="small" x="160" dy="25">values: Ada, 37</tspan></text>
+  <rect class="box" x="390" y="175" width="280" height="185" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="530" y="217"><tspan x="530">InsertData</tspan><tspan class="small" x="530" dy="30">tableName</tspan><tspan class="small" x="530" dy="25">ordered fields[]</tspan><tspan class="small" x="530" dy="25">matching values[]</tspan></text>
+  <rect class="box" x="780" y="175" width="255" height="185" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="907" y="215"><tspan x="907">Read-only accessors</tspan><tspan class="small" x="907" dy="30">TableName()</tspan><tspan class="small" x="907" dy="25">Fields() → copy</tspan><tspan class="small" x="907" dy="25">Values() → copy</tspan></text>
+  <rect class="box" x="390" y="405" width="280" height="90" fill="#f5f5f5" stroke="#666"/>
+  <text class="label" x="530" y="438"><tspan x="530">Zero value</tspan><tspan class="small" x="530" dy="25">empty table · nil lists</tspan></text>
+  <path class="edge" d="M285 268 H380"/><text class="small" x="332" y="250">copy input</text>
+  <path class="edge" d="M670 267 H770"/><text class="small" x="720" y="249">return copies</text>
+  <path class="edge" d="M530 360 V395"/><text class="small" x="590" y="385">safe defaults</text>
+</svg>

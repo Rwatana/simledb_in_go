@@ -12,6 +12,7 @@ Request.
 | `internal/parse.Lexer` | `simpledb/parse/Lexer.java` | Read tokens while retaining source position for lookahead |
 | `internal/parse.Parser` | `simpledb/parse/Parser.java` | Turn token sequences into query values |
 | `internal/parse.DeleteData` | `simpledb/parse/DeleteData.java` | Hold the target table and predicate of a DELETE statement |
+| `internal/parse.InsertData` | `simpledb/parse/InsertData.java` | Hold the target table, ordered fields, and corresponding values of an INSERT statement |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -255,6 +256,20 @@ Tests first failed to compile because `Parser.ParseDelete` was undefined. They c
 ordered conjunction, an omitted predicate, preservation of a following keyword, missing command clauses and table
 names, incomplete predicates, byte offsets, and a nil receiver.
 
+## Feature 15: Store parsed INSERT command data
+
+`parse.InsertData` maps to Java `parse.InsertData`. It stores the target table, the ordered field names, and the ordered
+`query.Constant` values corresponding to those fields. Go copies both slices when constructing the value and again
+when returning them from accessors, so mutation through caller-owned slices cannot alter the stored command. The
+zero value safely returns an empty table name and nil lists. The [INSERT-data diagram](../diagrams/ch09-insert-data.svg)
+shows the aligned field/value lists and defensive-copy boundary; its editable source is
+[`ch09-insert-data.drawio`](../diagrams/ch09-insert-data.drawio).
+
+### Test-first record
+
+Tests first failed to compile because `InsertData` and `NewInsertData` were undefined. They cover the table name,
+field/value order, constructor-copy isolation, accessor-copy isolation, and the zero value.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -267,3 +282,4 @@ names, incomplete predicates, byte offsets, and a nil receiver.
 - SELECT field and table lists are parsed iteratively rather than recursively, and query parsing leaves any trailing token for its caller.
 - `DeleteData` keeps its fields private and exposes a safe zero value; Java exposes its command data only through accessor methods but does not define Go's zero-value behavior.
 - `ParseDelete` is a concrete-command parser separate from Go's future update-command dispatcher; it leaves trailing tokens to its caller.
+- `InsertData` copies its field and value slices for clear ownership; Java exposes its internal mutable lists directly.
