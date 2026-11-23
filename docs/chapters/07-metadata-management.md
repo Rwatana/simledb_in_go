@@ -656,3 +656,21 @@ The test first failed to compile because `MetadataManager.InitializeCatalogs` di
 | `TestMetadataManagerInitializeCatalogsPreservesTableCatalogFailure` | Table catalog initialization failure preserves its cause and facade stage context and stops bootstrap |
 | `TestMetadataManagerInitializeCatalogsPreservesViewCatalogFailure` | View catalog initialization failure preserves its cause and prevents index catalog registration |
 | `TestMetadataManagerInitializeCatalogsPreservesIndexCatalogFailure` | Index catalog initialization failure preserves its cause after earlier catalogs succeed |
+
+## Feature 32: Create a table through the metadata facade
+
+`MetadataManager.CreateTable` delegates the supplied name, logical schema, and transaction to the facade's shared table
+manager. The resulting table and field catalog rows remain reconstructable by the same manager, while any catalog error
+is wrapped with the requested table name and facade context.
+
+This is the Go facade counterpart of Java `MetadataMgr.createTable`; it adds no second catalog-write path or duplicate
+schema calculation.
+
+### Test-first record
+
+The test first failed to compile because `MetadataManager.CreateTable` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestMetadataManagerCreateTableStoresSchemaThroughFacade` | Creating `student` through the facade persists an ordered integer/varchar schema that the table manager can reconstruct |
+| `TestMetadataManagerCreateTablePreservesNilSchemaError` | A nil schema returns table-specific facade context before a nil transaction can be touched |

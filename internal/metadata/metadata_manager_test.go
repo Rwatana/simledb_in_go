@@ -1,7 +1,11 @@
 package metadata
 
 import (
+	"errors"
+	"github.com/Rwatana/simledb_in_go/internal/record"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -126,4 +130,39 @@ func TestMetadataManagerInitializeCatalogsPreservesIndexCatalogFailure(t *testin
 	assertPageInt(t, tablePage, 152, 1)
 	assertPageString(t, tablePage, 156, "viewcat")
 	assertPageInt(t, tablePage, 228, 0)
+}
+
+func TestMetadataManagerCreateTableStoresSchemaThroughFacade(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewMetadataManager()
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	schema.AddVarcharField("sname", 20)
+
+	if err := manager.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+
+	layout, err := manager.tables.Layout("student", transaction)
+	if err != nil {
+		t.Fatalf("table manager Layout(student) error = %v", err)
+	}
+	if got, want := layout.Schema().Fields(), []string{"sid", "sname"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("student fields = %v, want %v", got, want)
+	}
+}
+
+func TestMetadataManagerCreateTablePreservesNilSchemaError(t *testing.T) {
+	err := NewMetadataManager().CreateTable("student", nil, nil)
+	if err == nil {
+		t.Fatal("CreateTable() error = nil, want nil-schema validation error")
+	}
+	for _, context := range []string{`create table "student" through metadata manager`, "schema is nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("CreateTable() error = %q, want context %q", err, context)
+		}
+	}
 }

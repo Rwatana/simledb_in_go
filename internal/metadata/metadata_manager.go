@@ -41,3 +41,11 @@ func (m *MetadataManager) InitializeCatalogs(transaction record.TableScanTransac
 	}
 	return nil
 }
+
+// CreateTable stores a table schema through the metadata facade.
+func (m *MetadataManager) CreateTable(tableName string, schema *record.Schema, transaction record.TableScanTransaction) error {
+	if err := m.tables.CreateTable(tableName, schema, transaction); err != nil {
+		return fmt.Errorf("create table %q through metadata manager: %w", tableName, err)
+	}
+	return nil
+}
