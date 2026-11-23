@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="590" viewBox="0 0 1240 590" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 24: Parse SQL CREATE TABLE statements</title>
+  <desc id="description">ParseCreateTable reads a table name and comma-separated fields, maps int and varchar lengths to schema definitions, and returns copied CreateTableData. It preserves trailing input and reports contextual byte-offset errors.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <text class="title" x="620" y="62" text-anchor="middle">Chapter 9 / Feature 24: Parse SQL CREATE TABLE statements</text>
+  <rect class="box" x="35" y="210" width="285" height="135" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="177" y="248"><tspan x="177">SQL input</tspan><tspan x="177" dy="30">CREATE TABLE student</tspan><tspan x="177" dy="27">(id int, name varchar(24))</tspan></text>
+  <rect class="box" x="390" y="200" width="285" height="150" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="532" y="244"><tspan x="532">ParseCreateTable</tspan><tspan x="532" dy="31">table name</tspan><tspan x="532" dy="27">comma-separated definitions</tspan></text>
+  <polygon points="877,190 1000,275 877,360 755,275" fill="#ffe6cc" stroke="#d79b00" stroke-width="2"/>
+  <text class="label" x="877" y="245"><tspan x="877">Field type</tspan><tspan x="877" dy="31">int → IntegerField</tspan><tspan x="877" dy="27">varchar(n) → VarcharField(n)</tspan></text>
+  <rect class="box" x="1050" y="200" width="160" height="150" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="1130" y="242"><tspan x="1130">CreateTableData</tspan><tspan x="1130" dy="31">table name</tspan><tspan x="1130" dy="27">ordered Schema</tspan></text>
+  <rect class="box" x="390" y="410" width="285" height="90" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="532" y="443"><tspan x="532">Following token stays available</tspan><tspan x="532" dy="27">caller continues parsing</tspan></text>
+  <rect class="box" x="755" y="410" width="455" height="90" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="982" y="443"><tspan x="982">Grammar and type errors</tspan><tspan x="982" dy="27">retain context and byte offsets</tspan></text>
+  <path class="edge" d="M320 277 H382"/><text class="small" x="351" y="265">consume list</text>
+  <path class="edge" d="M675 277 H747"/><text class="small" x="711" y="265">inspect type</text>
+  <path class="edge" d="M1000 277 H1042"/><text class="small" x="1020" y="265">add field</text>
+  <path class="edge" d="M532 350 V402" stroke-dasharray="7 6"/><text class="small" x="605" y="380">loop ends</text>
+  <path class="edge" d="M877 360 V402" stroke-dasharray="7 6"/><text class="small" x="945" y="390">error context</text>
+</svg>

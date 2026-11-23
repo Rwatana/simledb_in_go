@@ -1,0 +1,21 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-parse-create-table" name="Chapter 9 - Parse CREATE TABLE">
+    <mxGraphModel page="1" pageWidth="1240" pageHeight="590">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 24: Parse SQL CREATE TABLE statements" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="140" y="25" width="960" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="SQL input&#xa;&#xa;CREATE TABLE student&#xa;(id int, name varchar(24))" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;" vertex="1" parent="1"><mxGeometry x="35" y="210" width="285" height="135" as="geometry"/></mxCell>
+        <mxCell id="parser" value="ParseCreateTable&#xa;&#xa;table name&#xa;comma-separated definitions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;" vertex="1" parent="1"><mxGeometry x="390" y="200" width="285" height="150" as="geometry"/></mxCell>
+        <mxCell id="types" value="Field type&#xa;&#xa;int → IntegerField&#xa;varchar(n) → VarcharField(n)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=17;" vertex="1" parent="1"><mxGeometry x="755" y="190" width="245" height="170" as="geometry"/></mxCell>
+        <mxCell id="result" value="CreateTableData&#xa;&#xa;normalized table name&#xa;ordered copied Schema" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="1050" y="200" width="160" height="150" as="geometry"/></mxCell>
+        <mxCell id="tail" value="Following token stays available&#xa;&#xa;caller continues parsing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=16;" vertex="1" parent="1"><mxGeometry x="390" y="410" width="285" height="90" as="geometry"/></mxCell>
+        <mxCell id="error" value="Grammar and type errors&#xa;&#xa;retain context and byte offsets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;" vertex="1" parent="1"><mxGeometry x="755" y="410" width="455" height="90" as="geometry"/></mxCell>
+        <mxCell id="e1" value="consume list" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="input" target="parser"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="inspect type" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="parser" target="types"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="add field" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="types" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="loop ends" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="parser" target="tail"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="error context" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;" edge="1" parent="1" source="types" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

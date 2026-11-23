@@ -21,6 +21,7 @@ Request.
 | `internal/parse.CreateIndexData` | `simpledb/parse/CreateIndexData.java` | Hold the index, table, and field names of a CREATE INDEX statement |
 | `Parser.ParseCreateView` | `simpledb/parse/Parser.java` (`createView`) | Parse the view name and SELECT definition after CREATE VIEW |
 | `Parser.ParseCreateIndex` | `simpledb/parse/Parser.java` (`createIndex`) | Parse the index name, table, and indexed field after CREATE INDEX |
+| `Parser.ParseCreateTable` | `simpledb/parse/Parser.java` (`createTable`, `fieldDefs`, `fieldDef`, `fieldType`) | Parse a table name and ordered integer/varchar field definitions |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -394,6 +395,20 @@ shows the command sequence, result, and delimiter/error paths; its editable sour
 Tests first failed because `Parser.ParseCreateIndex` was undefined. They cover mixed-case names, following-token
 preservation, every required keyword/name/delimiter, byte offsets, and a nil receiver.
 
+## Feature 24: Parse SQL CREATE TABLE statements
+
+`Parser.ParseCreateTable` maps to Java `Parser.createTable` and its field-definition helpers. It reads `create table`,
+the normalized table name, and one or more comma-separated field definitions. Integer fields use `int`; string fields
+use `varchar(<non-negative length>)`. It returns the copied schema in declaration order, leaves trailing input for the
+caller, and wraps grammar failures without losing byte offsets. The [CREATE TABLE-parser diagram](../diagrams/ch09-parse-create-table.svg)
+shows the field-type choice, list loop, result, and error paths; its editable source is
+[`ch09-parse-create-table.drawio`](../diagrams/ch09-parse-create-table.drawio).
+
+### Test-first record
+
+Tests first failed because `Parser.ParseCreateTable` was undefined. They cover integer and varchar field metadata,
+ordered lists, trailing-token preservation, every grammar and type failure, byte offsets, and a nil receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -415,3 +430,4 @@ preservation, every required keyword/name/delimiter, byte offsets, and a nil rec
 - `CreateIndexData` keeps the Java command's three string values private and exposes Go-style accessors; its zero value returns empty strings.
 - `ParseCreateView` uses the Go `ParseQuery` method and preserves trailing input for its caller, matching Java's query delegation without consuming an extra token.
 - `ParseCreateIndex` returns contextual errors and preserves the following token, while Java mutates a parser's shared stream and throws on grammar failure.
+- `ParseCreateTable` parses field definitions iteratively and rejects unknown types with a contextual error; Java recurses through definitions and treats any non-`int` type as `varchar`.
