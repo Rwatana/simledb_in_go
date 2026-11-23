@@ -16,6 +16,29 @@ type Manager struct {
 	directory string
 	blockSize int
 	mu        sync.Mutex
+	ops       fileOperations
+}
+
+type fileOperations interface {
+	Open(string) (fileHandle, error)
+	OpenFile(string, int, os.FileMode) (fileHandle, error)
+}
+
+type fileHandle interface {
+	ReadAt([]byte, int64) (int, error)
+	WriteAt([]byte, int64) (int, error)
+	Sync() error
+	Close() error
+}
+
+type osFileOperations struct{}
+
+func (osFileOperations) Open(name string) (fileHandle, error) {
+	return os.Open(name)
+}
+
+func (osFileOperations) OpenFile(name string, flag int, perm os.FileMode) (fileHandle, error) {
+	return os.OpenFile(name, flag, perm)
 }
 
 // NewManager creates the database directory and returns a Manager for blockSize-byte blocks.
@@ -29,7 +52,7 @@ func NewManager(directory string, blockSize int) (*Manager, error) {
 	if err := os.MkdirAll(directory, 0o750); err != nil {
 		return nil, fmt.Errorf("create database directory %q: %w", directory, err)
 	}
-	return &Manager{directory: directory, blockSize: blockSize}, nil
+	return &Manager{directory: directory, blockSize: blockSize, ops: osFileOperations{}}, nil
 }
 
 // BlockSize returns the number of bytes in each database block.
@@ -46,7 +69,7 @@ func (m *Manager) Read(block storage.BlockID) (*storage.Page, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read block %v: %w", block, err)
 	}
-	file, err := os.Open(path)
+	file, err := m.ops.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("read block %v: open %q: %w", block, path, err)
 	}
@@ -56,9 +79,6 @@ func (m *Manager) Read(block storage.BlockID) (*storage.Page, error) {
 	read, err := file.ReadAt(contents, offset)
 	if err != nil {
 		return nil, fmt.Errorf("read block %v at byte offset %d: read %d of %d bytes: %w", block, offset, read, m.blockSize, err)
-	}
-	if read != m.blockSize {
-		return nil, fmt.Errorf("read block %v at byte offset %d: read %d of %d bytes", block, offset, read, m.blockSize)
 	}
 	return storage.NewPageFromBytes(contents), nil
 }
@@ -79,7 +99,7 @@ func (m *Manager) Write(block storage.BlockID, page *storage.Page) error {
 	if err != nil {
 		return fmt.Errorf("write block %v: %w", block, err)
 	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	file, err := m.ops.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return fmt.Errorf("write block %v: open %q: %w", block, path, err)
 	}
@@ -89,9 +109,6 @@ func (m *Manager) Write(block storage.BlockID, page *storage.Page) error {
 	written, err := file.WriteAt(contents, offset)
 	if err != nil {
 		return fmt.Errorf("write block %v at byte offset %d: wrote %d of %d bytes: %w", block, offset, written, len(contents), err)
-	}
-	if written != len(contents) {
-		return fmt.Errorf("write block %v at byte offset %d: wrote %d of %d bytes", block, offset, written, len(contents))
 	}
 	if err := file.Sync(); err != nil {
 		return fmt.Errorf("write block %v: sync %q: %w", block, path, err)

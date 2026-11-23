@@ -241,6 +241,10 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | `TestPageStoresLengthPrefixedBytes` | 空やNULを含むpayloadをlength prefix付きで保存する |
 | `TestPageRejectsOutOfBoundsAccess` | encoded rangeがcapacityを越える操作をerrorにする |
 | `TestPageSnapshotDoesNotExposeMutableMemory` | snapshotから内部memoryを書き換えられない |
+| `TestPageCoversByteEncodingLimits` | 不正なstored lengthとencoded length上限を検証する |
+
+coverage gateの導入に合わせ、巨大sliceを作らず`SetBytes`のsigned 4-byte length上限を検証できるprivate helperを設けた。
+既存の`page_test.go`からsynthetic limitを渡し、負のstored lengthや範囲外offsetも確認する。
 
 ## Javaソースリーディング
 
@@ -339,6 +343,12 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | `TestManagerWritesAndReadsBlocks` | 複数blockのoffset、round-trip、Page間の非aliasing |
 | `TestManagerRejectsInvalidBlockAccess` | 負数、overflow、size不一致、short read、path traversalのerror |
 | `TestNewPageFromBytesCopiesContents` | diskから渡されたsliceをPage内部と共有しない |
+| `TestManagerReadWrapsOpenAndReadFailures` | open/read I/O errorを文脈付きで返す |
+| `TestManagerWriteWrapsOpenWriteAndSyncFailures` | open/write/sync I/O errorを文脈付きで返す |
+| `TestNewManagerRejectsInvalidDirectory` | database directory作成失敗を返す |
+
+coverage gateで残っていた既存FileManagerのfailure pathは、privateなfile operation seamから`manager_test.go`内で注入する。
+`ReaderAt` / `WriterAt`はshort transfer時にerrorを返す契約なので、到達不能なcount-only fallbackは持たない。
 
 ## Javaソースリーディング
 
