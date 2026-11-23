@@ -20,6 +20,9 @@ type catalogTransaction struct {
 	unpins            []storage.BlockID
 	appendCalls       []string
 	sizeErr           error
+	sizeErrFile       string
+	sizeErrAfter      int
+	sizeErrCalls      int
 	setStringErr      error
 	setStringErrAfter int
 	setStringCalls    int
@@ -44,9 +47,16 @@ func newCatalogTransaction(t *testing.T, blockSize int) *catalogTransaction {
 	return &catalogTransaction{pages: pages, blockSize: blockSize}
 }
 
+func newEmptyCatalogTransaction(blockSize int) *catalogTransaction {
+	return &catalogTransaction{pages: make(map[storage.BlockID]*storage.Page), blockSize: blockSize}
+}
+
 func (t *catalogTransaction) Size(fileName string) (int, error) {
-	if t.sizeErr != nil {
-		return 0, t.sizeErr
+	if t.sizeErr != nil && (t.sizeErrFile == "" || t.sizeErrFile == fileName) {
+		t.sizeErrCalls++
+		if t.sizeErrAfter == 0 || t.sizeErrCalls == t.sizeErrAfter {
+			return 0, t.sizeErr
+		}
 	}
 	if _, ok := t.pages[storage.NewBlockID(fileName, 0)]; !ok {
 		return 0, nil
@@ -56,7 +66,13 @@ func (t *catalogTransaction) Size(fileName string) (int, error) {
 
 func (t *catalogTransaction) Append(fileName string) (storage.BlockID, error) {
 	t.appendCalls = append(t.appendCalls, fileName)
-	return storage.BlockID{}, fmt.Errorf("unexpected append of %q", fileName)
+	block := storage.NewBlockID(fileName, 0)
+	page, err := storage.NewPage(t.blockSize)
+	if err != nil {
+		return storage.BlockID{}, err
+	}
+	t.pages[block] = page
+	return block, nil
 }
 
 func (t *catalogTransaction) Pin(block storage.BlockID) error {
@@ -580,6 +596,79 @@ func TestTableManagerCreateTablePreservesTableSlotSizeWriteFailure(t *testing.T)
 	}
 }
 
+func TestTableManagerInitializeCatalogsStoresTheirOwnMetadata(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	manager := NewTableManager()
+
+	if err := manager.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	assertTableCatalogRow(t, tablePage, 0, "tblcat", NewTableCatalogLayout().SlotSize())
+	assertTableCatalogRow(t, tablePage, 76, "fldcat", NewFieldCatalogLayout().SlotSize())
+	assertPageInt(t, tablePage, 152, 0)
+
+	fieldPage := transaction.pages[storage.NewBlockID("fldcat.tbl", 0)]
+	assertFieldCatalogRow(t, fieldPage, 0, "tblcat", "tblname", record.VarcharField, MaxNameLength, 4)
+	assertFieldCatalogRow(t, fieldPage, 152, "tblcat", "slotsize", record.IntegerField, 0, 72)
+	assertFieldCatalogRow(t, fieldPage, 304, "fldcat", "tblname", record.VarcharField, MaxNameLength, 4)
+	assertFieldCatalogRow(t, fieldPage, 456, "fldcat", "fldname", record.VarcharField, MaxNameLength, 72)
+	assertFieldCatalogRow(t, fieldPage, 608, "fldcat", "type", record.IntegerField, 0, 140)
+	assertFieldCatalogRow(t, fieldPage, 760, "fldcat", "length", record.IntegerField, 0, 144)
+	assertFieldCatalogRow(t, fieldPage, 912, "fldcat", "offset", record.IntegerField, 0, 148)
+	assertPageInt(t, fieldPage, 1064, 0)
+
+	if got, want := transaction.appendCalls, []string{"tblcat.tbl", "fldcat.tbl"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("append calls = %v, want %v", got, want)
+	}
+}
+
+func TestTableManagerInitializeCatalogsPreservesTableCatalogFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	sizeErr := errors.New("table catalog size failed")
+	transaction.sizeErr = sizeErr
+	transaction.sizeErrFile = "tblcat.tbl"
+
+	err := NewTableManager().InitializeCatalogs(transaction)
+	if !errors.Is(err, sizeErr) {
+		t.Fatalf("InitializeCatalogs() error = %v, want size cause", err)
+	}
+	for _, context := range []string{"initialize table catalog", "open catalog scan", "read size"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("InitializeCatalogs() error = %q, want context %q", err, context)
+		}
+	}
+	if len(transaction.appendCalls) != 0 || len(transaction.pins) != 0 || len(transaction.unpins) != 0 {
+		t.Fatalf("catalog side effects = append %v, pins %v, unpins %v; want none", transaction.appendCalls, transaction.pins, transaction.unpins)
+	}
+}
+
+func TestTableManagerInitializeCatalogsPreservesFieldCatalogFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	sizeErr := errors.New("field catalog registration size failed")
+	transaction.sizeErr = sizeErr
+	transaction.sizeErrFile = "tblcat.tbl"
+	transaction.sizeErrAfter = 2
+
+	err := NewTableManager().InitializeCatalogs(transaction)
+	if !errors.Is(err, sizeErr) {
+		t.Fatalf("InitializeCatalogs() error = %v, want size cause", err)
+	}
+	for _, context := range []string{"initialize field catalog", "fldcat", "table catalog", "open catalog scan", "read size"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Fatalf("InitializeCatalogs() error = %q, want context %q", err, context)
+		}
+	}
+
+	tablePage := transaction.pages[storage.NewBlockID("tblcat.tbl", 0)]
+	assertPageString(t, tablePage, 4, "tblcat")
+	assertPageInt(t, tablePage, 76, 0)
+	if got, want := transaction.appendCalls, []string{"tblcat.tbl", "fldcat.tbl"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("append calls = %v, want %v", got, want)
+	}
+}
+
 func assertFieldCatalogRow(t *testing.T, page *storage.Page, base int, tableName, fieldName string, fieldType record.FieldType, length, offset int) {
 	t.Helper()
 	assertPageInt(t, page, base, 1)
@@ -588,6 +677,13 @@ func assertFieldCatalogRow(t *testing.T, page *storage.Page, base int, tableName
 	assertPageInt(t, page, base+140, int32(fieldType))
 	assertPageInt(t, page, base+144, int32(length))
 	assertPageInt(t, page, base+148, int32(offset))
+}
+
+func assertTableCatalogRow(t *testing.T, page *storage.Page, base int, tableName string, slotSize int) {
+	t.Helper()
+	assertPageInt(t, page, base, 1)
+	assertPageString(t, page, base+4, tableName)
+	assertPageInt(t, page, base+72, int32(slotSize))
 }
 
 func assertPageInt(t *testing.T, page *storage.Page, offset int, want int32) {
