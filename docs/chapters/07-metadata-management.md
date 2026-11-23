@@ -773,6 +773,9 @@ The statistics lookup error is tested after the matching index row and table lay
 `student.tbl` open/size error is returned with the requested table and statistics context, without exposing a partial
 index result.
 
+An invalid index field name is also tested independently: when the catalog names a field absent from the stored table
+schema, `IndexInfo` rejects the entry and returns index/field context rather than a partial map.
+
 ## Feature 36: Create an index through the metadata facade
 
 `MetadataManager.CreateIndex` delegates the index, table, and field names plus the transaction to the shared index

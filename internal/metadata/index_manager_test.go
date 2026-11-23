@@ -483,6 +483,39 @@ func TestIndexManagerIndexInfoPreservesIndexedTableStatisticsError(t *testing.T)
 	}
 }
 
+func TestIndexManagerIndexInfoRejectsUnregisteredIndexedField(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("sid")
+	if err := tables.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateIndex("idx_student_missing", "student", "missing", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil for an unregistered field", indexes)
+	}
+	if err == nil {
+		t.Fatal("IndexInfo() error = nil, want missing indexed field error")
+	}
+	for _, context := range []string{"idx_student_missing", "build index metadata for field", "field \"missing\" does not exist"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()
