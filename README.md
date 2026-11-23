@@ -34,6 +34,22 @@
 
 詳細は[アーキテクチャ方針](docs/architecture.md)を参照してください。
 
+## ローカルでCIを実行
+
+GitHub Actionsと同じGoテスト、statement coverage、vet、ドキュメント検査をMakefileから実行できます。
+
+```sh
+make test
+make coverage-check
+make vet
+make docs
+make ci
+```
+
+`make coverage`は`coverage.out`を作成し、`make coverage-report`は関数ごとの結果を表示します。
+`make coverage-html`はブラウザーで確認できる`coverage.html`を作成します。coverageの出力ファイルはGit管理対象外です。
+coverage用Go build cacheは既定で`/tmp/simpledb-coverage-cache`を使い、`COVERAGE_CACHE`で変更できます。
+
 ## リポジトリ構成（予定）
 
 ```text
