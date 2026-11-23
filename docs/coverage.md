@@ -426,3 +426,5 @@ At the Issue #807 string-token checkpoint, `/tmp/simpledb-coverage-807.out` agai
 The scheduled regression recheck on PR #808 produced `/tmp/simpledb-coverage-808-recheck.out`: full-module statement coverage is 100.0%, with no zero-count functions or statements. All eleven packages (buffer, concurrency, file, log, metadata, parse, query, record, recovery, storage, and transaction) remain at 100.0%. The uncached suite, per-package coverage, race tests, vet, docs validation, and diff check all pass.
 
 At the Issue #809 identifier checkpoint, `/tmp/simpledb-coverage-809.out` measures 100.0% for the full module and all eleven packages. Every lexer method and helper is covered, including each reserved-word branch. The complete suite, per-package coverage, race tests, vet, docs validation, and diff check pass.
+
+At the Issue #811 delimiter checkpoint, `/tmp/simpledb-coverage-811.out` measures 100.0% for the full module and all eleven packages. Every lexer method and helper remains fully covered; the complete suite, per-package coverage, race tests, vet, docs validation, and diff check pass.

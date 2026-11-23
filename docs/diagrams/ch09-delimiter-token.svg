@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 4: Read a delimiter</title>
+  <desc id="description">Lookahead checks a single punctuation byte without consuming it. Eating advances one byte only on a match, leaving the token unchanged on failure.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:18px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:16px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="560" fill="#fff"/>
+  <text class="title" x="600" y="60" text-anchor="middle">Chapter 9 / Feature 4: Read a delimiter</text>
+  <rect class="box" x="45" y="215" width="230" height="130" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="160" y="260"><tspan x="160">SQL input</tspan><tspan x="160" dy="30">name, next</tspan></text>
+  <rect class="box" x="355" y="200" width="270" height="160" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="490" y="237"><tspan x="490">MatchDelimiter(',')</tspan><tspan class="small" x="490" dy="31">skip whitespace</tspan><tspan class="small" x="490" dy="26">compare one byte</tspan><tspan class="small" x="490" dy="26">leave cursor unchanged</tspan></text>
+  <rect class="box" x="720" y="140" width="260" height="145" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="850" y="180"><tspan x="850">EatDelimiter(',')</tspan><tspan class="small" x="850" dy="32">consume one byte</tspan><tspan class="small" x="850" dy="26">only on a match</tspan></text>
+  <rect class="box" x="720" y="360" width="260" height="95" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="850" y="400"><tspan x="850">delimiter consumed</tspan><tspan class="small" x="850" dy="28">next input = next</tspan></text>
+  <rect class="box" x="355" y="410" width="270" height="100" fill="#f8cecc" stroke="#b85450"/>
+  <text class="small" x="490" y="440"><tspan x="490">unexpected or different token</tspan><tspan x="490" dy="24">error includes byte offset</tspan><tspan x="490" dy="24">cursor remains unchanged</tspan></text>
+  <path class="edge" d="M275 280 H345"/><text class="small" x="310" y="263">input</text>
+  <path class="edge" d="M625 245 H710"/><text class="small" x="667" y="227">match without consume</text>
+  <path class="edge" d="M850 285 V350"/><text class="small" x="878" y="326">match</text>
+  <path class="edge" d="M720 255 C680 305 665 400 635 445"/><text class="small" x="666" y="370">mismatch</text>
+</svg>

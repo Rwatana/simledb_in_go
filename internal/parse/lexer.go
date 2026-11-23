@@ -9,17 +9,19 @@ import (
 
 // Lexer reads tokens from SQL text without consuming a token during a match check.
 type Lexer struct {
-	input       string
-	position    int
-	tokenReady  bool
-	tokenStart  int
-	tokenEnd    int
-	intToken    bool
-	stringToken bool
-	stringValue string
-	wordToken   bool
-	wordValue   string
-	identifier  bool
+	input          string
+	position       int
+	tokenReady     bool
+	tokenStart     int
+	tokenEnd       int
+	intToken       bool
+	stringToken    bool
+	stringValue    string
+	wordToken      bool
+	wordValue      string
+	identifier     bool
+	delimiterToken bool
+	delimiterValue byte
 }
 
 // NewLexer creates a lexer positioned before the first token in input.
@@ -105,6 +107,29 @@ func (lexer *Lexer) EatIdentifier() (string, error) {
 	return value, nil
 }
 
+// MatchDelimiter reports whether the next token is the requested SQL punctuation byte.
+func (lexer *Lexer) MatchDelimiter(delimiter byte) bool {
+	if lexer == nil {
+		return false
+	}
+	lexer.peekToken()
+	return lexer.delimiterToken && lexer.delimiterValue == delimiter
+}
+
+// EatDelimiter consumes the requested SQL punctuation byte.
+func (lexer *Lexer) EatDelimiter(delimiter byte) error {
+	if lexer == nil {
+		return fmt.Errorf("read delimiter %q: lexer is nil", delimiter)
+	}
+	lexer.peekToken()
+	if !lexer.delimiterToken || lexer.delimiterValue != delimiter {
+		return fmt.Errorf("read delimiter %q at byte %d: next token does not match", delimiter, lexer.tokenStart)
+	}
+	lexer.position = lexer.tokenEnd
+	lexer.tokenReady = false
+	return nil
+}
+
 func (lexer *Lexer) peekToken() {
 	if lexer.tokenReady {
 		return
@@ -121,6 +146,8 @@ func (lexer *Lexer) peekToken() {
 	lexer.wordToken = false
 	lexer.wordValue = ""
 	lexer.identifier = false
+	lexer.delimiterToken = false
+	lexer.delimiterValue = 0
 	if start < len(lexer.input) && isDecimalDigit(lexer.input[start]) {
 		end := start + 1
 		for end < len(lexer.input) && isDecimalDigit(lexer.input[end]) {
@@ -155,6 +182,10 @@ func (lexer *Lexer) peekToken() {
 		lexer.wordValue = strings.ToLower(lexer.input[start:end])
 		lexer.wordToken = true
 		lexer.identifier = !isSQLKeyword(lexer.wordValue)
+	} else if start < len(lexer.input) && isDelimiterChar(lexer.input[start]) {
+		lexer.tokenEnd = start + 1
+		lexer.delimiterValue = lexer.input[start]
+		lexer.delimiterToken = true
 	}
 	lexer.tokenReady = true
 }
@@ -179,4 +210,8 @@ func isSQLKeyword(value string) bool {
 	default:
 		return false
 	}
+}
+
+func isDelimiterChar(value byte) bool {
+	return value >= '!' && value <= '~' && value != '\'' && value != '"' && !isIdentifierPart(value)
 }
