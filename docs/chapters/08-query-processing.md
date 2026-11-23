@@ -200,3 +200,13 @@ method, the Go method leaves both inputs unchanged and allocates independent ter
 `TestPredicateConjoinWithConcatenatesTermsAndPreservesInputs` first failed because `ConjoinWith` was undefined. It
 checks ordered duplicate preservation, evaluation of all included terms, empty operands, and that changing the result
 does not change either input.
+
+## Feature 20: Select predicate terms for a schema
+
+`Predicate.SelectSubPredicate` maps to Java `Predicate.selectSubPred(Schema)`. It retains applicable terms in their
+original order, including duplicates, by reusing `Term.AppliesTo`. Because Java returns `null` when no term applies,
+Go returns a zero-value `Predicate` with `false`; a matching result carries `true`. Literal-only terms still apply to
+a nil schema according to the expression behavior.
+
+`TestPredicateSelectSubPredicate` first failed because `SelectSubPredicate` was undefined. It checks partial filtering,
+ordering, duplicates, source immutability, no-match and empty predicates, and literal matching with a nil schema.
