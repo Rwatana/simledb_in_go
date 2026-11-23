@@ -323,6 +323,33 @@ func TestTableScanNextInBlockPreservesCursorOnReadFailure(t *testing.T) {
 	}
 }
 
+func TestTableScanNextWrapsCurrentBlockReadFailure(t *testing.T) {
+	readErr := errors.New("slot flag read failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 16, readErr: readErr},
+		size:                       1,
+	}
+	var schema Schema
+	schema.AddIntegerField("id")
+	scan, err := NewTableScan(transaction, "student", NewLayout(&schema))
+	if err != nil {
+		t.Fatalf("NewTableScan() error = %v", err)
+	}
+
+	found, err := scan.Next()
+	if found || !errors.Is(err, readErr) {
+		t.Fatalf("Next() = (%t, %v), want wrapped slot-flag read failure", found, err)
+	}
+	for _, want := range []string{"student.tbl", "search block 0", "after slot -1"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Next() error = %q, want context %q", err, want)
+		}
+	}
+	if scan.currentSlot != -1 || scan.recordPage == nil || scan.recordPage.Block().Number() != 0 {
+		t.Errorf("scan state after read failure: page=%v slot=%d", scan.recordPage, scan.currentSlot)
+	}
+}
+
 func TestTableScanNextInBlockRejectsClosedScan(t *testing.T) {
 	transaction := &recordingTableTransaction{size: 1}
 	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
