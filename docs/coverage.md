@@ -248,6 +248,9 @@ production limit and error text.
 On Darwin and Linux, a FIFO regression test now forces `Append` into a full-tail rollover whose flush fails. It
 checks the wrapped `ESPIPE` cause and append/rollover/block context, and verifies that the current Page, BlockID, and
 LSN remain unchanged after the failed transition.
+
+A separate filesystem test makes the durable log path a directory before a full-tail rollover. This reaches the
+new-block append failure and confirms its wrapped cause and context do not advance the in-memory tail state.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
