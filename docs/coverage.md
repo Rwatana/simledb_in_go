@@ -230,6 +230,9 @@ no record and preserves both numeric values in the error context.
 
 The current-block iterator now also covers a record position with fewer than four bytes remaining for its length
 prefix, returning no partial record and retaining the offset and Page-read context.
+
+Previous-block traversal now covers a FileManager read failure, confirming the wrapped cause is returned without
+committing a new block or position to the iterator.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
