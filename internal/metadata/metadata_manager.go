@@ -1,5 +1,11 @@
 package metadata
 
+import (
+	"fmt"
+
+	"github.com/Rwatana/simledb_in_go/internal/record"
+)
+
 // MetadataManager coordinates the table, view, statistics, and index metadata managers.
 type MetadataManager struct {
 	tables  *TableManager
@@ -20,4 +26,18 @@ func NewMetadataManager() *MetadataManager {
 		stats:   stats,
 		indexes: indexes,
 	}
+}
+
+// InitializeCatalogs creates and registers the complete metadata catalog set for a new database.
+func (m *MetadataManager) InitializeCatalogs(transaction record.TableScanTransaction) error {
+	if err := m.tables.InitializeCatalogs(transaction); err != nil {
+		return fmt.Errorf("initialize metadata catalogs: table catalogs: %w", err)
+	}
+	if err := m.views.InitializeCatalog(transaction); err != nil {
+		return fmt.Errorf("initialize metadata catalogs: view catalog: %w", err)
+	}
+	if err := m.indexes.InitializeCatalog(transaction); err != nil {
+		return fmt.Errorf("initialize metadata catalogs: index catalog: %w", err)
+	}
+	return nil
 }

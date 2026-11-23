@@ -636,3 +636,23 @@ The test first failed to compile because `NewMetadataManager` did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestNewMetadataManagerWiresSharedDependencies` | The facade creates all four managers and shares the table and statistics dependencies by identity |
+
+## Feature 31: Initialize all metadata catalogs
+
+`MetadataManager.InitializeCatalogs` runs the new-database startup sequence through the facade. It first initializes
+the self-describing `tblcat` and `fldcat` catalogs, then registers `viewcat`, and finally registers `idxcat`. The order
+ensures every later manager can persist its logical schema through an already usable table manager.
+
+After the sequence, all four catalog layouts can be reconstructed from `tblcat` and `fldcat`; no view or index data file
+is created until its first stored definition or registration. Each startup stage adds facade context to its error.
+
+### Test-first record
+
+The test first failed to compile because `MetadataManager.InitializeCatalogs` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestMetadataManagerInitializeCatalogsRegistersCompleteCatalogSet` | Startup makes the table, field, view, and index catalog layouts reconstructable while appending only the two physical self-describing catalog files |
+| `TestMetadataManagerInitializeCatalogsPreservesTableCatalogFailure` | Table catalog initialization failure preserves its cause and facade stage context and stops bootstrap |
+| `TestMetadataManagerInitializeCatalogsPreservesViewCatalogFailure` | View catalog initialization failure preserves its cause and prevents index catalog registration |
+| `TestMetadataManagerInitializeCatalogsPreservesIndexCatalogFailure` | Index catalog initialization failure preserves its cause after earlier catalogs succeed |
