@@ -451,6 +451,7 @@ build failed because `UpdateView` and `LogPreviousString` did not exist.
 | --- | --- |
 | `TestLogPreviousStringAppendsValueBeforeUpdate` | Captures block/offset/UTF-8 old value and returns append LSN |
 | `TestLogPreviousStringRejectsMissingAssignmentBeforeAppend` | Unassigned Buffer causes no log write |
+| `TestLogPreviousStringRejectsNilContentsBeforeAppend` | Assigned view without page contents preserves transaction/block context and causes no log write |
 | `TestLogPreviousStringRejectsPageReadFailureBeforeAppend` | Invalid length-prefixed region causes no log write |
 | `TestBufferSatisfiesUpdateView` | Integer and string logging share the same minimal Buffer port |
 

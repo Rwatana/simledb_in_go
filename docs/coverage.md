@@ -175,6 +175,10 @@ verifies the refresh keeps the old cache and lookup count intact. Metadata packa
 `recovery.LogPreviousInteger` now covers the assigned-buffer case where page contents are nil. The focused test confirms
 the transaction/block context is retained and no undo record is appended; the function is 100.0% covered, recovery
 package coverage is 97.6%, and full-module statement coverage remains 97.1%.
+
+`recovery.LogPreviousString` now covers the assigned-buffer case where page contents are nil. The focused test verifies
+transaction/block context and confirms no undo record is appended; the function is 100.0% covered, recovery package
+coverage is 97.9%, and full-module statement coverage is 97.2%.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

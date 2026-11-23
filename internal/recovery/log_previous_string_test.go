@@ -44,6 +44,23 @@ func TestLogPreviousStringRejectsMissingAssignmentBeforeAppend(t *testing.T) {
 	}
 }
 
+func TestLogPreviousStringRejectsNilContentsBeforeAppend(t *testing.T) {
+	block := storage.NewBlockID("tbl", 4)
+	appender := &recordingAppender{}
+	_, err := LogPreviousString(appender, 8, recordingBufferView{block: block, assigned: true}, 0)
+	if err == nil {
+		t.Fatal("LogPreviousString() error = nil, want nil-content failure")
+	}
+	for _, context := range []string{"transaction 8", "block [file tbl, block 4]", "buffer contents are nil"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("LogPreviousString() error = %q, want context %q", err, context)
+		}
+	}
+	if len(appender.records) != 0 {
+		t.Errorf("append calls = %d, want no recovery record", len(appender.records))
+	}
+}
+
 func TestLogPreviousStringRejectsPageReadFailureBeforeAppend(t *testing.T) {
 	page, _ := storage.NewPage(4)
 	appender := &recordingAppender{}
