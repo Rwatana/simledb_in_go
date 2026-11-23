@@ -9,12 +9,14 @@ import (
 
 // Lexer reads tokens from SQL text without consuming a token during a match check.
 type Lexer struct {
-	input      string
-	position   int
-	tokenReady bool
-	tokenStart int
-	tokenEnd   int
-	intToken   bool
+	input       string
+	position    int
+	tokenReady  bool
+	tokenStart  int
+	tokenEnd    int
+	intToken    bool
+	stringToken bool
+	stringValue string
 }
 
 // NewLexer creates a lexer positioned before the first token in input.
@@ -51,6 +53,31 @@ func (lexer *Lexer) EatIntConstant() (int32, error) {
 	return int32(value), nil
 }
 
+// MatchStringConstant reports whether the next token is a complete single-quoted string.
+func (lexer *Lexer) MatchStringConstant() bool {
+	if lexer == nil {
+		return false
+	}
+	lexer.peekToken()
+	return lexer.stringToken
+}
+
+// EatStringConstant consumes and returns the next single-quoted SQL string.
+// Doubled single quotes inside the literal decode to one quote.
+func (lexer *Lexer) EatStringConstant() (string, error) {
+	if lexer == nil {
+		return "", fmt.Errorf("read string constant: lexer is nil")
+	}
+	lexer.peekToken()
+	if !lexer.stringToken {
+		return "", fmt.Errorf("read string constant at byte %d: next token is not a string", lexer.tokenStart)
+	}
+	value := lexer.stringValue
+	lexer.position = lexer.tokenEnd
+	lexer.tokenReady = false
+	return value, nil
+}
+
 func (lexer *Lexer) peekToken() {
 	if lexer.tokenReady {
 		return
@@ -62,6 +89,8 @@ func (lexer *Lexer) peekToken() {
 	lexer.tokenStart = start
 	lexer.tokenEnd = start
 	lexer.intToken = false
+	lexer.stringToken = false
+	lexer.stringValue = ""
 	if start < len(lexer.input) && isDecimalDigit(lexer.input[start]) {
 		end := start + 1
 		for end < len(lexer.input) && isDecimalDigit(lexer.input[end]) {
@@ -69,6 +98,24 @@ func (lexer *Lexer) peekToken() {
 		}
 		lexer.tokenEnd = end
 		lexer.intToken = true
+	} else if start < len(lexer.input) && lexer.input[start] == '\'' {
+		var value strings.Builder
+		for end := start + 1; end < len(lexer.input); {
+			if lexer.input[end] != '\'' {
+				value.WriteByte(lexer.input[end])
+				end++
+				continue
+			}
+			if end+1 < len(lexer.input) && lexer.input[end+1] == '\'' {
+				value.WriteByte('\'')
+				end += 2
+				continue
+			}
+			lexer.tokenEnd = end + 1
+			lexer.stringValue = value.String()
+			lexer.stringToken = true
+			break
+		}
 	}
 	lexer.tokenReady = true
 }
