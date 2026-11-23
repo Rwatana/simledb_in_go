@@ -12,6 +12,7 @@ implementation can preserve the same interface.
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
+| `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
 | `internal/metadata.IndexInfo` | `simpledb/metadata/IndexInfo.java` | Open the configured static hash index using the retained transaction and index-record layout |
 | `internal/plan.IndexSelectPlan` | `simpledb/index/planner/IndexSelectPlan.java` | Retain the child plan, index metadata, and search key for indexed selection |
 | `internal/query.RecordScan` | `simpledb/record/TableScan.java` | Go adapter that converts typed record fields into query constants without coupling records to query values |
@@ -316,6 +317,19 @@ index metadata return zero; the child plan is not consulted for this index-defin
 The focused test first failed because `IndexSelectPlan.DistinctValues` was undefined. Tests verify the single value for
 the indexed field, metadata delegation for another field even when the child has different estimates, and zero results
 for nil plan and absent metadata. A compile-time assertion confirms that `IndexSelectPlan` now implements `Plan`.
+
+## Feature 24: Position an index join on its first left row
+
+`indexquery.NewIndexJoinScan` retains the left scan, index, join-field name, and right record scan, then initializes
+the left scan and positions the index with the first left row's typed join value. An empty left input leaves the index
+unpositioned and the scan exhausted. The constructor and `BeforeFirst` report wrapped errors without closing these
+caller-owned resources; advancing the index entries and reading joined fields remain separate behaviors.
+
+### Test-first record
+
+The focused tests first failed because `IndexJoinScan` and `NewIndexJoinScan` were undefined. They cover initial typed
+key positioning, empty left input, repeat positioning, invalid dependencies, and wrapped left-reset, left-advance,
+join-value, and index-positioning errors.
 
 ## Intentional differences from Java
 
