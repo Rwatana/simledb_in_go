@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Rwatana/simledb_in_go/internal/query"
+	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
 // Parser converts SQL text into query and update values.
@@ -281,6 +282,76 @@ func (parser *Parser) ParseCreateIndex() (CreateIndexData, error) {
 		return CreateIndexData{}, fmt.Errorf("parse create index closing delimiter: %w", err)
 	}
 	return NewCreateIndexData(indexName, tableName, fieldName), nil
+}
+
+// ParseCreateTable reads a table name and its ordered field definitions.
+func (parser *Parser) ParseCreateTable() (CreateTableData, error) {
+	if parser == nil {
+		return CreateTableData{}, fmt.Errorf("parse create table: parser is nil")
+	}
+	if err := parser.lexer.EatKeyword("create"); err != nil {
+		return CreateTableData{}, fmt.Errorf("parse create table CREATE keyword: %w", err)
+	}
+	if err := parser.lexer.EatKeyword("table"); err != nil {
+		return CreateTableData{}, fmt.Errorf("parse create table TABLE keyword: %w", err)
+	}
+	tableName, err := parser.ParseField()
+	if err != nil {
+		return CreateTableData{}, fmt.Errorf("parse create table name: %w", err)
+	}
+	if err := parser.lexer.EatDelimiter('('); err != nil {
+		return CreateTableData{}, fmt.Errorf("parse create table opening delimiter: %w", err)
+	}
+	schema, err := parser.parseCreateTableFieldDefinitions()
+	if err != nil {
+		return CreateTableData{}, err
+	}
+	if err := parser.lexer.EatDelimiter(')'); err != nil {
+		return CreateTableData{}, fmt.Errorf("parse create table closing delimiter: %w", err)
+	}
+	return NewCreateTableData(tableName, schema), nil
+}
+
+func (parser *Parser) parseCreateTableFieldDefinitions() (record.Schema, error) {
+	var schema record.Schema
+	for {
+		fieldName, err := parser.ParseField()
+		if err != nil {
+			return record.Schema{}, fmt.Errorf("parse create table field definitions: %w", err)
+		}
+		definition, err := parser.parseCreateTableFieldType()
+		if err != nil {
+			return record.Schema{}, err
+		}
+		schema.AddField(fieldName, definition.Type, definition.Length)
+		if !parser.lexer.MatchDelimiter(',') {
+			return schema, nil
+		}
+		// A successful match guarantees this consume succeeds before the lexer changes.
+		_ = parser.lexer.EatDelimiter(',')
+	}
+}
+
+func (parser *Parser) parseCreateTableFieldType() (record.FieldDefinition, error) {
+	if parser.lexer.MatchKeyword("int") {
+		// A successful match guarantees this consume succeeds before the lexer changes.
+		_ = parser.lexer.EatKeyword("int")
+		return record.FieldDefinition{Type: record.IntegerField}, nil
+	}
+	if err := parser.lexer.EatKeyword("varchar"); err != nil {
+		return record.FieldDefinition{}, fmt.Errorf("parse create table field type: %w", err)
+	}
+	if err := parser.lexer.EatDelimiter('('); err != nil {
+		return record.FieldDefinition{}, fmt.Errorf("parse create table varchar opening delimiter: %w", err)
+	}
+	length, err := parser.lexer.EatIntConstant()
+	if err != nil {
+		return record.FieldDefinition{}, fmt.Errorf("parse create table varchar length: %w", err)
+	}
+	if err := parser.lexer.EatDelimiter(')'); err != nil {
+		return record.FieldDefinition{}, fmt.Errorf("parse create table varchar closing delimiter: %w", err)
+	}
+	return record.FieldDefinition{Type: record.VarcharField, Length: int(length)}, nil
 }
 
 func (parser *Parser) parseInsertFieldList() ([]string, error) {
