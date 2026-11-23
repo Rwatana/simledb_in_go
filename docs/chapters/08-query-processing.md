@@ -172,3 +172,12 @@ behavior; it does not add SQL quoting. A zero-value side uses the stable express
 
 `TestTermString` first failed because `Term.String` was undefined. It covers field/literal order, unquoted strings,
 field/field terms, empty text, and a term with an unset expression.
+
+## Feature 17: Treat an empty predicate as true
+
+`Predicate.IsSatisfied` implements the vacuous-conjunction behavior of Java's empty `Predicate()` and
+`isSatisfied(Scan)`. Go's zero-value `Predicate` represents the empty conjunction, so no constructor or term storage is
+needed for this case. Evaluation returns true without consulting the scan and therefore also works with a nil scan.
+
+`TestEmptyPredicateIsTrueWithoutScanAccess` first failed because `Predicate` did not exist. It verifies true for both
+nil and instrumented scans and confirms that no value lookup occurs.
