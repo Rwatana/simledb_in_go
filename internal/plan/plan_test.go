@@ -332,6 +332,94 @@ func TestSelectPlanRecordsOutputHandlesNilPlansAndZeroFactor(t *testing.T) {
 	}
 }
 
+func TestSelectPlanDistinctValuesUsesPredicateEqualities(t *testing.T) {
+	child := selectPlanEstimateProbe{"age": 8, "birth_year": 3, "score": 11}
+	tests := []struct {
+		name      string
+		predicate query.Predicate
+		fieldName string
+		want      int
+	}{
+		{
+			name: "field equals constant on left",
+			predicate: query.NewPredicateWithTerm(query.NewTerm(
+				query.NewFieldExpression("age"),
+				query.NewConstantExpression(query.NewIntConstant(20)),
+			)),
+			fieldName: "age",
+			want:      1,
+		},
+		{
+			name: "field equals constant on right including zero-value constant",
+			predicate: query.NewPredicateWithTerm(query.NewTerm(
+				query.NewConstantExpression(query.Constant{}),
+				query.NewFieldExpression("age"),
+			)),
+			fieldName: "age",
+			want:      1,
+		},
+		{
+			name: "field equality uses smaller estimate",
+			predicate: query.NewPredicateWithTerm(query.NewTerm(
+				query.NewFieldExpression("age"), query.NewFieldExpression("birth_year"),
+			)),
+			fieldName: "age",
+			want:      3,
+		},
+		{
+			name: "field equality uses smaller estimate when requested field is right",
+			predicate: query.NewPredicateWithTerm(query.NewTerm(
+				query.NewFieldExpression("age"), query.NewFieldExpression("birth_year"),
+			)),
+			fieldName: "birth_year",
+			want:      3,
+		},
+		{
+			name: "unrelated predicate delegates to child",
+			predicate: query.NewPredicateWithTerm(query.NewTerm(
+				query.NewFieldExpression("score"),
+				query.NewConstantExpression(query.NewIntConstant(4)),
+			)),
+			fieldName: "age",
+			want:      8,
+		},
+		{
+			name:      "empty predicate delegates to child",
+			predicate: query.Predicate{},
+			fieldName: "score",
+			want:      11,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := NewSelectPlan(child, test.predicate).DistinctValues(test.fieldName); got != test.want {
+				t.Fatalf("DistinctValues(%q) = %d, want %d", test.fieldName, got, test.want)
+			}
+		})
+	}
+}
+
+func TestSelectPlanDistinctValuesHandlesNilPlansAndChildren(t *testing.T) {
+	var nilPlan *SelectPlan
+	if got := nilPlan.DistinctValues("age"); got != 0 {
+		t.Fatalf("nil SelectPlan.DistinctValues(age) = %d, want 0", got)
+	}
+	if got := NewSelectPlan(nil, query.Predicate{}).DistinctValues("age"); got != 0 {
+		t.Fatalf("SelectPlan without child DistinctValues(age) = %d, want 0", got)
+	}
+}
+
+type selectPlanEstimateProbe map[string]int
+
+func (selectPlanEstimateProbe) Open() (query.Scan, error) { return nil, nil }
+func (selectPlanEstimateProbe) BlocksAccessed() int       { return 0 }
+func (selectPlanEstimateProbe) RecordsOutput() int        { return 0 }
+func (probe selectPlanEstimateProbe) DistinctValues(fieldName string) int {
+	return probe[fieldName]
+}
+func (selectPlanEstimateProbe) Schema() *record.Schema { return nil }
+
 type tablePlanTransaction struct {
 	size    int
 	sizeErr error
