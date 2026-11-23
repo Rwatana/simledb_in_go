@@ -7,6 +7,8 @@ import (
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
+const recordSlotEmpty int32 = 0
+
 // RecordTransaction provides the transaction operations used by a record page.
 type RecordTransaction interface {
 	Pin(storage.BlockID) error
@@ -87,6 +89,18 @@ func (p *RecordPage) SetString(slot int, fieldName, value string) error {
 	}
 	if err := p.transaction.SetString(p.block, int32(position), value, true); err != nil {
 		return fmt.Errorf("write string to block %v slot %d field %q at offset %d: %w", p.block, slot, fieldName, position, err)
+	}
+	return nil
+}
+
+// Delete marks slot empty with transaction logging enabled.
+func (p *RecordPage) Delete(slot int) error {
+	position := slot * p.layout.SlotSize()
+	if position < math.MinInt32 || position > math.MaxInt32 {
+		return fmt.Errorf("delete record from block %v slot %d: offset %d exceeds int32 range", p.block, slot, position)
+	}
+	if err := p.transaction.SetInt(p.block, int32(position), recordSlotEmpty, true); err != nil {
+		return fmt.Errorf("delete record from block %v slot %d at offset %d: %w", p.block, slot, position, err)
 	}
 	return nil
 }
