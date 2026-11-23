@@ -1,0 +1,44 @@
+name: Go coverage
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Measure statement coverage
+        run: go test ./... -coverprofile=coverage.out
+
+      - name: Require 100 percent statement coverage
+        run: |
+          coverage=$(go tool cover -func=coverage.out | awk '$1 == "total:" { print $3 }')
+          if [[ -z "$coverage" ]]; then
+            echo "Could not read total statement coverage from coverage.out."
+            exit 1
+          fi
+          echo "Go statement coverage: **$coverage**" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$coverage" != "100.0%" ]]; then
+            echo "Go statement coverage must be 100.0%; found $coverage."
+            exit 1
+          fi

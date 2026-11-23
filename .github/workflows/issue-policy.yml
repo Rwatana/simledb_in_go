@@ -1,0 +1,36 @@
+name: Issue policy
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+      - reopened
+
+permissions:
+  contents: read
+
+jobs:
+  title-prefix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate Issue title prefix
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          valid=false
+          while IFS= read -r prefix; do
+            if [[ "$ISSUE_TITLE" == "[$prefix] "* ]]; then
+              valid=true
+              break
+            fi
+          done < <(sed -n 's/^  - //p' hack/prefix.yml)
+
+          if [[ "$valid" != "true" ]]; then
+            echo "Invalid Issue title: $ISSUE_TITLE"
+            echo "Use one of the prefixes defined in hack/prefix.yml."
+            exit 1
+          fi

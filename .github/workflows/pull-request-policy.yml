@@ -1,0 +1,62 @@
+name: Pull request policy
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate Pull Request title, branch, and issue reference
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          valid_prefix=false
+          while IFS= read -r prefix; do
+            if [[ "$PR_TITLE" == "[$prefix] "* ]]; then
+              valid_prefix=true
+              break
+            fi
+          done < <(sed -n 's/^  - //p' hack/prefix.yml)
+
+          if [[ "$valid_prefix" != "true" ]]; then
+            echo "Invalid Pull Request title: $PR_TITLE"
+            echo "Use one of the prefixes defined in hack/prefix.yml."
+            exit 1
+          fi
+
+          if [[ "$HEAD_REF" =~ ^feature/#([0-9]+)_[a-z0-9]+(_[a-z0-9]+)*$ ]]; then
+            issue_number="${BASH_REMATCH[1]}"
+          else
+            echo "Invalid branch name: $HEAD_REF"
+            echo "Expected: feature/#<issue-number>_<snake_case_description>"
+            exit 1
+          fi
+
+          if ! grep -Eq '^## Issue Number[[:space:]]*$' <<< "$PR_BODY"; then
+            echo "Pull Request body must contain: ## Issue Number"
+            exit 1
+          fi
+
+          if ! grep -Eq "^#${issue_number}[[:space:]]*$" <<< "$PR_BODY"; then
+            echo "Issue Number must match the branch: #${issue_number}"
+            exit 1
+          fi
+
+          if ! grep -Eq "(Closes|Fixes|Resolves)[[:space:]]+#${issue_number}([^0-9]|$)" <<< "$PR_BODY"; then
+            echo "Pull Request body must close Issue #${issue_number}."
+            exit 1
+          fi
