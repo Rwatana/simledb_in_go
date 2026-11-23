@@ -1,0 +1,17 @@
+<mxfile host="app.diagrams.net" modified="2026-11-23T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-parse-field" name="Chapter 9 - Parse Field">
+    <mxGraphModel page="1" pageWidth="1200" pageHeight="560">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 7: Parse a field name" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="210" y="30" width="780" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="SQL input&#xa;&#xa;Customer, next" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=19;" vertex="1" parent="1"><mxGeometry x="45" y="215" width="230" height="130" as="geometry"/></mxCell>
+        <mxCell id="parser" value="Parser.ParseField()&#xa;&#xa;use identifier rules&#xa;normalize lower-case&#xa;consume valid field only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;" vertex="1" parent="1"><mxGeometry x="355" y="200" width="270" height="160" as="geometry"/></mxCell>
+        <mxCell id="result" value="field = customer&#xa;next token = comma" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=18;" vertex="1" parent="1"><mxGeometry x="720" y="150" width="260" height="120" as="geometry"/></mxCell>
+        <mxCell id="error" value="reserved or invalid token&#xa;&#xa;byte-positioned error&#xa;cursor remains unchanged" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=17;" vertex="1" parent="1"><mxGeometry x="355" y="410" width="270" height="100" as="geometry"/></mxCell>
+        <mxCell id="e1" value="input" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="input" target="parser"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="identifier accepted" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="parser" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="mismatch" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="parser" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

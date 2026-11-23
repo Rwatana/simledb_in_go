@@ -16,6 +16,18 @@ func NewParser(input string) *Parser {
 	return &Parser{lexer: NewLexer(input)}
 }
 
+// ParseField reads and returns the next identifier field name.
+func (parser *Parser) ParseField() (string, error) {
+	if parser == nil {
+		return "", fmt.Errorf("parse field: parser is nil")
+	}
+	field, err := parser.lexer.EatIdentifier()
+	if err != nil {
+		return "", fmt.Errorf("parse field: %w", err)
+	}
+	return field, nil
+}
+
 // ParseConstant reads a string or non-negative integer query constant.
 func (parser *Parser) ParseConstant() (query.Constant, error) {
 	if parser == nil {
