@@ -282,6 +282,48 @@ func TestTermAppliesToSchema(t *testing.T) {
 	}
 }
 
+func TestTermString(t *testing.T) {
+	tests := []struct {
+		name string
+		term Term
+		want string
+	}{
+		{
+			name: "field equals integer literal",
+			term: NewTerm(NewFieldExpression("age"), NewConstantExpression(NewIntConstant(4))),
+			want: "age=4",
+		},
+		{
+			name: "string literal is unquoted",
+			term: NewTerm(NewConstantExpression(NewStringConstant("Ada")), NewFieldExpression("name")),
+			want: "Ada=name",
+		},
+		{
+			name: "both fields",
+			term: NewTerm(NewFieldExpression("left"), NewFieldExpression("right")),
+			want: "left=right",
+		},
+		{
+			name: "empty expressions",
+			term: NewTerm(NewFieldExpression(""), NewConstantExpression(NewStringConstant(""))),
+			want: "=",
+		},
+		{
+			name: "unset expression placeholder",
+			term: NewTerm(Expression{}, NewFieldExpression("name")),
+			want: "<unset-expression>=name",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.term.String(); got != test.want {
+				t.Fatalf("String() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
 func schemaWithFields(names ...string) *record.Schema {
 	var schema record.Schema
 	for _, name := range names {
