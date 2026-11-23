@@ -2,8 +2,20 @@
 
 The `Go test` and `Go coverage` workflows are independent checks. `Go coverage` runs the full suite with a coverage
 profile, writes total statement coverage to the GitHub Actions job summary, and fails unless the full module reaches
-100.0%. `Go vet`, documentation, issue-policy, pull-request-policy, and commit-count checks each have their own
-workflow file and status check.
+100.0%. `Go vet`, documentation, Issue title, and commit-count checks each have their own workflow and status
+check. On main, the three Pull Request metadata checks were still combined; Issue #803 / PR #804 splits those
+independently of this coverage repair.
+
+## Current main baseline: Issue #805
+
+Before this test repair, the two Go packages present on main reported **89.0%** total statement coverage: file
+85.5%, storage 93.3%. After covering the existing Page boundary and FileManager I/O errors, both packages report
+**100.0%** and the full current main module reports **100.0%**. The short-count fallbacks after a nil error were
+removed because Go's `io.ReaderAt` and `io.WriterAt` contracts require a non-nil error when fewer bytes are read or
+written; actual I/O failures retain their wrapped error and byte-count context.
+
+The historical checkpoints below describe the larger stacked feature branch at the time they were recorded; their
+package lists and totals are not measurements of the smaller main baseline.
 
 At the 2026-11-23 checkpoint for Issue #662, the full-module statement coverage is **96.7%** (rounded to one
 decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 97.6%, query

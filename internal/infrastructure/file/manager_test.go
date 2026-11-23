@@ -38,6 +38,22 @@ func TestNewManagerCreatesDatabaseDirectory(t *testing.T) {
 	}
 }
 
+func TestNewManagerRejectsInvalidDirectory(t *testing.T) {
+	t.Parallel()
+
+	if _, err := storagefile.NewManager("", 16); err == nil {
+		t.Fatal("NewManager(\"\", 16) error = nil, want an empty-directory error")
+	}
+
+	parentFile := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(parentFile, []byte("file"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if _, err := storagefile.NewManager(filepath.Join(parentFile, "database"), 16); err == nil {
+		t.Fatal("NewManager() error = nil, want a directory-creation error")
+	}
+}
+
 func TestManagerWritesAndReadsBlocks(t *testing.T) {
 	t.Parallel()
 
@@ -128,6 +144,9 @@ func TestManagerRejectsInvalidBlockAccess(t *testing.T) {
 	}
 
 	wrongSize := newStoragePage(t, blockSize-1)
+	if err := manager.Write(storage.NewBlockID("student.tbl", 0), nil); err == nil {
+		t.Error("Write() with a nil Page error = nil, want a nil-page error")
+	}
 	if err := manager.Write(storage.NewBlockID("student.tbl", 0), wrongSize); err == nil {
 		t.Error("Write() wrong Page capacity error = nil, want a size mismatch error")
 	}

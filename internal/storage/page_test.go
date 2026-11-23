@@ -132,6 +132,40 @@ func TestPageRejectsOutOfBoundsAccess(t *testing.T) {
 	}
 }
 
+func TestPageGetBytesRejectsMalformedLengthAndPayload(t *testing.T) {
+	t.Parallel()
+
+	t.Run("length prefix outside page", func(t *testing.T) {
+		t.Parallel()
+		page := newPage(t, 4)
+		if _, err := page.GetBytes(1); err == nil {
+			t.Fatal("GetBytes(1) error = nil, want an out-of-bounds length-prefix error")
+		}
+	})
+
+	t.Run("negative length prefix", func(t *testing.T) {
+		t.Parallel()
+		page := newPage(t, 4)
+		if err := page.SetInt(0, -1); err != nil {
+			t.Fatalf("SetInt() error = %v", err)
+		}
+		if _, err := page.GetBytes(0); err == nil {
+			t.Fatal("GetBytes(0) error = nil, want a negative-length error")
+		}
+	})
+
+	t.Run("payload outside page", func(t *testing.T) {
+		t.Parallel()
+		page := newPage(t, 4)
+		if err := page.SetInt(0, 1); err != nil {
+			t.Fatalf("SetInt() error = %v", err)
+		}
+		if _, err := page.GetBytes(0); err == nil {
+			t.Fatal("GetBytes(0) error = nil, want an out-of-bounds payload error")
+		}
+	})
+}
+
 func TestPageSnapshotDoesNotExposeMutableMemory(t *testing.T) {
 	t.Parallel()
 

@@ -74,16 +74,28 @@ func (p *Page) GetBytes(offset int) ([]byte, error) {
 
 // SetBytes stores value at offset after a four-byte length prefix.
 func (p *Page) SetBytes(offset int, value []byte) error {
-	if len(value) > math.MaxInt32 {
-		return fmt.Errorf("set bytes at offset %d: length %d exceeds four-byte signed prefix", offset, len(value))
+	return p.setBytes(offset, value, int64(len(value)))
+}
+
+func (p *Page) setBytes(offset int, value []byte, length int64) error {
+	encodedLength, err := encodedBytesLength(offset, length)
+	if err != nil {
+		return err
 	}
 	destination, err := p.bytesAt(offset, encodedIntSize+len(value))
 	if err != nil {
 		return fmt.Errorf("set bytes at offset %d with length %d: %w", offset, len(value), err)
 	}
-	binary.BigEndian.PutUint32(destination[:encodedIntSize], uint32(len(value)))
+	binary.BigEndian.PutUint32(destination[:encodedIntSize], encodedLength)
 	copy(destination[encodedIntSize:], value)
 	return nil
+}
+
+func encodedBytesLength(offset int, length int64) (uint32, error) {
+	if length > math.MaxInt32 {
+		return 0, fmt.Errorf("set bytes at offset %d: length %d exceeds four-byte signed prefix", offset, length)
+	}
+	return uint32(length), nil
 }
 
 // Snapshot returns a copy of all encoded bytes in the page.

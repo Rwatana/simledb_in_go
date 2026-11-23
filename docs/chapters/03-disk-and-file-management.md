@@ -240,7 +240,9 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | `TestPageStoresFourByteIntegers` | 符号付きint32をbig-endianでround-tripする |
 | `TestPageStoresLengthPrefixedBytes` | 空やNULを含むpayloadをlength prefix付きで保存する |
 | `TestPageRejectsOutOfBoundsAccess` | encoded rangeがcapacityを越える操作をerrorにする |
+| `TestPageGetBytesRejectsMalformedLengthAndPayload` | 範囲外prefix、負のlength、範囲外payloadを拒否する |
 | `TestPageSnapshotDoesNotExposeMutableMemory` | snapshotから内部memoryを書き換えられない |
+| `TestPageRejectsOversizedBytesWithoutAllocatingThem` | 巨大sliceを確保せずint32 length上限を検証する |
 
 ## Javaソースリーディング
 
@@ -296,6 +298,11 @@ block sizeが32 bytesなら、block 2はfileの64..95 bytesに対応する。wri
 `WriteAt`し、readは同じ長さを`ReadAt`して新しいPageへcopyする。blockの途中までしか読めない
 short readは成功として扱わない。
 
+`ReadAt`と`WriteAt`はshort countと同時にerrorを返すGoのcontractを使う。errorを受け取った場合は
+blockとoffset、実際に処理したbyte数を含めて返す。testではprivateなfile openerを差し替え、通常の
+filesystemだけでは安定して再現できないread、write、sync failureを確認する。public APIにはtest用の
+configurable I/Oを公開しない。
+
 ### 公開API
 
 | API | 責務 |
@@ -336,8 +343,11 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | Test | 説明する振る舞い |
 | --- | --- |
 | `TestNewManagerCreatesDatabaseDirectory` | directory作成とblock size contract |
+| `TestNewManagerRejectsInvalidDirectory` | 空directoryと親fileによる作成失敗を拒否する |
 | `TestManagerWritesAndReadsBlocks` | 複数blockのoffset、round-trip、Page間の非aliasing |
 | `TestManagerRejectsInvalidBlockAccess` | 負数、overflow、size不一致、short read、path traversalのerror |
+| `TestManagerReadWrapsOpenAndReadFailures` | open/read errorのcauseとbyte数を保持する |
+| `TestManagerWriteWrapsOpenWriteAndSyncFailures` | open/write/sync errorのcauseを保持する |
 | `TestNewPageFromBytesCopiesContents` | diskから渡されたsliceをPage内部と共有しない |
 
 ## Javaソースリーディング
