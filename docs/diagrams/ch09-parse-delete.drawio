@@ -1,0 +1,23 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-parse-delete" name="Chapter 9 - Parse DELETE">
+    <mxGraphModel page="1" pageWidth="1240" pageHeight="580">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 14: Parse a DELETE statement" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="200" y="20" width="840" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="SQL input&#xa;&#xa;delete from student&#xa;where age = 18 returning" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=17;" vertex="1" parent="1"><mxGeometry x="30" y="210" width="230" height="125" as="geometry"/></mxCell>
+        <mxCell id="keywords" value="Required keywords&#xa;&#xa;delete&#xa;from" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=17;" vertex="1" parent="1"><mxGeometry x="330" y="100" width="210" height="125" as="geometry"/></mxCell>
+        <mxCell id="table" value="Target table&#xa;&#xa;ParseField()&#xa;normalized identifier" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=16;" vertex="1" parent="1"><mxGeometry x="330" y="300" width="210" height="125" as="geometry"/></mxCell>
+        <mxCell id="where" value="Optional WHERE&#xa;&#xa;reuse ParsePredicate()&#xa;empty when absent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=16;" vertex="1" parent="1"><mxGeometry x="625" y="200" width="235" height="135" as="geometry"/></mxCell>
+        <mxCell id="result" value="DeleteData&#xa;&#xa;target table + predicate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="950" y="145" width="235" height="115" as="geometry"/></mxCell>
+        <mxCell id="tail" value="Next token remains&#xa;for the caller" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=16;" vertex="1" parent="1"><mxGeometry x="950" y="345" width="235" height="90" as="geometry"/></mxCell>
+        <mxCell id="errors" value="Missing keyword, table, or predicate&#xa;contextual byte-positioned error" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=16;" vertex="1" parent="1"><mxGeometry x="330" y="480" width="530" height="70" as="geometry"/></mxCell>
+        <mxCell id="e1" value="read" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="input" target="keywords"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="then table" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="keywords" target="table"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="optional predicate" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="table" target="where"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="construct" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="where" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="leave unread" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="result" target="tail"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="parse errors" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;dashed=1;" edge="1" parent="1" source="where" target="errors"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

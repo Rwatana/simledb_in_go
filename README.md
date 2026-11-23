@@ -72,9 +72,8 @@
 
 ## 次の一歩
 
-Chapter 9ではSQLの字句解析とSELECT文の解析を進めています。現在はDELETE command dataを追加しました。
-次はDELETE構文の解析を実装し、その後にINSERT、UPDATE、CREATEとupdate command dispatchを個別のIssueへ
-分けて進めます。
+Chapter 9ではSQLの字句解析とSELECT文、DELETE文の解析を進めています。次はINSERT、UPDATE、CREATEのcommand
+dataと構文解析を個別のIssueへ分け、その後にupdate command dispatchを追加します。
 
 ## 参照元
 
