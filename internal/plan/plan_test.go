@@ -35,3 +35,26 @@ func TestPlanContractExposesScanEstimatesAndSchema(t *testing.T) {
 		t.Fatal("Schema() = non-nil, want nil probe schema")
 	}
 }
+
+func TestTablePlanSchemaReturnsResolvedTableSchema(t *testing.T) {
+	var schema record.Schema
+	schema.AddIntegerField("student_id")
+	schema.AddVarcharField("student_name", 24)
+	layout := record.NewLayout(&schema)
+
+	tablePlan := NewTablePlan(nil, "student", layout)
+	if got := tablePlan.Schema(); got != &schema {
+		t.Fatalf("Schema() = %p, want the schema stored in the layout %p", got, &schema)
+	}
+}
+
+func TestTablePlanSchemaHandlesNilPlanAndLayout(t *testing.T) {
+	var nilPlan *TablePlan
+	if got := nilPlan.Schema(); got != nil {
+		t.Fatalf("nil TablePlan.Schema() = %p, want nil", got)
+	}
+
+	if got := NewTablePlan(nil, "student", nil).Schema(); got != nil {
+		t.Fatalf("TablePlan with nil layout Schema() = %p, want nil", got)
+	}
+}
