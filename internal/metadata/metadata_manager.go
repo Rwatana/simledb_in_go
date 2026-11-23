@@ -66,3 +66,12 @@ func (m *MetadataManager) CreateView(viewName, definition string, transaction re
 	}
 	return nil
 }
+
+// ViewDefinition returns a stored view definition and reports whether it exists.
+func (m *MetadataManager) ViewDefinition(viewName string, transaction record.TableScanTransaction) (string, bool, error) {
+	definition, found, err := m.views.ViewDefinition(viewName, transaction)
+	if err != nil {
+		return "", false, fmt.Errorf("look up view %q through metadata manager: %w", viewName, err)
+	}
+	return definition, found, nil
+}
