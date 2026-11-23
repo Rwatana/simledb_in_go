@@ -370,6 +370,10 @@ undersized page to verify the wrapped block/offset context and unchanged LSN whe
 append still covers the success path. Every statement in the log package is now covered, and full-module statement
 coverage is 99.9%. The only remaining package below 100.0% is transaction.
 
+`Transaction.SetInt` now delegates recovery-LSN recording to a private helper whose error path can be tested directly
+with a failing recorder. The test checks the wrapped cause and integer block/offset/LSN context. `SetInt` is now
+100.0% covered, transaction package coverage is 99.4%, and full-module statement coverage remains 99.9%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

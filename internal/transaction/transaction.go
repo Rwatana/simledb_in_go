@@ -235,10 +235,15 @@ func (t *Transaction) SetInt(block storage.BlockID, offset, value int32, logUpda
 		return fmt.Errorf("set integer in transaction buffer %v at offset %d: %w", block, offset, err)
 	}
 	frame.MarkModified(buffer.TransactionID(t.id))
-	if lsn > 0 {
-		if err := frame.RecordRecoveryLSN(lsn); err != nil {
-			return fmt.Errorf("set integer in transaction buffer %v at offset %d: record recovery LSN %d: %w", block, offset, lsn, err)
-		}
+	return recordRecoveryLSN(frame.RecordRecoveryLSN, lsn, "set integer", block, offset)
+}
+
+func recordRecoveryLSN(record func(logmanager.LSN) error, lsn logmanager.LSN, operation string, block storage.BlockID, offset int32) error {
+	if lsn == 0 {
+		return nil
+	}
+	if err := record(lsn); err != nil {
+		return fmt.Errorf("%s in transaction buffer %v at offset %d: record recovery LSN %d: %w", operation, block, offset, lsn, err)
 	}
 	return nil
 }
