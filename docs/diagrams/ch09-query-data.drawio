@@ -1,0 +1,19 @@
+<mxfile host="app.diagrams.net" modified="2026-11-23T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-query-data" name="Chapter 9 - Query Data">
+    <mxGraphModel page="1" pageWidth="1200" pageHeight="560">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 11: Store SELECT query data" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="210" y="25" width="780" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="Constructor input&#xa;&#xa;fields · tables · predicate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;" vertex="1" parent="1"><mxGeometry x="35" y="220" width="240" height="120" as="geometry"/></mxCell>
+        <mxCell id="data" value="QueryData&#xa;&#xa;copy ordered lists&#xa;store predicate value" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;" vertex="1" parent="1"><mxGeometry x="350" y="200" width="260" height="160" as="geometry"/></mxCell>
+        <mxCell id="lists" value="Fields() / Tables()&#xa;&#xa;return independent copies" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="710" y="115" width="250" height="125" as="geometry"/></mxCell>
+        <mxCell id="render" value="String()&#xa;&#xa;select ... from ...&#xa;optional where ..." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=17;" vertex="1" parent="1"><mxGeometry x="710" y="300" width="250" height="125" as="geometry"/></mxCell>
+        <mxCell id="zero" value="zero or incomplete value&#xa;&#xa;safe marker&#xa;&lt;unset-query&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=17;" vertex="1" parent="1"><mxGeometry x="350" y="430" width="260" height="90" as="geometry"/></mxCell>
+        <mxCell id="e1" value="copy input" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="input" target="data"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="read lists" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="data" target="lists"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="render query" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="data" target="render"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="missing fields or tables" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="data" target="zero"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
