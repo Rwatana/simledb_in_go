@@ -15,11 +15,56 @@ import (
 
 var _ Plan = contractProbe{}
 var _ QueryPlanner = queryPlannerContractProbe{}
+var _ UpdatePlanner = updatePlannerContractProbe{}
 
 type queryPlannerContractProbe struct{}
 
 func (queryPlannerContractProbe) CreatePlan(parse.QueryData, record.TableScanTransaction) (Plan, error) {
 	return nil, nil
+}
+
+type updatePlannerContractProbe struct{}
+
+func (updatePlannerContractProbe) ExecuteInsert(parse.InsertData, record.TableScanTransaction) (int, error) {
+	return 0, nil
+}
+func (updatePlannerContractProbe) ExecuteDelete(parse.DeleteData, record.TableScanTransaction) (int, error) {
+	return 0, nil
+}
+func (updatePlannerContractProbe) ExecuteModify(parse.ModifyData, record.TableScanTransaction) (int, error) {
+	return 0, nil
+}
+func (updatePlannerContractProbe) ExecuteCreateTable(parse.CreateTableData, record.TableScanTransaction) (int, error) {
+	return 0, nil
+}
+func (updatePlannerContractProbe) ExecuteCreateView(parse.CreateViewData, record.TableScanTransaction) (int, error) {
+	return 0, nil
+}
+func (updatePlannerContractProbe) ExecuteCreateIndex(parse.CreateIndexData, record.TableScanTransaction) (int, error) {
+	return 0, nil
+}
+
+func TestUpdatePlannerContractCoversEachUpdateCommand(t *testing.T) {
+	planner := updatePlannerContractProbe{}
+	transaction := &tablePlanTransaction{}
+	checks := []struct {
+		name    string
+		execute func() (int, error)
+	}{
+		{"insert", func() (int, error) { return planner.ExecuteInsert(parse.InsertData{}, transaction) }},
+		{"delete", func() (int, error) { return planner.ExecuteDelete(parse.DeleteData{}, transaction) }},
+		{"modify", func() (int, error) { return planner.ExecuteModify(parse.ModifyData{}, transaction) }},
+		{"create table", func() (int, error) { return planner.ExecuteCreateTable(parse.CreateTableData{}, transaction) }},
+		{"create view", func() (int, error) { return planner.ExecuteCreateView(parse.CreateViewData{}, transaction) }},
+		{"create index", func() (int, error) { return planner.ExecuteCreateIndex(parse.CreateIndexData{}, transaction) }},
+	}
+	for _, check := range checks {
+		t.Run(check.name, func(t *testing.T) {
+			if affected, err := check.execute(); affected != 0 || err != nil {
+				t.Errorf("execution probe = (%d, %v), want (0, nil)", affected, err)
+			}
+		})
+	}
 }
 
 type contractProbe struct{}
