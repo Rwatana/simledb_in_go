@@ -268,6 +268,20 @@ remain separate behaviors.
 The focused test first failed because `IndexSelectPlan` and `NewIndexSelectPlan` were undefined. Tests verify retained
 dependencies/search key, unchanged child-schema identity, and nil results for a nil plan or child.
 
+## Feature 20: Open an index-select scan from its plan
+
+`IndexSelectPlan.Open` opens its child and requires the query-level `RecordScan` adapter around the table scan, then
+opens the retained index metadata and constructs an `IndexSelectScan` positioned on the search key. Invalid plans,
+unset keys, nil or incompatible child scans, child-opening failures, and index-positioning failures return contextual
+errors. If an opened child or scan cannot be used, acquired scans are closed and cleanup failures remain joined with
+the original cause.
+
+### Test-first record
+
+The focused test first failed because `IndexSelectPlan.Open` was undefined. Tests verify successful adapter creation and
+cleanup, missing state/key checks before child I/O, wrapped child errors including partial scan cleanup, nil and
+incompatible scan rejection, and joined bucket-position/table-cleanup errors.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
