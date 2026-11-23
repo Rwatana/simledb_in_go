@@ -435,6 +435,30 @@ func TestRecordPageFormatRejectsInvalidLayoutAndWrapsFailures(t *testing.T) {
 	}
 }
 
+func TestRecordPageFormatRejectsSchemaFieldWithoutMetadataOffset(t *testing.T) {
+	var schema Schema
+	schema.AddIntegerField("id")
+	transaction := &recordingRecordTransaction{blockSize: 8}
+	block := storage.NewBlockID("records.tbl", 3)
+	page, err := NewRecordPage(transaction, block, NewLayoutFromMetadata(&schema, nil, 8))
+	if err != nil {
+		t.Fatalf("NewRecordPage() error = %v", err)
+	}
+
+	err = page.Format()
+	if err == nil {
+		t.Fatal("Format() with a schema field missing from layout metadata returned nil error")
+	}
+	for _, want := range []string{block.String(), "slot 0", `field "id"`, "not in layout"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Format() error = %q, want context %q", err, want)
+		}
+	}
+	if len(transaction.writeOperations) != 1 || transaction.writeOperations[0] != (writeOperation{kind: "int", offset: 0, integer: recordSlotEmpty}) {
+		t.Errorf("Format() writes before metadata error = %v, want only the unlogged slot flag", transaction.writeOperations)
+	}
+}
+
 func TestRecordPageNextAfterFindsOccupiedSlotWithinCompleteSlots(t *testing.T) {
 	transaction := &recordingRecordTransaction{blockSize: 34, readValues: []int32{recordSlotEmpty, recordSlotEmpty, 1}}
 	block := storage.NewBlockID("records.tbl", 3)

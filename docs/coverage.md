@@ -289,6 +289,10 @@ The insertion path also has a focused test for a slot-flag read failure after ro
 It verifies the new-block context, preserves the scan state, and confirms no logged record write follows the failure.
 `TableScan.Insert` is now 100.0% covered, record package coverage is 98.8%, and full-module statement coverage is 98.8%.
 
+`RecordPage.Format` now has a separate malformed-metadata test: a declared schema field absent from the physical offset
+map returns block/slot/field context after writing only the slot's unlogged empty flag. `Format` is now 88.9% covered,
+record package coverage is 99.1%, and full-module statement coverage remains 98.8%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
