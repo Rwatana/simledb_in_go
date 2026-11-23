@@ -49,5 +49,10 @@ func (t *Transaction) Commit() (logmanager.LSN, error) {
 	flush := func(transaction recovery.TransactionID) error {
 		return t.bufferManager.FlushAll(buffer.TransactionID(transaction))
 	}
-	return recovery.CommitTransaction(flush, t.logs, t.id)
+	lsn, err := recovery.CommitTransaction(flush, t.logs, t.id)
+	if err != nil {
+		return 0, err
+	}
+	t.locks.Release()
+	return lsn, nil
 }
