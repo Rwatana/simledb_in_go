@@ -1,6 +1,16 @@
 package query
 
-import "github.com/Rwatana/simledb_in_go/internal/record"
+import (
+	"math"
+
+	"github.com/Rwatana/simledb_in_go/internal/record"
+)
+
+// DistinctValueEstimator provides field cardinality estimates to query terms.
+type DistinctValueEstimator interface {
+	// DistinctValues estimates the number of distinct values for fieldName.
+	DistinctValues(fieldName string) int
+}
 
 // Term compares two expressions for equality.
 type Term struct {
@@ -24,6 +34,45 @@ func (term Term) IsSatisfied(scan ValueScan) (bool, error) {
 		return false, err
 	}
 	return lhs.Equal(rhs), nil
+}
+
+// ReductionFactor estimates how much this equality term reduces result rows.
+// It returns the larger estimate for two fields, the field estimate for a
+// field compared with a constant, one for equal constants, and math.MaxInt32
+// for unequal constants. A missing estimator yields zero for field terms.
+func (term Term) ReductionFactor(estimator DistinctValueEstimator) int {
+	lhsField, lhsIsField := term.lhs.AsFieldName()
+	rhsField, rhsIsField := term.rhs.AsFieldName()
+	if lhsIsField && rhsIsField {
+		if estimator == nil {
+			return 0
+		}
+		lhsEstimate := estimator.DistinctValues(lhsField)
+		rhsEstimate := estimator.DistinctValues(rhsField)
+		if lhsEstimate > rhsEstimate {
+			return lhsEstimate
+		}
+		return rhsEstimate
+	}
+	if lhsIsField {
+		if estimator == nil {
+			return 0
+		}
+		return estimator.DistinctValues(lhsField)
+	}
+	if rhsIsField {
+		if estimator == nil {
+			return 0
+		}
+		return estimator.DistinctValues(rhsField)
+	}
+
+	lhsConstant, lhsIsConstant := term.lhs.AsConstant()
+	rhsConstant, rhsIsConstant := term.rhs.AsConstant()
+	if lhsIsConstant && rhsIsConstant && lhsConstant.Equal(rhsConstant) {
+		return 1
+	}
+	return math.MaxInt32
 }
 
 // EquatesWithConstant returns the literal compared with fieldName, if this term has that form.
