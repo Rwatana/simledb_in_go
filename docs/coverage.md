@@ -3,8 +3,8 @@
 The `go-quality` job runs the full Go test suite with a coverage profile and writes total statement coverage to the
 GitHub Actions job summary. This keeps the measurement visible on every pull request and main-branch push.
 
-At the 2026-11-23 checkpoint for Issue #620, the full-module statement coverage is **95.4%** (rounded to one
-decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 92.9%, query
+At the 2026-11-23 checkpoint for Issue #622, the full-module statement coverage is **95.4%** (rounded to one
+decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 93.2%, query
 100.0%, record 96.7%, recovery 97.4%, storage 100.0%, and transaction 91.3%. Recent focused tests closed existing
 `Expression.Evaluate`, `Page.GetBytes`, `Page.SetBytes`, and metadata nil-schema, integer-range, scan-open, scan-close,
 both catalog-initialization failure paths, table- and field-catalog row insertion, field-catalog table-name,
@@ -56,6 +56,8 @@ Index-catalog row insertion failure is now tested by failing the next slot-occup
 The `IndexManager.IndexInfo` scan-advance error is now injected specifically on the `idxcat.tbl` occupancy read. The test verifies that the catalog scan cause and table/catalog context survive and that a partially built map is not returned. `IndexManager.IndexInfo` is now 84.2% covered, metadata coverage is 92.7%, and full-module coverage is 95.3%. The remaining branches in this function are being tested independently.
 
 The `IndexManager.IndexInfo` indexed-table-name read failure is now isolated to the `tablename` field in `idxcat.tbl`; table-layout reconstruction runs before the injection. The test confirms that the original cause and field/table context survive without returning a partial map. `IndexManager.IndexInfo` is now 86.8% covered, metadata coverage is 92.9%, and full-module coverage is 95.4%.
+
+The matching index-name read failure now has its own injection at the `indexname` offset in `idxcat.tbl`. The matching table-name read succeeds before failure, and the test verifies the table/field context, wrapped cause, and nil result map. `IndexManager.IndexInfo` is now 89.5% covered, metadata coverage is 93.2%, and full-module coverage remains 95.4%.
 
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests

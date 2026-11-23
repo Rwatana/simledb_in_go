@@ -759,6 +759,9 @@ A second focused check injects failure while reading an index row's `tablename` 
 layout reconstruction is unaffected. The lookup preserves the table and field context, wraps the original cause, and
 returns no partial result map.
 
+The index-name read failure is tested separately after the indexed table name matches. This confirms that a failing
+`indexname` read retains the requested table and field context and returns no partial index map.
+
 ## Feature 36: Create an index through the metadata facade
 
 `MetadataManager.CreateIndex` delegates the index, table, and field names plus the transaction to the shared index
