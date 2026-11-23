@@ -87,3 +87,17 @@ func TestDecodeSetStringRecordRejectsInvalidEncoding(t *testing.T) {
 		})
 	}
 }
+
+func TestDecodeSetStringRecordRejectsTruncatedFilenameLength(t *testing.T) {
+	encoded, err := EncodeSetStringRecord(7, storage.NewBlockID("tbl", 2), 16, "old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	missingBytes := len(encoded) - setStringFixedSize + 1
+	binary.BigEndian.PutUint32(encoded[8:12], uint32(missingBytes))
+
+	_, err = DecodeSetStringRecord(encoded)
+	if err == nil || !strings.Contains(err.Error(), "does not contain filename length") {
+		t.Fatalf("DecodeSetStringRecord() error = %v, want truncated filename length context", err)
+	}
+}

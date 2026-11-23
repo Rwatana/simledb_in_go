@@ -378,6 +378,7 @@ failed because the SETSTRING operation, encoder, and decoder did not exist.
 | `TestSetStringRecordRoundTripsUTF8AndSignedFields` | Both strings and signed fields round-trip |
 | `TestEncodeSetStringRecordRejectsBlockOutsideInt32` | Block number cannot truncate |
 | `TestDecodeSetStringRecordRejectsInvalidEncoding` | Both lengths and exact boundary are strict |
+| `TestDecodeSetStringRecordRejectsTruncatedFilenameLength` | Filename length cannot claim bytes missing before the fixed fields |
 
 ## Feature 13: Append a SETSTRING record
 
