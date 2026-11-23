@@ -350,6 +350,11 @@ full-module statement coverage remains 99.5%.
 the wrapped cause, page bytes, and handle cleanup. `Write` and the file package are now 100.0% covered, and full-module
 statement coverage is 99.6%.
 
+Log rollover now covers a failure to write the initialized page for the newly appended tail block. The test verifies that
+the old tail remains selected, the record receives no LSN, and the successfully flushed LSN is retained. The
+`rollOverLocked` function is now 86.7% covered, log package coverage is 95.9%, and full-module statement coverage
+remains 99.6%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
