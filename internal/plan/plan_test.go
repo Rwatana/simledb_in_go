@@ -7,12 +7,20 @@ import (
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/metadata"
+	"github.com/Rwatana/simledb_in_go/internal/parse"
 	"github.com/Rwatana/simledb_in_go/internal/query"
 	"github.com/Rwatana/simledb_in_go/internal/record"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
 var _ Plan = contractProbe{}
+var _ QueryPlanner = queryPlannerContractProbe{}
+
+type queryPlannerContractProbe struct{}
+
+func (queryPlannerContractProbe) CreatePlan(parse.QueryData, record.TableScanTransaction) (Plan, error) {
+	return nil, nil
+}
 
 type contractProbe struct{}
 
