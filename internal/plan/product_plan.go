@@ -102,6 +102,25 @@ func (p *ProductPlan) RecordsOutput() int {
 	return int(int32(p.left.RecordsOutput()) * int32(p.right.RecordsOutput()))
 }
 
+// DistinctValues returns the estimate from the child whose schema contains fieldName.
+func (p *ProductPlan) DistinctValues(fieldName string) int {
+	if p == nil || p.left == nil || p.right == nil {
+		return 0
+	}
+	leftSchema := p.left.Schema()
+	rightSchema := p.right.Schema()
+	if leftSchema == nil || rightSchema == nil {
+		return 0
+	}
+	if leftSchema.HasField(fieldName) {
+		return p.left.DistinctValues(fieldName)
+	}
+	if rightSchema.HasField(fieldName) {
+		return p.right.DistinctValues(fieldName)
+	}
+	return 0
+}
+
 type productPlanScanSource struct {
 	name string
 	scan query.Scan

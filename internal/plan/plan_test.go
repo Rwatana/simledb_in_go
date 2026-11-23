@@ -686,22 +686,73 @@ func TestProductPlanRecordsOutputUsesJavaInt32Arithmetic(t *testing.T) {
 	}
 }
 
+func TestProductPlanDistinctValuesDelegatesByChildSchema(t *testing.T) {
+	var leftSchema, rightSchema record.Schema
+	leftSchema.AddIntegerField("student_id")
+	rightSchema.AddVarcharField("student_name", 24)
+	left := &productPlanProbe{schema: &leftSchema, distinct: map[string]int{"student_id": 7}}
+	right := &productPlanProbe{schema: &rightSchema, distinct: map[string]int{"student_name": 9}}
+	product := NewProductPlan(left, right)
+	for field, want := range map[string]int{"student_id": 7, "student_name": 9} {
+		if got := product.DistinctValues(field); got != want {
+			t.Errorf("DistinctValues(%q) = %d, want %d", field, got, want)
+		}
+	}
+	if got := product.DistinctValues("missing"); got != 0 {
+		t.Errorf("DistinctValues(missing) = %d, want 0", got)
+	}
+}
+
+func TestProductPlanDistinctValuesPrefersLeftForDuplicateField(t *testing.T) {
+	var leftSchema, rightSchema record.Schema
+	leftSchema.AddIntegerField("shared")
+	rightSchema.AddIntegerField("shared")
+	left := &productPlanProbe{schema: &leftSchema, distinct: map[string]int{"shared": 3}}
+	right := &productPlanProbe{schema: &rightSchema, distinct: map[string]int{"shared": 8}}
+	if got := NewProductPlan(left, right).DistinctValues("shared"); got != 3 {
+		t.Fatalf("DistinctValues(shared) = %d, want left estimate 3", got)
+	}
+}
+
+func TestProductPlanDistinctValuesHandlesNilPlanChildrenAndSchemas(t *testing.T) {
+	var nilPlan *ProductPlan
+	if got := nilPlan.DistinctValues("id"); got != 0 {
+		t.Errorf("nil ProductPlan.DistinctValues(id) = %d, want 0", got)
+	}
+	var schema record.Schema
+	child := &productPlanProbe{schema: &schema, distinct: map[string]int{"id": 3}}
+	if got := NewProductPlan(nil, child).DistinctValues("id"); got != 0 {
+		t.Errorf("ProductPlan without left child DistinctValues(id) = %d, want 0", got)
+	}
+	if got := NewProductPlan(child, nil).DistinctValues("id"); got != 0 {
+		t.Errorf("ProductPlan without right child DistinctValues(id) = %d, want 0", got)
+	}
+	if got := NewProductPlan(&productPlanProbe{}, child).DistinctValues("id"); got != 0 {
+		t.Errorf("ProductPlan with missing left schema DistinctValues(id) = %d, want 0", got)
+	}
+	if got := NewProductPlan(child, &productPlanProbe{}).DistinctValues("id"); got != 0 {
+		t.Errorf("ProductPlan with missing right schema DistinctValues(id) = %d, want 0", got)
+	}
+}
+
 type productPlanProbe struct {
-	scan    query.Scan
-	openErr error
-	opens   int
-	blocks  int
-	records int
+	scan     query.Scan
+	openErr  error
+	opens    int
+	blocks   int
+	records  int
+	schema   *record.Schema
+	distinct map[string]int
 }
 
 func (plan *productPlanProbe) Open() (query.Scan, error) {
 	plan.opens++
 	return plan.scan, plan.openErr
 }
-func (plan *productPlanProbe) BlocksAccessed() int  { return plan.blocks }
-func (plan *productPlanProbe) RecordsOutput() int   { return plan.records }
-func (*productPlanProbe) DistinctValues(string) int { return 0 }
-func (*productPlanProbe) Schema() *record.Schema    { return nil }
+func (plan *productPlanProbe) BlocksAccessed() int                 { return plan.blocks }
+func (plan *productPlanProbe) RecordsOutput() int                  { return plan.records }
+func (plan *productPlanProbe) DistinctValues(fieldName string) int { return plan.distinct[fieldName] }
+func (plan *productPlanProbe) Schema() *record.Schema              { return plan.schema }
 
 type productPlanScanStub struct {
 	rows             []map[string]query.Constant
