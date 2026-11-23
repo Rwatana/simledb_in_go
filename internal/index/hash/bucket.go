@@ -11,6 +11,13 @@ import (
 // BucketCount is the fixed number of buckets used by the static hash index.
 const BucketCount = 100
 
+// SearchCost estimates the number of index blocks visited for a search.
+// The estimate assumes an even distribution across buckets; recordsPerBlock is
+// accepted to match the index cost API but does not affect the bucket count.
+func SearchCost(numBlocks, recordsPerBlock int) int {
+	return numBlocks / BucketCount
+}
+
 // BucketNumber maps a query value to its static hash-index bucket.
 func BucketNumber(value query.Constant) (int, error) {
 	if integer, ok := value.AsInt(); ok {

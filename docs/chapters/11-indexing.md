@@ -39,6 +39,18 @@ shows how a query value becomes a bucket number; its editable source is
 The first focused test run failed because `BucketNumber` and `BucketCount` were undefined. Tests verify positive and
 negative integers, ASCII/BMP/supplementary Unicode strings, the empty-string hash, bucket bounds, and unset-value errors.
 
+## Feature 3: Estimate static hash search cost
+
+`hash.SearchCost` mirrors Java `HashIndex.searchCost`: it estimates the cost of a key lookup as
+`numBlocks / BucketCount`, assuming the blocks are distributed evenly among 100 buckets. It accepts
+`recordsPerBlock` for API parity, but the static-hash estimate does not use it.
+
+### Test-first record
+
+The first focused test run failed because `SearchCost` was undefined. Tests cover an empty index, estimates below and at
+one bucket, integer truncation between bucket boundaries, multiple buckets, and the intentionally ignored
+records-per-block argument.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
