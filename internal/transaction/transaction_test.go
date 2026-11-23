@@ -47,6 +47,7 @@ type recordingTransactionLockManager struct {
 	exclusiveErr  error
 	sharedCalls   int
 	exclusiveCall int
+	exclusiveIDs  []storage.BlockID
 	releaseCalls  int
 }
 
@@ -55,8 +56,9 @@ func (m *recordingTransactionLockManager) LockShared(storage.BlockID) error {
 	return m.sharedErr
 }
 
-func (m *recordingTransactionLockManager) LockExclusive(storage.BlockID) error {
+func (m *recordingTransactionLockManager) LockExclusive(block storage.BlockID) error {
 	m.exclusiveCall++
+	m.exclusiveIDs = append(m.exclusiveIDs, block)
 	return m.exclusiveErr
 }
 
@@ -1429,6 +1431,33 @@ func TestTransactionAppendRequiresFileManager(t *testing.T) {
 	}
 	if err == nil || err.Error() != `append transaction file "tbl": file manager is not configured` {
 		t.Errorf("Append() error = %v, want file-manager configuration error", err)
+	}
+}
+
+func TestTransactionAppendPreservesEOFExclusiveLockFailure(t *testing.T) {
+	wantErr := concurrency.ErrLockConflict
+	locks := &recordingTransactionLockManager{exclusiveErr: wantErr}
+	files := &recordingFileSizer{lengths: map[string]int{}}
+	tx := &Transaction{locks: locks, fileManager: files}
+
+	block, err := tx.Append("tbl")
+	if block != (storage.BlockID{}) {
+		t.Errorf("Append() block = %v, want zero block after lock failure", block)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("Append() error = %v, want lock conflict", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), `append transaction file "tbl": acquire EOF exclusive lock`) {
+		t.Errorf("Append() error = %v, want file and operation context", err)
+	}
+	if locks.exclusiveCall != 1 {
+		t.Errorf("exclusive lock calls = %d, want 1", locks.exclusiveCall)
+	}
+	if !reflect.DeepEqual(locks.exclusiveIDs, []storage.BlockID{storage.NewBlockID("tbl", -1)}) {
+		t.Errorf("exclusive lock blocks = %v, want EOF sentinel", locks.exclusiveIDs)
+	}
+	if len(files.appendNames) != 0 {
+		t.Errorf("FileManager.Append() calls = %v, want none after lock failure", files.appendNames)
 	}
 }
 

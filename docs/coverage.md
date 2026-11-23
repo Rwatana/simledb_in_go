@@ -135,8 +135,9 @@ The EOF shared-lock failure path now verifies that `Transaction.Size` preserves 
 file-sizer call. The method is now 100.0% covered, transaction coverage is 94.8%, and full-module coverage remains
 96.6%.
 
-`Transaction.Append` now tests its zero-value guard and returns the existing file-manager configuration error before
-lock access. The method is 88.9% covered, transaction coverage is 95.4%, and full-module coverage is 96.7%.
+`Transaction.Append` now tests both its zero-value guard and the EOF exclusive-lock failure. The lock failure preserves
+the conflict and file-operation context, returns a zero block, and prevents the file-manager append. The method is now
+100.0% covered, transaction coverage is 96.0%, and full-module coverage remains 96.7%.
 
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
