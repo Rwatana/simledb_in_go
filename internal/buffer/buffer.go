@@ -33,7 +33,11 @@ func New(files *storagefile.Manager, logs *logmanager.Manager) (*Buffer, error) 
 	if logs == nil {
 		return nil, fmt.Errorf("create buffer: log manager must not be nil")
 	}
-	contents, err := storage.NewPage(files.BlockSize())
+	blockSize := files.BlockSize()
+	if blockSize <= 0 {
+		return nil, fmt.Errorf("create buffer: block size %d must be positive", blockSize)
+	}
+	contents, err := storage.NewPage(blockSize)
 	if err != nil {
 		return nil, fmt.Errorf("create buffer contents: %w", err)
 	}
