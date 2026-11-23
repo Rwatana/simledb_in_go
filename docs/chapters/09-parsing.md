@@ -237,6 +237,24 @@ source is [`ch09-delete-data.drawio`](../diagrams/ch09-delete-data.drawio).
 Tests first failed to compile because `DeleteData` and `NewDeleteData` were undefined. They cover storing and reading
 the target table and predicate, plus safe accessors on the zero value.
 
+## Feature 14: Parse SQL DELETE statements
+
+`Parser.ParseDelete` maps to Java `Parser.delete`. It consumes `delete from`, reads the normalized table identifier,
+and optionally parses a `where` predicate through the existing predicate parser. Without `where`, the returned
+`DeleteData` contains an empty predicate. Any token after the command remains available to the caller.
+
+Go keeps DELETE parsing independent from `Parser.ParseUpdateCommand`: this method parses one concrete command and
+returns its existing data value; top-level dispatch is a separate behavior. Errors retain lexer byte offsets and add
+clause context. The [DELETE-parser diagram](../diagrams/ch09-parse-delete.svg) shows the required clauses, optional
+predicate, preserved next token, and error paths; the editable source is
+[`ch09-parse-delete.drawio`](../diagrams/ch09-parse-delete.drawio).
+
+### Test-first record
+
+Tests first failed to compile because `Parser.ParseDelete` was undefined. They cover a mixed-case command with an
+ordered conjunction, an omitted predicate, preservation of a following keyword, missing command clauses and table
+names, incomplete predicates, byte offsets, and a nil receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -248,3 +266,4 @@ the target table and predicate, plus safe accessors on the zero value.
 - Keyword matching compares the normalized input word to the expected argument exactly, as Java does; callers provide the canonical lower-case spelling.
 - SELECT field and table lists are parsed iteratively rather than recursively, and query parsing leaves any trailing token for its caller.
 - `DeleteData` keeps its fields private and exposes a safe zero value; Java exposes its command data only through accessor methods but does not define Go's zero-value behavior.
+- `ParseDelete` is a concrete-command parser separate from Go's future update-command dispatcher; it leaves trailing tokens to its caller.

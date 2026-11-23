@@ -117,6 +117,33 @@ func (parser *Parser) ParseQuery() (QueryData, error) {
 	return NewQueryData(fields, tables, predicate), nil
 }
 
+// ParseDelete reads a DELETE table name and optional predicate.
+func (parser *Parser) ParseDelete() (DeleteData, error) {
+	if parser == nil {
+		return DeleteData{}, fmt.Errorf("parse delete: parser is nil")
+	}
+	if err := parser.lexer.EatKeyword("delete"); err != nil {
+		return DeleteData{}, fmt.Errorf("parse delete DELETE keyword: %w", err)
+	}
+	if err := parser.lexer.EatKeyword("from"); err != nil {
+		return DeleteData{}, fmt.Errorf("parse delete FROM keyword: %w", err)
+	}
+	tableName, err := parser.ParseField()
+	if err != nil {
+		return DeleteData{}, fmt.Errorf("parse delete table name: %w", err)
+	}
+	var predicate query.Predicate
+	if parser.lexer.MatchKeyword("where") {
+		// A successful match guarantees this consume succeeds before the lexer changes.
+		_ = parser.lexer.EatKeyword("where")
+		predicate, err = parser.ParsePredicate()
+		if err != nil {
+			return DeleteData{}, fmt.Errorf("parse delete WHERE predicate: %w", err)
+		}
+	}
+	return NewDeleteData(tableName, predicate), nil
+}
+
 func (parser *Parser) parseQueryNameList(kind string) ([]string, error) {
 	name, err := parser.ParseField()
 	if err != nil {

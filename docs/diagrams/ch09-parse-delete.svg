@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="580" viewBox="0 0 1240 580" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 14: Parse a DELETE statement</title>
+  <desc id="description">The parser consumes delete and from, reads one table identifier, optionally parses a predicate, returns DeleteData, and leaves the first following token available. Syntax failures report contextual byte-positioned errors.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}.error{stroke-dasharray:8 6}
+    </style>
+  </defs>
+  <rect width="1240" height="580" fill="#fff"/>
+  <text class="title" x="620" y="57" text-anchor="middle">Chapter 9 / Feature 14: Parse a DELETE statement</text>
+  <rect class="box" x="30" y="210" width="230" height="125" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="145" y="251"><tspan x="145">SQL input</tspan><tspan class="small" x="145" dy="29">delete from student</tspan><tspan class="small" x="145" dy="24">where age = 18 returning</tspan></text>
+  <rect class="box" x="330" y="100" width="210" height="125" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="435" y="140"><tspan x="435">Required keywords</tspan><tspan class="small" x="435" dy="29">delete</tspan><tspan class="small" x="435" dy="23">from</tspan></text>
+  <rect class="box" x="330" y="300" width="210" height="125" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="435" y="339"><tspan x="435">Target table</tspan><tspan class="small" x="435" dy="29">ParseField()</tspan><tspan class="small" x="435" dy="23">normalized identifier</tspan></text>
+  <rect class="box" x="625" y="200" width="235" height="135" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="742" y="241"><tspan x="742">Optional WHERE</tspan><tspan class="small" x="742" dy="29">reuse ParsePredicate()</tspan><tspan class="small" x="742" dy="24">empty when absent</tspan></text>
+  <rect class="box" x="950" y="145" width="235" height="115" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="1067" y="187"><tspan x="1067">DeleteData</tspan><tspan class="small" x="1067" dy="30">target table + predicate</tspan></text>
+  <rect class="box" x="950" y="345" width="235" height="90" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="1067" y="380"><tspan x="1067">Next token remains</tspan><tspan class="small" x="1067" dy="24">for the caller</tspan></text>
+  <rect class="box" x="330" y="480" width="530" height="70" fill="#f5f5f5" stroke="#666"/>
+  <text class="small" x="595" y="510"><tspan x="595">Missing keyword, table, or predicate</tspan><tspan x="595" dy="23">contextual byte-positioned error</tspan></text>
+  <path class="edge" d="M260 250 L320 190"/><text class="small" x="285" y="213">read</text>
+  <path class="edge" d="M435 225 V290"/><text class="small" x="483" y="263">then table</text>
+  <path class="edge" d="M540 355 L615 280"/><text class="small" x="582" y="333">optional predicate</text>
+  <path class="edge" d="M860 235 L940 205"/><text class="small" x="897" y="205">construct</text>
+  <path class="edge" d="M1067 260 V335"/><text class="small" x="1110" y="307">leave unread</text>
+  <path class="edge error" d="M742 335 V470"/><text class="small" x="794" y="421">parse errors</text>
+</svg>
