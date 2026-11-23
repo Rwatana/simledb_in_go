@@ -613,6 +613,26 @@ The tests first failed to compile because `TableScan.MoveToNextBlock` did not ex
 
 This maps Java `TableScan.moveToBlock(rp.block().number()+1)` while keeping release and pin failures explicit.
 
+## Feature 36: Iterate a table scan across existing blocks
+
+`TableScan.Next` first searches the current record page. On exhaustion it checks whether that page is final, and when
+more pages exist it moves forward and repeats. This composition skips any number of empty intermediate blocks, returns
+the first occupied slot found, and leaves the final page pinned with cursor `-1` when the table is exhausted.
+
+### Test-first record
+
+The tests first failed to compile because `TableScan.Next` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableScanNextSkipsEmptyBlocksAndFindsTheNextRecord` | Iteration crosses empty pages, returns the first occupied slot, then stops on final exhaustion |
+| `TestTableScanNextStopsAtAnEmptyLastBlock` | An empty final page ends iteration without moving or unpinning it |
+| `TestTableScanNextWrapsTraversalFailure` | A failed last-page check retains its cause and identifies the block being left |
+| `TestTableScanNextRejectsClosedScan` | A scan without a current page cannot begin iteration |
+
+This completes Java `TableScan.next` by composing the separately tested current-page search, final-page check, and
+`moveToBlock(rp.block().number()+1)` behaviors.
+
 ## Next behavior
 
-Compose current-block search, last-block detection, and next-block movement into cross-block table iteration.
+Read an integer field from the table scan's current record.

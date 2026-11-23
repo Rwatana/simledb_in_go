@@ -134,3 +134,30 @@ func (s *TableScan) MoveToNextBlock() error {
 	s.currentSlot = -1
 	return nil
 }
+
+// Next advances to the next occupied record across existing table blocks.
+func (s *TableScan) Next() (bool, error) {
+	if s.recordPage == nil {
+		return false, fmt.Errorf("iterate table scan for %q: no current record page", s.fileName)
+	}
+	for {
+		blockNumber := s.recordPage.Block().Number()
+		found, err := s.NextInBlock()
+		if err != nil {
+			return false, fmt.Errorf("iterate table scan for %q: search block %d: %w", s.fileName, blockNumber, err)
+		}
+		if found {
+			return true, nil
+		}
+		last, err := s.AtLastBlock()
+		if err != nil {
+			return false, fmt.Errorf("iterate table scan for %q: continue after block %d: %w", s.fileName, blockNumber, err)
+		}
+		if last {
+			return false, nil
+		}
+		if err := s.MoveToNextBlock(); err != nil {
+			return false, fmt.Errorf("iterate table scan for %q: continue after block %d: %w", s.fileName, blockNumber, err)
+		}
+	}
+}
