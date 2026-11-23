@@ -30,6 +30,7 @@ func (s *sliceRollbackRecordSource) Next() (Record, bool, error) {
 
 type recordingRollbackUndoTarget struct {
 	events       []string
+	setIntErr    error
 	setStringErr error
 }
 
@@ -45,7 +46,7 @@ func (t *recordingRollbackUndoTarget) Unpin(block storage.BlockID) error {
 
 func (t *recordingRollbackUndoTarget) SetInt(_ storage.BlockID, _ int32, value int32, logUpdate bool) error {
 	t.events = append(t.events, "setint:"+strconv.FormatInt(int64(value), 10)+":"+boolText(logUpdate))
-	return nil
+	return t.setIntErr
 }
 
 func (t *recordingRollbackUndoTarget) SetString(_ storage.BlockID, _ int32, value string, logUpdate bool) error {

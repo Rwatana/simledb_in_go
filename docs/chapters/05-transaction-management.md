@@ -738,6 +738,7 @@ first. The initial build failed because `UndoRestartRecords` did not exist.
 | `TestUndoRestartRecordsRestoresOnlyUnfinishedUpdatesInSourceOrder` | Restore only unfinished SETSTRING/SETINT in reverse-log order |
 | `TestUndoRestartRecordsReturnsSourceFailure` | Checkpoint-bounded traversal failure stops restart recovery |
 | `TestUndoRestartRecordsStopsAfterUnfinishedUndoFailure` | Failed newest undo prevents older mutations |
+| `TestUndoRestartRecordsPreservesIntegerUndoFailure` | A failed SETINT restore keeps its cause and prevents consuming older history |
 
 This maps to the completion tracking and `rec.undo(tx)` branch in Java `RecoveryMgr.doRecover`. Iterator construction and
 post-undo durability remain separate.

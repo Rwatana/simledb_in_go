@@ -56,3 +56,25 @@ func TestUndoRestartRecordsStopsAfterUnfinishedUndoFailure(t *testing.T) {
 		t.Fatalf("error = %v source.next = %d", err, source.next)
 	}
 }
+
+func TestUndoRestartRecordsPreservesIntegerUndoFailure(t *testing.T) {
+	want := errors.New("integer restore failed")
+	block := storage.NewBlockID("tbl", 2)
+	source := &sliceRollbackRecordSource{records: []Record{
+		SetIntRecord{transaction: 10, block: block, oldValue: 4},
+		SetStringRecord{transaction: 8, block: block, oldValue: "older"},
+	}}
+	target := &recordingRollbackUndoTarget{setIntErr: want}
+
+	err := UndoRestartRecords(source, target)
+	if !errors.Is(err, want) || !strings.Contains(err.Error(), "SETINT") {
+		t.Fatalf("UndoRestartRecords() error = %v, want wrapped SETINT failure", err)
+	}
+	if source.next != 1 {
+		t.Errorf("source records consumed = %d, want 1 before stopping", source.next)
+	}
+	wantEvents := []string{"pin:" + block.String(), "setint:4:false", "unpin:" + block.String()}
+	if !reflect.DeepEqual(target.events, wantEvents) {
+		t.Errorf("undo events = %#v, want %#v", target.events, wantEvents)
+	}
+}
