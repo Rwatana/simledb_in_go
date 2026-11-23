@@ -822,6 +822,48 @@ func TestTransactionRejectsGetStringAfterCompletion(t *testing.T) {
 	}
 }
 
+func TestTransactionSetIntPreservesExclusiveLockFailure(t *testing.T) {
+	bufferManager, logs, block := newTransactionDataBlock(t, 8, 42)
+	var allocator IDAllocator
+	var table concurrency.LockTable
+	tx, err := New(&allocator, &table, bufferManager, logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Pin(block); err != nil {
+		t.Fatal(err)
+	}
+	wantErr := concurrency.ErrLockConflict
+	locks := &recordingTransactionLockManager{exclusiveErr: wantErr}
+	tx.locks = locks
+
+	err = tx.SetInt(block, 8, 77, false)
+	if !errors.Is(err, wantErr) {
+		t.Errorf("SetInt() error = %v, want lock conflict", err)
+	}
+	wantContext := "set integer in transaction buffer " + block.String() + " at offset 8: acquire exclusive lock"
+	if err == nil || !strings.Contains(err.Error(), wantContext) {
+		t.Errorf("SetInt() error = %v, want context %q", err, wantContext)
+	}
+	if locks.exclusiveCall != 1 {
+		t.Errorf("exclusive lock calls = %d, want 1", locks.exclusiveCall)
+	}
+	frame, ok := tx.buffers.Buffer(block)
+	if !ok {
+		t.Fatal("failed SetInt removed transaction buffer ownership")
+	}
+	got, err := frame.Contents().GetInt(8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 42 {
+		t.Errorf("integer after lock failure = %d, want original value 42", got)
+	}
+	if _, dirty := frame.ModifyingTransaction(); dirty {
+		t.Error("exclusive lock failure marked the page modified")
+	}
+}
+
 func TestTransactionSetIntWithoutLoggingUpdatesPinnedPageExclusively(t *testing.T) {
 	bufferManager, _, block := newTransactionDataBlock(t, 8, 42)
 	var allocator IDAllocator

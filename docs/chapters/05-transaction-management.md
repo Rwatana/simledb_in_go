@@ -1483,6 +1483,7 @@ because `Transaction.SetInt` did not exist.
 | --- | --- |
 | `TestTransactionSetIntWithoutLoggingUpdatesPinnedPageExclusively` | The no-log path updates the page, marks the transaction dirty, retains exclusive ownership, and writes no recovery record |
 | `TestTransactionSetIntWithoutLoggingReturnsPreconditionAndPageFailures` | Missing ownership and invalid offsets fail without dirtying the frame, while logged writes cannot silently bypass WAL |
+| `TestTransactionSetIntPreservesExclusiveLockFailure` | An exclusive-lock failure preserves the page value and clean metadata |
 
 This maps to Java `Transaction.setInt(..., false)` and supplies the `IntegerUndoTarget` signature used by SETINT undo.
 

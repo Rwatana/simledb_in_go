@@ -147,6 +147,10 @@ coverage is 96.5%, and full-module coverage is 96.8%.
 string, preserves the conflict and block/offset context, and stops before page access. The method is now 100.0%
 covered, transaction coverage is 97.1%, and full-module coverage remains 96.8%.
 
+`Transaction.SetInt` now tests its existing exclusive-lock failure path. The lock cause and operation context remain
+visible, and the page stays unchanged and clean. Method coverage is 95.0%, transaction coverage is 97.7%, and
+full-module coverage is 96.9%.
+
 The current-block iterator boundary test covers the error returned when an in-memory log-page boundary is outside
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
 also cover early rejection of index lookups with missing table- or statistics-manager dependencies and an index
