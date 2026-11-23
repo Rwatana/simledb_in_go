@@ -1,0 +1,22 @@
+<mxfile host="app.diagrams.net" modified="2026-11-23T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch09-parse-constant" name="Chapter 9 - Parse Constant">
+    <mxGraphModel page="1" pageWidth="1200" pageHeight="600">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 9 / Feature 6: Parse a constant" style="text;html=1;align=center;fontSize=25;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="210" y="30" width="780" height="55" as="geometry"/></mxCell>
+        <mxCell id="input" value="SQL input&#xa;&#xa;42 or 'text'" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=19;" vertex="1" parent="1"><mxGeometry x="45" y="230" width="220" height="120" as="geometry"/></mxCell>
+        <mxCell id="parser" value="Parser.ParseConstant()&#xa;&#xa;look ahead at next token&#xa;choose string or integer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;" vertex="1" parent="1"><mxGeometry x="330" y="210" width="260" height="160" as="geometry"/></mxCell>
+        <mxCell id="string" value="single-quoted string&#xa;&#xa;decode doubled quote&#xa;preserve content" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=18;" vertex="1" parent="1"><mxGeometry x="685" y="120" width="230" height="130" as="geometry"/></mxCell>
+        <mxCell id="integer" value="decimal integer&#xa;&#xa;check int32 range&#xa;preserve value" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=18;" vertex="1" parent="1"><mxGeometry x="685" y="300" width="230" height="130" as="geometry"/></mxCell>
+        <mxCell id="result" value="query.Constant&#xa;&#xa;following token remains available" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=18;" vertex="1" parent="1"><mxGeometry x="1000" y="210" width="180" height="150" as="geometry"/></mxCell>
+        <mxCell id="error" value="wrong or malformed token&#xa;&#xa;byte-positioned error&#xa;input remains unchanged" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=17;" vertex="1" parent="1"><mxGeometry x="330" y="430" width="260" height="120" as="geometry"/></mxCell>
+        <mxCell id="e1" value="input" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="input" target="parser"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="string token" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="parser" target="string"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="integer token" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="parser" target="integer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="decoded value" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="string" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="checked value" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="integer" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="invalid token" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="parser" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

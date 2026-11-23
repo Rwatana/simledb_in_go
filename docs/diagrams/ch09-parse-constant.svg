@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 6: Parse a constant</title>
+  <desc id="description">Parser.ParseConstant looks ahead and sends a quoted string or decimal integer to the matching lexer consumer. It returns a query constant and leaves following input available. Invalid input returns a byte-positioned error without advancing.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:18px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:16px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="600" fill="#fff"/>
+  <text class="title" x="600" y="60" text-anchor="middle">Chapter 9 / Feature 6: Parse a constant</text>
+  <rect class="box" x="45" y="230" width="220" height="120" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="155" y="275"><tspan x="155">SQL input</tspan><tspan x="155" dy="30">42 or 'text'</tspan></text>
+  <rect class="box" x="330" y="210" width="260" height="160" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="460" y="247"><tspan x="460">Parser.ParseConstant()</tspan><tspan class="small" x="460" dy="32">look at next token</tspan><tspan class="small" x="460" dy="26">choose string or integer</tspan></text>
+  <rect class="box" x="685" y="120" width="230" height="130" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="800" y="160"><tspan x="800">single-quoted string</tspan><tspan class="small" x="800" dy="32">decode doubled quote</tspan><tspan class="small" x="800" dy="26">preserve content</tspan></text>
+  <rect class="box" x="685" y="300" width="230" height="130" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="800" y="340"><tspan x="800">decimal integer</tspan><tspan class="small" x="800" dy="32">check int32 range</tspan><tspan class="small" x="800" dy="26">preserve value</tspan></text>
+  <rect class="box" x="1000" y="210" width="180" height="150" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="1090" y="260"><tspan x="1090">query.Constant</tspan><tspan class="small" x="1090" dy="34">next token remains</tspan><tspan class="small" x="1090" dy="26">available</tspan></text>
+  <rect class="box" x="330" y="430" width="260" height="120" fill="#f8cecc" stroke="#b85450"/>
+  <text class="small" x="460" y="470"><tspan x="460">wrong or malformed token</tspan><tspan x="460" dy="26">byte-positioned error</tspan><tspan x="460" dy="26">input remains unchanged</tspan></text>
+  <path class="edge" d="M265 290 H320"/><text class="small" x="292" y="272">input</text>
+  <path class="edge" d="M590 250 C630 250 640 185 675 185"/><text class="small" x="635" y="210">string</text>
+  <path class="edge" d="M590 330 C630 330 640 365 675 365"/><text class="small" x="635" y="355">integer</text>
+  <path class="edge" d="M915 180 H990"/><text class="small" x="950" y="162">decoded value</text>
+  <path class="edge" d="M915 365 H990"/><text class="small" x="950" y="347">checked value</text>
+  <path class="edge" d="M460 370 V420"/><text class="small" x="500" y="405">failure</text>
+</svg>

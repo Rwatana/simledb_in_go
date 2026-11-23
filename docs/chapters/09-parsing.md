@@ -10,6 +10,7 @@ Request.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/parse.Lexer` | `simpledb/parse/Lexer.java` | Read tokens while retaining source position for lookahead |
+| `internal/parse.Parser` | `simpledb/parse/Parser.java` | Turn token sequences into query values |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -106,6 +107,24 @@ Tests first failed to compile because `MatchKeyword` and `EatKeyword` were undef
 an ordinary expected word, uppercase input normalization, the Java expected-argument comparison rule, word boundaries,
 repeated lookahead, following identifiers and keywords, mismatches, wrong token kinds, stable byte offsets, empty input,
 whitespace, and nil receivers.
+
+## Feature 6: Parse SQL constant literals
+
+`Parser.ParseConstant` maps to Java `Parser.constant`. It reads either a single-quoted string or a non-negative integer
+from the parser's lexer and returns the existing `query.Constant` value. String parsing keeps the lexer's decoded
+contents; integer parsing keeps the checked `int32` range. The parser advances only after the selected lexer operation
+succeeds, and lexer errors retain their byte offset and cause through a parser-specific context.
+
+Go keeps the parser as a small adapter over `Lexer` and `query.Constant` instead of introducing a second constant type.
+The [constant-parsing diagram](../diagrams/ch09-parse-constant.svg) shows the string and integer paths converging on the
+query constant value while invalid input preserves the token; its editable source is
+[`ch09-parse-constant.drawio`](../diagrams/ch09-parse-constant.drawio).
+
+### Test-first record
+
+The tests first failed to compile because `NewParser` and `Parser` were undefined. They cover integer and decoded string
+values, preserving following input, wrong token kinds, unterminated strings, integer overflow, stable byte offsets,
+repeated failures without consumption, empty input, whitespace, and a nil parser receiver.
 
 ## Intentional differences from Java
 
