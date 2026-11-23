@@ -386,6 +386,32 @@ func TestLockTableTimesOutBlockedSharedRequest(t *testing.T) {
 	}
 }
 
+func TestLockTableImmediatelyTimesOutBlockedSharedRequest(t *testing.T) {
+	var table LockTable
+	block := storage.NewBlockID("tbl", 1)
+	other := storage.NewBlockID("tbl", 2)
+	if err := table.LockShared(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockExclusive(block); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.LockShared(other); err != nil {
+		t.Fatal(err)
+	}
+
+	err := table.WaitSharedFor(block, 0)
+	if !errors.Is(err, ErrLockTimeout) {
+		t.Fatalf("WaitSharedFor() error = %v, want ErrLockTimeout", err)
+	}
+	if got := table.locks[block]; got != -1 {
+		t.Fatalf("exclusive state after immediate timeout = %d, want -1", got)
+	}
+	if got := table.locks[other]; got != 1 {
+		t.Fatalf("other shared holders = %d, want 1", got)
+	}
+}
+
 func TestLockTableBoundedSharedRequestAcquiresBeforeDeadline(t *testing.T) {
 	var table LockTable
 	block := storage.NewBlockID("tbl", 1)

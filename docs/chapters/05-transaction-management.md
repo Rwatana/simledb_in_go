@@ -1045,9 +1045,13 @@ granted. Timeout changes no lock state.
 Deadline abort/state preservation and successful acquisition before the deadline were tested first. The initial build
 failed because `WaitSharedFor` and `ErrLockTimeout` did not exist.
 
+A zero-duration request exercises the already-expired deadline check before the timer is installed. It returns the same
+timeout error immediately and leaves both the exclusive holder and unrelated block state unchanged.
+
 | Test | Observable behavior |
 | --- | --- |
 | `TestLockTableTimesOutBlockedSharedRequest` | A persistent exclusive holder causes a distinguishable timeout without state mutation |
+| `TestLockTableImmediatelyTimesOutBlockedSharedRequest` | A zero timeout returns immediately while preserving the exclusive holder and unrelated shared state |
 | `TestLockTableBoundedSharedRequestAcquiresBeforeDeadline` | Final release before the deadline grants one shared hold |
 
 This maps to Java `LockTable.sLock`'s elapsed-time check and `LockAbortException`. Go accepts the duration explicitly so
