@@ -73,7 +73,8 @@ pin increment、unpin、modifying transaction、recovery LSN、最初のBlockID�
 進み、最初のunpinned victim候補を選び、cache済みframeをpinして0→1遷移だけをavailable countへ反映できます。
 Manager経由のunpinも1→0遷移だけをavailable countへ反映し、cache missでは既存のinitial assignment、clean
 reassignment、dirty WAL replacementへdispatchして成功後にpinできます。cache hitとmissは1つのatomicな
-non-waiting attemptへ合成済みです。次はfinal unpinから待機clientへ通知する同期を追加します。
+non-waiting attemptへ合成済みで、final unpinはcondition variableで利用可能状態を通知します。次はpublic
+`Pin`のwaiting loopを追加します。
 
 ## 参照元
 
