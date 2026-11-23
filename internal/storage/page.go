@@ -74,7 +74,11 @@ func (p *Page) GetBytes(offset int) ([]byte, error) {
 
 // SetBytes stores value at offset after a four-byte length prefix.
 func (p *Page) SetBytes(offset int, value []byte) error {
-	if len(value) > math.MaxInt32 {
+	return p.setBytesWithLimit(offset, value, math.MaxInt32)
+}
+
+func (p *Page) setBytesWithLimit(offset int, value []byte, maxLength int) error {
+	if len(value) > maxLength {
 		return fmt.Errorf("set bytes at offset %d: length %d exceeds four-byte signed prefix", offset, len(value))
 	}
 	destination, err := p.bytesAt(offset, encodedIntSize+len(value))
