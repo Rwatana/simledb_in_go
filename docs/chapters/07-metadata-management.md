@@ -137,3 +137,39 @@ The test first failed to compile because `TableManager.InitializeCatalogs` did n
 | `TestTableManagerInitializeCatalogsPreservesFieldCatalogFailure` | Failure opening `fldcat` retains bootstrap context after the table catalog row is written |
 
 This maps the `isNew` branch of Java `TableMgr` while making bootstrap an explicit, separately testable Go operation.
+
+## Feature 6: Reconstruct a table layout from the catalogs
+
+`TableManager.Layout` locates the requested table's stored slot size in `tblcat`, then walks `fldcat` in record order to
+rebuild the schema and offset map. It returns `record.NewLayoutFromMetadata`, preserving catalog offsets and slot width
+instead of recalculating them from today's encoding rules. This maps Java `TableMgr.getLayout`.
+
+The Go API reports an absent table explicitly instead of returning a layout with Java's `-1` sentinel size. It also
+rejects slot sizes smaller than the occupancy flag, unknown field types, negative lengths, duplicate fields, and offsets
+outside the stored slot. Both catalog scans use the shared cleanup boundary, so close failures remain visible.
+
+An empty-schema table is valid: it has a four-byte slot and no matching `fldcat` rows. Layout caching remains outside
+this behavior.
+
+### Test-first record
+
+The tests first failed to compile because `TableManager.Layout` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestTableManagerLayoutReconstructsStoredPhysicalMetadata` | Stored catalog order, types, lengths, offsets, and slot size reconstruct the field-catalog layout and both scans close |
+| `TestTableManagerLayoutReportsMissingTableAndClosesTableCatalog` | An absent table returns contextual failure after closing `tblcat` without opening `fldcat` |
+| `TestTableManagerLayoutPreservesTableCatalogScanFailure` | An occupancy-read failure in `tblcat` retains its cause and closes the scan |
+| `TestTableManagerLayoutPreservesRegisteredTableNameReadFailure` | A table-name read failure retains catalog context and closes `tblcat` |
+| `TestTableManagerLayoutPreservesTableCatalogSlotSizeReadFailure` | A slot-size read failure retains the requested-table context and closes `tblcat` |
+| `TestTableManagerLayoutRejectsInvalidTableCatalogSlotSize` | A stored slot size smaller than the occupancy flag is rejected |
+| `TestTableManagerLayoutPreservesFieldCatalogScanFailure` | An occupancy-read failure in `fldcat` retains its cause and closes both scans |
+| `TestTableManagerLayoutPreservesFieldOwnerTableNameReadFailure` | A field owner-name read failure retains table context and closes both scans |
+| `TestTableManagerLayoutPreservesFieldNameReadFailure` | A field-name read failure retains field-catalog context and closes both scans |
+| `TestTableManagerLayoutRejectsDuplicateFieldMetadata` | Duplicate stored field names are rejected while both catalog scans close |
+| `TestTableManagerLayoutPreservesFieldTypeReadFailure` | A field-type read failure retains its cause and closes both scans |
+| `TestTableManagerLayoutRejectsInvalidFieldType` | An unknown stored field type is rejected |
+| `TestTableManagerLayoutPreservesFieldLengthReadFailure` | A field-length read failure retains its cause and closes both scans |
+| `TestTableManagerLayoutRejectsNegativeFieldLength` | A negative stored field length is rejected |
+| `TestTableManagerLayoutPreservesFieldOffsetReadFailure` | A field-offset read failure retains its cause and closes both scans |
+| `TestTableManagerLayoutRejectsFieldOffsetsOutsideStoredSlot` | A field offset beyond the stored slot is rejected |
