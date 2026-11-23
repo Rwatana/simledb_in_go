@@ -1,8 +1,8 @@
 # Chapter 10: Planning
 
 Planning turns parsed SQL into a relational query tree. A plan describes both the scan that will execute that tree and
-metadata used to compare alternatives before opening a scan. Each concrete plan, estimate, verification rule, and
-planner composition remains a separate observable behavior and Issue.
+metadata used to compare alternatives before opening a scan. Each concrete plan, scan, estimate, verification rule,
+and planner composition remains a separate observable behavior and Issue.
 
 ## Java source map
 
@@ -10,7 +10,7 @@ planner composition remains a separate observable behavior and Issue.
 | --- | --- | --- |
 | `internal/plan.Plan` | `simpledb/plan/Plan.java` | Describe opening a scan, estimating its cost and output, and exposing its schema |
 | `internal/plan.TablePlan` | `simpledb/plan/TablePlan.java` | Retain one table's resolved layout and expose its logical schema |
-| `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine the schemas of two child plans |
+| `internal/plan.ProductPlan` | `simpledb/plan/ProductPlan.java` | Combine child schemas and open their Cartesian-product scan |
 
 ## Feature 1: Define the query plan contract
 
@@ -177,6 +177,21 @@ shows the product node joining child schemas; its editable source remains
 The first focused test run failed because `ProductPlan` and `NewProductPlan` were undefined. Tests verify ordered field
 definitions, stable schema identity, and construction with missing children.
 
+## Feature 13: Open a product scan
+
+`ProductPlan.Open` maps to Java `ProductPlan.open()` and composes the two child plan scans with the existing
+`query.ProductScan`. It initializes the product scan before returning it, so callers can advance immediately. Missing
+child plans and scans return errors; a right-child open failure closes the already opened left scan, and a failed
+product-scan initialization closes both inputs while preserving the primary and cleanup errors. ProductScan itself
+owns the left-major traversal and field-read behavior. The [plan diagram](../diagrams/ch10-plan-contract.svg) shows
+ProductPlan opening both child scans into the product scan; its editable source remains
+[`ch10-plan-contract.drawio`](../diagrams/ch10-plan-contract.drawio).
+
+### Test-first record
+
+The first focused test run failed because `ProductPlan.Open` was undefined. Tests verify the returned scan type and
+first product row, nil plan/scan handling, contextual child errors, and closing opened scans after a later-stage failure.
+
 ## Intentional differences from Java
 
 - `Plan.Open` returns `(query.Scan, error)` rather than only a scan so Go callers can handle storage failures without exceptions or panics.
@@ -186,3 +201,4 @@ definitions, stable schema identity, and construction with missing children.
 - `TablePlan.DistinctValues` forwards the current simple `StatInfo` estimate; field-specific statistics remain outside this table-plan behavior.
 - `SelectPlan.Schema` returns the child schema directly because filtering does not change the set of output fields.
 - `SelectPlan.BlocksAccessed` delegates directly to the child; estimates affected by selectivity remain distinct methods.
+- `ProductPlan.Open` initializes both child scans before returning and closes partial scan resources when composition fails.
