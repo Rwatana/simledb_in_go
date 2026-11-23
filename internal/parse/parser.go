@@ -248,6 +248,41 @@ func (parser *Parser) ParseCreateView() (CreateViewData, error) {
 	return NewCreateViewData(viewName, definition), nil
 }
 
+// ParseCreateIndex reads the index, table, and field names in a CREATE INDEX statement.
+func (parser *Parser) ParseCreateIndex() (CreateIndexData, error) {
+	if parser == nil {
+		return CreateIndexData{}, fmt.Errorf("parse create index: parser is nil")
+	}
+	if err := parser.lexer.EatKeyword("create"); err != nil {
+		return CreateIndexData{}, fmt.Errorf("parse create index CREATE keyword: %w", err)
+	}
+	if err := parser.lexer.EatKeyword("index"); err != nil {
+		return CreateIndexData{}, fmt.Errorf("parse create index INDEX keyword: %w", err)
+	}
+	indexName, err := parser.ParseField()
+	if err != nil {
+		return CreateIndexData{}, fmt.Errorf("parse create index name: %w", err)
+	}
+	if err := parser.lexer.EatKeyword("on"); err != nil {
+		return CreateIndexData{}, fmt.Errorf("parse create index ON keyword: %w", err)
+	}
+	tableName, err := parser.ParseField()
+	if err != nil {
+		return CreateIndexData{}, fmt.Errorf("parse create index table name: %w", err)
+	}
+	if err := parser.lexer.EatDelimiter('('); err != nil {
+		return CreateIndexData{}, fmt.Errorf("parse create index opening delimiter: %w", err)
+	}
+	fieldName, err := parser.ParseField()
+	if err != nil {
+		return CreateIndexData{}, fmt.Errorf("parse create index field name: %w", err)
+	}
+	if err := parser.lexer.EatDelimiter(')'); err != nil {
+		return CreateIndexData{}, fmt.Errorf("parse create index closing delimiter: %w", err)
+	}
+	return NewCreateIndexData(indexName, tableName, fieldName), nil
+}
+
 func (parser *Parser) parseInsertFieldList() ([]string, error) {
 	field, err := parser.ParseField()
 	if err != nil {

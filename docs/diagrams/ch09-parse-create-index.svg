@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="540" viewBox="0 0 1160 540" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 9 Feature 23: Parse SQL CREATE INDEX statements</title>
+  <desc id="description">ParseCreateIndex consumes CREATE INDEX, index name, ON, table name, and one parenthesized field, returning CreateIndexData. It preserves the following token and keeps byte offsets on grammar errors.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>
+      .title{font:700 25px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:18;ry:18}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <text class="title" x="580" y="62" text-anchor="middle">Chapter 9 / Feature 23: Parse SQL CREATE INDEX statements</text>
+  <rect class="box" x="45" y="210" width="260" height="130" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="175" y="248"><tspan x="175">SQL input</tspan><tspan x="175" dy="30">CREATE INDEX ix</tspan><tspan x="175" dy="27">ON student (name)</tspan></text>
+  <rect class="box" x="385" y="195" width="300" height="160" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="535" y="237"><tspan x="535">ParseCreateIndex</tspan><tspan x="535" dy="31">create → index → name</tspan><tspan x="535" dy="27">on → table → (field)</tspan></text>
+  <rect class="box" x="790" y="195" width="325" height="160" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="952" y="237"><tspan x="952">CreateIndexData</tspan><tspan x="952" dy="31">index name</tspan><tspan x="952" dy="27">table name · field name</tspan></text>
+  <rect class="box" x="385" y="405" width="300" height="90" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="535" y="438"><tspan x="535">Following token stays available</tspan><tspan x="535" dy="27">caller continues parsing</tspan></text>
+  <rect class="box" x="790" y="405" width="325" height="90" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="952" y="438"><tspan x="952">Grammar errors keep context</tspan><tspan x="952" dy="27">and byte offsets</tspan></text>
+  <path class="edge" d="M305 275 H377"/><text class="small" x="341" y="263">consume</text>
+  <path class="edge" d="M685 275 H782"/><text class="small" x="733" y="263">build result</text>
+  <path class="edge" d="M535 355 V397" stroke-dasharray="7 6"/><text class="small" x="607" y="382">no extra consume</text>
+  <path class="edge" d="M685 320 H740 V450 H782" stroke-dasharray="7 6"/><text class="small" x="742" y="430">wrap context</text>
+</svg>

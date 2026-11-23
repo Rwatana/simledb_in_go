@@ -20,6 +20,7 @@ Request.
 | `internal/parse.CreateViewData` | `simpledb/parse/CreateViewData.java` | Hold the view name and rendered query definition of a CREATE VIEW statement |
 | `internal/parse.CreateIndexData` | `simpledb/parse/CreateIndexData.java` | Hold the index, table, and field names of a CREATE INDEX statement |
 | `Parser.ParseCreateView` | `simpledb/parse/Parser.java` (`createView`) | Parse the view name and SELECT definition after CREATE VIEW |
+| `Parser.ParseCreateIndex` | `simpledb/parse/Parser.java` (`createIndex`) | Parse the index name, table, and indexed field after CREATE INDEX |
 
 ## Feature 1: Read integer literals from SQL text
 
@@ -380,6 +381,19 @@ sequence, query delegation, result, and error paths; its editable source is
 Tests first failed because `Parser.ParseCreateView` was undefined. They cover mixed-case syntax and query predicates,
 preservation of a following token, missing keywords/name/query pieces, byte offsets, and a nil receiver.
 
+## Feature 23: Parse SQL CREATE INDEX statements
+
+`Parser.ParseCreateIndex` maps to Java `Parser.createIndex`. It consumes `create index`, reads the normalized index and
+table names around `on`, then parses one field name inside parentheses and returns `CreateIndexData`. It leaves the next
+token untouched and wraps each grammar error without losing its byte offset. The [CREATE INDEX-parser diagram](../diagrams/ch09-parse-create-index.svg)
+shows the command sequence, result, and delimiter/error paths; its editable source is
+[`ch09-parse-create-index.drawio`](../diagrams/ch09-parse-create-index.drawio).
+
+### Test-first record
+
+Tests first failed because `Parser.ParseCreateIndex` was undefined. They cover mixed-case names, following-token
+preservation, every required keyword/name/delimiter, byte offsets, and a nil receiver.
+
 ## Intentional differences from Java
 
 - The Go API accepts SQL text as a string rather than a Java `Reader`.
@@ -400,3 +414,4 @@ preservation of a following token, missing keywords/name/query pieces, byte offs
 - `CreateViewData` exposes the query definition as rendered text rather than returning `QueryData`; the stored query value remains read-only through its public API.
 - `CreateIndexData` keeps the Java command's three string values private and exposes Go-style accessors; its zero value returns empty strings.
 - `ParseCreateView` uses the Go `ParseQuery` method and preserves trailing input for its caller, matching Java's query delegation without consuming an extra token.
+- `ParseCreateIndex` returns contextual errors and preserves the following token, while Java mutates a parser's shared stream and throws on grammar failure.
