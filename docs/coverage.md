@@ -317,6 +317,10 @@ Table-statistics calculation now exercises a record scan failure caused by a slo
 the underlying cause and table/scan context and confirms the scan releases its page pin. `calculateTableStats` is now
 93.8% covered, metadata package coverage is 98.4%, and full-module statement coverage remains 99.1%.
 
+Statistics refresh now also exercises failure while advancing the registered-table catalog scan. It verifies the
+wrapped cause, cleanup of the failed scan's pin, and retention of the previous cache and lookup count. `refreshLocked`
+is now 88.9% covered, metadata package coverage is 99.0%, and full-module statement coverage is 99.2%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

@@ -190,6 +190,45 @@ func TestStatManagerRefreshPreservesTableCatalogLayoutFailure(t *testing.T) {
 	}
 }
 
+func TestStatManagerRefreshPreservesRegisteredTableScanFailure(t *testing.T) {
+	transaction := newCatalogTransaction(t, 2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+
+	manager := NewStatManager(tables)
+	stale := NewStatInfo(8, 9)
+	manager.stats["stale"] = stale
+	manager.calls = 37
+	transaction.unpins = nil
+
+	wantErr := errors.New("registered table flag unavailable")
+	transaction.getIntErr = wantErr
+	transaction.getIntOffset = 76
+	transaction.getIntErrFile = "tblcat.tbl"
+	transaction.getIntErrAfter = 2
+
+	err := manager.Refresh(transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Refresh() error = %v, want wrapped registered-table scan failure", err)
+	}
+	for _, context := range []string{"refresh table statistics", "scan registered tables", "find occupied record"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Refresh() error = %q, want context %q", err, context)
+		}
+	}
+	if len(transaction.unpins) == 0 || transaction.unpins[len(transaction.unpins)-1] != storage.NewBlockID("tblcat.tbl", 0) {
+		t.Errorf("last unpin = %v, want failed registered-table scan block %v", transaction.unpins, storage.NewBlockID("tblcat.tbl", 0))
+	}
+	if manager.calls != 37 {
+		t.Errorf("lookup calls = %d, want unchanged value 37", manager.calls)
+	}
+	if len(manager.stats) != 1 || manager.stats["stale"] != stale {
+		t.Errorf("statistics cache = %v, want the prior stale snapshot retained", manager.stats)
+	}
+}
+
 func TestStatManagerStatisticsCachesFirstLookup(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(256)
 	var schema record.Schema
