@@ -12,6 +12,7 @@ dependency order. Each observable behavior remains a separate Issue, branch, com
 | `internal/query.Term` | `simpledb/query/Term.java` | Equality between two expressions |
 | `internal/query.Scan` | `simpledb/query/Scan.java` | Shared traversal, field access, and cleanup contract |
 | `internal/query.UpdateScan` | `simpledb/query/UpdateScan.java` | A scan with record mutation and RID positioning |
+| `internal/query.RecordScan` | `simpledb/record/TableScan.java` | Adapter from record storage scans to query values |
 
 ## Feature 1: Initialize an integer query constant
 
@@ -273,3 +274,15 @@ This PR defines only the query-side contract; adding a concrete scan implementat
 
 `TestUpdateScanContractProvidesMutationAndRIDOperations` first failed to compile because `UpdateScan` was undefined.
 It assigns an instrumented implementation to the interface and exercises every added operation through that boundary.
+
+## Feature 27: Adapt record table scans to query scans
+
+`NewRecordScan` wraps the existing `record.TableScan` and exposes it as `query.UpdateScan`. The embedded record scan
+provides traversal, typed access, mutation, RID positioning, and cleanup; `RecordScan.GetVal` and `SetVal` translate
+between schema field types and query constants. A field-kind mismatch or unknown field returns a contextual error
+before mutation. Unlike Java, the record package does not implement an interface from the query package: the query
+adapter depends on record types, so the dependency remains one-way and avoids an import cycle.
+
+The integration tests first failed to compile because `query.NewRecordScan` was undefined. An in-memory transaction
+fake verifies typed values, updates, iteration, insertion/deletion, RID positioning, cleanup, invalid fields and
+constant kinds, and wrapped storage errors.
