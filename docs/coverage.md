@@ -167,6 +167,10 @@ registration with a missing table-manager dependency, before catalog or transact
 `MetadataManager.Statistics` now has an independent refresh-failure test. It confirms the facade returns no partial
 snapshot, keeps both table/facade and refresh context, counts the failed lookup, and does not cache a result. The method
 is now 100.0% covered; metadata package coverage is 97.9%, while the full module remains 97.0%.
+
+`StatManager.Refresh` now exercises its table-catalog layout failure path. The test checks the wrapped read error and
+verifies the refresh keeps the old cache and lookup count intact. Metadata package coverage is now 98.2%,
+`refreshLocked` is 81.5% covered, and full-module statement coverage is 97.1%.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

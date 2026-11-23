@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -102,6 +103,44 @@ func TestStatManagerRefreshRebuildsEveryRegisteredTable(t *testing.T) {
 		if stats == nil || stats.RecordsOutput() != records {
 			t.Fatalf("%s statistics = %v, want %d records", tableName, stats, records)
 		}
+	}
+}
+
+func TestStatManagerRefreshPreservesTableCatalogLayoutFailure(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+
+	manager := NewStatManager(tables)
+	stale := NewStatInfo(8, 9)
+	manager.stats["stale"] = stale
+	manager.calls = 37
+	wantErr := errors.New("table catalog size unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "tblcat.tbl"
+
+	err := manager.Refresh(transaction)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Refresh() error = %v, want wrapped catalog size failure", err)
+	}
+	for _, context := range []string{
+		"refresh table statistics",
+		"load table catalog layout",
+		`load layout for table "tblcat" from table catalog`,
+		"open catalog scan",
+		"read size",
+	} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("Refresh() error = %q, want context %q", err, context)
+		}
+	}
+	if manager.calls != 37 {
+		t.Errorf("lookup calls = %d, want unchanged value 37", manager.calls)
+	}
+	if len(manager.stats) != 1 || manager.stats["stale"] != stale {
+		t.Errorf("statistics cache = %v, want prior stale snapshot retained", manager.stats)
 	}
 }
 

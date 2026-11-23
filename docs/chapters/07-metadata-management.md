@@ -427,9 +427,13 @@ The test first failed to compile because `StatManager.Refresh` did not exist.
 | Test | Observable behavior |
 | --- | --- |
 | `TestStatManagerRefreshRebuildsEveryRegisteredTable` | Refresh replaces stale cache state with `tblcat`, `fldcat`, and user-table snapshots and resets the call counter |
+| `TestStatManagerRefreshPreservesTableCatalogLayoutFailure` | A table-catalog layout read failure preserves its cause/context and leaves the prior cache and lookup count unchanged |
 
 This maps Java `StatMgr.refreshStatistics` while exposing the fallible refresh explicitly instead of hiding it in a
 constructor.
+
+The independent table-catalog layout failure test confirms that a refresh retains the prior cache snapshot and lookup
+counter when the catalog cannot be read.
 
 ## Feature 19: Cache statistics on first lookup
 
