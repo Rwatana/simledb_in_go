@@ -674,3 +674,20 @@ The test first failed to compile because `MetadataManager.CreateTable` did not e
 | --- | --- |
 | `TestMetadataManagerCreateTableStoresSchemaThroughFacade` | Creating `student` through the facade persists an ordered integer/varchar schema that the table manager can reconstruct |
 | `TestMetadataManagerCreateTablePreservesNilSchemaError` | A nil schema returns table-specific facade context before a nil transaction can be touched |
+
+## Feature 33: Look up a table layout through the metadata facade
+
+`MetadataManager.Layout` delegates a table name and transaction to the shared table manager, returning the reconstructed
+physical layout unchanged. Catalog failures keep their detailed lower-level cause and gain the requested table name plus
+facade context.
+
+This maps Java `MetadataMgr.getLayout` without caching a second copy of catalog-derived layouts in the facade.
+
+### Test-first record
+
+The test first failed to compile because `MetadataManager.Layout` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestMetadataManagerLayoutReconstructsTableThroughFacade` | Lookup returns the stored field order and exact slot size for a table created through the facade |
+| `TestMetadataManagerLayoutPreservesCatalogReadError` | A failed catalog size read returns no layout and retains the requested table, facade, and cause context |
