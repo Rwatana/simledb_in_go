@@ -429,6 +429,7 @@ failed because `UpdateView` and `LogPreviousInteger` did not exist.
 | --- | --- |
 | `TestLogPreviousIntegerAppendsValueBeforeUpdate` | Captures block/offset/old value and returns append LSN |
 | `TestLogPreviousIntegerRejectsMissingAssignmentBeforeAppend` | Unassigned Buffer causes no log write |
+| `TestLogPreviousIntegerRejectsNilContentsBeforeAppend` | Assigned view without page contents preserves transaction/block context and causes no log write |
 | `TestLogPreviousIntegerRejectsPageReadFailureBeforeAppend` | Invalid page range causes no log write |
 | `TestBufferSatisfiesUpdateView` | Existing Buffer directly satisfies the consumer port |
 
