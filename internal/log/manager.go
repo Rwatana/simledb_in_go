@@ -43,6 +43,10 @@ func NewManager(files *storagefile.Manager, fileName string) (*Manager, error) {
 }
 
 func newManager(files logFiles, fileName string) (*Manager, error) {
+	return newManagerWithPageFactory(files, fileName, storage.NewPage)
+}
+
+func newManagerWithPageFactory(files logFiles, fileName string, newPage func(int) (*storage.Page, error)) (*Manager, error) {
 	blockSize := files.BlockSize()
 	if blockSize < boundarySize {
 		return nil, fmt.Errorf("create log manager for %q: block size %d cannot store the %d-byte boundary", fileName, blockSize, boundarySize)
@@ -56,7 +60,7 @@ func newManager(files logFiles, fileName string) (*Manager, error) {
 		return nil, fmt.Errorf("create log manager for %q: %w", fileName, err)
 	}
 	if length == 0 {
-		page, err := storage.NewPage(blockSize)
+		page, err := newPage(blockSize)
 		if err != nil {
 			return nil, fmt.Errorf("create log manager for %q: create tail page: %w", fileName, err)
 		}

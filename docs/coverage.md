@@ -355,6 +355,11 @@ the old tail remains selected, the record receives no LSN, and the successfully 
 `rollOverLocked` function is now 86.7% covered, log package coverage is 95.9%, and full-module statement coverage
 remains 99.6%.
 
+Initial log-tail page setup now uses a private page-factory seam so allocation and boundary initialization failures can
+be tested after the file block size has passed validation. Both failures preserve their stage context and append no
+block. `newManagerWithPageFactory` is 100.0% covered, log package coverage is 97.5%, and full-module statement
+coverage is 99.7%.
+
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.

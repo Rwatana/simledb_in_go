@@ -158,6 +158,51 @@ func TestNewManagerPreservesInitialBlockWriteFailure(t *testing.T) {
 	}
 }
 
+func TestNewManagerPreservesInitialTailPageCreationFailure(t *testing.T) {
+	t.Parallel()
+
+	files, err := storagefile.NewManager(filepath.Join(t.TempDir(), "database"), 32)
+	if err != nil {
+		t.Fatalf("file.NewManager() error = %v", err)
+	}
+	pageErr := errors.New("tail page allocation failed")
+	manager, err := newManagerWithPageFactory(files, "simpledb.log", func(int) (*storage.Page, error) {
+		return nil, pageErr
+	})
+	if manager != nil {
+		t.Errorf("newManagerWithPageFactory() manager = %v, want nil", manager)
+	}
+	if !errors.Is(err, pageErr) || !strings.Contains(err.Error(), "create tail page") {
+		t.Errorf("newManagerWithPageFactory() error = %v, want wrapped tail page allocation failure", err)
+	}
+	if length, lengthErr := files.Length("simpledb.log"); lengthErr != nil || length != 0 {
+		t.Errorf("log file length after page creation failure = (%d, %v), want (0, nil)", length, lengthErr)
+	}
+}
+
+func TestNewManagerPreservesInitialTailBoundaryInitializationFailure(t *testing.T) {
+	t.Parallel()
+
+	files, err := storagefile.NewManager(filepath.Join(t.TempDir(), "database"), 32)
+	if err != nil {
+		t.Fatalf("file.NewManager() error = %v", err)
+	}
+	manager, err := newManagerWithPageFactory(files, "simpledb.log", func(int) (*storage.Page, error) {
+		return storage.NewPage(3)
+	})
+	if manager != nil {
+		t.Errorf("newManagerWithPageFactory() manager = %v, want nil", manager)
+	}
+	for _, context := range []string{"initialize boundary", "byte range [0:4] exceeds page capacity 3"} {
+		if err == nil || !strings.Contains(err.Error(), context) {
+			t.Errorf("newManagerWithPageFactory() error = %v, want context %q", err, context)
+		}
+	}
+	if length, lengthErr := files.Length("simpledb.log"); lengthErr != nil || length != 0 {
+		t.Errorf("log file length after boundary initialization failure = (%d, %v), want (0, nil)", length, lengthErr)
+	}
+}
+
 func TestAppendPreservesRolloverInitializedBlockWriteFailure(t *testing.T) {
 	t.Parallel()
 
