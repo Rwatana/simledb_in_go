@@ -28,6 +28,11 @@ func (m *StatManager) Statistics(tableName string, layout *record.Layout, transa
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
+	if m.calls > 100 {
+		if err := m.refreshLocked(transaction); err != nil {
+			return nil, fmt.Errorf("look up statistics for table %q: refresh cache: %w", tableName, err)
+		}
+	}
 	if stats := m.stats[tableName]; stats != nil {
 		return stats, nil
 	}
@@ -43,6 +48,10 @@ func (m *StatManager) Statistics(tableName string, layout *record.Layout, transa
 func (m *StatManager) Refresh(transaction record.TableScanTransaction) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.refreshLocked(transaction)
+}
+
+func (m *StatManager) refreshLocked(transaction record.TableScanTransaction) error {
 	if m.tables == nil {
 		return fmt.Errorf("refresh table statistics: table manager is nil")
 	}
