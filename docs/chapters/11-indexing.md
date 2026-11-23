@@ -118,8 +118,28 @@ straight field mapping does not require a duplicate illustration.
 The focused test run first failed because `HashIndex.GetDataRID` was undefined. Tests cover block/slot conversion,
 missing scan and current row, nil or absent schema fields, non-integer fields, and wrapped reads of both RID components.
 
+## Feature 9: Insert a hash-index entry
+
+`HashIndex.Insert` validates the transaction, index-record schema, key type, and signed 32-bit RID storage before
+replacing the current bucket scan. It then uses `BeforeFirst` to open the key's static bucket table, inserts one record,
+and writes `block`, `id`, and `dataval`. The bucket scan remains open as the index's current scan, matching the Java
+stateful contract; the caller releases it with `Close`. Errors from bucket opening, slot allocation, and each field
+write retain their causes and identify the index operation. New empty bucket files are opened through `record.TableScan`,
+which formats the record slots before insertion.
+
+The [hash-index insertion diagram](../diagrams/ch11-hash-insert.svg) shows the validation, old-scan release, bucket
+selection, row write, and retained scan; the editable source is [`ch11-hash-insert.drawio`](../diagrams/ch11-hash-insert.drawio).
+
+### Test-first record
+
+The focused test run first failed because `HashIndex.Insert` was undefined. Tests verify integer and varchar values,
+existing and newly created bucket tables, RID fields, the retained search key/scan, malformed schemas and values, RID
+range overflow, table size/append/pin failures, scan insertion and field-write failures, and preservation of a previous
+scan when repositioning cannot release it.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
 - The contract uses the existing `query.Constant` and `record.RID` value types; concrete hash and B-tree indexes remain separate implementations.
 - Static hash bucket selection normalizes Java hash remainders to a nonnegative range, avoiding Java's negative-remainder invalid-index case.
+- Go insertion validates the index-record schema and signed 32-bit RID storage before changing scan state, and wraps storage failures as explicit errors.

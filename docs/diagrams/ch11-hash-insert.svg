@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 11 Feature 9: Insert a hash-index entry</title>
+  <desc id="description">HashIndex.Insert validates the data value, RID, and index record layout before replacing scan state. It positions on the static bucket, inserts block, id, and dataval fields, and retains the open TableScan for later use or Close. Failures return contextual wrapped errors.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>.title{font:700 24px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:16;ry:16}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}.dashed{stroke-dasharray:8 6}</style>
+  </defs>
+  <rect width="1200" height="760" fill="#fff"/>
+  <text class="title" x="600" y="60" text-anchor="middle">Chapter 11 / Feature 9: Insert a hash-index entry</text>
+  <rect class="box" x="50" y="135" width="300" height="100" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="200" y="173"><tspan x="200">dataValue + dataRID</tspan><tspan x="200" dy="30">Constant + RID</tspan></text>
+  <rect class="box" x="430" y="115" width="390" height="135" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="625" y="151"><tspan x="625">Validate before changing scan state</tspan><tspan x="625" dy="28">block, id, dataval fields and types</tspan><tspan x="625" dy="27">RID fits signed 32-bit storage</tspan></text>
+  <rect class="box" x="430" y="315" width="390" height="120" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="625" y="355"><tspan x="625">BeforeFirst(dataValue)</tspan><tspan x="625" dy="29">close old scan and open hashed bucket</tspan></text>
+  <rect class="box" x="430" y="510" width="390" height="100" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="625" y="551"><tspan x="625">TableScan.Insert()</tspan><tspan x="625" dy="29">write block · id · dataval</tspan></text>
+  <rect class="box" x="850" y="510" width="300" height="100" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="1000" y="550"><tspan x="1000">HashIndex.scan remains open</tspan><tspan x="1000" dy="28">continue or call Close()</tspan></text>
+  <rect class="box" x="50" y="470" width="300" height="100" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="200" y="509"><tspan x="200">Contextual error</tspan><tspan x="200" dy="28">preserve the cause</tspan></text>
+  <path class="edge" d="M350 185 H422"/><text class="small" x="386" y="165">entry</text>
+  <path class="edge" d="M625 250 V307"/><text class="small" x="682" y="282">valid</text>
+  <path class="edge" d="M625 435 V502"/><text class="small" x="692" y="475">bucket scan</text>
+  <path class="edge" d="M820 560 H842"/><text class="small" x="831" y="540">inserted</text>
+  <path class="edge dashed" d="M430 188 H200 V462"/><text class="small" x="281" y="330">validation or bucket open</text>
+  <path class="edge dashed" d="M430 560 H358"/><text class="small" x="394" y="540">scan/field error</text>
+</svg>
