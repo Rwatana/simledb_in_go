@@ -446,6 +446,43 @@ func TestIndexManagerIndexInfoPreservesIndexedTableLayoutError(t *testing.T) {
 	}
 }
 
+func TestIndexManagerIndexInfoPreservesIndexedTableStatisticsError(t *testing.T) {
+	transaction := newEmptyCatalogTransaction(2048)
+	tables := NewTableManager()
+	if err := tables.InitializeCatalogs(transaction); err != nil {
+		t.Fatalf("InitializeCatalogs() error = %v", err)
+	}
+	var schema record.Schema
+	schema.AddIntegerField("majorid")
+	if err := tables.CreateTable("student", &schema, transaction); err != nil {
+		t.Fatalf("CreateTable() error = %v", err)
+	}
+	manager := NewIndexManager(tables, NewStatManager(tables))
+	if err := manager.InitializeCatalog(transaction); err != nil {
+		t.Fatalf("InitializeCatalog() error = %v", err)
+	}
+	if err := manager.CreateIndex("idx_student_major", "student", "majorid", transaction); err != nil {
+		t.Fatalf("CreateIndex() error = %v", err)
+	}
+	wantErr := errors.New("indexed table file unavailable")
+	transaction.sizeErr = wantErr
+	transaction.sizeErrFile = "student.tbl"
+	transaction.sizeErrAfter = 1
+
+	indexes, err := manager.IndexInfo("student", transaction)
+	if indexes != nil {
+		t.Fatalf("IndexInfo() indexes = %v, want nil after statistics failure", indexes)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("IndexInfo() error = %v, want wrapped statistics cause", err)
+	}
+	for _, context := range []string{"student", "load statistics for indexed table", "calculate statistics for table"} {
+		if !strings.Contains(err.Error(), context) {
+			t.Errorf("IndexInfo() error = %q, want context %q", err, context)
+		}
+	}
+}
+
 func TestIndexManagerIndexInfoReturnsRegistrationsForRequestedTable(t *testing.T) {
 	transaction := newEmptyCatalogTransaction(2048)
 	tables := NewTableManager()

@@ -769,6 +769,10 @@ The indexed-table layout failure is tested after a matching idxcat row has been 
 failure proves that idxcat reconstruction succeeds first, while the later table layout lookup returns its cause and
 table-specific context without a partial index map.
 
+The statistics lookup error is tested after the matching index row and table layout are available. An injected
+`student.tbl` open/size error is returned with the requested table and statistics context, without exposing a partial
+index result.
+
 ## Feature 36: Create an index through the metadata facade
 
 `MetadataManager.CreateIndex` delegates the index, table, and field names plus the transaction to the shared index
