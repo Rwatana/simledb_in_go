@@ -842,3 +842,4 @@ The test first failed to compile because `MetadataManager.Statistics` did not ex
 | Test | Observable behavior |
 | --- | --- |
 | `TestMetadataManagerStatisticsReturnsSharedManagerSnapshot` | Facade lookup reports two stored records and returns the exact snapshot installed in the shared statistics manager cache |
+| `TestMetadataManagerStatisticsPreservesRefreshFailure` | A failed refresh returns no partial snapshot, preserves refresh and facade context, counts the lookup, and leaves the cache empty |

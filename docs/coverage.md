@@ -163,6 +163,10 @@ The current-block iterator boundary test covers the error returned when an in-me
 the valid range, while confirming no iterator is returned and the durable tail is unchanged. The index metadata tests
 also cover early rejection of index lookups with missing table- or statistics-manager dependencies and an index
 registration with a missing table-manager dependency, before catalog or transaction access.
+
+`MetadataManager.Statistics` now has an independent refresh-failure test. It confirms the facade returns no partial
+snapshot, keeps both table/facade and refresh context, counts the failed lookup, and does not cache a result. The method
+is now 100.0% covered; metadata package coverage is 97.9%, while the full module remains 97.0%.
 The CI step reports
 coverage without enforcing a threshold while the repository is below 100%. Add a required 100%
 threshold only after the complete suite measures 100.0%; otherwise CI would be permanently red before the target is met.
