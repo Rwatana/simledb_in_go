@@ -780,10 +780,27 @@ build failed because `RecoverRestartChanges` did not exist.
 This maps to `bm.flushAll(txnum)` immediately after `doRecover()` in Java `RecoveryMgr.recover`. CHECKPOINT append and
 LSN flush remain separate.
 
+## Feature 33: Append a CHECKPOINT record
+
+`AppendCheckpointRecord` composes the existing four-byte quiescent checkpoint encoding with `LogAppender`. It performs
+exactly one append, returns the LSN unchanged, and preserves an append failure with checkpoint context and no retry.
+
+### Test-first record
+
+Exact bytes/LSN and contextual append failure were tested first. The initial build failed because
+`AppendCheckpointRecord` did not exist.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestAppendCheckpointRecordAppendsExactEncodingAndReturnsLSN` | One exact append and unchanged LSN |
+| `TestAppendCheckpointRecordReturnsAppendFailureWithContext` | Wrapped checkpoint context and no retry |
+
+This maps to Java `CheckpointRecord.writeToLog`; restart-recovery ordering and durability remain separate.
+
 ## Next behavior
 
-Continue with Sect. 5.3.9.3 restart recovery by appending CHECKPOINT after recovered-buffer flush, then flush its LSN as
-a separate behavior.
+Continue with Sect. 5.3.9.3 restart recovery by composing CHECKPOINT append after recovered-buffer flush, then flush its
+LSN as a separate behavior.
 
 ## Sources
 
