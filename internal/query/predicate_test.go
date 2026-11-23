@@ -225,3 +225,24 @@ func TestPredicateEquatesWithField(t *testing.T) {
 		t.Fatalf("empty.EquatesWithField(age) = (%q, %v), want absent", got, ok)
 	}
 }
+
+func TestPredicateString(t *testing.T) {
+	var empty Predicate
+	if got := empty.String(); got != "" {
+		t.Fatalf("empty.String() = %q, want empty string", got)
+	}
+
+	first := NewTerm(NewFieldExpression("age"), NewConstantExpression(NewIntConstant(7)))
+	second := NewTerm(NewFieldExpression("name"), NewConstantExpression(NewStringConstant("Ada")))
+	if got := NewPredicateWithTerm(first).String(); got != "age=7" {
+		t.Fatalf("single-term String() = %q, want %q", got, "age=7")
+	}
+
+	predicate := Predicate{terms: []Term{first, second}}
+	if got, want := predicate.String(), "age=7 and name=Ada"; got != want {
+		t.Fatalf("String() = %q, want %q", got, want)
+	}
+	if want := []Term{first, second}; !reflect.DeepEqual(predicate.terms, want) {
+		t.Fatalf("predicate terms = %v, want unchanged %v", predicate.terms, want)
+	}
+}

@@ -1,6 +1,10 @@
 package query
 
-import "github.com/Rwatana/simledb_in_go/internal/record"
+import (
+	"strings"
+
+	"github.com/Rwatana/simledb_in_go/internal/record"
+)
 
 // Predicate represents a conjunction of query terms.
 // Its zero value is an empty conjunction that is always satisfied.
@@ -76,6 +80,15 @@ func (predicate Predicate) EquatesWithField(fieldName string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// String renders the predicate's terms in order, separated by " and ".
+func (predicate Predicate) String() string {
+	terms := make([]string, len(predicate.terms))
+	for index, term := range predicate.terms {
+		terms[index] = term.String()
+	}
+	return strings.Join(terms, " and ")
 }
 
 // IsSatisfied reports whether every term in the predicate is satisfied by scan.
