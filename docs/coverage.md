@@ -608,6 +608,11 @@ statement coverage in every executable package and function. `IndexSelectPlan.Bl
 matching-row estimates, nil plan/metadata, metadata estimate errors, and signed 32-bit addition overflow. The full
 uncached suite, race tests, vet, docs, gofmt, and diff checks pass.
 
+At the Issue #967 index-select-plan-records-output checkpoint, `/tmp/simpledb-coverage-967.out` measures 100.0%
+statement coverage in every executable package and function. `IndexSelectPlan.RecordsOutput` covers metadata delegation
+without a child plan and zero estimates for nil plan or missing metadata. The full uncached suite, race tests, vet,
+docs, gofmt, and diff checks pass.
+
 At the Issue #893 project-plan-schema checkpoint, `/tmp/simpledb-coverage-893.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `NewProjectPlan` covers nil dependencies, valid ordered fields, empty projections, and missing-field errors; `ProjectPlan.Schema` covers both ordinary and nil receivers. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
 
 At the Issue #891 product-plan-distinct-estimate checkpoint, `/tmp/simpledb-coverage-891.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProductPlan.DistinctValues` covers left/right field routing, left-side duplicate-name precedence, nil dependencies, missing schemas, and unknown fields. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
