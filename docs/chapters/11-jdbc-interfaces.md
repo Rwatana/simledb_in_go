@@ -129,9 +129,11 @@ transaction and row path. `driver.RowsColumnTypeDatabaseTypeName` reports `VARCH
 schema in column order, so `database/sql.Rows.ColumnTypes()` exposes those database-specific names without advancing
 the scan. `driver.RowsColumnTypeScanType` reports `string` for varchar values and `int64` for integer values, matching
 the driver's row values. `driver.RowsColumnTypeLength` reports the declared varchar character limit and returns no
-variable-length bound for integer columns. Precision/scale and nullability remain independent optional metadata behaviors.
+variable-length bound for integer columns. `driver.RowsColumnTypeNullable` reports that supported scalar fields are
+known non-nullable because the current record/query value model cannot represent NULL. Precision/scale remain
+independent optional metadata behaviors.
 The [statement lifecycle and query diagram](../diagrams/ch11-embedded-statement.svg) shows how a prepared statement
-opens a scan and returns rows plus database type names, Go scan types, and variable-column lengths; its [editable Draw.io
+opens a scan and returns rows plus database type names, Go scan types, varchar lengths, and nullability; its [editable Draw.io
 source](../diagrams/ch11-embedded-statement.drawio) is kept beside the SVG.
 The [update execution diagram](../diagrams/ch11-embedded-update-execution.svg) shows transaction ownership during a
 statement call; its [editable Draw.io source](../diagrams/ch11-embedded-update-execution.drawio) is maintained too.
@@ -188,6 +190,7 @@ needs them.
 | `TestStatementRowsReportsDatabaseTypeNames` | Driver rows and `database/sql.Rows.ColumnTypes()` report projected integer and varchar database type names |
 | `TestStatementRowsReportsScanTypes` | Driver rows and `database/sql.Rows.ColumnTypes()` report the Go types used to scan projected integer and varchar values |
 | `TestStatementRowsReportsColumnLengths` | Driver rows and `database/sql.Rows.ColumnTypes()` report varchar limits and no variable-length bound for integer columns |
+| `TestStatementRowsReportsNullability` | Driver rows and `database/sql.Rows.ColumnTypes()` report supported scalar columns as known non-nullable |
 | `TestStatementRowsReportsInvalidStateAndScanFailures` | Closed rows, wrong destinations, scan/read errors, unsupported types, and close failures are returned |
 | `TestDatabaseSQLExecutesUpdatesInsideExplicitTransaction` | CREATE TABLE and INSERT execute through `sql.Tx`, report affected rows, commit, and roll back independently |
 | `TestConnectionTracksOneActiveTransactionForStatementExecution` | A connection rejects nested transactions and becomes reusable after explicit completion |

@@ -192,6 +192,47 @@ func TestStatementRowsReportsColumnLengths(t *testing.T) {
 	}
 }
 
+func TestStatementRowsReportsNullability(t *testing.T) {
+	var schema record.Schema
+	schema.AddVarcharField("name", 20)
+	schema.AddIntegerField("id")
+	rows := &statementRows{schema: &schema, columns: schema.Fields()}
+	var driverRows driver.Rows = rows
+	metadata, ok := driverRows.(driver.RowsColumnTypeNullable)
+	if !ok {
+		t.Fatal("statement rows do not implement driver.RowsColumnTypeNullable")
+	}
+	for index := range rows.columns {
+		nullable, known := metadata.ColumnTypeNullable(index)
+		if nullable || !known {
+			t.Errorf("ColumnTypeNullable(%d) = (%t, %t), want (false, true)", index, nullable, known)
+		}
+	}
+	for _, index := range []int{-1, 2} {
+		if nullable, known := metadata.ColumnTypeNullable(index); nullable || known {
+			t.Errorf("ColumnTypeNullable(%d) = (%t, %t), want (false, false)", index, nullable, known)
+		}
+	}
+	if nullable, known := (*statementRows)(nil).ColumnTypeNullable(0); nullable || known {
+		t.Errorf("nil ColumnTypeNullable(0) = (%t, %t), want (false, false)", nullable, known)
+	}
+	if nullable, known := (&statementRows{columns: []string{"name"}}).ColumnTypeNullable(0); nullable || known {
+		t.Errorf("missing-schema ColumnTypeNullable(0) = (%t, %t), want (false, false)", nullable, known)
+	}
+
+	missingField := &statementRows{schema: &record.Schema{}, columns: []string{"missing"}}
+	if nullable, known := missingField.ColumnTypeNullable(0); nullable || known {
+		t.Errorf("missing-field ColumnTypeNullable(0) = (%t, %t), want (false, false)", nullable, known)
+	}
+
+	var unsupportedSchema record.Schema
+	unsupportedSchema.AddField("unknown", record.FieldType(99), 0)
+	unsupported := &statementRows{schema: &unsupportedSchema, columns: unsupportedSchema.Fields()}
+	if nullable, known := unsupported.ColumnTypeNullable(0); nullable || known {
+		t.Errorf("unsupported ColumnTypeNullable(0) = (%t, %t), want (false, false)", nullable, known)
+	}
+}
+
 func TestStatementRowsReportsInvalidStateAndScanFailures(t *testing.T) {
 	destination := []driver.Value{nil}
 	if err := (*statementRows)(nil).Next(destination); err == nil || !strings.Contains(err.Error(), "rows") {
