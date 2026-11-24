@@ -1,9 +1,18 @@
 # Go test coverage
 
-The `Go test` and `Go coverage` workflows are independent checks. `Go coverage` runs the full suite with a coverage
-profile, writes total statement coverage to the GitHub Actions job summary, and fails unless the full module reaches
-100.0%. `Go vet`, documentation, issue-policy, pull-request-policy, and commit-count checks each have their own
-workflow file and status check.
+## Current gate
+
+The current full-module statement coverage is **100.0%**. The independent `Go coverage` workflow runs the full suite
+with a coverage profile, reports the module total in the GitHub Actions job summary, and fails unless that total is
+100.0%. The repository keeps each check in its own workflow file and status check: Branch name, Commit count,
+Documentation, Go coverage, Go test, Go vet, Issue closing reference, Issue policy, Issue reference, and Pull request
+title. Issue policy runs on issue events; the other checks validate pull requests. There is no current
+`pull-request-policy.yml` workflow.
+
+## Historical coverage checkpoints
+
+The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
+current coverage gate or current module total.
 
 At the 2026-11-23 checkpoint for Issue #662, the full-module statement coverage is **96.7%** (rounded to one
 decimal place). Package coverage is buffer 100.0%, concurrency 95.6%, file 96.9%, log 82.4%, metadata 97.6%, query
