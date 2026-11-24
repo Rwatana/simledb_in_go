@@ -98,6 +98,8 @@ Prepare, and invalid state. Uncached
 statements. The profile covers 5,388 statements with zero uncovered; `go tool cover -func` reports 589 executable
 functions and the module total at 100.0%, with no function below 100%.
 
+Issue #1161 adds `embedded.ParseEmbeddedURL` for the Java-compatible `jdbc:simpledb:` prefix. Table-driven tests preserve relative and absolute path suffixes exactly and reject unsupported prefixes and empty names. Parsing remains separate from path resolution, manager construction, and connector binding. The parser and tests remain within the 100.0% statement, function, and module coverage gate; the independent coverage workflow continues to enforce that gate.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
