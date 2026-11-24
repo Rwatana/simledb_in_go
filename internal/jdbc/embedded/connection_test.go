@@ -27,8 +27,31 @@ func TestNewConnectionValidatesManagersAndImplementsDriverConnection(t *testing.
 	if _, ok := any(connection).(driver.Conn); !ok {
 		t.Fatalf("connection type %T does not implement driver.Conn", connection)
 	}
-	if statement, err := connection.Prepare("select id from student"); statement != nil || !errors.Is(err, driver.ErrSkip) {
-		t.Errorf("Prepare() = (%v, %v), want unsupported statement and driver.ErrSkip", statement, err)
+	prepared, err := connection.Prepare("select id from student")
+	if err != nil {
+		t.Fatalf("Prepare() error = %v", err)
+	}
+	statement, ok := prepared.(*statement)
+	if !ok {
+		t.Fatalf("Prepare() type = %T, want *statement", prepared)
+	}
+	if statement.query != "select id from student" || statement.connection != connection {
+		t.Fatalf("Prepare() state = (%q, %p), want original SQL and connection", statement.query, statement.connection)
+	}
+	if statement.NumInput() != -1 {
+		t.Errorf("NumInput() = %d, want -1 until parameter parsing exists", statement.NumInput())
+	}
+	if result, err := statement.Exec(nil); result != nil || !errors.Is(err, driver.ErrSkip) {
+		t.Errorf("Exec() = (%v, %v), want unsupported execution and driver.ErrSkip", result, err)
+	}
+	if rows, err := statement.Query(nil); rows != nil || !errors.Is(err, driver.ErrSkip) {
+		t.Errorf("Query() = (%v, %v), want unsupported query and driver.ErrSkip", rows, err)
+	}
+	if err := statement.Close(); err != nil {
+		t.Errorf("statement Close() error = %v", err)
+	}
+	if err := statement.Close(); err != nil {
+		t.Errorf("repeated statement Close() error = %v", err)
 	}
 }
 
@@ -135,6 +158,33 @@ func TestTransactionAdapterRejectsNilAndMissingTransactions(t *testing.T) {
 	}
 	if err := emptyAdapter.Rollback(); err == nil || !strings.Contains(err.Error(), "transaction") {
 		t.Errorf("Rollback() without an underlying transaction error = %v, want transaction error", err)
+	}
+}
+
+func TestStatementRejectsNilAndClosedOperations(t *testing.T) {
+	var nilStatement *statement
+	if err := nilStatement.Close(); err == nil || !strings.Contains(err.Error(), "statement") {
+		t.Errorf("Close() on nil statement error = %v, want statement error", err)
+	}
+	if result, err := nilStatement.Exec(nil); result != nil || err == nil || !strings.Contains(err.Error(), "statement") {
+		t.Errorf("Exec() on nil statement = (%v, %v), want statement error", result, err)
+	}
+	if rows, err := nilStatement.Query(nil); rows != nil || err == nil || !strings.Contains(err.Error(), "statement") {
+		t.Errorf("Query() on nil statement = (%v, %v), want statement error", rows, err)
+	}
+	if nilStatement.NumInput() != -1 {
+		t.Errorf("NumInput() on nil statement = %d, want -1", nilStatement.NumInput())
+	}
+
+	closed := &statement{}
+	if err := closed.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if result, err := closed.Exec(nil); result != nil || err == nil || !strings.Contains(err.Error(), "closed") {
+		t.Errorf("Exec() on closed statement = (%v, %v), want closed-statement error", result, err)
+	}
+	if rows, err := closed.Query(nil); rows != nil || err == nil || !strings.Contains(err.Error(), "closed") {
+		t.Errorf("Query() on closed statement = (%v, %v), want closed-statement error", rows, err)
 	}
 }
 

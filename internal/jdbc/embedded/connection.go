@@ -25,15 +25,15 @@ func NewConnection(managers *server.Managers) (*Connection, error) {
 	return &Connection{managers: managers}, nil
 }
 
-// Prepare reports that statement preparation is not implemented by this connection yet.
-func (connection *Connection) Prepare(_ string) (driver.Stmt, error) {
+// Prepare creates a statement handle without parsing or executing the SQL text.
+func (connection *Connection) Prepare(query string) (driver.Stmt, error) {
 	if connection == nil {
 		return nil, fmt.Errorf("prepare embedded statement: connection is nil")
 	}
 	if connection.closed {
 		return nil, fmt.Errorf("prepare embedded statement: connection is closed")
 	}
-	return nil, driver.ErrSkip
+	return &statement{connection: connection, query: query}, nil
 }
 
 // Close marks the connection closed without completing transactions already returned to callers.
