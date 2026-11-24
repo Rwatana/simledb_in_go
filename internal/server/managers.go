@@ -5,8 +5,11 @@ import (
 	"fmt"
 
 	"github.com/Rwatana/simledb_in_go/internal/buffer"
+	"github.com/Rwatana/simledb_in_go/internal/concurrency"
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
+	"github.com/Rwatana/simledb_in_go/internal/recovery"
+	"github.com/Rwatana/simledb_in_go/internal/transaction"
 )
 
 const logFileName = "simpledb.log"
@@ -19,6 +22,8 @@ type Managers struct {
 	Logs *logmanager.Manager
 	// Buffers owns the configured pool of memory frames.
 	Buffers *buffer.Manager
+	ids     *transaction.IDAllocator
+	locks   *concurrency.LockTable
 }
 
 // NewManagers creates the file, log, and buffer managers using the supplied settings.
@@ -38,5 +43,27 @@ func NewManagers(directory string, blockSize, bufferCount int) (*Managers, error
 		return nil, fmt.Errorf("initialize server buffer manager: %w", err)
 	}
 
-	return &Managers{Files: files, Logs: logs, Buffers: buffers}, nil
+	return &Managers{
+		Files:   files,
+		Logs:    logs,
+		Buffers: buffers,
+		ids:     &transaction.IDAllocator{},
+		locks:   &concurrency.LockTable{},
+	}, nil
+}
+
+// NewTransaction creates a transaction using this manager set's shared storage and identity state.
+func (m *Managers) NewTransaction() (*transaction.Transaction, error) {
+	if m == nil || m.Files == nil || m.Logs == nil || m.Buffers == nil || m.ids == nil || m.locks == nil {
+		return nil, fmt.Errorf("create server transaction: manager set is incomplete")
+	}
+
+	iterator := func() (recovery.EncodedRecordIterator, error) {
+		return m.Logs.Iterator()
+	}
+	created, err := transaction.NewWithFileManager(m.ids, m.locks, m.Files, m.Buffers, m.Logs, iterator)
+	if err != nil {
+		return nil, fmt.Errorf("create server transaction: %w", err)
+	}
+	return created, nil
 }

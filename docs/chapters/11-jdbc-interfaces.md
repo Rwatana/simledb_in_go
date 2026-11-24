@@ -11,6 +11,10 @@ The first Go behavior composes the file, log, and buffer managers from explicit 
 assembly diagram](../diagrams/ch11-server-manager-assembly.svg) shows their initialization order and the failure boundary;
 the [editable Draw.io source](../diagrams/ch11-server-manager-assembly.drawio) is maintained beside it.
 
+The next behavior opens transactions from that shared manager set. The [transaction creation diagram](../diagrams/ch11-server-transaction-creation.svg)
+shows the per-server ID and lock state, shared storage dependencies, START logging, and the no-transaction error path;
+its [editable Draw.io source](../diagrams/ch11-server-transaction-creation.drawio) is maintained beside it.
+
 ## Java source map
 
 | Java source | Responsibility |
@@ -33,6 +37,11 @@ initialization failures are wrapped with the failing stage and no partial set is
 adds recovery, metadata initialization, planner selection, and transaction commit; those effects remain separate
 behaviors.
 
+`Managers.NewTransaction` uses one ID allocator and lock table shared by the manager set, while each returned transaction
+keeps its own buffer ownership. Creation appends a START record to the shared log and supplies the log iterator needed
+for transaction rollback. A failed START append returns no transaction. Process-restart recovery, catalog initialization,
+planner selection, transaction lifecycle, and client adapters remain separate behaviors.
+
 The embedded and network drivers share a client contract in Java, but Go should introduce an adapter only when a concrete
 caller needs it. The RMI proxy classes are transport-specific and should not be reproduced as a Go class hierarchy or
 copied into the embedded path. A future Go client boundary can use the standard `database/sql/driver` contract if its
@@ -46,9 +55,16 @@ actual scope requires SQL driver compatibility.
 | `TestNewManagersReturnsNoManagersWhenFileManagerFails` | Directory creation failure is wrapped and exposes no partial manager set |
 | `TestNewManagersReturnsNoManagersWhenLogManagerFails` | An unusable log block size is reported after file-manager creation with no partial manager set |
 | `TestNewManagersReturnsNoManagersWhenBufferManagerFails` | Invalid buffer capacity is reported after log initialization with no partial manager set |
+| `TestManagersNewTransactionSharesIdentityAndAppendsStartRecords` | Successful transactions share sequential IDs, append START records, and can use the configured log iterator |
+| `TestManagersNewTransactionRejectsNilAndIncompleteManagers` | Nil and zero-value manager sets fail before returning a transaction |
+| `TestManagersNewTransactionRejectsMissingDependencies` | An incomplete dependency is rejected before log access |
+| `TestManagersNewTransactionReportsMissingInternalState` | Missing shared lock state is rejected before log access |
+| `TestManagersNewTransactionReturnsNoTransactionWhenStartCannotFit` | A log that cannot store START returns contextual failure and no transaction |
+| `TestManagersNewTransactionUsesFileBackedStorage` | A committed transaction writes through the configured file and buffer managers |
 
-The tests first failed to compile because `NewManagers` did not exist. They use temporary database directories and keep
-manager composition separate from recovery, metadata and planner bootstrap, transaction creation, and JDBC client operations.
+The manager-composition tests first failed to compile because `NewManagers` did not exist. The transaction tests first
+failed because `Managers.NewTransaction` did not exist. They use temporary database directories and keep each behavior
+separate from process-restart recovery, metadata and planner bootstrap, and JDBC client operations.
 
 ## Intentional differences
 
