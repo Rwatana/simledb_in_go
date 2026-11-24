@@ -1,0 +1,42 @@
+<mxfile host="app.diagrams.net" modified="2026-11-25T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ch13-record-comparator" name="Record comparator">
+    <mxGraphModel dx="1100" dy="760" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="fields" value="Sort fields&#xa;[dept, name]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="215" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="left" value="Left ValueScan&#xa;dept, then name" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="right" value="Right ValueScan&#xa;dept, then name" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="350" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="compare" value="query.Constant.Compare&#xa;first field pair" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="340" y="215" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="different" value="non-zero?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="620" y="215" width="130" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="result" value="Return first ordering&#xa;negative or positive" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="820" y="95" width="170" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="next" value="Equal: compare next field&#xa;dept -> name" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="340" y="390" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="equal" value="All fields equal&#xa;return 0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="650" y="405" width="160" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="fields-edge" style="endArrow=block;html=1;" edge="1" parent="1" source="fields" target="compare"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="left-edge" style="endArrow=block;html=1;" edge="1" parent="1" source="left" target="compare"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="right-edge" style="endArrow=block;html=1;" edge="1" parent="1" source="right" target="compare"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="decision-edge" style="endArrow=block;html=1;" edge="1" parent="1" source="compare" target="different"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="different-edge" value="yes" style="endArrow=block;html=1;" edge="1" parent="1" source="different" target="result"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="same-edge" value="no" style="endArrow=block;html=1;" edge="1" parent="1" source="different" target="next"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="loop-edge" value="more fields" style="endArrow=block;html=1;rounded=1;" edge="1" parent="1" source="next" target="compare"><mxGeometry relative="1" as="geometry"><mxPoint x="445" y="325" as="sourcePoint" /><mxPoint x="445" y="285" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="end-edge" value="last field" style="endArrow=block;html=1;" edge="1" parent="1" source="next" target="equal"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

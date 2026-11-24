@@ -9,6 +9,7 @@ a file or issue transaction operations.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/materialize.TempTable`, `NewTempTable` | `simpledb/materialize/TempTable.java` | Allocate a unique temporary relation name and retain its transaction and record layout before opening a scan |
+| `internal/materialize.RecordComparator` | `simpledb/materialize/RecordComparator.java` | Compare the current values of two scans lexicographically in sort-field order |
 
 ## Feature 1: Describe a temporary table
 
@@ -57,3 +58,24 @@ pin/format steps, cleanup after format errors, and caller-owned scan close.
 Java `TempTable.open` returns an `UpdateScan`. Go returns the narrow `query.UpdateScan` interface and uses the existing
 `query.NewRecordScan` adapter to expose query constants while keeping `record` independent of `query`. The temporary
 table remains outside the metadata catalog, and descriptor construction still performs no storage I/O.
+
+## Feature 3: Compare records by ordered sort fields
+
+`RecordComparator` compares each requested field in order through the query `ValueScan` contract. The first unequal
+pair determines the ascending order; all equal fields, including an empty field list, compare equal. The constructor
+copies the caller's field list. Read errors are contextual and preserve their causes, while unset or differently typed
+constants return an error instead of relying on an unchecked comparison. The
+[lexicographic comparator diagram](../diagrams/ch13-record-comparator.svg) shows the short-circuit path; the editable
+source is [`ch13-record-comparator.drawio`](../diagrams/ch13-record-comparator.drawio).
+
+### Test-first record
+
+The first focused build failed because `NewRecordComparator` and `RecordComparator` were undefined. Tests cover integer
+and string order, field-order copying, first-difference short-circuiting, all-equal and empty-key cases, nil inputs, and
+wrapped scan-read errors plus unset or incompatible constants.
+
+### Design decision
+
+Java implements `Comparator<Scan>` and assumes its `Constant` comparison cannot fail. Go accepts `query.ValueScan`, the
+smallest interface needed for value comparison, and returns an error because scan reads and typed constant comparison
+can fail in this implementation. This keeps the comparator independent of storage traversal and update methods.

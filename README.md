@@ -28,7 +28,7 @@
 | 10 | Planning | 実装中 | [query plan contract、TablePlan/SelectPlan/ProductPlan/ProjectPlanのscan・schema・estimateの解説・実装記録](docs/chapters/10-planning.md) |
 | 11 | JDBC Interfaces | 実装中 | [server managers、embedded database/sql connector、SQL planningとJava source map](docs/chapters/11-jdbc-interfaces.md) |
 | 12 | Indexing | 実装中 | [index traversal contractと索引実装の解説・実装記録](docs/chapters/12-indexing.md) |
-| 13 | Materialization and Sorting | 実装中 | [一時テーブル記述子・scanとソート処理の解説・実装記録](docs/chapters/13-materialization-and-sorting.md) |
+| 13 | Materialization and Sorting | 実装中 | [一時テーブル記述子・scan・ソート比較器の解説・実装記録](docs/chapters/13-materialization-and-sorting.md) |
 | 14 | Effective Buffer Utilization | 未着手 | — |
 | 15 | Query Optimization | 未着手 | — |
 
@@ -82,7 +82,7 @@ Chapter 11 JDBC Interfacesでは、`internal/server.NewManagers`でfile・log・
 
 Chapter 12 Indexingでは、値/RIDベースの索引走査契約、100個の静的hash bucketへのJava互換キー割当、静的hash indexの探索コスト見積もり、hashとB-treeの初期化・走査・挿入・削除、索引scan/plan、B-tree page・分割・root growthを実装しています。葉とdirectory pageを同時にpinせず、1 frameでも探索できるようにしています。
 
-Chapter 9 ParsingのSQL tokenizationとupdate-command dispatchは完了し、Chapter 10 Planningではquery plan contract、SELECT/UPDATE planner、TablePlan・SelectPlan・ProductPlan・ProjectPlanのscan/schema/estimateを実装中です。Chapter 13 Materialization and Sortingでは、一時テーブル記述子からquery.UpdateScanを開く境界を実装しています。Chapter 14 Effective Buffer UtilizationとChapter 15 Query Optimizationは未着手です。
+Chapter 9 ParsingのSQL tokenizationとupdate-command dispatchは完了し、Chapter 10 Planningではquery plan contract、SELECT/UPDATE planner、TablePlan・SelectPlan・ProductPlan・ProjectPlanのscan/schema/estimateを実装中です。Chapter 13 Materialization and Sortingでは、一時テーブルをquery.UpdateScanとして開き、複数のsort fieldを使うレコード比較器を実装しています。Chapter 14 Effective Buffer UtilizationとChapter 15 Query Optimizationは未着手です。
 
 ## 参照元
 
