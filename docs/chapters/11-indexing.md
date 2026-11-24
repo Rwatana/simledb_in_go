@@ -11,7 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/btree.BTreeIndex`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTreeIndex.java` | Retain index state; derive the directory layout from the leaf schema; initialize empty leaf and directory files |
+| `internal/index/btree.BTreeIndex`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTreeIndex.java` | Retain index state; derive the directory layout; initialize files; position before a search key |
 | `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
@@ -1238,6 +1238,25 @@ The focused compilation first failed because `NewBTreeIndex` was undefined. Test
 retained names/layouts/root, leaf-before-directory initialization, existing files, invalid inputs before file access,
 wrapped initialization errors, and nil partial results. The constructor is 100.0% covered.
 
+## Feature 84: Position a B-tree index before its search key
+
+Java `BTreeIndex.beforeFirst` closes any old leaf cursor, descends from the block-zero directory root, and opens the
+selected leaf immediately before the first matching key. Go's `BTreeIndex.BeforeFirst` validates the retained layouts,
+root, and key type before storage access; it uses `Page.FindLeafBlock`, maps the directory child number to the leaf
+filename, closes the level-zero directory page before pinning the leaf, and records the slot before the first key not
+less than the search value. Matching-entry advancement and overflow-chain iteration remain separate. Errors preserve
+their causes. If an unpin fails during cleanup, the still-owned page remains attached to the index so a later positioning
+call can retry releasing it. The existing [directory insertion](../diagrams/ch11-btree-insert-dir.svg) and
+[B-tree page format](../diagrams/ch11-btree-page-format.svg) diagrams show the selected child and page handoff; their
+editable Draw.io sources are reused.
+
+### Test-first record
+
+The focused compilation first failed because `BTreeIndex.BeforeFirst` and its retained leaf state were undefined. Tests
+cover integer and varchar positioning, leaf-before-root replacement order, invalid index/key state before pinning,
+wrapped directory/pin/leaf-positioning errors, and retryable leaf or directory cleanup failures. The constructor and
+positioning method keep the package at 100.0% statement coverage.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1246,6 +1265,7 @@ wrapped initialization errors, and nil partial results. The constructor is 100.0
 - Go insertion validates the index-record schema and signed 32-bit RID storage before changing scan state, and wraps storage failures as explicit errors.
 - Go deletion reports storage failures as errors while preserving the Java behavior of removing the first matching RID and treating a missing entry as a successful no-op.
 - `btree.NewBTreeIndex` returns Go errors with wrapped storage causes and no partial index; the caller rolls back transaction-owned appended blocks after construction fails.
+- `btree.BTreeIndex.BeforeFirst` reports traversal and pin failures as Go errors; a page whose unpin failed remains owned by the index for a later cleanup retry.
 - `IndexSelectScan` reports index-position failures as Go errors and leaves index lifetime management to its caller.
 - `IndexSelectScan.Next` reports index and table-scan failures as errors, and avoids moving the data scan after exhaustion.
 - `IndexSelectScan.GetInt` reports data-scan read failures as Go errors while preserving their wrapped causes.
