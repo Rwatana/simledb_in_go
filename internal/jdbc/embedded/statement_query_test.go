@@ -74,6 +74,11 @@ func TestPreparedStatementQueryReturnsProjectedRowsToDatabaseSQL(t *testing.T) {
 			t.Errorf("column %q database type = %q, want %q", columns[index], got, want)
 		}
 	}
+	for index, want := range []reflect.Type{reflect.TypeOf(""), reflect.TypeOf(int64(0))} {
+		if got := columnTypes[index].ScanType(); got != want {
+			t.Errorf("column %q scan type = %v, want %v", columns[index], got, want)
+		}
+	}
 	if !rows.Next() {
 		t.Fatalf("rows Next() = false, error = %v, want one matching row", rows.Err())
 	}
