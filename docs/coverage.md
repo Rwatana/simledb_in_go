@@ -144,6 +144,11 @@ affected rows, and leaves the current transaction ID and completion to the calle
 are contextual and preserve the ID. The independent coverage workflow continues to require 100.0% package, function,
 and module statement coverage.
 
+Issue #1193 adds `storage.Page.GetString` as a read view over the existing four-byte length-prefixed payload. Tests
+cover empty text, embedded NUL, multibyte UTF-8, unchanged page bytes, truncated prefix, negative length, and truncated
+payload errors. The separate coverage workflow continues to enforce 100.0% package, function, and module statement
+coverage.
+
 Issue #1191 adds JDBC-compatible display widths to remote query columns. Integer width is six; varchar width uses its
 declared field length; each result adds one character after taking the larger of that width and the field name. Tests
 cover each sizing case and verify metadata survives the RPC response. The separate coverage workflow still requires

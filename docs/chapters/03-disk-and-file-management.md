@@ -161,7 +161,8 @@ interfaceも追加していない。値の生成、比較、表示に外部依�
 
 編集可能な図は[Draw.io版](../diagrams/ch03-page-encoding.drawio)、ブラウザで表示できる図は
 [SVG版](../diagrams/ch03-page-encoding.svg)を参照する。図は固定長Pageの中で4-byte整数と
-length-prefixedなbyte列がどのoffsetを占めるかを示す。
+length-prefixedなbyte列がどのoffsetを占めるか、および`GetString`が同じpayloadをUTF-8文字列として
+読むことを示す。
 
 ### 問い
 
@@ -170,11 +171,13 @@ disk blockへ書き出す前の値を、固定長memory領域のどこに、何b
 ### 概念
 
 `Page`は固定capacityのbyte列を持ち、値の先頭位置をoffsetで指定する。整数は必ず4 bytes、
-任意のbinary payloadは4-byteのlength prefixとpayload本体として格納する。
+任意のbinary payloadは4-byteのlength prefixとpayload本体として格納する。`GetString`はこの同じ
+encodingを読み、payload bytesをUTF-8文字列として返す。string専用の別形式やprefixは追加しない。
 
 ```text
 integer = 4-byte signed value
 bytes   = 4-byte payload length + payload
+string  = same bytes encoding, interpreted as UTF-8
 ```
 
 複数の値を同じPageへ置く場合、呼び出し側が前の値のencoded lengthを使って次のoffsetを決める。
@@ -188,6 +191,7 @@ bytes   = 4-byte payload length + payload
 | `Capacity()` | 利用可能な総byte数を返す |
 | `SetInt` / `GetInt` | offset指定で4-byte整数を書き読みする |
 | `SetBytes` / `GetBytes` | offset指定でlength-prefixed bytesを書き読みする |
+| `GetString` | `GetBytes`と同じpayloadをUTF-8文字列として読む |
 | `Snapshot()` | file I/Oへ渡せる全Page内容のcopyを返す |
 
 `GetBytes`と`Snapshot`は内部sliceを直接返さずcopyを返す。呼び出し側が返却値を変更しても、
@@ -205,7 +209,8 @@ if err != nil {
 }
 
 _ = page.SetInt(0, 42)
-_ = page.SetBytes(8, []byte{0xde, 0xad, 0xbe, 0xef})
+_ = page.SetBytes(8, []byte("hello"))
+_ = page.GetString(8) // reads the same length-prefixed payload as text
 ```
 
 すべてのread/writeで`offset + encoded length`がcapacity内かを確認する。範囲外accessや、
@@ -232,6 +237,20 @@ FAIL github.com/Rwatana/simledb_in_go/internal/storage [build failed]
 ok github.com/Rwatana/simledb_in_go/internal/storage
 ```
 
+### Issue #1193: length-prefixed string reads
+
+`GetString`のテストを実装より先に追加し、focused buildが`Page.GetString`未定義で失敗することを確認した。
+実装は既存の`GetBytes`を呼び出し、そのerrorへstring readのoffsetを付けて返す。成功時は得られたpayload
+だけをGo stringへ変換するため、Page bytesやlength prefixは変更しない。
+
+```text
+TestPageReadsLengthPrefixedStrings: storage.Page.GetString undefined
+```
+
+Greenでは空文字列、embedded NUL、multibyte UTF-8 (`東京🙂`) の読取りと、truncated prefix、negative length、
+truncated payloadのcontext付きerrorを確認する。encoding自体は`GetBytes`と共有するため、`SetString`は別の
+observable behaviorとして後続Issueで扱う。
+
 ### Test cases
 
 | Test | 説明する振る舞い |
@@ -239,6 +258,8 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | `TestNewPageHasFixedCapacity` | capacityが固定され、負数を拒否する |
 | `TestPageStoresFourByteIntegers` | 符号付きint32をbig-endianでround-tripする |
 | `TestPageStoresLengthPrefixedBytes` | 空やNULを含むpayloadをlength prefix付きで保存する |
+| `TestPageReadsLengthPrefixedStrings` | 既存payloadを空・NUL・multibyte UTF-8文字列として読み、Pageを変更しない |
+| `TestPageGetStringReportsLengthPrefixAndPayloadErrors` | prefix/payloadの境界errorにstring offsetのcontextを付ける |
 | `TestPageGetBytesRejectsTruncatedLengthPrefix` | prefix全体がPageに収まらない場合にoffset付きerrorを返す |
 | `TestPageGetBytesRejectsNegativeLength` | 負のlength prefixをpayload allocation前に拒否する |
 | `TestValidateByteSequenceLengthRejectsUnencodableLength` | int32 length prefixへ格納できないpayload長を拒否する |
@@ -264,7 +285,8 @@ ok github.com/Rwatana/simledb_in_go/internal/storage
 | `ByteBuffer.allocateDirect` | 固定長`[]byte` | off-heap最適化は計測理由がないため持ち込まない |
 | `getInt` / `putInt` | `GetInt` / `SetInt` | `int32`とbig-endianで4-byte contractを明示する |
 | `getBytes` / `setBytes` | `GetBytes` / `SetBytes` | 同じlength prefix形式を使い、copyを返す |
-| `getString` / `setString` | 未実装 | string encodingはrecord実装が要求した時点で追加する |
+| `getString` | `GetString` | 既存length-prefixed payloadをUTF-8文字列として読み、別encodingを作らない |
+| `setString` | 未実装 | string書込みは独立した後続behaviorで追加する |
 | `contents()` | `Snapshot()` | package外のfile I/Oへmutable sliceを公開しない |
 | `BufferOverflowException`等 | `error` | 境界失敗を呼び出し側が明示的に扱えるようにする |
 
@@ -279,7 +301,7 @@ Java版のAPI名は参考にするが、`ByteBuffer`のmutable positionやexcept
 
 ## 意図的に含めなかったもの
 
-- string専用APIと文字encoding
+- `SetString`によるstring専用書込み（別のobservable behaviorとして後続Issueで扱う）
 - `BlockID`との関連付け
 - filesystemへのread/write/append
 - block sizeの設定管理

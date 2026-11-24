@@ -72,6 +72,15 @@ func (p *Page) GetBytes(offset int) ([]byte, error) {
 	return result, nil
 }
 
+// GetString returns the UTF-8 string stored at offset using the length-prefixed byte encoding.
+func (p *Page) GetString(offset int) (string, error) {
+	value, err := p.GetBytes(offset)
+	if err != nil {
+		return "", fmt.Errorf("get string at offset %d: %w", offset, err)
+	}
+	return string(value), nil
+}
+
 // SetBytes stores value at offset after a four-byte length prefix.
 func (p *Page) SetBytes(offset int, value []byte) error {
 	return p.setBytesWithLength(offset, value, int64(len(value)))
