@@ -134,6 +134,20 @@ func (scan *ChunkScan) GetInt(fieldName string) (int32, error) {
 	return value, nil
 }
 
+// GetString reads a string field from the current chunk record.
+func (scan *ChunkScan) GetString(fieldName string) (string, error) {
+	operation := fmt.Sprintf("read string field %q", fieldName)
+	if err := scan.validateCurrentRecord(operation); err != nil {
+		return "", err
+	}
+	page := scan.pages[scan.currentPage]
+	value, err := page.GetString(scan.currentSlot, fieldName)
+	if err != nil {
+		return "", fmt.Errorf("read string field %q from chunk scan block %d: %w", fieldName, page.Block().Number(), err)
+	}
+	return value, nil
+}
+
 // Close releases every retained chunk-page pin and keeps failed releases for a retry.
 func (scan *ChunkScan) Close() error {
 	if scan == nil || scan.transaction == nil {
