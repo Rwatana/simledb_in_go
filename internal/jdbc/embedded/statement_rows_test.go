@@ -141,6 +141,57 @@ func TestStatementRowsReportsScanTypes(t *testing.T) {
 	}
 }
 
+func TestStatementRowsReportsColumnLengths(t *testing.T) {
+	var schema record.Schema
+	schema.AddVarcharField("name", 20)
+	schema.AddIntegerField("id")
+	rows := &statementRows{schema: &schema, columns: schema.Fields()}
+	var driverRows driver.Rows = rows
+	metadata, ok := driverRows.(driver.RowsColumnTypeLength)
+	if !ok {
+		t.Fatal("statement rows do not implement driver.RowsColumnTypeLength")
+	}
+	for index, want := range []struct {
+		length int64
+		ok     bool
+	}{{20, true}, {0, false}} {
+		length, ok := metadata.ColumnTypeLength(index)
+		if length != want.length || ok != want.ok {
+			t.Errorf("ColumnTypeLength(%d) = (%d, %t), want (%d, %t)", index, length, ok, want.length, want.ok)
+		}
+	}
+	for _, index := range []int{-1, 2} {
+		if length, ok := metadata.ColumnTypeLength(index); length != 0 || ok {
+			t.Errorf("ColumnTypeLength(%d) = (%d, %t), want (0, false)", index, length, ok)
+		}
+	}
+	if length, ok := (*statementRows)(nil).ColumnTypeLength(0); length != 0 || ok {
+		t.Errorf("nil ColumnTypeLength(0) = (%d, %t), want (0, false)", length, ok)
+	}
+	if length, ok := (&statementRows{columns: []string{"name"}}).ColumnTypeLength(0); length != 0 || ok {
+		t.Errorf("missing-schema ColumnTypeLength(0) = (%d, %t), want (0, false)", length, ok)
+	}
+
+	missingField := &statementRows{schema: &record.Schema{}, columns: []string{"missing"}}
+	if length, ok := missingField.ColumnTypeLength(0); length != 0 || ok {
+		t.Errorf("missing-field ColumnTypeLength(0) = (%d, %t), want (0, false)", length, ok)
+	}
+
+	var unsupportedSchema record.Schema
+	unsupportedSchema.AddField("unknown", record.FieldType(99), 0)
+	unsupported := &statementRows{schema: &unsupportedSchema, columns: unsupportedSchema.Fields()}
+	if length, ok := unsupported.ColumnTypeLength(0); length != 0 || ok {
+		t.Errorf("unsupported ColumnTypeLength(0) = (%d, %t), want (0, false)", length, ok)
+	}
+
+	var invalidLengthSchema record.Schema
+	invalidLengthSchema.AddVarcharField("invalid", -1)
+	invalidLength := &statementRows{schema: &invalidLengthSchema, columns: invalidLengthSchema.Fields()}
+	if length, ok := invalidLength.ColumnTypeLength(0); length != 0 || ok {
+		t.Errorf("negative-length ColumnTypeLength(0) = (%d, %t), want (0, false)", length, ok)
+	}
+}
+
 func TestStatementRowsReportsInvalidStateAndScanFailures(t *testing.T) {
 	destination := []driver.Value{nil}
 	if err := (*statementRows)(nil).Next(destination); err == nil || !strings.Contains(err.Error(), "rows") {
