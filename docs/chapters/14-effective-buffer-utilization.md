@@ -9,6 +9,7 @@ operations.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
+| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own the pinned record pages for one bounded block range; traversal is documented separately |
 
 ## Feature 1: Choose a safe buffer root
 
@@ -63,3 +64,38 @@ undefined. This estimator performs no transaction or buffer-manager operations; 
 
 The focused package tests cover every executable statement and function. The full module coverage workflow continues
 to require 100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 3: Pin and release a bounded chunk
+
+`multibuffer.NewChunkScan` validates an inclusive, non-negative block range and pins one `record.RecordPage` for
+each block in ascending order. `ChunkScan.Close` attempts every release and retains only pages whose unpin operation
+failed, allowing a later close call to retry those releases without repeating successful unpins. If construction
+fails after earlier pins were acquired, it releases them before returning; when cleanup itself fails, the returned
+partial scan retains those failed releases so the caller can retry `Close`.
+
+The [chunk page-lifetime diagram](../diagrams/ch14-chunk-scan-pins.svg) shows range validation, ordered pinning,
+failure cleanup, and retryable release; its editable source is
+[`ch14-chunk-scan-pins.drawio`](../diagrams/ch14-chunk-scan-pins.drawio). Page traversal, rewind, and field access
+remain separate scan behaviors.
+
+### Test-first record
+
+Focused tests first failed to compile because `NewChunkScan`, `ChunkTransaction`, and `ChunkScan` were undefined.
+Tests cover invalid configuration before I/O, inclusive ascending pins, cleanup after a later pin failure, joined pin
+and unpin causes, retention and retry of failed releases, aggregation across multiple close failures, and repeated
+close after success.
+
+### Design decision
+
+The Go boundary embeds `record.RecordTransaction` and adds only the `Unpin` operation required by the chunk resource
+lifecycle. `ChunkScan` retains `RecordPage` handles rather than duplicating block pin logic. The inclusive loop stops
+before incrementing the final block number, including when it is the maximum `int`. If a pin failure is followed by a
+cleanup failure, construction returns both the original error and a partial scan that owns only the pins that still
+need release. Unlike Java's constructor, Go validates the range and exposes cleanup errors rather than silently
+assuming every pin succeeded. This type does not yet implement `query.Scan`; cursor movement and record values are
+independent behaviors.
+
+### Validation
+
+The focused tests cover every executable statement and function. The module coverage workflow continues to require
+100.0% statement coverage for every executable package, function, and module total.
