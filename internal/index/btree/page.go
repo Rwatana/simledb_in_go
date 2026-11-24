@@ -140,15 +140,19 @@ func (page *Page) FindSlotBefore(searchKey query.Constant) (int, error) {
 }
 
 func pageSlotFieldPosition(slot, slotSize, fieldOffset int) (int, error) {
+	return pageSlotFieldPositionForCount(int64(slot), slotSize, fieldOffset)
+}
+
+func pageSlotFieldPositionForCount(slot int64, slotSize, fieldOffset int) (int, error) {
 	maxInt := int(^uint(0) >> 1)
 	if slot < 0 || slotSize <= 0 || fieldOffset < 0 || fieldOffset > maxInt-8 || fieldOffset >= slotSize {
 		return 0, fmt.Errorf("invalid slot position inputs: slot %d, slot size %d, field offset %d", slot, slotSize, fieldOffset)
 	}
 	available := maxInt - 8 - fieldOffset
-	if slot > available/slotSize {
+	if slot > int64(available/slotSize) {
 		return 0, fmt.Errorf("slot %d field position exceeds int range", slot)
 	}
-	return 8 + slot*slotSize + fieldOffset, nil
+	return 8 + int(slot)*slotSize + fieldOffset, nil
 }
 
 // Close releases the block pin owned by the page.
@@ -168,6 +172,51 @@ func (page *Page) Close() error {
 	}
 	page.block = storage.BlockID{}
 	return nil
+}
+
+// IsFull reports whether the next B-tree record slot reaches or exceeds the block size.
+func (page *Page) IsFull() (bool, error) {
+	if page == nil {
+		return false, fmt.Errorf("check whether B-tree page is full: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return false, fmt.Errorf("check whether B-tree page is full: page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return false, fmt.Errorf("check whether B-tree page in block %v is full: transaction is nil", page.block)
+	}
+	if page.layout == nil {
+		return false, fmt.Errorf("check whether B-tree page in block %v is full: layout is nil", page.block)
+	}
+	if page.layout.Schema() == nil {
+		return false, fmt.Errorf("check whether B-tree page in block %v is full: layout schema is nil", page.block)
+	}
+	slotSize := page.layout.SlotSize()
+	if slotSize <= 0 {
+		return false, fmt.Errorf("check whether B-tree page in block %v is full: invalid slot size %d", page.block, slotSize)
+	}
+
+	countValue, err := page.transaction.GetInt(page.block, 4)
+	if err != nil {
+		return false, fmt.Errorf("check whether B-tree page in block %v is full: read record count: %w", page.block, err)
+	}
+	if countValue < 0 {
+		return false, fmt.Errorf("check whether B-tree page in block %v is full: record count %d is negative", page.block, countValue)
+	}
+	nextSlot := int64(countValue) + 1
+	nextSlotPosition, err := pageSlotFieldPositionForCount(nextSlot, slotSize, 0)
+	if err != nil {
+		return false, fmt.Errorf("check whether B-tree page in block %v is full: %w", page.block, err)
+	}
+
+	blockSize, err := page.transaction.BlockSize()
+	if err != nil {
+		return false, fmt.Errorf("check whether B-tree page in block %v is full: read block size: %w", page.block, err)
+	}
+	if blockSize <= 0 {
+		return false, fmt.Errorf("check whether B-tree page in block %v is full: invalid block size %d", page.block, blockSize)
+	}
+	return nextSlotPosition >= blockSize, nil
 }
 
 func isNilPageTransaction(transaction PageTransaction) bool {
