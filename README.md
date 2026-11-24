@@ -26,7 +26,11 @@
 | 8 | Query Processing | 実装中 | [query scanと関係演算子の解説・実装記録](docs/chapters/08-query-processing.md) |
 | 9 | Parsing | 実装完了（PR stack上） | [SQL tokenizationとupdate-command dispatchの解説・実装記録](docs/chapters/09-parsing.md) |
 | 10 | Planning | 実装中 | [query plan contract、TablePlan/SelectPlan/ProductPlan/ProjectPlanのscan・schema・estimateの解説・実装記録](docs/chapters/10-planning.md) |
-| 11 | Indexing | 実装中 | [index traversal contractと索引実装の解説・実装記録](docs/chapters/11-indexing.md) |
+| 11 | JDBC Interfaces | 学習資料作成済み・実装未着手 | [Java source mapとGo移植方針](docs/chapters/11-jdbc-interfaces.md) |
+| 12 | Indexing | 実装中 | [index traversal contractと索引実装の解説・実装記録](docs/chapters/12-indexing.md) |
+| 13 | Materialization and Sorting | 未着手 | — |
+| 14 | Effective Buffer Utilization | 未着手 | — |
+| 15 | Query Optimization | 未着手 | — |
 
 第1章は概念導入、第2章はJDBCによるクライアント境界の説明であり、書籍もSimpleDBの
 内部実装の解説を第3章から始めています。そのため、第1章と第2章のPRにはGo実装を含めません。
@@ -74,9 +78,11 @@
 
 ## 次の一歩
 
-B-tree索引は検索キーに対応するleaf blockへ降り、最初に一致するentryの直前へ位置決めし、続けて一致するentryへ進めて現在のentryからtable RIDを取得します。追加時はleaf分割をdirectoryへ伝え、block 0のrootを維持したまま成長させます。削除時は指定された値とRIDのleaf entryだけを除去し、ページのclose失敗は再試行可能にします。葉・directoryページは同時にpinせず、1 frameでも探索できるようにします。
+Chapter 11 JDBC Interfacesの概要とJava source mapを追加しました。GoではまだJDBC/server境界を実装していません。まずJava `SimpleDB`の3引数constructorが行うfile・log・buffer managerの組み立てを、既存のGo infrastructureから独立した振る舞いとして移します。metadata、planner、embedded client、network clientは別の振る舞いとして後続に分けます。
 
-Chapter 9のparsingを終え、Chapter 10 PlanningのQueryPlanner、UpdatePlanner契約、BasicQueryPlannerによるテーブル・ビューSELECT計画、BetterQueryPlannerによるブロックアクセス見積もりに基づく結合順序の選択、BasicUpdatePlannerによるDELETE・UPDATE・INSERT・CREATE TABLE・CREATE VIEW・CREATE INDEX、TablePlan/SelectPlan/ProductPlan/ProjectPlanを追加しています。Chapter 11 Indexingでは、値/RIDベースの索引走査契約、100個の静的hash bucketへのJava互換キー割当、静的hash indexの探索コスト見積もり、HashIndexの初期化、スキャン解放、キーbucketへの位置決め、衝突を除外する一致エントリー走査、現在の索引行からのRID取得、hash bucketへのエントリー挿入、指定したRIDのhash entry削除、IndexSelectScanの初期位置決め、一致行への移動、選択行の整数・文字列フィールド読み取り、query constantとしての型付き値取得、フィールド有無の確認、索引・表スキャンの解放、IndexInfoからの静的hash index生成、IndexSelectPlanのchild schema公開、scan生成、ブロックアクセス、一致行数、distinct値の見積もり、IndexJoinScanの左行キーによる初期位置決め、一致RIDの走査、整数フィールドの右優先読み取り、型付きフィールドの右優先読み取り、文字列フィールドの右優先読み取り、結合フィールドの存在確認、索引結合scanのリソース解放、IndexJoinPlanの左・右schema結合、走査生成、ブロックアクセス・出力レコード数・distinct値見積もり、B-treeページのpinning、Java互換sorted slot position、ページのclose、次レコードの容量確認、typed dataval、page flagの読み書き、B-treeページrecord countの読み書き、directory child block番号とleaf record RIDの読み取り、typed datavalの読み書き、directory child block番号の書き込みとleaf entryのRID書き込み、directory entry挿入、leaf entry挿入とB-tree page entry削除、ページ初期化、新規ページの追加と初期化、B-treeページ後半レコードの分割、directory keyによるchild block選択、child directory pageの1段階オープン、複数レベルを下ったleaf block探索、level-zero directoryからleaf pageへのpin移行、leaf page内の次slot検索と検索キー一致判定、search keyと先頭キーに基づくoverflow blockの選択、選択済みoverflow leaf pageへのpin移行、search key直前へのleaf cursor初期位置決め、一致entry・overflow pageへの次進行、cursor現在slotのRID取得、RID指定のleaf entry削除、B-tree directory entry値、空きslotへのleaf entry挿入、葉カーソルのclose、最小キーを先頭にもつleaf pageの分割、同値キーだけを持つfull leaf pageのoverflow chainと、混合キー葉ページのduplicate-group境界split、key順のdirectory entry挿入、full directory pageの分割、last slotを満たした時の挿入と分割、親へ再帰的に伝えるdirectory split separatorの挿入と、block zeroにrootを保ったまま新しいrootを作る成長処理、level-zero rootへの初期minimum-key entry設定、空のleaf page初期化とleafファイル初期block作成を実装しています。
+Chapter 12 Indexingでは、値/RIDベースの索引走査契約、100個の静的hash bucketへのJava互換キー割当、静的hash indexの探索コスト見積もり、hashとB-treeの初期化・走査・挿入・削除、索引scan/plan、B-tree page・分割・root growthを実装しています。葉とdirectory pageを同時にpinせず、1 frameでも探索できるようにしています。
+
+Chapter 9 ParsingのSQL tokenizationとupdate-command dispatchは完了し、Chapter 10 Planningではquery plan contract、SELECT/UPDATE planner、TablePlan・SelectPlan・ProductPlan・ProjectPlanのscan/schema/estimateを実装中です。Chapter 13 Materialization and Sorting、Chapter 14 Effective Buffer Utilization、Chapter 15 Query Optimizationは未着手です。
 
 ## 参照元
 

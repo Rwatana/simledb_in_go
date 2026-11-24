@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 12 Feature 37: B-tree slot search</title>
+  <desc id="desc">FindSlotBefore scans sorted values and returns the slot before the first value greater than or equal to the search key. For duplicated key 20, the result is slot 0.</desc>
+  <style>.title{font-family:Arial,sans-serif;font-size:28px;font-weight:700;fill:#1f2937}.head{font-family:Arial,sans-serif;font-size:21px;font-weight:700;fill:#1f2937}.body{font-family:Arial,sans-serif;font-size:18px;fill:#1f2937}</style>
+  <rect width="1200" height="680" fill="#fff"/>
+  <text class="title" x="600" y="78" text-anchor="middle">Chapter 12 / Feature 37: Position before a search key</text>
+  <rect x="70" y="235" width="230" height="150" rx="12" fill="#dae8fc" stroke="#6c8ebf" stroke-width="2"/>
+  <text class="head" x="185" y="280" text-anchor="middle">Page header</text>
+  <text class="body" x="185" y="325" text-anchor="middle">flag · count = 4</text>
+  <rect x="400" y="210" width="280" height="210" rx="12" fill="#d5e8d4" stroke="#82b366" stroke-width="2"/>
+  <text class="head" x="540" y="255" text-anchor="middle">Sorted dataval</text>
+  <text class="body" x="540" y="300" text-anchor="middle">slot 0: 10 · slot 1: 20</text>
+  <text class="body" x="540" y="340" text-anchor="middle">slot 2: 20 · slot 3: 40</text>
+  <rect x="800" y="215" width="310" height="170" rx="12" fill="#e1d5e7" stroke="#9673a6" stroke-width="2"/>
+  <text class="head" x="955" y="265" text-anchor="middle">FindSlotBefore(20)</text>
+  <text class="body" x="955" y="310" text-anchor="middle">stop at first value ≥ key</text>
+  <text class="body" x="955" y="350" text-anchor="middle">duplicate scan stops at slot 1</text>
+  <rect x="420" y="500" width="400" height="110" rx="12" fill="#fff2cc" stroke="#d6b656" stroke-width="2"/>
+  <text class="head" x="620" y="545" text-anchor="middle">Return slot 0</text>
+  <text class="body" x="620" y="582" text-anchor="middle">the position immediately before slot 1</text>
+  <path d="M300 310H400 M800 300H680 M540 420V500" fill="none" stroke="#475569" stroke-width="3"/>
+  <polygon points="400,310 385,302 385,318" fill="#475569"/>
+  <polygon points="680,300 695,292 695,308" fill="#475569"/>
+  <polygon points="540,500 532,485 548,485" fill="#475569"/>
+</svg>

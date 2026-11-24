@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Append and format a B-tree page</title>
+  <desc id="desc">Append one block to the current page's file, initialize its header and complete slots, and withhold its block ID if formatting fails.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 z" fill="#475569" />
+    </marker>
+    <style>
+      text { font-family: system-ui, sans-serif; fill: #172033; }
+      .title { font-size: 26px; font-weight: 700; }
+      .box { stroke-width: 2; rx: 12; }
+      .current { fill: #dae8fc; stroke: #6c8ebf; }
+      .append { fill: #fff2cc; stroke: #d6b656; }
+      .target { fill: #d5e8d4; stroke: #82b366; }
+      .format { fill: #e1d5e7; stroke: #9673a6; }
+      .failure { fill: #f8cecc; stroke: #b85450; }
+      .label { font-size: 19px; font-weight: 700; }
+      .arrow { stroke: #475569; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <text class="title" x="600" y="60" text-anchor="middle">Chapter 12 / Feature 54: Append and format a B-tree page</text>
+  <rect class="box current" x="70" y="150" width="230" height="100" />
+  <text class="label" x="185" y="190" text-anchor="middle"><tspan x="185">Current page</tspan><tspan x="185" dy="28">file = index.idx</tspan></text>
+  <rect class="box append" x="400" y="150" width="260" height="100" />
+  <text class="label" x="530" y="190" text-anchor="middle"><tspan x="530">Append exactly one block</tspan><tspan x="530" dy="28">to the same file</tspan></text>
+  <rect class="box target" x="760" y="150" width="250" height="100" />
+  <text class="label" x="885" y="190" text-anchor="middle"><tspan x="885">New block</tspan><tspan x="885" dy="28">index.idx / next block</tspan></text>
+  <rect class="box format" x="760" y="330" width="250" height="120" />
+  <text x="885" y="365" text-anchor="middle" font-size="18" font-weight="700"><tspan x="885">Format the page</tspan><tspan x="885" dy="27">flag + empty count + defaults</tspan><tspan x="885" dy="27">all writes unlogged</tspan></text>
+  <rect class="box failure" x="400" y="330" width="260" height="120" />
+  <text x="530" y="365" text-anchor="middle" font-size="18" font-weight="700"><tspan x="530">If formatting fails</tspan><tspan x="530" dy="27">return no block ID</tspan><tspan x="530" dy="27">caller must not publish</tspan></text>
+  <path class="arrow" d="M300 200 H392" />
+  <path class="arrow" d="M660 200 H752" />
+  <path class="arrow" d="M885 250 V322" />
+  <path class="arrow" d="M760 390 H668" />
+  <text x="600" y="520" text-anchor="middle" font-size="18" fill="#475569">AppendNew does not pin or unpin; the caller owns the block lifecycle.</text>
+</svg>

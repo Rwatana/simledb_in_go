@@ -1,0 +1,28 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T13:45:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch12-btree-open-child-directory" name="Open Child B-tree Directory Page">
+    <mxGraphModel page="1" pageWidth="1200" pageHeight="680">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 12 / Feature 57: Open one child directory page" style="text;html=1;align=center;fontSize=26;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="24" width="1080" height="48" as="geometry"/>
+        </mxCell>
+        <mxCell id="parent" value="Parent directory page · flag = 2&#xa;search key selects child block 8&#xa;Parent pin remains owned by caller" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=19;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="145" width="430" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="child" value="Child directory page · block 8&#xa;Same transaction and directory layout&#xa;New pin belongs to caller" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=19;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="145" width="430" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="reject" value="Level 0 page points to leaves&#xa;OpenChildDirectory rejects it&#xa;Leaf pages use a different layout" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="365" y="425" width="470" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="open" value="FindChildBlock + Pin" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;" edge="1" parent="1" source="parent" target="child">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="level" value="flag = 0" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=2;dashed=1;strokeColor=#b85450;" edge="1" parent="1" source="parent" target="reject">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

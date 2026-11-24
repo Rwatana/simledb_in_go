@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 12 Feature 2: Static hash bucket selection</title>
+  <desc id="description">A query.Constant becomes a Java-compatible hash code. Integer keys use their signed value; string keys use Java String.hashCode over UTF-16 code units. BucketNumber normalizes the remainder modulo 100 into a nonnegative bucket from 0 through 99. An unset constant returns an explicit error.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+    <style>.title{font:700 24px sans-serif;fill:#1f2937}.box{stroke-width:2;rx:16;ry:16}.label{font:17px sans-serif;fill:#1f2937;text-anchor:middle}.small{font:15px sans-serif;fill:#475569;text-anchor:middle}.edge{stroke:#475569;stroke-width:3;fill:none;marker-end:url(#arrow)}</style>
+  </defs>
+  <text class="title" x="600" y="62" text-anchor="middle">Chapter 12 / Feature 2: Static hash bucket selection</text>
+  <rect class="box" x="50" y="210" width="230" height="120" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="label" x="165" y="245"><tspan x="165">query.Constant</tspan><tspan x="165" dy="27">int32 key</tspan><tspan x="165" dy="27">string key</tspan></text>
+  <rect class="box" x="370" y="175" width="300" height="180" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="label" x="520" y="215"><tspan x="520">Java-compatible hash</tspan><tspan x="520" dy="31">integer: signed value</tspan><tspan x="520" dy="29">string: String.hashCode()</tspan><tspan x="520" dy="29">iterate UTF-16 code units</tspan></text>
+  <rect class="box" x="760" y="175" width="300" height="180" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="label" x="910" y="215"><tspan x="910">BucketNumber</tspan><tspan x="910" dy="31">hash % 100</tspan><tspan x="910" dy="29">normalize negative remainder</tspan><tspan x="910" dy="29">result is in [0, 100)</tspan></text>
+  <rect class="box" x="690" y="445" width="440" height="120" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="label" x="910" y="481"><tspan x="910">Static hash index</tspan><tspan x="910" dy="30">bucket 0 · bucket 1 · … · bucket 99</tspan><tspan x="910" dy="27">scan one bucket for the search key</tspan></text>
+  <rect class="box" x="50" y="455" width="230" height="90" fill="#f8cecc" stroke="#b85450"/>
+  <text class="label" x="165" y="490"><tspan x="165">Unset Constant</tspan><tspan x="165" dy="27">returns an explicit error</tspan></text>
+  <path class="edge" d="M280 270 H362"/><text class="small" x="320" y="252">value hash</text>
+  <path class="edge" d="M670 265 H752"/><text class="small" x="710" y="247">signed hash code</text>
+  <path class="edge" d="M910 355 V437"/><text class="small" x="966" y="400">bucket number</text>
+  <path class="edge" d="M165 330 V447" stroke-dasharray="7 6"/><text class="small" x="210" y="397">invalid key</text>
+</svg>

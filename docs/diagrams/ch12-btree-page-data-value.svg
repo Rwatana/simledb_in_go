@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 12 Feature 40: Read a B-tree page data value</title>
+  <desc id="desc">Page.GetDataVal combines the eight-byte page header, slot index, layout slot size, and dataval field offset to read a typed value and return a query constant.</desc>
+  <style>.title{font-family:Arial,sans-serif;font-size:28px;font-weight:700;fill:#1f2937}.head{font-family:Arial,sans-serif;font-size:21px;font-weight:700;fill:#1f2937}.body{font-family:Arial,sans-serif;font-size:18px;fill:#1f2937}</style>
+  <rect width="1200" height="680" fill="#fff"/>
+  <text class="title" x="600" y="72" text-anchor="middle">Chapter 12 / Feature 40: Read a B-tree page data value</text>
+  <rect x="80" y="145" width="280" height="135" rx="12" fill="#dae8fc" stroke="#6c8ebf" stroke-width="2"/>
+  <text class="head" x="220" y="195" text-anchor="middle">Caller</text>
+  <text class="body" x="220" y="235" text-anchor="middle">GetDataVal(slot)</text>
+  <rect x="460" y="145" width="310" height="135" rx="12" fill="#e1d5e7" stroke="#9673a6" stroke-width="2"/>
+  <text class="head" x="615" y="195" text-anchor="middle">Page + Layout</text>
+  <text class="body" x="615" y="235" text-anchor="middle">position = 8 + slot × slotSize + offset</text>
+  <rect x="870" y="145" width="250" height="135" rx="12" fill="#d5e8d4" stroke="#82b366" stroke-width="2"/>
+  <text class="head" x="995" y="195" text-anchor="middle">Transaction</text>
+  <text class="body" x="995" y="235" text-anchor="middle">GetInt / GetString</text>
+  <path d="M360 212H460 M770 212H870" fill="none" stroke="#475569" stroke-width="3"/>
+  <polygon points="460,212 445,204 445,220" fill="#475569"/>
+  <polygon points="870,212 855,204 855,220" fill="#475569"/>
+  <rect x="300" y="390" width="600" height="145" rx="12" fill="#fff2cc" stroke="#d6b656" stroke-width="2"/>
+  <text class="head" x="600" y="440" text-anchor="middle">Typed query.Constant</text>
+  <text class="body" x="600" y="480" text-anchor="middle">IntegerField → NewIntConstant</text>
+  <text class="body" x="600" y="515" text-anchor="middle">VarcharField → NewStringConstant</text>
+  <path d="M995 280V340H600V390" fill="none" stroke="#475569" stroke-width="3"/>
+  <polygon points="600,390 592,375 608,375" fill="#475569"/>
+  <text class="body" x="795" y="330" text-anchor="middle">read the declared field type</text>
+  <text class="body" x="600" y="600" text-anchor="middle">The accessor leaves the page pin unchanged.</text>
+</svg>

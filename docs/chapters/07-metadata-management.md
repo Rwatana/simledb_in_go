@@ -484,7 +484,7 @@ the physical index-record layout in book order: integer `block`, integer `id`, t
 field's exact logical type and varchar length.
 
 Initialization validates the dependencies and field name instead of allowing a later nil dereference. At this stage,
-the concrete `HashIndex` opening behavior remains deferred until the index implementation exists; the Chapter 11
+the concrete `HashIndex` opening behavior remains deferred until the index implementation exists; the Chapter 12
 follow-up below now resolves that dependency without adding a speculative B-tree implementation.
 
 ### Test-first record
@@ -848,7 +848,7 @@ The test first failed to compile because `MetadataManager.Statistics` did not ex
 | `TestMetadataManagerStatisticsReturnsSharedManagerSnapshot` | Facade lookup reports two stored records and returns the exact snapshot installed in the shared statistics manager cache |
 | `TestMetadataManagerStatisticsPreservesRefreshFailure` | A failed refresh returns no partial snapshot, preserves refresh and facade context, counts the lookup, and leaves the cache empty |
 
-## Chapter 11 follow-up: Open an index from its metadata
+## Chapter 12 follow-up: Open an index from its metadata
 
 `IndexInfo.Open` constructs the existing static `HashIndex` from the transaction, index name, and record layout retained
 by the metadata object. Construction itself performs no transaction I/O; bucket selection and table access begin when
