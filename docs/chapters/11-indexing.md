@@ -866,6 +866,22 @@ The focused tests first failed because `Page.FindOverflowBlock` was undefined. T
 overflow block zero, a mismatching first key, a negative flag, invalid/typed-nil state, mismatched or unset search keys,
 malformed layouts, wrapped first-key and flag reads, flag-read ordering after a mismatch, and unchanged pin ownership.
 
+## Feature 62: Open the selected B-tree overflow page
+
+After Java `BTreeLeaf.tryOverflow` selects an overflow block, it closes the current contents page and pins the next page
+with the same transaction and leaf layout. Go's `Page.OpenOverflowPage` performs that resource transition for a
+previously selected same-file block. It validates the current page and target before releasing anything, then closes
+before pinning so a one-frame buffer suffices. The returned page belongs to the caller. An unpin failure leaves the
+current page open for retry; a target pin failure after close leaves the receiver closed with its dependencies retained.
+Choosing whether overflow applies, resetting the slot, RID retrieval, and cursor state remain separate behaviors; no
+diagram is needed for this one-page ownership transition.
+
+### Test-first record
+
+The focused tests first failed because `Page.OpenOverflowPage` was undefined. Tests cover close-before-pin order,
+one active pin maximum, target and dependency retention, caller cleanup, pre-close rejection of invalid state and
+cross-file/negative targets, retry after unpin failure, and a failed target pin that leaves the receiver closed.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
