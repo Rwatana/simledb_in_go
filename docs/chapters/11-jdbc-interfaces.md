@@ -81,7 +81,9 @@ is maintained beside the SVG. This is a Go-native server boundary and does not i
 accepts connections from a caller-owned listener and serves each on its own goroutine and `DriverService`, so every
 client keeps an independent transaction while sharing the configured manager set. It closes accepted connections when
 an RPC service ends; the caller stops accepting by closing the listener, and that expected `net.ErrClosed` returns normally.
-Unexpected accept errors keep their cause. The [network RPC listener diagram](../diagrams/ch11-network-rpc-listener.svg)
+Unexpected accept errors keep their cause. When a transport ends, `ServeConnection` rolls back any still-active
+transaction to release its locks and buffers; an explicit `SimpleDB.Close` has already committed and closed the session.
+The [network RPC listener diagram](../diagrams/ch11-network-rpc-listener.svg)
 shows the independent per-connection services and shutdown owner; its [editable Draw.io source](../diagrams/ch11-network-rpc-listener.drawio)
 is kept beside the SVG. `DriverService.Commit` commits the retained transaction and starts its successor on the same connection, matching the
 Java server connection cycle without exposing RMI. Its [network commit diagram](../diagrams/ch11-network-rpc-commit.svg)
@@ -263,6 +265,10 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestServeListenerKeepsConcurrentClientTransactionsIndependent` | Listener clients receive independent RPC transaction state and shutdown remains with the caller |
 | `TestServeListenerRejectsNilInputsAndWrapsAcceptFailure` | Nil dependencies fail before Accept, unexpected Accept causes are preserved, and listener closure is normal |
 | `TestServeListenerAcceptsWhileConnectionIsBeingServedAndClosesConnection` | Accepting continues while a handler runs and accepted connections close when handlers return |
+| `TestServeConnectionRollsBackActiveSessionOnTransportDisconnect` | Uncommitted catalog changes are undone when an RPC transport ends without Close |
+| `TestServeConnectionKeepsExplicitSessionCloseCommitted` | Explicit session Close commits its updates and disconnect cleanup leaves them visible |
+| `TestDriverServiceDisconnectHandlesInvalidStateAndRollbackFailure` | Disconnect cleanup is idempotent for inactive state and preserves rollback failures |
+| `TestServeConnectionReturnsDisconnectRollbackFailure` | A rollback failure after RPC service exit is returned with disconnect context |
 | `TestConnectRPCSessionRetainsTransactionIDAndLeavesClientOpen` | The client constructor stores the returned transaction ID and leaves the caller-owned RPC client usable |
 | `TestConnectRPCSessionRejectsNilClient` | Nil clients return no session and a nil session reports transaction ID zero |
 | `TestConnectRPCSessionWrapsRemoteConnectErrorWithoutReturningSession` | A failed server-side Connect is contextual and returns no client session |
@@ -411,6 +417,11 @@ The network RPC-query test-first run initially failed because `ExecuteQueryReque
 verify the session transaction remains active until explicit Commit. Direct tests cover parse/planner/open failures,
 invalid state, schema/scan validation, materialization cleanup, partial-open cleanup, no partial results, and empty results.
 The response uses concrete gob-friendly structs rather than interface-valued cells.
+
+The network RPC-disconnect test-first run initially failed because `DriverService.disconnect` was undefined. Integration
+tests verify that an unclosed session rolls back a catalog change and releases transaction state when its transport ends,
+while an explicit `SimpleDB.Close` remains committed. Direct tests cover inactive/closed cleanup, a completed transaction
+rollback error, and propagation of disconnect cleanup failures from `ServeConnection`.
 
 The network RPC-listener test-first run initially failed because `ServeListener` was undefined. A listener can accept
 multiple independent net/rpc sessions while earlier connections remain active; tests confirm different transaction IDs,
