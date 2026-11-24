@@ -56,6 +56,10 @@ failures with the host while preserving their cause, and the caller owns closing
 is only the socket-opening boundary; it does not implement the Java RMI handshake, SQL request protocol, or remote
 session lifecycle. The [network dial diagram](../diagrams/ch11-network-dial.svg) shows validation, address construction,
 and connection ownership; its [editable Draw.io source](../diagrams/ch11-network-dial.drawio) is kept beside the SVG.
+`network.DialNetworkRPCClient` composes that URL dial with Go's `net/rpc.NewClient`, returning a caller-owned RPC client
+whose `Close` also closes the underlying connection. A successful dial only creates the RPC transport: it does not send
+`SimpleDB.Connect` or create a database session. This is the Go-native gob RPC protocol, not Java RMI. Context cancellation,
+invalid URLs, nil dial dependencies/results, and wrapped dial causes are tested at this boundary.
 
 `ConnectRPCSession` sends `SimpleDB.Connect` through a caller-supplied `rpc.Client` and retains the returned transaction ID
 on a `RemoteSession`. The client and underlying transport remain caller-owned; a failed RPC returns no session. The
@@ -244,6 +248,9 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestDialNetworkURLRejectsNilConnection` | A dialer that succeeds without a connection returns an error |
 | `TestDialNetworkURLRejectsNilDialer` | Missing dial dependencies are rejected before dialing |
 | `TestDialNetworkURLHonorsCanceledContext` | Canceled contexts stop the default dial path |
+| `TestDialNetworkRPCClientUsesContextAndReturnsCallerOwnedClient` | A URL dial becomes a working RPC client using caller context, default port, and caller-owned closure |
+| `TestDialNetworkRPCClientRejectsInputsAndWrapsDialFailures` | Invalid inputs and nil connections fail; dial failures preserve their cause |
+| `TestDialNetworkRPCClientHonorsCanceledContext` | The public RPC-client dial rejects an already canceled context |
 | `TestServeConnectionCreatesOneTransactionOnRemoteConnect` | RPC Connect creates one START-logged transaction retained for the connection and rejects replacement |
 | `TestServeConnectionReportsManagerTransactionFailureOverRPC` | START-record failures are returned over RPC without a transaction ID |
 | `TestServeConnectionRejectsNilAndIncompleteInputs` | Nil connections/managers and incomplete transaction manager sets are rejected |
@@ -419,6 +426,11 @@ the active transaction ID. Nil/closed/client-less sessions and a wrapped remote 
 The network RPC client-query test-first run initially failed because `RemoteSession.ExecuteQuery` was undefined. Tests
 verify an empty result, ordered VARCHAR/INTEGER metadata and typed rows, unchanged transaction ID, invalid local session
 state, a wrapped remote error, and suppression of partial response data.
+
+The network RPC-client dial test-first run initially failed because `DialNetworkRPCClient` was undefined. An injected
+context dialer proves that the parsed host uses port 1099 and that the returned `rpc.Client` performs a `SimpleDB.Connect`
+exchange. Tests also cover nil/canceled contexts, invalid URLs, nil dial dependencies/results, and wrapped dial failures;
+closing the returned client ends the owned transport, while session creation remains a separate call.
 
 ## Intentional differences
 

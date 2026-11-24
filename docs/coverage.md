@@ -144,6 +144,12 @@ affected rows, and leaves the current transaction ID and completion to the calle
 are contextual and preserve the ID. The independent coverage workflow continues to require 100.0% package, function,
 and module statement coverage.
 
+Issue #1185 adds `DialNetworkRPCClient`, which turns the context-aware default-port TCP dial into a caller-owned Go
+`net/rpc.Client`; closing that client closes its connection. Tests perform a real RPC exchange through an injected dialer
+and cover URL/port selection, cancellation, nil inputs/results, and wrapped dial failures. Creating the transport does not
+start a database session or claim Java RMI compatibility. The independent coverage workflow continues to enforce 100.0%
+statement coverage in every executable package, function, and the module total.
+
 Issue #1183 adds `RemoteSession.ExecuteQuery`, which returns the server's ordered column metadata and typed rows without
 completing the active transaction or changing its ID. Nil, client-less, and closed sessions return empty results with
 contextual errors; RPC failures preserve their cause and suppress partial results. The coverage workflow continues to
