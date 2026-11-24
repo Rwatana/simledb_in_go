@@ -570,6 +570,42 @@ func TestChunkScanGetStringRejectsUnavailableCurrentRecordBeforeFieldIO(t *testi
 	}
 }
 
+func TestChunkScanHasFieldReportsSchemaWithoutStorageAccess(t *testing.T) {
+	layout := chunkStringLayout()
+	transaction := &chunkTransactionProbe{blockSize: 128}
+	scan, err := NewChunkScan(transaction, "records.tbl", layout, 0, 0)
+	if err != nil {
+		t.Fatalf("NewChunkScan() error = %v", err)
+	}
+	pins := append([]storage.BlockID(nil), transaction.pins...)
+	for field, want := range map[string]bool{"id": true, "name": true, "missing": false, "": false} {
+		if got := scan.HasField(field); got != want {
+			t.Errorf("HasField(%q) = %t, want %t", field, got, want)
+		}
+	}
+	if !reflect.DeepEqual(transaction.pins, pins) || len(transaction.intReads) != 0 || len(transaction.stringReads) != 0 {
+		t.Fatalf("HasField performed storage I/O: pins=%v intReads=%v stringReads=%v", transaction.pins, transaction.intReads, transaction.stringReads)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	for field, want := range map[string]bool{"id": true, "name": true, "missing": false} {
+		if got := scan.HasField(field); got != want {
+			t.Errorf("closed HasField(%q) = %t, want %t", field, got, want)
+		}
+	}
+	var nilScan *ChunkScan
+	if nilScan.HasField("id") {
+		t.Error("nil HasField(id) = true, want false")
+	}
+	if (&ChunkScan{}).HasField("id") {
+		t.Error("zero-value HasField(id) = true, want false")
+	}
+	if len(transaction.intReads) != 0 || len(transaction.stringReads) != 0 {
+		t.Fatalf("HasField read field data: integers=%v strings=%v", transaction.intReads, transaction.stringReads)
+	}
+}
+
 func TestChunkScanNextReportsPageErrorsWithoutMovingCursor(t *testing.T) {
 	blockErr := errors.New("block size failed")
 	transaction := &chunkTransactionProbe{blockErr: blockErr}

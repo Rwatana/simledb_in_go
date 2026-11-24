@@ -148,6 +148,15 @@ func (scan *ChunkScan) GetString(fieldName string) (string, error) {
 	return value, nil
 }
 
+// HasField reports whether the chunk scan's record schema declares fieldName.
+func (scan *ChunkScan) HasField(fieldName string) bool {
+	if scan == nil || scan.layout == nil {
+		return false
+	}
+	schema := scan.layout.Schema()
+	return schema != nil && schema.HasField(fieldName)
+}
+
 // Close releases every retained chunk-page pin and keeps failed releases for a retry.
 func (scan *ChunkScan) Close() error {
 	if scan == nil || scan.transaction == nil {
