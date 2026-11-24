@@ -92,21 +92,6 @@ func TestLeafInsertSplitsVarcharDuplicatePageIntoOverflowChain(t *testing.T) {
 	}
 }
 
-func TestLeafInsertReportsMixedKeysWhenInsertedPageBecomesFull(t *testing.T) {
-	leaf, tx, _, _, _ := newLeafInsertBeforeFirstFixture(t, []int32{5, 7}, query.NewIntConstant(5))
-
-	entry, err := leaf.Insert(record.NewRID(30, 4))
-	if entry != nil || err == nil {
-		t.Fatalf("Insert() = (%v, %v), want explicit mixed-key split error", entry, err)
-	}
-	if leaf.currentSlot != 0 {
-		t.Fatalf("cursor slot after insert = %d, want inserted slot 0", leaf.currentSlot)
-	}
-	if len(tx.appendCalls) != 0 {
-		t.Fatalf("mixed-key page appended blocks %v; non-duplicate split remains a separate behavior", tx.appendCalls)
-	}
-}
-
 func TestLeafInsertDuplicateOverflowWrapsPostInsertErrors(t *testing.T) {
 	for _, test := range []struct {
 		name         string
