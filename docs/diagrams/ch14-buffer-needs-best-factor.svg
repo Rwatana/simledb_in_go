@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560" viewBox="0 0 1120 560" role="img" aria-labelledby="title desc">
+  <title id="title">Buffer factor estimator</title>
+  <desc id="desc">BestFactor reserves two buffers, returns one for a small budget or size, and binary searches the increasing divisor sequence for the first ceiling quotient that fits.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52677d"/></marker>
+    <style>
+      text { font: 16px sans-serif; fill: #172b4d; text-anchor: middle; }
+      .small { font-size: 13px; }
+      .input { fill: #dae8fc; stroke: #6c8ebf; }
+      .step { fill: #fff2cc; stroke: #d6b656; }
+      .work { fill: #d5e8d4; stroke: #82b366; }
+      .result { fill: #d5e8d4; stroke: #82b366; }
+      .fallback { fill: #f8cecc; stroke: #b85450; }
+      .decision { fill: #e1d5e7; stroke: #9673a6; }
+      .edge { fill: none; stroke: #52677d; stroke-width: 2; marker-end: url(#arrow); }
+      .box { stroke-width: 2; rx: 12; }
+    </style>
+  </defs>
+  <rect width="1120" height="560" fill="#fff"/>
+  <rect class="input box" x="35" y="210" width="190" height="82"/>
+  <text x="130" y="240">Inputs</text><text class="small" x="130" y="266">available buffers; blocks</text>
+  <rect class="step box" x="275" y="210" width="210" height="82"/>
+  <text x="380" y="240">Reserve two buffers</text><text class="small" x="380" y="266">usable = available - 2</text>
+  <polygon class="decision" points="612,190 685,250 612,310 540,250" stroke-width="2"/>
+  <text class="small" x="612" y="245">usable ≤ 1</text><text class="small" x="612" y="266">or size ≤ 1?</text>
+  <rect class="fallback box" x="790" y="70" width="150" height="60"/>
+  <text x="865" y="106">Return 1</text>
+  <rect class="work box" x="760" y="220" width="230" height="82"/>
+  <text x="875" y="249">Binary search divisor</text><text class="small" x="875" y="275">ceil(size / divisor)</text>
+  <polygon class="decision" points="617,380 700,435 617,490 535,435" stroke-width="2"/>
+  <text class="small" x="617" y="440">quotient ≤ usable?</text>
+  <rect class="result box" x="275" y="405" width="180" height="60"/>
+  <text x="365" y="441">Return quotient</text>
+  <path class="edge" d="M225 251 H275"/><path class="edge" d="M485 251 H540"/>
+  <path class="edge" d="M645 210 L790 117"/><text class="small" x="715" y="154">yes</text>
+  <path class="edge" d="M685 250 H760"/><text class="small" x="720" y="238">no</text>
+  <path class="edge" d="M875 302 L668 390"/>
+  <path class="edge" d="M535 435 H455"/><text class="small" x="495" y="425">yes</text>
+  <path class="edge" d="M617 490 V520 H875 V302"/><text class="small" x="755" y="515">no: larger divisor</text>
+</svg>
