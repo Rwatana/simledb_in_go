@@ -420,6 +420,18 @@ The focused tests first failed because `IndexJoinPlan.Open` was undefined. Tests
 resource release, nil plan dependencies and child scans, typed-nil scans, incompatible right scan types, partial child
 open failures, left positioning/advancement/join-value errors, index positioning errors, and cleanup failures.
 
+## Feature 33: Estimate index join block accesses
+
+Java `IndexJoinPlan.blocksAccessed` estimates `B(left) + R(left) * B(index) + R(join)`. Go's
+`IndexJoinPlan.BlocksAccessed` uses the retained left plan and index metadata, reproduces Java signed 32-bit overflow,
+and returns zero when required state is absent or index metadata cannot compute its block estimate, matching the Go
+error-handling choice made for `IndexSelectPlan`.
+
+### Test-first record
+
+The focused tests first failed because `IndexJoinPlan.BlocksAccessed` was undefined. Tests verify the formula, nil
+receiver/children/metadata, a failed metadata estimate, and signed 32-bit overflow.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

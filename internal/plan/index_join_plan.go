@@ -104,6 +104,22 @@ func (join *IndexJoinPlan) Open() (query.Scan, error) {
 	return indexJoinScan, nil
 }
 
+// BlocksAccessed estimates the index join's left, index, and output block accesses.
+func (join *IndexJoinPlan) BlocksAccessed() int {
+	if join == nil || join.left == nil || join.right == nil || join.indexInfo == nil {
+		return 0
+	}
+	indexBlocks, err := join.indexInfo.BlocksAccessed()
+	if err != nil {
+		return 0
+	}
+	leftBlocks := int32(join.left.BlocksAccessed())
+	leftRecords := int32(join.left.RecordsOutput())
+	indexBlocks32 := int32(indexBlocks)
+	indexRecords := int32(join.indexInfo.RecordsOutput())
+	return int(leftBlocks + leftRecords*indexBlocks32 + leftRecords*indexRecords)
+}
+
 func isNilIndexJoinPlanScan(scan query.Scan) bool {
 	if scan == nil {
 		return true
