@@ -11,7 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/btree.BTreeIndex`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTreeIndex.java` | Retain index state; derive the directory layout; initialize files; position and advance a search cursor; read its current RID; insert entries and propagate splits; close retained pages |
+| `internal/index/btree.BTreeIndex`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTreeIndex.java` | Retain index state; derive the directory layout; initialize files; position and advance a search cursor; read its current RID; insert and delete entries; propagate insertion splits; close retained pages |
 | `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
@@ -1317,6 +1317,16 @@ directory changes, leaf split propagation, root growth and block-zero retention,
 pinning, joined leaf-write/close failures, root-repin failure, and a directory split error combined with retryable root
 cleanup. The method is 100.0% covered.
 
+## Feature 89: Delete an entry through the B-tree index
+
+Java `BTreeIndex.delete` positions the leaf for a value and removes the matching RID. Go's `BTreeIndex.Delete` uses the
+same cursor contract, deletes only the first value/RID pair, and does not modify directory pages. It closes the leaf
+before returning and retains a failed unpin for retry through `Close`; mutation and cleanup causes are joined. If a
+logged delete fails, transaction rollback remains the caller's responsibility. The existing [directory-to-leaf diagram](../diagrams/ch11-btree-find-leaf-block.svg)
+and editable source `ch11-btree-find-leaf-block.drawio` explain how the search key selects the leaf. The focused test-first compilation failed because `BTreeIndex.Delete` was
+undefined; tests cover a matching RID, a missing RID, nil and invalid-key inputs, positioning failure, and joined delete
+and close failures with cleanup retry. The method is 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1330,6 +1340,7 @@ cleanup. The method is 100.0% covered.
 - `btree.BTreeIndex.GetDataRID` reports nil or unpositioned cursor state as Go errors and preserves wrapped leaf/page-read causes.
 - `btree.BTreeIndex.Close` attempts both retained page closes, joins errors, and preserves failed handles for retry.
 - `btree.BTreeIndex.Insert` closes the modified leaf before directory access, propagates splits, retains root block zero, and leaves transaction rollback to the caller after an error.
+- `btree.BTreeIndex.Delete` removes only the requested leaf value/RID pair without directory mutation, and leaves transaction rollback to the caller after an error.
 - `IndexSelectScan` reports index-position failures as Go errors and leaves index lifetime management to its caller.
 - `IndexSelectScan.Next` reports index and table-scan failures as errors, and avoids moving the data scan after exhaustion.
 - `IndexSelectScan.GetInt` reports data-scan read failures as Go errors while preserving their wrapped causes.

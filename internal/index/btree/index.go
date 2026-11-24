@@ -221,6 +221,32 @@ func (index *BTreeIndex) Insert(dataValue query.Constant, dataRID record.RID) er
 	return nil
 }
 
+// Delete removes one value/RID entry from the B-tree index.
+// The caller must roll back the transaction if deletion returns an error after logged writes.
+func (index *BTreeIndex) Delete(dataValue query.Constant, dataRID record.RID) error {
+	if index == nil {
+		return fmt.Errorf("delete B-tree index entry %s -> %s: index is nil", dataValue, dataRID)
+	}
+	if err := index.BeforeFirst(dataValue); err != nil {
+		return fmt.Errorf("delete B-tree index entry %s -> %s: position cursor: %w", dataValue, dataRID, err)
+	}
+	leaf := index.leaf
+	deleteErr := leaf.Delete(dataRID)
+	leafCloseErr := leaf.Close()
+	if leafCloseErr != nil {
+		leafCloseErr = fmt.Errorf("close leaf cursor after deleting %s -> %s: %w", dataValue, dataRID, leafCloseErr)
+	} else {
+		index.leaf = nil
+	}
+	if deleteErr != nil {
+		deleteErr = fmt.Errorf("delete leaf entry: %w", deleteErr)
+	}
+	if deleteErr != nil || leafCloseErr != nil {
+		return fmt.Errorf("delete B-tree index entry %s -> %s: %w", dataValue, dataRID, errors.Join(deleteErr, leafCloseErr))
+	}
+	return nil
+}
+
 // NewBTreeIndex initializes the files and retained state for one B-tree index.
 // The caller must roll back the transaction if construction fails after an append.
 func NewBTreeIndex(transaction btreeFileTransaction, indexName string, leafLayout *record.Layout) (*BTreeIndex, error) {
