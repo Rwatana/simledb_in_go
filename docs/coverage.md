@@ -144,6 +144,11 @@ affected rows, and leaves the current transaction ID and completion to the calle
 are contextual and preserve the ID. The independent coverage workflow continues to require 100.0% package, function,
 and module statement coverage.
 
+Issue #1191 adds JDBC-compatible display widths to remote query columns. Integer width is six; varchar width uses its
+declared field length; each result adds one character after taking the larger of that width and the field name. Tests
+cover each sizing case and verify metadata survives the RPC response. The separate coverage workflow still requires
+100.0% statement coverage in every executable package, function, and module total.
+
 Issue #1189 makes `ServeConnection` roll back a still-active transaction after its RPC transport ends, releasing locks and
 buffers. An explicit `SimpleDB.Close` has already committed and is left unchanged. Tests exercise uncommitted catalog
 rollback, committed Close behavior, inactive cleanup, and returned rollback failures. The independent coverage workflow

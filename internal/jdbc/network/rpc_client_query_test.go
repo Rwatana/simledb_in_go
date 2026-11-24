@@ -46,7 +46,7 @@ func TestRemoteSessionExecuteQueryReturnsTypedRowsWithoutCompletingTransaction(t
 	if err != nil {
 		t.Fatalf("ExecuteQuery(empty) error = %v", err)
 	}
-	if len(empty.Columns) != 1 || empty.Columns[0] != (QueryColumn{Name: "name", Type: "VARCHAR"}) || len(empty.Rows) != 0 {
+	if len(empty.Columns) != 1 || empty.Columns[0] != (QueryColumn{Name: "name", Type: "VARCHAR", DisplaySize: 21}) || len(empty.Rows) != 0 {
 		t.Errorf("ExecuteQuery(empty) = %#v, want one VARCHAR column and no rows", empty)
 	}
 
@@ -54,7 +54,7 @@ func TestRemoteSessionExecuteQueryReturnsTypedRowsWithoutCompletingTransaction(t
 	if err != nil {
 		t.Fatalf("ExecuteQuery() error = %v", err)
 	}
-	wantColumns := []QueryColumn{{Name: "name", Type: "VARCHAR"}, {Name: "id", Type: "INTEGER"}}
+	wantColumns := []QueryColumn{{Name: "name", Type: "VARCHAR", DisplaySize: 21}, {Name: "id", Type: "INTEGER", DisplaySize: 7}}
 	if !reflect.DeepEqual(response.Columns, wantColumns) {
 		t.Errorf("ExecuteQuery() columns = %#v, want %#v", response.Columns, wantColumns)
 	}
