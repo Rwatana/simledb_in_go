@@ -11,7 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries and propagate split separators |
+| `internal/index/btree.Page`, `ensureLeafFile` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java`, `simpledb/index/btree/BTreeIndex.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries and initialize an empty leaf file |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
 | `internal/metadata.IndexInfo` | `simpledb/metadata/IndexInfo.java` | Open the configured static hash index using the retained transaction and index-record layout |
@@ -1162,6 +1162,24 @@ leaf layouts, initial and overflow block numbers, flag -1, count zero, default s
 page ownership, invalid page/layout fields, and wrapped block-size and formatting errors. The new method is 100.0%
 covered.
 
+## Feature 80: Ensure an empty B-tree leaf file has its initial page
+
+Java `BTreeIndex` checks the leaf-file length, appends block zero when the file is empty, and formats that block as an
+empty leaf page. Go's internal `ensureLeafFile` performs the same orchestration by checking the file length before
+appending, validating the leaf layout, opening the new block with `NewPage`, and delegating its format to
+`Page.InitializeLeafPage`. Existing leaf files remain unchanged. A newly appended block belongs to the transaction, so
+the caller must roll it back when a later pin, format, or close operation fails; this helper always attempts to release
+the page pin and joins initialization and cleanup failures. Directory-file initialization and the complete index
+constructor remain separate. The existing [B-tree page format diagram](../diagrams/ch11-btree-page-format.svg) shows
+the initialized block; its editable Draw.io source is reused.
+
+### Test-first record
+
+The focused test first failed because `ensureLeafFile` and its transaction boundary were undefined. Tests cover empty
+integer and varchar files, existing files, append/pin/format/unpin behavior, malformed inputs and returned blocks, and
+wrapped storage and cleanup errors. `leafPageFields` is shared with `Page.InitializeLeafPage` so both entry points
+validate the same record shape. Every statement in the new helper and every executable function remain 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1192,3 +1210,4 @@ covered.
 - `btree.Page.MakeNewRoot` keeps the root in block zero, moves old entries to a new page, installs two child entries, and raises the level last.
 - `btree.Page.InitializeDirectoryRoot` formats an allocated block-zero directory root and adds the initial minimum-key entry for leaf block zero.
 - `btree.Page.InitializeLeafPage` formats an already allocated leaf block with overflow flag -1 and an empty record count.
+- `btree.ensureLeafFile` appends and initializes the first leaf block only when the index leaf file is empty, then releases the temporary page pin.
