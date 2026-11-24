@@ -926,6 +926,21 @@ diagram is needed for this read-only delegation.
 The focused tests first failed because `Leaf.GetDataRID` was undefined. Tests verify the exact current slot, overflow
 page RID, unchanged cursor/page pin state, and wrapped block/id read errors.
 
+## Feature 66: Delete a matching B-tree leaf entry
+
+Java `BTreeLeaf.delete` advances through records for the retained search key, compares each current data RID, and removes
+the first match from the current `BTPage`. Go's `Leaf.Delete` uses its existing `Next` and `GetDataRID` behaviors, then
+delegates the removal to `Page.Delete`; the scan naturally continues through overflow pages and stops at the first match.
+No matching RID is a successful no-op. Cursor, RID-read, and page-delete errors retain their causes, and a failed page
+deletion leaves the cursor on the entry for retry. Leaf insertion and cursor close remain separate behaviors; no diagram
+is needed for this scan-and-remove operation.
+
+### Test-first record
+
+The focused tests first failed because `Leaf.Delete` was undefined. Tests cover removal among duplicate keys, overflow
+traversal, no-match behavior, wrapped advance/RID/delete errors, retained pin ownership, and cursor position on deletion
+failure.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
