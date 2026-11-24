@@ -77,7 +77,13 @@ transport remain caller-owned.
 `SimpleDB.Connect` creates one transaction through the shared manager set, retains it on that connection's service, and
 returns its transaction ID. The [network RPC session diagram](../diagrams/ch11-network-rpc-session.svg) shows the connect
 request, START-log boundary, and per-connection transaction; its [editable Draw.io source](../diagrams/ch11-network-rpc-session.drawio)
-is maintained beside the SVG. This is a Go-native server boundary and does not implement Java RMI framing. `DriverService.Commit` commits the retained transaction and starts its successor on the same connection, matching the
+is maintained beside the SVG. This is a Go-native server boundary and does not implement Java RMI framing. `network.ServeListener`
+accepts connections from a caller-owned listener and serves each on its own goroutine and `DriverService`, so every
+client keeps an independent transaction while sharing the configured manager set. It closes accepted connections when
+an RPC service ends; the caller stops accepting by closing the listener, and that expected `net.ErrClosed` returns normally.
+Unexpected accept errors keep their cause. The [network RPC listener diagram](../diagrams/ch11-network-rpc-listener.svg)
+shows the independent per-connection services and shutdown owner; its [editable Draw.io source](../diagrams/ch11-network-rpc-listener.drawio)
+is kept beside the SVG. `DriverService.Commit` commits the retained transaction and starts its successor on the same connection, matching the
 Java server connection cycle without exposing RMI. Its [network commit diagram](../diagrams/ch11-network-rpc-commit.svg)
 shows the durable COMMIT marker followed by the next START record; its [editable Draw.io source](../diagrams/ch11-network-rpc-commit.drawio)
 is maintained beside the SVG. `DriverService.Rollback` also completes the current transaction and opens the next one,
@@ -254,6 +260,9 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestServeConnectionCreatesOneTransactionOnRemoteConnect` | RPC Connect creates one START-logged transaction retained for the connection and rejects replacement |
 | `TestServeConnectionReportsManagerTransactionFailureOverRPC` | START-record failures are returned over RPC without a transaction ID |
 | `TestServeConnectionRejectsNilAndIncompleteInputs` | Nil connections/managers and incomplete transaction manager sets are rejected |
+| `TestServeListenerKeepsConcurrentClientTransactionsIndependent` | Listener clients receive independent RPC transaction state and shutdown remains with the caller |
+| `TestServeListenerRejectsNilInputsAndWrapsAcceptFailure` | Nil dependencies fail before Accept, unexpected Accept causes are preserved, and listener closure is normal |
+| `TestServeListenerAcceptsWhileConnectionIsBeingServedAndClosesConnection` | Accepting continues while a handler runs and accepted connections close when handlers return |
 | `TestConnectRPCSessionRetainsTransactionIDAndLeavesClientOpen` | The client constructor stores the returned transaction ID and leaves the caller-owned RPC client usable |
 | `TestConnectRPCSessionRejectsNilClient` | Nil clients return no session and a nil session reports transaction ID zero |
 | `TestConnectRPCSessionWrapsRemoteConnectErrorWithoutReturningSession` | A failed server-side Connect is contextual and returns no client session |
@@ -402,6 +411,11 @@ The network RPC-query test-first run initially failed because `ExecuteQueryReque
 verify the session transaction remains active until explicit Commit. Direct tests cover parse/planner/open failures,
 invalid state, schema/scan validation, materialization cleanup, partial-open cleanup, no partial results, and empty results.
 The response uses concrete gob-friendly structs rather than interface-valued cells.
+
+The network RPC-listener test-first run initially failed because `ServeListener` was undefined. A listener can accept
+multiple independent net/rpc sessions while earlier connections remain active; tests confirm different transaction IDs,
+a usable second-client commit after the first session closes, accepted-connection cleanup, nil-input rejection, wrapped
+accept errors, and normal caller-directed shutdown with `net.ErrClosed`.
 
 The network RPC client-session test-first run initially failed because `RemoteSession`, `ConnectRPCSession`, and
 `TransactionID` were undefined. Tests verify the transaction ID returned by the `SimpleDB.Connect` RPC, nil-client

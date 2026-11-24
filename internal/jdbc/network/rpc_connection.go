@@ -92,6 +92,38 @@ func ServeConnection(conn net.Conn, managers *server.Managers) error {
 	return serveConnection(conn, managers, rpc.NewServer())
 }
 
+// ServeListener accepts network clients and serves each RPC connection independently.
+// The caller retains ownership of listener and stops accepting by closing it.
+func ServeListener(listener net.Listener, managers *server.Managers) error {
+	return serveListener(listener, managers, func(conn net.Conn, managers *server.Managers) error {
+		return ServeConnection(conn, managers)
+	})
+}
+
+type connectionHandler func(net.Conn, *server.Managers) error
+
+func serveListener(listener net.Listener, managers *server.Managers, serve connectionHandler) error {
+	if listener == nil {
+		return fmt.Errorf("serve network RPC listener: listener is nil")
+	}
+	if managers == nil {
+		return fmt.Errorf("serve network RPC listener: manager set is nil")
+	}
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+			return fmt.Errorf("serve network RPC listener: %w", err)
+		}
+		go func() {
+			defer conn.Close()
+			_ = serve(conn, managers)
+		}()
+	}
+}
+
 type rpcConnectionServer interface {
 	rpcRegistrar
 	ServeConn(io.ReadWriteCloser)
