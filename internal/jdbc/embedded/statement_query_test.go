@@ -79,6 +79,15 @@ func TestPreparedStatementQueryReturnsProjectedRowsToDatabaseSQL(t *testing.T) {
 			t.Errorf("column %q scan type = %v, want %v", columns[index], got, want)
 		}
 	}
+	for index, want := range []struct {
+		length int64
+		ok     bool
+	}{{20, true}, {0, false}} {
+		length, ok := columnTypes[index].Length()
+		if length != want.length || ok != want.ok {
+			t.Errorf("column %q length = (%d, %t), want (%d, %t)", columns[index], length, ok, want.length, want.ok)
+		}
+	}
 	if !rows.Next() {
 		t.Fatalf("rows Next() = false, error = %v, want one matching row", rows.Err())
 	}

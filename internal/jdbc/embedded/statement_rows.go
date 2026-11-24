@@ -20,6 +20,7 @@ type statementRows struct {
 var _ driver.Rows = (*statementRows)(nil)
 var _ driver.RowsColumnTypeDatabaseTypeName = (*statementRows)(nil)
 var _ driver.RowsColumnTypeScanType = (*statementRows)(nil)
+var _ driver.RowsColumnTypeLength = (*statementRows)(nil)
 
 func newStatementRows(scan query.Scan, schema *record.Schema) (*statementRows, error) {
 	if scan == nil {
@@ -73,6 +74,26 @@ func (rows *statementRows) ColumnTypeScanType(index int) reflect.Type {
 		return reflect.TypeOf("")
 	default:
 		return nil
+	}
+}
+
+// ColumnTypeLength reports a variable-length result column's declared length.
+func (rows *statementRows) ColumnTypeLength(index int) (int64, bool) {
+	if rows == nil || rows.schema == nil || index < 0 || index >= len(rows.columns) {
+		return 0, false
+	}
+	definition, ok := rows.schema.Field(rows.columns[index])
+	if !ok {
+		return 0, false
+	}
+	switch definition.Type {
+	case record.VarcharField:
+		if definition.Length < 0 {
+			return 0, false
+		}
+		return int64(definition.Length), true
+	default:
+		return 0, false
 	}
 }
 
