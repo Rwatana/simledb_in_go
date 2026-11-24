@@ -100,6 +100,64 @@ func TestPageStoresLengthPrefixedBytes(t *testing.T) {
 	}
 }
 
+func TestPageReadsLengthPrefixedStrings(t *testing.T) {
+	t.Parallel()
+
+	page := newPage(t, 64)
+	want := []string{"", "zero\x00one", "東京🙂"}
+	for index, value := range want {
+		if err := page.SetBytes(index*16, []byte(value)); err != nil {
+			t.Fatalf("SetBytes(%d, %q) error = %v", index*16, value, err)
+		}
+	}
+	before := page.Snapshot()
+	for index, value := range want {
+		got, err := page.GetString(index * 16)
+		if err != nil {
+			t.Fatalf("GetString(%d) error = %v", index*16, err)
+		}
+		if got != value {
+			t.Errorf("GetString(%d) = %q, want %q", index*16, got, value)
+		}
+	}
+	if after := page.Snapshot(); !bytes.Equal(after, before) {
+		t.Errorf("GetString() changed page bytes: after = %v, before = %v", after, before)
+	}
+}
+
+func TestPageGetStringReportsLengthPrefixAndPayloadErrors(t *testing.T) {
+	t.Parallel()
+
+	pageWithInt := func(size, offset int, value int32) *storage.Page {
+		page := newPage(t, size)
+		if err := page.SetInt(offset, value); err != nil {
+			t.Fatalf("SetInt(%d, %d) error = %v", offset, value, err)
+		}
+		return page
+	}
+	tests := []struct {
+		name    string
+		page    *storage.Page
+		wantErr string
+	}{
+		{name: "truncated prefix", page: newPage(t, 3), wantErr: "byte range [0:4] exceeds page capacity 3"},
+		{name: "negative length", page: pageWithInt(8, 0, -1), wantErr: "negative length -1"},
+		{name: "truncated payload", page: pageWithInt(7, 0, 4), wantErr: "byte range [4:8] exceeds page capacity 7"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			value, err := tt.page.GetString(0)
+			if err == nil || value != "" {
+				t.Fatalf("GetString(0) = (%q, %v), want empty value and error", value, err)
+			}
+			if !strings.Contains(err.Error(), "get string at offset 0") || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("GetString(0) error = %q, want context and %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestPageGetBytesRejectsTruncatedLengthPrefix(t *testing.T) {
 	t.Parallel()
 
