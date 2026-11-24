@@ -53,3 +53,21 @@ func (s *RemoteSession) Commit() error {
 	s.transactionID = response.TransactionID
 	return nil
 }
+
+// Rollback rolls back the remote transaction and stores the server's successor transaction ID.
+func (s *RemoteSession) Rollback() error {
+	if s == nil {
+		return fmt.Errorf("roll back network RPC client session: session is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.client == nil {
+		return fmt.Errorf("roll back network RPC client session: client is nil")
+	}
+	var response RollbackResponse
+	if err := s.client.Call("SimpleDB.Rollback", RollbackRequest{}, &response); err != nil {
+		return fmt.Errorf("roll back network RPC client session: %w", err)
+	}
+	s.transactionID = response.TransactionID
+	return nil
+}
