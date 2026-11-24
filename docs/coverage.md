@@ -53,6 +53,12 @@ command `GOCACHE=/tmp/simpledb-go-cache go test ./... -count=1 -coverprofile=/tm
 reports 100.0% statement coverage for every executable package; `go tool cover -func` reports every executable
 function and module total at 100.0%, with no zero-count statements.
 
+Issue #1123 adds the `Managers.UpdatePlanner` composition. Its integration test executes CREATE TABLE through the
+composed basic update planner and reads the registered schema through the same metadata facade and transaction. The
+uncached command `GOCACHE=/tmp/simpledb-go-cache go test ./... -count=1 -coverprofile=/tmp/simpledb-coverage-1123-final.out`
+reports 100.0% statement coverage for every executable package; `go tool cover -func` reports every executable
+function and module total at 100.0%, with no zero-count statements.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the

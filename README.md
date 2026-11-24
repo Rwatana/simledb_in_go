@@ -78,7 +78,7 @@
 
 ## 次の一歩
 
-Chapter 11 JDBC Interfacesでは、`internal/server.NewManagers`でfile・log・buffer managerを明示設定から組み立て、独立したmetadata managerとbasic SELECT plannerを加えた共有管理セットからSTART記録付きtransactionを生成します。呼び出し側が所有するtransactionを使ったcatalog初期化と、明示呼び出しによるprocess-restart recoveryを追加し、update planner、planner strategy selection、transaction lifecycle、embedded JDBC client、network clientは別の振る舞いとして後続に分けます。
+Chapter 11 JDBC Interfacesでは、`internal/server.NewManagers`でfile・log・buffer managerを明示設定から組み立て、独立したmetadata managerとbasic query/update plannerを加えた共有管理セットからSTART記録付きtransactionを生成します。呼び出し側が所有するtransactionを使ったcatalog初期化と、明示呼び出しによるprocess-restart recoveryを追加し、planner strategy selection、update command dispatch、transaction lifecycle、embedded JDBC client、network clientは別の振る舞いとして後続に分けます。
 
 Chapter 12 Indexingでは、値/RIDベースの索引走査契約、100個の静的hash bucketへのJava互換キー割当、静的hash indexの探索コスト見積もり、hashとB-treeの初期化・走査・挿入・削除、索引scan/plan、B-tree page・分割・root growthを実装しています。葉とdirectory pageを同時にpinせず、1 frameでも探索できるようにしています。
 

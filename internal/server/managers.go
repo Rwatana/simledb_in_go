@@ -18,7 +18,7 @@ import (
 
 const logFileName = "simpledb.log"
 
-// Managers contains the file, log, buffer, metadata, and SELECT planning components for one database runtime.
+// Managers contains the storage, metadata, and basic query/update planning components for one database runtime.
 type Managers struct {
 	// Files reads and writes fixed-size database blocks.
 	Files *storagefile.Manager
@@ -30,11 +30,13 @@ type Managers struct {
 	Metadata *metadata.MetadataManager
 	// QueryPlanner creates SELECT plans using this manager set's metadata facade.
 	QueryPlanner plan.QueryPlanner
-	ids          *transaction.IDAllocator
-	locks        *concurrency.LockTable
+	// UpdatePlanner executes parsed SQL updates using this manager set's metadata facade.
+	UpdatePlanner plan.UpdatePlanner
+	ids           *transaction.IDAllocator
+	locks         *concurrency.LockTable
 }
 
-// NewManagers creates the file, log, buffer, metadata, and basic SELECT planning components using the supplied settings.
+// NewManagers creates the storage managers, metadata facade, and basic query/update planners using the supplied settings.
 func NewManagers(directory string, blockSize, bufferCount int) (*Managers, error) {
 	files, err := storagefile.NewManager(directory, blockSize)
 	if err != nil {
@@ -60,6 +62,7 @@ func NewManagers(directory string, blockSize, bufferCount int) (*Managers, error
 		locks:    &concurrency.LockTable{},
 	}
 	managers.QueryPlanner = plan.NewBasicQueryPlanner(managers.Metadata)
+	managers.UpdatePlanner = plan.NewBasicUpdatePlanner(managers.Metadata)
 	return managers, nil
 }
 
