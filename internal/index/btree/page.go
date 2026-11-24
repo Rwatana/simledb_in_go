@@ -3,6 +3,7 @@ package btree
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -738,6 +739,128 @@ func (page *Page) AppendNew(flag int32) (storage.BlockID, error) {
 		return storage.BlockID{}, fmt.Errorf("append new B-tree page in block %v: format: %w", block, err)
 	}
 	return block, nil
+}
+
+// Split moves the records starting at splitSlot into a newly appended page.
+func (page *Page) Split(splitSlot int, flag int32) (storage.BlockID, error) {
+	if page == nil {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page: current page is closed")
+	}
+	if page.block.Number() < 0 {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: current block number is negative", page.block)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: transaction is nil", page.block)
+	}
+	if page.layout == nil {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: layout is nil", page.block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: invalid layout: %w", page.block, err)
+	}
+	if len(fields) == 0 {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: layout schema has no fields", page.block)
+	}
+	count, err := page.GetNumRecs()
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: read record count: %w", page.block, err)
+	}
+	if count < 0 {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: record count %d is negative", page.block, count)
+	}
+	if splitSlot < 0 || int64(splitSlot) > int64(count) {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: split slot %d is outside [0,%d]", page.block, splitSlot, count)
+	}
+	blockSize, err := page.transaction.BlockSize()
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: read block size: %w", page.block, err)
+	}
+	const headerSize = 8
+	if blockSize < headerSize {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: block size %d is smaller than header size %d", page.block, blockSize, headerSize)
+	}
+	slotSize := page.layout.SlotSize()
+	slotCount := (blockSize - headerSize) / slotSize
+	movedCount := int(count) - splitSlot
+	if movedCount > slotCount {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: suffix has %d records but destination holds %d", page.block, movedCount, slotCount)
+	}
+	for _, slot := range []int{int(count) - 1, movedCount - 1} {
+		if slot < 0 {
+			continue
+		}
+		for _, field := range fields {
+			position, err := pageSlotFieldPosition(slot, slotSize, field.offset)
+			if err != nil {
+				return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: field %q slot %d position: %w", page.block, field.name, slot, err)
+			}
+			if position > math.MaxInt32 {
+				return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: field %q slot %d offset %d exceeds int32 range", page.block, field.name, slot, position)
+			}
+		}
+	}
+	newBlock, err := page.AppendNew(flag)
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: append destination: %w", page.block, err)
+	}
+	destination, err := NewPage(page.transaction, newBlock, page.layout)
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("split B-tree page in block %v: pin destination %v: %w", page.block, newBlock, err)
+	}
+	closeDestination := func(operationErr error) (storage.BlockID, error) {
+		closeErr := destination.Close()
+		if closeErr != nil {
+			closeErr = fmt.Errorf("split B-tree page in block %v: close destination: %w", page.block, closeErr)
+		}
+		if operationErr != nil && closeErr != nil {
+			return storage.BlockID{}, errors.Join(operationErr, closeErr)
+		}
+		if operationErr != nil {
+			return storage.BlockID{}, operationErr
+		}
+		if closeErr != nil {
+			return storage.BlockID{}, closeErr
+		}
+		return newBlock, nil
+	}
+	for destinationSlot := 0; destinationSlot < movedCount; destinationSlot++ {
+		for _, field := range fields {
+			sourcePosition := headerSize + splitSlot*slotSize + field.offset
+			destinationPosition := headerSize + destinationSlot*slotSize + field.offset
+			switch field.typeOf {
+			case record.IntegerField:
+				value, err := page.transaction.GetInt(page.block, sourcePosition)
+				if err != nil {
+					return closeDestination(fmt.Errorf("split B-tree page in block %v: read integer field %q at slot %d: %w", page.block, field.name, splitSlot, err))
+				}
+				if err := destination.transaction.SetInt(destination.block, int32(destinationPosition), value, true); err != nil {
+					return closeDestination(fmt.Errorf("split B-tree page in block %v: write integer field %q at slot %d: %w", newBlock, field.name, destinationSlot, err))
+				}
+			case record.VarcharField:
+				value, err := page.transaction.GetString(page.block, sourcePosition)
+				if err != nil {
+					return closeDestination(fmt.Errorf("split B-tree page in block %v: read varchar field %q at slot %d: %w", page.block, field.name, splitSlot, err))
+				}
+				if err := destination.transaction.SetString(destination.block, int32(destinationPosition), value, true); err != nil {
+					return closeDestination(fmt.Errorf("split B-tree page in block %v: write varchar field %q at slot %d: %w", newBlock, field.name, destinationSlot, err))
+				}
+			}
+		}
+		if err := destination.setNumRecs(int32(destinationSlot + 1)); err != nil {
+			return closeDestination(fmt.Errorf("split B-tree page in block %v: write destination record count: %w", newBlock, err))
+		}
+		if err := page.Delete(splitSlot); err != nil {
+			return closeDestination(fmt.Errorf("split B-tree page in block %v: delete moved source slot %d: %w", page.block, splitSlot, err))
+		}
+	}
+	if err := destination.SetFlag(flag); err != nil {
+		return closeDestination(fmt.Errorf("split B-tree page in block %v: write destination flag: %w", newBlock, err))
+	}
+	return closeDestination(nil)
 }
 
 func (page *Page) insertSlot(slot int, value query.Constant) (int32, error) {

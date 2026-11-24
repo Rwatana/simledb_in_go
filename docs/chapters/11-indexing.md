@@ -741,6 +741,24 @@ The focused tests first failed because `Page.AppendNew` was undefined. Tests ver
 the returned block on success, wrapped append and format errors, a zero block ID after partial-format failure,
 pre-append dependency validation, invalid appended block IDs, no pin changes, and no format writes after append fails.
 
+## Feature 55: Split a B-tree page
+
+Java `BTPage.split` appends and formats a destination page, transfers records beginning at `splitpos`, sets the new
+page flag, and returns its block. Go's `Page.Split` validates the record count, split boundary, destination capacity,
+layout offsets, and signed write positions before allocating the destination. It copies each schema field into the
+destination with logged writes, advances that page's count after a complete record, then deletes the source record at
+the split slot so the remaining suffix moves left in order. The source page's flag and pin remain unchanged. The
+destination is pinned for the operation and closed on every path; storage and close failures preserve their causes,
+and logged mutations require transaction rollback if an error interrupts the transfer. A failure returns no block ID.
+The [B-tree page split diagram](../diagrams/ch11-btree-page-split.svg) shows the prefix/suffix boundary, the new page,
+and the count changes; its editable source is [`ch11-btree-page-split.drawio`](../diagrams/ch11-btree-page-split.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.Split` was undefined. Tests verify integer and varchar suffixes, empty and
+full split boundaries, record order and logged copies, source/destination flags and counts, capacity/offset validation
+before append, append/pin/read/write/count/flag/unpin failures, cause preservation, and destination cleanup.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
