@@ -35,11 +35,18 @@ type RollbackResponse struct {
 	TransactionID int64
 }
 
+// CloseRequest is the empty request for closing a remote database session.
+type CloseRequest struct{}
+
+// CloseResponse is the empty response returned after a remote session is closed.
+type CloseResponse struct{}
+
 // DriverService serves requests over one RPC connection and retains its transaction.
 type DriverService struct {
 	managers    *server.Managers
 	mu          sync.Mutex
 	transaction *transaction.Transaction
+	closed      bool
 }
 
 // ServeConnection serves a gob-encoded RPC client on conn until it closes.
@@ -103,6 +110,9 @@ func (s *DriverService) Connect(_ ConnectRequest, reply *ConnectResponse) error 
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("connect network RPC session: session is closed")
+	}
 	if s.transaction != nil {
 		return fmt.Errorf("connect network RPC session: session is already connected")
 	}
@@ -131,6 +141,9 @@ func (s *DriverService) Commit(_ CommitRequest, reply *CommitResponse) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("commit network RPC session: session is closed")
+	}
 	if s.transaction == nil {
 		return fmt.Errorf("commit network RPC session: active transaction is nil")
 	}
@@ -163,6 +176,9 @@ func (s *DriverService) Rollback(_ RollbackRequest, reply *RollbackResponse) err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("rollback network RPC session: session is closed")
+	}
 	if s.transaction == nil {
 		return fmt.Errorf("rollback network RPC session: active transaction is nil")
 	}
@@ -176,5 +192,32 @@ func (s *DriverService) Rollback(_ RollbackRequest, reply *RollbackResponse) err
 	}
 	s.transaction = created
 	reply.TransactionID = int64(created.ID())
+	return nil
+}
+
+// Close commits the active transaction and marks this RPC session closed without starting another one.
+func (s *DriverService) Close(_ CloseRequest, reply *CloseResponse) error {
+	if reply != nil {
+		*reply = CloseResponse{}
+	}
+	if s == nil {
+		return fmt.Errorf("close network RPC session: service is nil")
+	}
+	if reply == nil {
+		return fmt.Errorf("close network RPC session: reply is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("close network RPC session: session is closed")
+	}
+	if s.transaction == nil {
+		return fmt.Errorf("close network RPC session: active transaction is nil")
+	}
+	if _, err := s.transaction.Commit(); err != nil {
+		return fmt.Errorf("close network RPC transaction: %w", err)
+	}
+	s.transaction = nil
+	s.closed = true
 	return nil
 }

@@ -67,7 +67,10 @@ shows the durable COMMIT marker followed by the next START record; its [editable
 is maintained beside the SVG. `DriverService.Rollback` also completes the current transaction and opens the next one,
 using the distinct durable rollback path. The [network RPC rollback diagram](../diagrams/ch11-network-rpc-rollback.svg)
 shows the ROLLBACK record and successor START; its [editable Draw.io source](../diagrams/ch11-network-rpc-rollback.drawio)
-is maintained beside the SVG. Connection close and SQL operations remain separate behaviors.
+is maintained beside the SVG. `DriverService.Close` commits the active transaction and marks the RPC session closed
+without starting a successor. The [network RPC close diagram](../diagrams/ch11-network-rpc-close.svg) shows the final
+COMMIT and the absence of a next START; its [editable Draw.io source](../diagrams/ch11-network-rpc-close.drawio) is
+maintained beside the SVG. The caller still owns the transport `net.Conn`; remote SQL operations remain separate.
 
 ## Go design and current status
 
@@ -229,6 +232,10 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestDriverServiceRollbackRejectsInvalidStateAndReply` | Nil state, manager set, reply, and active transaction are rejected |
 | `TestDriverServiceRollbackKeepsTransactionWhenRollbackFails` | A failed rollback returns no new ID and does not replace the active transaction |
 | `TestDriverServiceRollbackLeavesNoStaleTransactionWhenNextStartFails` | Successful rollback followed by successor-start failure leaves no completed transaction attached and permits reconnect |
+| `TestDriverServiceCloseCommitsWithoutSuccessorOverRPC` | RPC Close commits the active transaction and starts no successor |
+| `TestDriverServiceCloseRejectsInvalidStateAndReply` | Nil service/reply and a missing active transaction are rejected |
+| `TestDriverServiceCloseKeepsSessionOpenWhenCommitFails` | A failed close commit preserves the active transaction and open session |
+| `TestDriverServiceRejectsNewOperationsAfterClose` | Connect, Commit, Rollback, and repeated Close are rejected after closure |
 | `TestConnectorConnectValidatesReceiverContextAndCancellation` | Nil state and canceled contexts return errors before creating a connection |
 | `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
@@ -326,6 +333,11 @@ The network RPC-rollback test-first run initially failed because `RollbackReques
 completed-transaction errors, and a failed successor START after durable rollback. In that last case the completed
 transaction is detached and Connect can be retried; connection close and SQL dispatch remain separate.
 
+The network RPC-close test-first run initially failed because `CloseRequest`, `CloseResponse`, and `DriverService.Close`
+were undefined. Tests verify the final COMMIT through RPC without a successor START, reject invalid or repeated lifecycle
+operations, and confirm that a failed commit leaves the transaction attached and the session open. A successful close
+ends the service session but leaves transport ownership with the caller; remote SQL remains separate.
+
 ## Intentional differences
 
 - Do not reproduce the Java `java.sql` adapter hierarchy mechanically.
@@ -334,4 +346,4 @@ transaction is detached and Connect can be retried; connection close and SQL dis
 - Keep the upstream Java distribution and book PDF outside Git.
 - Parse the Java-compatible embedded URL prefix, but keep path resolution, database initialization, and manager settings explicit in Go.
 - Parse the Java-compatible network URL into a host, but keep dialing and remote-session lifecycle separate from parsing; the current Go network parser preserves the default registry port convention.
-- Open a TCP socket to the parsed network host with caller context, then serve Go `net/rpc` Connect, Commit, and Rollback requests, with each transaction outcome opening a successor; defer connection close and remote SQL operations to separate behaviors.
+- Open a TCP socket to the parsed network host with caller context, then serve Go `net/rpc` Connect, Commit, Rollback, and Close requests. Commit and Rollback start successor transactions; Close commits without a successor and ends the RPC session while leaving the transport `net.Conn` caller-owned. Keep remote SQL operations separate.

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 11: Network RPC session close</title>
+  <desc id="description">SimpleDB.Close commits the retained transaction, closes its RPC service session, and starts no successor transaction. A failed commit preserves the open session and transaction. The caller owns the network connection.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#374151"/></marker>
+    <style>.title{font:700 24px system-ui,sans-serif;fill:#1f2937}.label{font:700 16px system-ui,sans-serif;fill:#111827}.small{font:13px system-ui,sans-serif;fill:#374151}.box{stroke-width:2}.line{fill:none;stroke:#374151;stroke-width:2;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1200" height="700" fill="#fff"/><text class="title" x="600" y="52" text-anchor="middle">Chapter 11 / Network RPC session close</text>
+  <rect class="box" x="60" y="155" width="230" height="95" rx="14" fill="#e0f2fe" stroke="#0284c7"/><text class="label" x="175" y="192" text-anchor="middle">RPC client</text><text class="small" x="175" y="222" text-anchor="middle">SimpleDB.Close</text>
+  <rect class="box" x="360" y="155" width="250" height="95" rx="14" fill="#ede9fe" stroke="#7c3aed"/><text class="label" x="485" y="192" text-anchor="middle">DriverService</text><text class="small" x="485" y="222" text-anchor="middle">active transaction 1</text>
+  <rect class="box" x="700" y="155" width="270" height="95" rx="14" fill="#fef3c7" stroke="#d97706"/><text class="label" x="835" y="192" text-anchor="middle">Transaction.Commit</text><text class="small" x="835" y="222" text-anchor="middle">durable COMMIT record</text>
+  <rect class="box" x="830" y="400" width="270" height="110" rx="14" fill="#dcfce7" stroke="#16a34a"/><text class="label" x="965" y="438" text-anchor="middle">CloseResponse</text><text class="small" x="965" y="467" text-anchor="middle">session closed</text><text class="small" x="965" y="490" text-anchor="middle">no successor START</text>
+  <rect class="box" x="90" y="400" width="310" height="90" rx="14" fill="#dbeafe" stroke="#2563eb"/><text class="label" x="245" y="438" text-anchor="middle">Caller owns net.Conn</text><text class="small" x="245" y="468" text-anchor="middle">closes transport after RPC response</text>
+  <rect class="box" x="210" y="575" width="780" height="75" rx="14" fill="#fee2e2" stroke="#dc2626"/><text class="small" x="600" y="605" text-anchor="middle">Failed COMMIT preserves the active transaction and open session.</text><text class="small" x="600" y="630" text-anchor="middle">Closed sessions reject Connect, Commit, Rollback, and repeated Close.</text>
+  <path class="line" d="M290 202 H360"/><path class="line" d="M610 202 H700"/><path class="line" d="M835 250 V325 H965 V400"/><path class="line" d="M175 250 V325 H245 V400"/><path class="line" d="M835 250 V535 H990 V575"/>
+  <text class="small" x="325" y="187" text-anchor="middle">gob RPC</text><text class="small" x="655" y="187" text-anchor="middle">commit</text><text class="small" x="920" y="325" text-anchor="middle">success only</text>
+</svg>
