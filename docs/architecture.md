@@ -65,8 +65,10 @@ Chapter 2で確認した`Connection`や`ResultSet`の責務も、その名前の
 - Integration: 一時ディレクトリを使い、実ファイルとの境界を検証
 - Example: 公開APIの読み方を`Example...`で示し、ドキュメントと一緒に検証
 
-Go statement coverage is measured by CI on every pull request and main-branch push. See
-[the coverage policy](coverage.md) for the current baseline and the plan for a 100% gate.
+Go statement coverage is enforced at 100.0% on every pull request and main-branch push by the independent
+Go coverage workflow. Go test, Go vet, documentation, branch-name, commit-count, Issue-policy, Issue-reference, and
+pull-request-title checks each run in their own workflow and report a separate status. See
+[the coverage policy](coverage.md) for the maintained threshold and coverage details.
 
 Chapter 1には実装対象がないため、Goテストは追加しない。docs-only PRではMarkdownの
 相対リンクとDraw.io XMLが開けることを確認する。
