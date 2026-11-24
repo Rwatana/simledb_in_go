@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="680" viewBox="0 0 1100 680" role="img" aria-labelledby="title description">
   <title id="title">Chapter 11: Embedded prepared statement SELECT rows</title>
-  <desc id="description">A Go application prepares and queries through an embedded connection. QueryContext rejects cancellation before planning. The prepared statement opens a query plan with the active caller-owned transaction and returns projected query scan values through driver.Rows.</desc>
+  <desc id="description">A Go application prepares and queries through an embedded connection. QueryContext rejects cancellation before planning. The prepared statement opens a query plan with the active caller-owned transaction and returns projected values and database type names through driver.Rows.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#374151"/></marker>
     <style>
@@ -25,14 +25,15 @@
   <rect class="box" x="700" y="405" width="330" height="95" rx="14" fill="#ede9fe" stroke="#7c3aed"/>
   <text class="label" x="865" y="442" text-anchor="middle">Managers.CreateQueryPlan</text>
   <text class="small" x="865" y="472" text-anchor="middle">Plan.Open() → query.Scan</text>
-  <rect class="box" x="700" y="540" width="330" height="75" rx="14" fill="#f3f4f6" stroke="#6b7280"/>
-  <text class="label" x="865" y="570" text-anchor="middle">driver.Rows</text>
-  <text class="small" x="865" y="597" text-anchor="middle">Columns / Next / Close</text>
+  <rect class="box" x="700" y="530" width="330" height="90" rx="14" fill="#f3f4f6" stroke="#6b7280"/>
+  <text class="label" x="865" y="560" text-anchor="middle">driver.Rows</text>
+  <text class="small" x="865" y="587" text-anchor="middle">Columns / Next / Close</text>
+  <text class="small" x="865" y="607" text-anchor="middle">DatabaseTypeName</text>
   <path class="line" d="M250 232 H330"/><text class="small" x="290" y="215" text-anchor="middle">SQL</text>
   <path class="line" d="M575 232 H700"/><text class="small" x="637" y="215" text-anchor="middle">prepared handle</text>
   <path class="blue" d="M452 285 V425"/><text class="small" x="472" y="360">Begin</text>
   <path class="purple" d="M865 290 V350 H865 V405"/><text class="small" x="910" y="355">Stmt.Query</text>
   <path class="blue" d="M575 467 H700"/><text class="small" x="637" y="450" text-anchor="middle">same transaction</text>
-  <path class="green" d="M865 500 V540"/><text class="small" x="885" y="527">projected scan</text>
-  <text class="small" x="550" y="655" text-anchor="middle">QueryContext rejects cancellation before planning. Parameters and optional result metadata remain separate.</text>
+  <path class="green" d="M865 500 V530"/><text class="small" x="885" y="522">projected scan</text>
+  <text class="small" x="550" y="655" text-anchor="middle">ColumnTypes reports projected VARCHAR / INTEGER names without advancing the scan.</text>
 </svg>

@@ -17,6 +17,7 @@ type statementRows struct {
 }
 
 var _ driver.Rows = (*statementRows)(nil)
+var _ driver.RowsColumnTypeDatabaseTypeName = (*statementRows)(nil)
 
 func newStatementRows(scan query.Scan, schema *record.Schema) (*statementRows, error) {
 	if scan == nil {
@@ -33,6 +34,25 @@ func (rows *statementRows) Columns() []string {
 		return nil
 	}
 	return append([]string(nil), rows.columns...)
+}
+
+// ColumnTypeDatabaseTypeName reports the database type name for a result column.
+func (rows *statementRows) ColumnTypeDatabaseTypeName(index int) string {
+	if rows == nil || rows.schema == nil || index < 0 || index >= len(rows.columns) {
+		return ""
+	}
+	definition, ok := rows.schema.Field(rows.columns[index])
+	if !ok {
+		return ""
+	}
+	switch definition.Type {
+	case record.IntegerField:
+		return "INTEGER"
+	case record.VarcharField:
+		return "VARCHAR"
+	default:
+		return ""
+	}
 }
 
 func (rows *statementRows) Close() error {
