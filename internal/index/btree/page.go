@@ -896,6 +896,98 @@ func (page *Page) InsertDirectoryEntry(entry DirEntry) error {
 	return nil
 }
 
+// SplitDirectoryPage splits a full B-tree directory page and returns the first entry in the new right page.
+func (page *Page) SplitDirectoryPage() (DirEntry, error) {
+	if page == nil {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page: page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: transaction is nil", page.block)
+	}
+	if page.layout == nil {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: layout is nil", page.block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: invalid layout: %w", page.block, err)
+	}
+	if len(fields) != 2 {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: directory layout must contain exactly dataval and block fields", page.block)
+	}
+	datavalFound := false
+	blockFound := false
+	for _, field := range fields {
+		switch field.name {
+		case "dataval":
+			datavalFound = true
+		case "block":
+			blockFound = true
+			if field.typeOf != record.IntegerField {
+				return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: block field is not an integer", page.block)
+			}
+		}
+	}
+	if !datavalFound || !blockFound {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: layout requires dataval and block fields", page.block)
+	}
+
+	level, err := page.GetFlag()
+	if err != nil {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: read directory level: %w", page.block, err)
+	}
+	if level < 0 {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: page level %d is negative", page.block, level)
+	}
+	count, err := page.GetNumRecs()
+	if err != nil {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: read record count: %w", page.block, err)
+	}
+	if count < 0 {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: record count %d is negative", page.block, count)
+	}
+	blockSize, err := page.transaction.BlockSize()
+	if err != nil {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: read block size: %w", page.block, err)
+	}
+	if blockSize < 8 {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: block size %d is smaller than the page header", page.block, blockSize)
+	}
+	capacity := (blockSize - 8) / page.layout.SlotSize()
+	if capacity < 2 {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: capacity %d cannot produce two nonempty pages", page.block, capacity)
+	}
+	if count < 2 {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: record count %d cannot produce two nonempty pages", page.block, count)
+	}
+	if int64(count) != int64(capacity) {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: record count %d does not fill capacity %d", page.block, count, capacity)
+	}
+
+	splitSlot := int(count / 2)
+	key, err := page.GetDataVal(splitSlot)
+	if err != nil {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: read separator key at slot %d: %w", page.block, splitSlot, err)
+	}
+	childBlock, err := page.GetChildNum(splitSlot)
+	if err != nil {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: read separator child at slot %d: %w", page.block, splitSlot, err)
+	}
+	if childBlock < 0 {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: separator child block %d is negative", page.block, childBlock)
+	}
+	newBlock, err := page.Split(splitSlot, level)
+	if err != nil {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: split records: %w", page.block, err)
+	}
+	if int64(newBlock.Number()) > math.MaxInt32 {
+		return DirEntry{}, fmt.Errorf("split B-tree directory page in block %v: new child block %d exceeds signed 32-bit directory range", page.block, newBlock.Number())
+	}
+	return NewDirEntry(key, int(newBlock.Number())), nil
+}
+
 // InsertDir opens a directory slot and stores its key and child block number.
 func (page *Page) InsertDir(slot int, value query.Constant, childBlock int32) error {
 	count, err := page.insertSlot(slot, value)

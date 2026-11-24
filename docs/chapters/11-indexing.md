@@ -1051,6 +1051,25 @@ duplicate placement, varchar end-append, empty-page insertion, use of the last p
 before mutation, invalid directory layouts and levels, signed 32-bit child-block bounds, and wrapped page flag, count,
 block-size, key-read, and write errors.
 
+## Feature 74: Split a full B-tree directory page
+
+Java `BTreeDir.split` keeps the lower directory records on the current page, moves the upper records into a newly
+appended page, and returns that page's first key and block as a separator. Go's `Page.SplitDirectoryPage` requires an
+exact directory layout, a nonnegative level, and a physically full page with enough records for two nonempty sides. It
+splits at the midpoint, preserves the level on both pages, and returns the first moved `DirEntry` for insertion into the
+parent. A nonfull page is rejected before allocation. Parent insertion, recursive split propagation, and root growth
+remain separate operations. If logged transfer or cleanup fails, the returned entry is zero and the caller must roll
+back the transaction. The existing [B-tree page split diagram](../diagrams/ch11-btree-page-split.svg) shows the
+source/destination boundary and is reused; its editable source is
+[`ch11-btree-page-split.drawio`](../diagrams/ch11-btree-page-split.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.SplitDirectoryPage` was undefined. They verify integer and varchar
+separators, even and odd record counts, preserved page levels and sorted records, returned destination block, pin
+cleanup, nonfull and invalid-page rejection before allocation, signed 32-bit separator block validation, and wrapped
+flag/count/capacity/key/child/append/pin/write/unpin errors. The new method is 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1075,3 +1094,4 @@ block-size, key-read, and write errors.
 - `btree.Page.SetDataRID` reports invalid or out-of-range identifiers and transaction write failures as Go errors, and logs both leaf RID fields separately.
 - `btree.Page.InsertDir` copies later directory entries from right to left before inserting a key/child pair; storage errors remain explicit and transaction logging enables caller rollback.
 - `btree.Page.InsertDirectoryEntry` validates directory level and physical capacity before finding the ordered insertion point; directory splitting remains a separate operation.
+- `btree.Page.SplitDirectoryPage` splits only an already full directory page and returns a parent separator; recursive propagation and root growth remain separate operations.
