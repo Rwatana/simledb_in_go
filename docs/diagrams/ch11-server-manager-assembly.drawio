@@ -1,0 +1,24 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T11:02:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch11-server-manager-assembly" name="Server Manager Assembly">
+    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="720" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 11 / Feature 1: Compose the SimpleDB managers" style="text;html=1;align=center;fontSize=26;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="60" y="28" width="1160" height="48" as="geometry"/></mxCell>
+        <mxCell id="settings" value="Database settings&lt;br&gt;directory&lt;br&gt;block size&lt;br&gt;buffer count" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2fe;strokeColor=#0284c7;fontSize=18;" vertex="1" parent="1"><mxGeometry x="55" y="225" width="200" height="150" as="geometry"/></mxCell>
+        <mxCell id="file" value="File Manager&lt;br&gt;fixed-size blocks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;fontSize=18;" vertex="1" parent="1"><mxGeometry x="315" y="245" width="190" height="110" as="geometry"/></mxCell>
+        <mxCell id="log" value="Log Manager&lt;br&gt;simpledb.log" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontSize=18;" vertex="1" parent="1"><mxGeometry x="565" y="245" width="190" height="110" as="geometry"/></mxCell>
+        <mxCell id="buffer" value="Buffer Manager&lt;br&gt;configured frame pool" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#7c3aed;fontSize=18;" vertex="1" parent="1"><mxGeometry x="815" y="245" width="205" height="110" as="geometry"/></mxCell>
+        <mxCell id="result" value="Complete Managers&lt;br&gt;returned only on success" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3f4f6;strokeColor=#4b5563;fontSize=18;" vertex="1" parent="1"><mxGeometry x="1080" y="245" width="170" height="110" as="geometry"/></mxCell>
+        <mxCell id="error" value="Contextual error&lt;br&gt;nil manager set" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fee2e2;strokeColor=#dc2626;fontSize=18;" vertex="1" parent="1"><mxGeometry x="465" y="490" width="330" height="100" as="geometry"/></mxCell>
+        <mxCell id="e1" value="1: create" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#374151;fontSize=14;" edge="1" parent="1" source="settings" target="file"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="2: create" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#374151;fontSize=14;" edge="1" parent="1" source="file" target="log"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="3: create" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#374151;fontSize=14;" edge="1" parent="1" source="log" target="buffer"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="all succeeded" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#374151;fontSize=14;" edge="1" parent="1" source="buffer" target="result"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="any failure" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#dc2626;fontSize=14;" edge="1" parent="1" source="file" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="any failure" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#dc2626;fontSize=14;" edge="1" parent="1" source="log" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="any failure" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#dc2626;fontSize=14;" edge="1" parent="1" source="buffer" target="error"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
