@@ -167,6 +167,12 @@ Issue #1202 adds `materialize.RecordComparator` for ordered lexicographic compar
 numeric and string order, short-circuit and tie behavior, copied field order, empty fields, invalid state, read failures,
 and incomparable constants. The independent coverage workflow continues to require 100.0% statement coverage.
 
+Issue #1204 adds `materialize.MaterializePlan`, copying source query rows in schema order into a temporary table and
+returning its scan before the first row. Tests cover empty and multi-field results, source metadata, exact and partial
+block estimates, each source/destination error phase, and scan cleanup with joined causes. Every statement in the new
+materialization-plan implementation is covered; the independent workflow continues to require 100.0% package,
+function, and module statement coverage.
+
 Issue #1195 adds `storage.Page.SetString`, converting UTF-8 bytes through the existing `SetBytes` length-prefix path.
 Tests round-trip empty text, embedded NUL, and multibyte text through both string and byte APIs, and verify a failed
 capacity write preserves the original page. The separate coverage workflow continues to enforce 100.0% package,

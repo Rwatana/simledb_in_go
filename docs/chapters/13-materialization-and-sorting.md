@@ -9,6 +9,7 @@ a file or issue transaction operations.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/materialize.TempTable`, `NewTempTable` | `simpledb/materialize/TempTable.java` | Allocate a unique temporary relation name and retain its transaction and record layout before opening a scan |
+| `internal/materialize.MaterializePlan` | `simpledb/materialize/MaterializePlan.java` | Copy an underlying query scan into a temporary table and expose its output scan and cost estimates |
 | `internal/materialize.RecordComparator` | `simpledb/materialize/RecordComparator.java` | Compare the current values of two scans lexicographically in sort-field order |
 
 ## Feature 1: Describe a temporary table
@@ -79,3 +80,31 @@ wrapped scan-read errors plus unset or incompatible constants.
 Java implements `Comparator<Scan>` and assumes its `Constant` comparison cannot fail. Go accepts `query.ValueScan`, the
 smallest interface needed for value comparison, and returns an error because scan reads and typed constant comparison
 can fail in this implementation. This keeps the comparator independent of storage traversal and update methods.
+
+## Feature 4: Materialize query plan results
+
+`MaterializePlan.Open` opens the source plan, creates a temporary-table descriptor from its output schema, copies each
+row in schema field order through the `query.Scan` and `query.UpdateScan` contracts, closes the source, and returns the
+temporary scan rewound before its first row. Empty input produces an empty scan. Any source read, destination write, or
+rewind failure closes scans already acquired and retains the original error along with cleanup failures. The
+[materialization flow diagram](../diagrams/ch13-materialize-plan.svg) shows the row-copy and ownership boundary; the
+editable source is [`ch13-materialize-plan.drawio`](../diagrams/ch13-materialize-plan.drawio).
+
+`Schema`, `RecordsOutput`, and `DistinctValues` preserve the source estimates. `BlocksAccessed` estimates only later reads
+of the materialized file by dividing output records by records per block and rounding upward; it excludes the one-time
+copy cost. Invalid or unusable block-size estimates return zero because the `plan.Plan` contract does not return errors
+from cost methods.
+
+### Test-first record
+
+The focused test-first build failed because `MaterializePlan` and `NewMaterializePlan` were undefined. Tests cover
+ordered multi-field copies, empty input, returned scan position and ownership, metadata delegation, exact and partial
+block estimates, invalid dependencies, source-open/iteration/value/close errors, destination-open/insert/write errors,
+rewind errors, and joined cleanup failures. Every statement in the new feature is exercised.
+
+### Design decision
+
+Java materialization performs the copy imperatively and returns an `UpdateScan`. Go expresses it as a `plan.Plan` and
+returns the narrow `query.Scan` contract, with the source and temporary destination retaining their existing ownership
+rules. The copy is synchronous and row-at-a-time; it does not introduce a second record representation or include the
+materialization pass in the read-cost estimate.

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-labelledby="title desc">
+  <title id="title">Materialize plan data flow</title>
+  <desc id="desc">MaterializePlan reads rows and fields from a source query scan in schema order, inserts them into a temporary query update scan, closes the source, rewinds the destination, and returns it before the first row. Its block estimate excludes the one-time copy.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52677d"/></marker>
+    <style>
+      text { font: 16px sans-serif; fill: #172b4d; text-anchor: middle; }
+      .small { font-size: 13px; }
+      .source { fill: #dae8fc; stroke: #6c8ebf; }
+      .process { fill: #d5e8d4; stroke: #82b366; }
+      .temp { fill: #fff2cc; stroke: #d6b656; }
+      .cleanup { fill: #f8cecc; stroke: #b85450; }
+      .result { fill: #e1d5e7; stroke: #9673a6; }
+      .estimate { fill: #f5f5f5; stroke: #666666; }
+      .edge { fill: none; stroke: #52677d; stroke-width: 2; marker-end: url(#arrow); }
+      .dashed { stroke-dasharray: 7 5; }
+    </style>
+  </defs>
+  <rect width="900" height="600" fill="#ffffff"/>
+  <rect class="source" x="40" y="70" width="210" height="75" rx="12"/>
+  <text x="145" y="100">Source plan</text><text class="small" x="145" y="124">schema + estimates</text>
+  <rect class="source" x="40" y="220" width="210" height="75" rx="12"/>
+  <text x="145" y="250">query.Scan</text><text class="small" x="145" y="274">next row / get values</text>
+  <rect class="process" x="340" y="140" width="240" height="95" rx="14"/>
+  <text x="460" y="174">MaterializePlan.Open</text><text class="small" x="460" y="198">copy rows in schema order</text>
+  <rect class="temp" x="650" y="150" width="210" height="95" rx="12"/>
+  <text x="755" y="181">TempTable</text><text class="small" x="755" y="204">query.UpdateScan</text><text class="small" x="755" y="226">append rows + values</text>
+  <rect class="cleanup" x="340" y="340" width="240" height="80" rx="12"/>
+  <text x="460" y="373">Close source scan</text><text class="small" x="460" y="398">rewind destination scan</text>
+  <rect class="result" x="650" y="345" width="210" height="85" rx="12"/>
+  <text x="755" y="375">query.Scan returned</text><text class="small" x="755" y="399">before first row</text><text class="small" x="755" y="420">caller closes it</text>
+  <rect class="estimate" x="40" y="455" width="270" height="90" rx="12"/>
+  <text x="175" y="485">BlocksAccessed</text><text class="small" x="175" y="509">ceil(records / records per block)</text><text class="small" x="175" y="532">excludes one-time copy</text>
+  <path class="edge" d="M250 108 C290 108 300 165 340 175"/>
+  <path class="edge" d="M250 258 C290 258 300 215 340 205"/>
+  <text class="small" x="293" y="242">rows</text>
+  <path class="edge" d="M580 187 L650 187"/>
+  <text class="small" x="615" y="174">insert + set</text>
+  <path class="edge" d="M755 245 C755 295 550 290 510 340"/>
+  <path class="edge" d="M250 274 C292 300 310 360 340 374"/>
+  <path class="edge" d="M580 380 L650 380"/>
+  <path class="edge dashed" d="M145 145 C145 285 115 360 155 455"/>
+</svg>
