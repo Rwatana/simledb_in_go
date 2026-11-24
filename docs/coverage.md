@@ -74,6 +74,14 @@ cover all six routes, unsupported command data, malformed SQL, and planner error
 `go tool cover -func` reports all 582 executable functions and the module total at 100.0%. The independent coverage
 workflow continues to enforce this target.
 
+Issue #1129 adds `Managers.SetQueryPlannerStrategy` for the existing basic and cost-aware query planners. Tests keep
+the basic default, exercise both implementations against the same metadata facade, and verify that nil manager state
+or an unknown strategy does not replace the installed planner. Uncached
+`GOCACHE=/tmp/simpledb-go-cache go test ./... -count=1 -coverprofile=/tmp/simpledb-coverage-1129-final.out` reports
+100.0% statement coverage for every executable package; the profile contains 5,356 statement entries and no
+uncovered statements. `go tool cover -func` reports 583 executable functions and the module total at 100.0%, with
+no function below 100%. The independent coverage workflow remains a separate status check.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the

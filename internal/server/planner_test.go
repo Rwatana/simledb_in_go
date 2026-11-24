@@ -3,9 +3,11 @@ package server
 import (
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Rwatana/simledb_in_go/internal/parse"
+	"github.com/Rwatana/simledb_in_go/internal/plan"
 	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
@@ -52,5 +54,70 @@ func TestManagersComposeBasicQueryPlannerWithTheirMetadata(t *testing.T) {
 	}
 	if _, err := transaction.Commit(); err != nil {
 		t.Fatalf("Commit() query error = %v", err)
+	}
+}
+
+func TestManagersSetQueryPlannerStrategyUsesSharedMetadata(t *testing.T) {
+	managers := newQueryDispatchManagers(t)
+	if _, ok := managers.QueryPlanner.(*plan.BasicQueryPlanner); !ok {
+		t.Fatalf("NewManagers().QueryPlanner has type %T, want *plan.BasicQueryPlanner by default", managers.QueryPlanner)
+	}
+
+	for _, test := range []struct {
+		name     string
+		strategy QueryPlannerStrategy
+		wantType any
+	}{
+		{name: "basic", strategy: QueryPlannerStrategyBasic, wantType: (*plan.BasicQueryPlanner)(nil)},
+		{name: "better", strategy: QueryPlannerStrategyBetter, wantType: (*plan.BetterQueryPlanner)(nil)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := managers.SetQueryPlannerStrategy(test.strategy); err != nil {
+				t.Fatalf("SetQueryPlannerStrategy(%v) error = %v", test.strategy, err)
+			}
+			if got := reflect.TypeOf(managers.QueryPlanner); got != reflect.TypeOf(test.wantType) {
+				t.Fatalf("QueryPlanner type = %v, want %v", got, reflect.TypeOf(test.wantType))
+			}
+
+			transaction, err := managers.NewTransaction()
+			if err != nil {
+				t.Fatalf("NewTransaction() error = %v", err)
+			}
+			queryPlan, err := managers.CreateQueryPlan("select name from student where id = 1", transaction)
+			if err != nil {
+				t.Fatalf("CreateQueryPlan() with selected strategy error = %v", err)
+			}
+			if got, want := queryPlan.Schema().Fields(), []string{"name"}; !reflect.DeepEqual(got, want) {
+				t.Errorf("CreateQueryPlan().Schema().Fields() = %v, want %v", got, want)
+			}
+			if _, err := transaction.Commit(); err != nil {
+				t.Fatalf("Commit() after planning error = %v", err)
+			}
+		})
+	}
+}
+
+func TestManagersSetQueryPlannerStrategyRejectsInvalidInputsWithoutReplacingPlanner(t *testing.T) {
+	managers := newQueryDispatchManagers(t)
+	previous := managers.QueryPlanner
+	for name, managerSet := range map[string]*Managers{
+		"nil":              nil,
+		"missing metadata": {QueryPlanner: previous},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := managerSet.SetQueryPlannerStrategy(QueryPlannerStrategyBetter); err == nil || !strings.Contains(err.Error(), "manager") {
+				t.Fatalf("SetQueryPlannerStrategy() error = %v, want manager validation error", err)
+			}
+			if managerSet != nil && managerSet.QueryPlanner != previous {
+				t.Error("SetQueryPlannerStrategy() replaced the planner after manager validation failed")
+			}
+		})
+	}
+
+	if err := managers.SetQueryPlannerStrategy(QueryPlannerStrategy(255)); err == nil || !strings.Contains(err.Error(), "strategy") {
+		t.Fatalf("SetQueryPlannerStrategy(unknown) error = %v, want strategy validation error", err)
+	}
+	if managers.QueryPlanner != previous {
+		t.Error("SetQueryPlannerStrategy() replaced the planner after rejecting an unknown strategy")
 	}
 }
