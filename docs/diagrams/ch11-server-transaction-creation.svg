@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 11: Open a transaction from shared server managers</title>
+  <desc id="description">A caller asks a server manager set to create a transaction. The manager set shares an ID allocator, lock table, file manager, log manager, and buffer manager. Successful creation appends a START record and returns a transaction; a log failure returns contextual error without a transaction.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#374151"/></marker>
+    <marker id="error-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#dc2626"/></marker>
+    <style>
+      .title{font:700 24px system-ui,sans-serif;fill:#1f2937}.label{font:700 18px system-ui,sans-serif;fill:#111827}.small{font:15px system-ui,sans-serif;fill:#374151}.box{stroke-width:2}.line{fill:none;stroke:#374151;stroke-width:2;marker-end:url(#arrow)}.errorline{fill:none;stroke:#dc2626;stroke-width:2;stroke-dasharray:7 5;marker-end:url(#error-arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="620" fill="#ffffff"/>
+  <text class="title" x="600" y="52" text-anchor="middle">Chapter 11 / Open a transaction from shared server managers</text>
+  <rect class="box" x="40" y="235" width="180" height="90" rx="16" fill="#e0f2fe" stroke="#0284c7"/>
+  <text class="label" x="130" y="286" text-anchor="middle">Application caller</text>
+  <rect class="box" x="300" y="225" width="270" height="110" rx="16" fill="#ede9fe" stroke="#7c3aed"/>
+  <text class="label" x="435" y="270" text-anchor="middle">Managers.NewTransaction()</text>
+  <text class="small" x="435" y="301" text-anchor="middle">assign ID · append START</text>
+  <rect class="box" x="650" y="90" width="250" height="125" rx="16" fill="#f3f4f6" stroke="#4b5563"/>
+  <text class="label" x="775" y="130" text-anchor="middle">Shared runtime state</text>
+  <text class="small" x="775" y="162" text-anchor="middle">ID allocator</text>
+  <text class="small" x="775" y="188" text-anchor="middle">Lock table</text>
+  <rect class="box" x="650" y="330" width="300" height="130" rx="16" fill="#dcfce7" stroke="#16a34a"/>
+  <text class="label" x="800" y="370" text-anchor="middle">Shared managers</text>
+  <text class="small" x="800" y="403" text-anchor="middle">File manager</text>
+  <text class="small" x="800" y="431" text-anchor="middle">Log manager · Buffer manager</text>
+  <rect class="box" x="990" y="220" width="180" height="120" rx="16" fill="#fef3c7" stroke="#d97706"/>
+  <text class="label" x="1080" y="261" text-anchor="middle">Transaction</text>
+  <text class="small" x="1080" y="292" text-anchor="middle">unique ID</text>
+  <text class="small" x="1080" y="318" text-anchor="middle">local buffer ownership</text>
+  <rect class="box" x="300" y="470" width="270" height="100" rx="16" fill="#fee2e2" stroke="#dc2626"/>
+  <text class="label" x="435" y="508" text-anchor="middle">START append fails</text>
+  <text class="small" x="435" y="537" text-anchor="middle">contextual error · no transaction</text>
+  <path class="line" d="M220 280 H300"/>
+  <path class="line" d="M650 150 H600 V245 H570"/>
+  <text class="small" x="606" y="137" text-anchor="middle">shared state</text>
+  <path class="line" d="M570 300 H620 V395 H650"/>
+  <text class="small" x="614" y="350" text-anchor="middle">START</text>
+  <path class="line" d="M570 255 H990"/>
+  <text class="small" x="780" y="242" text-anchor="middle">success</text>
+  <path class="errorline" d="M650 445 H610 V520 H570"/>
+  <text class="small" x="608" y="488" text-anchor="middle">log error</text>
+</svg>
