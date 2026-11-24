@@ -1441,3 +1441,23 @@ func isNilPageTransaction(transaction PageTransaction) bool {
 	value := reflect.ValueOf(transaction)
 	return value.Kind() == reflect.Pointer && value.IsNil()
 }
+
+func compareBTreeKeys(left, right query.Constant) (int, bool) {
+	leftInt, isInteger := left.AsInt()
+	if isInteger {
+		rightInt, comparable := right.AsInt()
+		if !comparable {
+			return 0, false
+		}
+		return cmp.Compare(leftInt, rightInt), true
+	}
+	leftText, isString := left.AsString()
+	if !isString {
+		return 0, false
+	}
+	rightText, comparable := right.AsString()
+	if !comparable {
+		return 0, false
+	}
+	return slices.Compare(utf16.Encode([]rune(leftText)), utf16.Encode([]rune(rightText))), true
+}
