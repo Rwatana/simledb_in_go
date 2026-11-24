@@ -1,0 +1,25 @@
+<mxfile host="app.diagrams.net" modified="2026-11-25T12:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch11-embedded-url" name="Embedded URL parsing">
+    <mxGraphModel dx="1300" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Chapter 11 / Embedded database URL configuration" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="120" y="20" width="1060" height="50" as="geometry" /></mxCell>
+        <mxCell id="source" value="Data source name&#xa;jdbc:simpledb:studentdb" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2fe;strokeColor=#0284c7;fontSize=15;" vertex="1" parent="1"><mxGeometry x="40" y="135" width="230" height="90" as="geometry" /></mxCell>
+        <mxCell id="parser" value="embedded.ParseEmbeddedURL&#xa;validates prefix and name" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontSize=15;" vertex="1" parent="1"><mxGeometry x="330" y="135" width="250" height="90" as="geometry" /></mxCell>
+        <mxCell id="name" value="Database name&#xa;studentdb (suffix preserved)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontSize=15;" vertex="1" parent="1"><mxGeometry x="640" y="135" width="250" height="90" as="geometry" /></mxCell>
+        <mxCell id="config" value="Caller selects directory&#xa;and manager settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#7c3aed;fontSize=15;" vertex="1" parent="1"><mxGeometry x="950" y="135" width="260" height="90" as="geometry" /></mxCell>
+        <mxCell id="managers" value="server.NewManagers&#xa;configured storage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;fontSize=15;" vertex="1" parent="1"><mxGeometry x="950" y="365" width="260" height="90" as="geometry" /></mxCell>
+        <mxCell id="connector" value="embedded.NewConnector&#xa;manager-bound driver" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce7f3;strokeColor=#db2777;fontSize=15;" vertex="1" parent="1"><mxGeometry x="640" y="365" width="250" height="90" as="geometry" /></mxCell>
+        <mxCell id="database" value="sql.OpenDB(connector)&#xa;in-process database" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontSize=15;" vertex="1" parent="1"><mxGeometry x="330" y="365" width="250" height="90" as="geometry" /></mxCell>
+        <mxCell id="edge-source-parser" value="parse" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=13;" edge="1" parent="1" source="source" target="parser"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-parser-name" value="returns suffix" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=13;" edge="1" parent="1" source="parser" target="name"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-name-config" value="input to caller policy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=13;" edge="1" parent="1" source="name" target="config"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-config-managers" value="initialize" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=13;" edge="1" parent="1" source="config" target="managers"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-managers-connector" value="bind" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=13;" edge="1" parent="1" source="managers" target="connector"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-connector-db" value="open" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=13;" edge="1" parent="1" source="connector" target="database"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="note" value="Parsing does not create directories or managers; no global driver registration is required." style="text;html=1;align=center;fontSize=14;fontColor=#374151;" vertex="1" parent="1"><mxGeometry x="100" y="560" width="1100" height="45" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

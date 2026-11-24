@@ -110,11 +110,14 @@ diagram](../diagrams/ch11-embedded-transaction-lifecycle.svg) shows the connecti
 
 `embedded.Connector` binds a caller-supplied `server.Managers` set to Go's `driver.Connector` interface. Each
 `Connect(ctx)` call returns a fresh `Connection` and respects context cancellation. Its `Driver()` adapter also creates
-fresh connections from the already-bound manager set; `Driver.Open` ignores the data source name because URL parsing
-and database selection are separate behaviors. `sql.OpenDB(connector)` therefore uses the same in-process database
-without registering a global driver. The [embedded connector diagram](../diagrams/ch11-embedded-connector.svg) shows
-both standard-library entry points; its [editable Draw.io source](../diagrams/ch11-embedded-connector.drawio) is kept
-beside the SVG.
+fresh connections from the already-bound manager set; `Driver.Open` ignores the data source name because the connector
+has already selected a database. `ParseEmbeddedURL` separately extracts the database name following the Java-compatible
+`jdbc:simpledb:` prefix. Callers choose the storage directory and manager settings from that name, then bind the
+resulting managers to a connector. `sql.OpenDB(connector)` uses the same in-process database without registering a
+global driver. The [embedded connector diagram](../diagrams/ch11-embedded-connector.svg) shows both standard-library
+entry points; its [editable Draw.io source](../diagrams/ch11-embedded-connector.drawio) is kept beside the SVG. The
+[embedded URL flow](../diagrams/ch11-embedded-url.svg) separates name parsing from directory and manager selection;
+its [editable Draw.io source](../diagrams/ch11-embedded-url.drawio) is maintained beside the SVG.
 
 `Connection.Prepare` retains the SQL string and connection in a `driver.Stmt` handle. `Close` is idempotent, and
 `NumInput` counts positional `?` markers outside single-quoted literals so `database/sql` can check arity before
@@ -178,6 +181,8 @@ needs them.
 | `TestConnectionRejectsInvalidReceiversAndManagerState` | Nil, closed, and incomplete connections return contextual errors |
 | `TestTransactionAdapterRejectsNilAndMissingTransactions` | Nil transaction adapters reject commit and rollback safely |
 | `TestNewConnectorReturnsFreshDriverConnections` | A connector implements `driver.Connector` and returns distinct connections |
+| `TestParseEmbeddedURL` | The JDBC-compatible embedded URL prefix is removed while relative and absolute database paths are preserved |
+| `TestParseEmbeddedURLRejectsUnsupportedAndEmptyNames` | Missing/unsupported URL prefixes and empty database names return errors |
 | `TestConnectorConnectValidatesReceiverContextAndCancellation` | Nil state and canceled contexts return errors before creating a connection |
 | `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
@@ -246,9 +251,14 @@ planner composition and strategy selection, embedded connection lifecycle, conne
 transaction-bound SQL updates, database-level autocommit, context-aware connection and prepared-statement execution,
 scalar prepared-statement binding, query rows, and JDBC client operations as separate behaviors.
 
+The embedded URL test-first run initially failed to compile because `ParseEmbeddedURL` was undefined. The parser deliberately
+does not create directories or managers; URL interpretation, storage configuration, and connector construction remain
+separate responsibilities.
+
 ## Intentional differences
 
 - Do not reproduce the Java `java.sql` adapter hierarchy mechanically.
 - Do not introduce RMI merely to match Java's network classes; define a Go transport only when a server/client use case is implemented.
 - Preserve explicit Go errors for initialization and lifecycle failures rather than relying on JDBC `SQLException` conventions.
 - Keep the upstream Java distribution and book PDF outside Git.
+- Parse the Java-compatible embedded URL prefix, but keep path resolution, database initialization, and manager settings explicit in Go.
