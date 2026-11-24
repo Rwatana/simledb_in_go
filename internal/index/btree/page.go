@@ -1021,6 +1021,49 @@ func (page *Page) InsertDirectoryEntryAndSplit(entry DirEntry) (*DirEntry, error
 	return &separator, nil
 }
 
+// InsertDirectoryEntryRecursive inserts entry into the selected directory subtree and returns a split separator.
+func (page *Page) InsertDirectoryEntryRecursive(entry DirEntry) (*DirEntry, error) {
+	level, err := page.GetFlag()
+	if err != nil {
+		return nil, fmt.Errorf("insert B-tree directory entry recursively: read directory level: %w", err)
+	}
+	if level < 0 {
+		return nil, fmt.Errorf("insert B-tree directory entry recursively in block %v: directory level %d is negative", page.block, level)
+	}
+	if level == 0 {
+		separator, err := page.InsertDirectoryEntryAndSplit(entry)
+		if err != nil {
+			return nil, fmt.Errorf("insert B-tree directory entry recursively at level zero: %w", err)
+		}
+		return separator, nil
+	}
+
+	child, err := page.OpenChildDirectory(entry.DataVal())
+	if err != nil {
+		return nil, fmt.Errorf("insert B-tree directory entry recursively in block %v: open child: %w", page.block, err)
+	}
+	childSeparator, insertErr := child.InsertDirectoryEntryRecursive(entry)
+	if insertErr != nil {
+		insertErr = fmt.Errorf("insert B-tree directory entry recursively in child block %v: %w", child.block, insertErr)
+	}
+	closeErr := child.Close()
+	if closeErr != nil {
+		closeErr = fmt.Errorf("insert B-tree directory entry recursively: close child: %w", closeErr)
+	}
+	if insertErr != nil || closeErr != nil {
+		return nil, errors.Join(insertErr, closeErr)
+	}
+	if childSeparator == nil {
+		return nil, nil
+	}
+
+	separator, err := page.InsertDirectoryEntryAndSplit(*childSeparator)
+	if err != nil {
+		return nil, fmt.Errorf("insert B-tree directory entry recursively in parent block %v: propagate child split: %w", page.block, err)
+	}
+	return separator, nil
+}
+
 // InsertDir opens a directory slot and stores its key and child block number.
 func (page *Page) InsertDir(slot int, value query.Constant, childBlock int32) error {
 	count, err := page.insertSlot(slot, value)
