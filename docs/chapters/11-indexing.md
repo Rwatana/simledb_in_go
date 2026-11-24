@@ -432,6 +432,17 @@ error-handling choice made for `IndexSelectPlan`.
 The focused tests first failed because `IndexJoinPlan.BlocksAccessed` was undefined. Tests verify the formula, nil
 receiver/children/metadata, a failed metadata estimate, and signed 32-bit overflow.
 
+## Feature 34: Estimate index join output records
+
+Java `IndexJoinPlan.recordsOutput` estimates `R(left) * R(index)`. Go's `IndexJoinPlan.RecordsOutput` uses signed
+32-bit multiplication to preserve Java overflow and returns zero when the receiver, left plan, or index metadata is
+missing. The right plan is not required because it does not participate in this estimate.
+
+### Test-first record
+
+The focused tests first failed because `IndexJoinPlan.RecordsOutput` was undefined. Tests verify the product, nil
+receiver/left/index metadata, independence from the right plan, and signed 32-bit overflow.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
