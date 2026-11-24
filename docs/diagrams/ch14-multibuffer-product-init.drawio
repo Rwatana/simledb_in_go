@@ -1,0 +1,21 @@
+<mxfile host="app.diagrams.net" modified="2026-11-25T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch14-multibuffer-product-init" name="Multibuffer product initialization">
+    <mxGraphModel dx="1100" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="table" value="Right table name" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="40" y="160" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="metadata" value="Transaction&lt;br&gt;Size(&amp;quot;name.tbl&amp;quot;)&lt;br&gt;AvailableBuffers()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="245" y="150" width="190" height="80" as="geometry" /></mxCell>
+        <mxCell id="factor" value="BestFactor&lt;br&gt;choose first chunk size" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="490" y="150" width="190" height="80" as="geometry" /></mxCell>
+        <mxCell id="pin" value="ChunkScan&lt;br&gt;pin first bounded range" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="735" y="150" width="190" height="80" as="geometry" /></mxCell>
+        <mxCell id="ready" value="Product scan initialized&lt;br&gt;left scan rewound&lt;br&gt;before first row" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="735" y="315" width="190" height="90" as="geometry" /></mxCell>
+        <mxCell id="empty" value="Empty relation&lt;br&gt;no chunk pins&lt;br&gt;no left rewind" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="245" y="325" width="190" height="80" as="geometry" /></mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="table" target="metadata"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="metadata" target="factor"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="factor" target="pin"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="pin" target="ready"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" value="size = 0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="metadata" target="empty"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

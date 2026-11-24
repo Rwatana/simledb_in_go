@@ -50,7 +50,10 @@ Chapter 2で確認した`Connection`や`ResultSet`の責務も、その名前の
 
 Chapter 14's `multibuffer.ChunkScan` stays independent of query value types. The Chapter 14
 `plan.ChunkValueScan` adapter composes that lower-level cursor with `query.Constant` conversion at the planner
-edge; the optimization cursor remains reusable without importing its consumer's value model.
+edge; the optimization cursor remains reusable without importing its consumer's value model. The
+`plan.MultibufferProductScan` initialization also belongs at this edge: it combines a left `query.Scan` with the
+transaction operations needed to size and pin a right-hand chunk, while keeping chunk resource management in
+`multibuffer`.
 
 ## テスト方針
 

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="500" viewBox="0 0 1000 500" role="img" aria-labelledby="title desc">
+  <title id="title">Multibuffer product scan initialization</title>
+  <desc id="desc">The plan reads right-table size and available buffers, chooses a chunk size, pins the first range, then rewinds the left scan. Empty input skips pinning and rewind.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#506070" />
+    </marker>
+    <style>
+      text { font: 16px sans-serif; fill: #18212b; }
+      .box { stroke-width: 2; rx: 12; }
+      .arrow { fill: none; stroke: #506070; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1000" height="500" fill="#ffffff" />
+  <text x="40" y="42" font-size="22" font-weight="700">Initialize the first bounded right-hand chunk</text>
+  <rect class="box" x="35" y="145" width="145" height="75" fill="#dae8fc" stroke="#6c8ebf" />
+  <text x="107" y="176" text-anchor="middle"><tspan x="107">Right table</tspan><tspan x="107" dy="22">name</tspan></text>
+  <rect class="box" x="225" y="130" width="185" height="105" fill="#fff2cc" stroke="#d6b656" />
+  <text x="317" y="160" text-anchor="middle"><tspan x="317">Transaction</tspan><tspan x="317" dy="22">Size(name.tbl)</tspan><tspan x="317" dy="22">AvailableBuffers()</tspan></text>
+  <rect class="box" x="455" y="130" width="180" height="105" fill="#d5e8d4" stroke="#82b366" />
+  <text x="545" y="165" text-anchor="middle"><tspan x="545">BestFactor</tspan><tspan x="545" dy="24">choose chunk size</tspan></text>
+  <rect class="box" x="680" y="130" width="180" height="105" fill="#f8cecc" stroke="#b85450" />
+  <text x="770" y="165" text-anchor="middle"><tspan x="770">ChunkScan</tspan><tspan x="770" dy="24">pin first range</tspan></text>
+  <rect class="box" x="680" y="320" width="235" height="100" fill="#e1d5e7" stroke="#9673a6" />
+  <text x="797" y="350" text-anchor="middle"><tspan x="797">Product scan initialized</tspan><tspan x="797" dy="23">left scan rewound</tspan><tspan x="797" dy="23">before first row</tspan></text>
+  <rect class="box" x="245" y="325" width="225" height="90" fill="#f5f5f5" stroke="#666666" />
+  <text x="357" y="354" text-anchor="middle"><tspan x="357">Empty relation</tspan><tspan x="357" dy="23">no pins or left rewind</tspan></text>
+  <path class="arrow" d="M180 182 H225" />
+  <path class="arrow" d="M410 182 H455" />
+  <path class="arrow" d="M635 182 H680" />
+  <path class="arrow" d="M770 235 V320" />
+  <path class="arrow" d="M317 235 V325" />
+  <text x="330" y="286" font-size="14" text-anchor="middle">size = 0</text>
+</svg>
