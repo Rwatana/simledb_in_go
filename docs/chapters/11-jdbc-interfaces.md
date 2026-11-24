@@ -119,8 +119,9 @@ beside the SVG.
 `Connection.Prepare` retains the SQL string and connection in a `driver.Stmt` handle. `Close` is idempotent, and
 `NumInput` remains `-1` until parameter parsing is implemented. `Stmt.Exec` routes zero-argument update SQL through
 `Managers.ExecuteUpdate` using the active connection transaction and returns the planner's affected-row count; the
-transaction remains open for explicit completion. `Stmt.Query` still returns `driver.ErrSkip`. Parameter binding,
-prepared-statement context execution, SELECT rows, and result metadata remain independent behaviors. The [statement lifecycle diagram](../diagrams/ch11-embedded-statement.svg)
+transaction remains open for explicit completion. `Stmt.ExecContext` applies the same behavior after rejecting nil or
+canceled contexts and unsupported parameters. `Stmt.Query` still returns `driver.ErrSkip`. Parameter binding, SELECT
+rows, and result metadata remain independent behaviors. The [statement lifecycle diagram](../diagrams/ch11-embedded-statement.svg)
 shows preparation; its [editable Draw.io source](../diagrams/ch11-embedded-statement.drawio) is kept beside the SVG.
 The [update execution diagram](../diagrams/ch11-embedded-update-execution.svg) shows transaction ownership during a
 statement call; its [editable Draw.io source](../diagrams/ch11-embedded-update-execution.drawio) is maintained too.
@@ -175,6 +176,8 @@ needs them.
 | `TestStatementExecLeavesCallerTransactionOpen` | Prepared statement updates remain caller-owned and are undone by rollback |
 | `TestDatabaseExecContextUsesAndHonorsContext` | `DB.ExecContext` commits on success, rejects cancellation before mutation, and keeps an explicit transaction usable |
 | `TestConnectionExecContextRejectsNilCanceledAndArgumentInputs` | Context execution rejects nil/canceled contexts and unsupported parameters before dispatch |
+| `TestPreparedStatementExecContextUsesCallerTransaction` | A prepared statement observes cancellation, returns affected rows, and leaves rollback to its caller |
+| `TestStatementExecContextRejectsInvalidInputs` | Context-aware statement calls reject nil/closed state, canceled contexts, missing transactions, and arguments |
 | `TestManagersComposeBasicUpdatePlannerWithTheirMetadata` | A manager set's update planner registers a table through shared metadata and a caller-owned transaction |
 | `TestManagersCreateQueryPlanParsesAndPlansSelect` | SELECT text is parsed and planned through the manager set without taking ownership of its transaction |
 | `TestManagersCreateQueryPlanReportsInvalidInputsAndFailures` | Incomplete managers, nil transactions, parse errors, and plan errors are returned with context |
@@ -198,11 +201,12 @@ undefined. Connector tests first failed because `Connector`, `NewConnector`, and
 Statement tests first failed because the connection returned no statement handle and the `statement` adapter was
 undefined. Statement-execution tests first failed because the connection did not expose an active transaction to the
 prepared statement. Autocommit tests first failed because `Connection` did not implement `driver.Execer`. Context-execution
-tests first failed because `Connection` did not implement `driver.ExecerContext`.
+tests first failed because `Connection` did not implement `driver.ExecerContext`. Prepared-statement context tests first
+failed because the statement adapter did not implement `driver.StmtExecContext`.
 These tests use temporary database directories and keep catalog initialization, explicit process-restart recovery,
 planner composition and strategy selection, embedded connection lifecycle, connector creation, statement preparation,
-transaction-bound SQL updates, database-level autocommit, context-aware connection execution, query rows, and JDBC client
-operations as separate behaviors.
+transaction-bound SQL updates, database-level autocommit, context-aware connection and prepared-statement execution,
+query rows, and JDBC client operations as separate behaviors.
 
 ## Intentional differences
 
