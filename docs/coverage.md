@@ -124,6 +124,12 @@ starting a successor. RPC tests inspect the final COMMIT record, confirm subsequ
 missing state, repeated close, and commit failure without losing the still-open transaction. The separate coverage
 workflow requires every executable package, function, and module statement to remain at 100.0%.
 
+Issue #1174 adds `DriverService.ExecuteUpdate`, routing one SQL update through the retained session transaction and the
+existing server parser/planner path without implicitly committing. RPC tests execute catalog-backed CREATE TABLE and
+INSERT commands, verify the row count, and confirm that explicit Commit completes the original transaction. Direct method
+tests cover parse/planner errors, zeroed responses, missing dependencies, and closed sessions. The independent coverage
+workflow continues to require 100.0% in all executable packages, functions, and the module total.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the

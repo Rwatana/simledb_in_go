@@ -35,6 +35,16 @@ type RollbackResponse struct {
 	TransactionID int64
 }
 
+// ExecuteUpdateRequest carries one SQL update statement for a remote database session.
+type ExecuteUpdateRequest struct {
+	Statement string
+}
+
+// ExecuteUpdateResponse reports the number of rows affected by a remote SQL update.
+type ExecuteUpdateResponse struct {
+	RowsAffected int64
+}
+
 // CloseRequest is the empty request for closing a remote database session.
 type CloseRequest struct{}
 
@@ -192,6 +202,36 @@ func (s *DriverService) Rollback(_ RollbackRequest, reply *RollbackResponse) err
 	}
 	s.transaction = created
 	reply.TransactionID = int64(created.ID())
+	return nil
+}
+
+// ExecuteUpdate runs one SQL update on the active transaction without completing or replacing it.
+func (s *DriverService) ExecuteUpdate(request ExecuteUpdateRequest, reply *ExecuteUpdateResponse) error {
+	if reply != nil {
+		*reply = ExecuteUpdateResponse{}
+	}
+	if s == nil {
+		return fmt.Errorf("execute network RPC update: service is nil")
+	}
+	if reply == nil {
+		return fmt.Errorf("execute network RPC update: reply is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("execute network RPC update: session is closed")
+	}
+	if s.managers == nil {
+		return fmt.Errorf("execute network RPC update: manager set is nil")
+	}
+	if s.transaction == nil {
+		return fmt.Errorf("execute network RPC update: active transaction is nil")
+	}
+	rows, err := s.managers.ExecuteUpdate(request.Statement, s.transaction)
+	if err != nil {
+		return fmt.Errorf("execute network RPC update: %w", err)
+	}
+	reply.RowsAffected = int64(rows)
 	return nil
 }
 
