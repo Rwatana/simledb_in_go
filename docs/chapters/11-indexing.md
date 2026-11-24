@@ -725,6 +725,22 @@ The focused tests first failed because `Page.Format` was undefined. Tests verify
 varchar defaults, schema write order, complete-slot boundaries, disabled logging, caller-owned pin state, invalid page,
 target and layout metadata, block-size and offset errors, and wrapped failures for header and default-value writes.
 
+## Feature 54: Append and format a new B-tree page
+
+Java `BTPage.appendNew` appends a block to the current page's file and formats it with the supplied flag. Go's
+`Page.AppendNew` checks the current page and schema before appending, requires the transaction to support block append,
+and then initializes the returned block through `Page.Format`. Formatting remains unlogged and does not alter pin
+ownership. Append and format failures preserve their causes; when formatting fails after allocation, the method returns
+no block ID so callers cannot publish a partially initialized page and can roll back the transaction as needed. The
+[append-and-format diagram](../diagrams/ch11-btree-page-append-new.svg) shows this sequence and its failure boundary;
+its editable source is [`ch11-btree-page-append-new.drawio`](../diagrams/ch11-btree-page-append-new.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.AppendNew` was undefined. Tests verify same-file append and format order,
+the returned block on success, wrapped append and format errors, a zero block ID after partial-format failure,
+pre-append dependency validation, invalid appended block IDs, no pin changes, and no format writes after append fails.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

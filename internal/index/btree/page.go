@@ -21,6 +21,10 @@ type PageTransaction interface {
 	Unpin(storage.BlockID) error
 }
 
+type pageBlockAppender interface {
+	Append(string) (storage.BlockID, error)
+}
+
 // Page retains one pinned B-tree block and the layout used to interpret its records.
 type Page struct {
 	transaction PageTransaction
@@ -690,6 +694,50 @@ func (page *Page) Format(block storage.BlockID, flag int32) error {
 		}
 	}
 	return nil
+}
+
+// AppendNew appends and formats a block in the current page's file.
+func (page *Page) AppendNew(flag int32) (storage.BlockID, error) {
+	if page == nil {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page: current page is closed")
+	}
+	if page.block.Number() < 0 {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page from block %v: current block number is negative", page.block)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page to %q: transaction is nil", page.block.FileName())
+	}
+	if page.layout == nil {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page to %q: layout is nil", page.block.FileName())
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page to %q: invalid layout: %w", page.block.FileName(), err)
+	}
+	if len(fields) == 0 {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page to %q: layout schema has no fields", page.block.FileName())
+	}
+	appender, ok := page.transaction.(pageBlockAppender)
+	if !ok {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page to %q: transaction does not support block append", page.block.FileName())
+	}
+	block, err := appender.Append(page.block.FileName())
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page to %q: %w", page.block.FileName(), err)
+	}
+	if block.FileName() != page.block.FileName() {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page to %q: transaction returned block in file %q", page.block.FileName(), block.FileName())
+	}
+	if block.Number() < 0 {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page to %q: transaction returned negative block number %d", page.block.FileName(), block.Number())
+	}
+	if err := page.Format(block, flag); err != nil {
+		return storage.BlockID{}, fmt.Errorf("append new B-tree page in block %v: format: %w", block, err)
+	}
+	return block, nil
 }
 
 func (page *Page) insertSlot(slot int, value query.Constant) (int32, error) {
