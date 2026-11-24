@@ -1145,6 +1145,23 @@ varchar sentinel entries, level and count, fixed block zero, unlogged format wri
 invalid pages/layouts/key types and insufficient block capacity before mutation, and wrapped block-size/format/entry
 write errors. The new method is 100.0% covered.
 
+## Feature 79: Initialize an empty B-tree leaf page
+
+Java `BTreeIndex` appends the first leaf block when the leaf file is empty, then formats that page with flag -1. Go's
+`Page.InitializeLeafPage` applies the leaf-specific layout checks to an already allocated, open page and delegates the
+zero-record/default-slot writes to `Page.Format` with flag -1. Block zero is used for the initial leaf and later
+nonnegative blocks may head overflow chains. It preserves the caller's page pin and does not append a block. The
+caller appends first and must roll back that append if formatting fails. Directory-root initialization and full
+index construction remain separate. The existing [B-tree page format diagram](../diagrams/ch11-btree-page-format.svg)
+shows the page header and empty slots; its editable Draw.io source is reused.
+
+### Test-first record
+
+The focused compilation first failed because `Page.InitializeLeafPage` was undefined. Tests cover integer and varchar
+leaf layouts, initial and overflow block numbers, flag -1, count zero, default slot values, unlogged writes, unchanged
+page ownership, invalid page/layout fields, and wrapped block-size and formatting errors. The new method is 100.0%
+covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1174,3 +1191,4 @@ write errors. The new method is 100.0% covered.
 - `btree.Page.InsertDirectoryEntryRecursive` recurses through existing directory pages and returns split separators upward; creating a new root remains the caller's responsibility.
 - `btree.Page.MakeNewRoot` keeps the root in block zero, moves old entries to a new page, installs two child entries, and raises the level last.
 - `btree.Page.InitializeDirectoryRoot` formats an allocated block-zero directory root and adds the initial minimum-key entry for leaf block zero.
+- `btree.Page.InitializeLeafPage` formats an already allocated leaf block with overflow flag -1 and an empty record count.
