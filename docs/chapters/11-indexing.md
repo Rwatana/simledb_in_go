@@ -1070,6 +1070,23 @@ separators, even and odd record counts, preserved page levels and sorted records
 cleanup, nonfull and invalid-page rejection before allocation, signed 32-bit separator block validation, and wrapped
 flag/count/capacity/key/child/append/pin/write/unpin errors. The new method is 100.0% covered.
 
+## Feature 75: Insert a B-tree directory entry and split when full
+
+Java `BTreeDir.insertEntry` inserts a key/child pair and splits the directory page when that insertion fills its last
+physical slot. Go's `Page.InsertDirectoryEntryAndSplit` composes the existing ordered insertion and full-page split
+operations. It returns no separator if physical capacity remains; otherwise it returns the new right page's first
+entry. It does not recurse into a parent or create a new root. Errors after the logged insertion require caller rollback,
+and no separator is returned on any error. The existing [directory insertion diagram](../diagrams/ch11-btree-insert-dir.svg)
+and [B-tree page split diagram](../diagrams/ch11-btree-page-split.svg) explain the two steps and are reused rather than
+duplicated.
+
+### Test-first record
+
+The focused tests first failed because `Page.InsertDirectoryEntryAndSplit` was undefined. They verify ordinary ordered
+insertion without splitting, the final-slot insertion followed by midpoint split, returned parent separator, integer and
+varchar ordering, preserved page levels, refusal when the page is already full, and wrapped insertion/count/capacity/
+split errors. The new method is 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1095,3 +1112,4 @@ flag/count/capacity/key/child/append/pin/write/unpin errors. The new method is 1
 - `btree.Page.InsertDir` copies later directory entries from right to left before inserting a key/child pair; storage errors remain explicit and transaction logging enables caller rollback.
 - `btree.Page.InsertDirectoryEntry` validates directory level and physical capacity before finding the ordered insertion point; directory splitting remains a separate operation.
 - `btree.Page.SplitDirectoryPage` splits only an already full directory page and returns a parent separator; recursive propagation and root growth remain separate operations.
+- `btree.Page.InsertDirectoryEntryAndSplit` combines insertion with the page-full split decision but leaves parent recursion and root growth to separate operations.

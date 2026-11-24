@@ -988,6 +988,39 @@ func (page *Page) SplitDirectoryPage() (DirEntry, error) {
 	return NewDirEntry(key, int(newBlock.Number())), nil
 }
 
+// InsertDirectoryEntryAndSplit inserts entry and returns a separator if it fills the directory page.
+func (page *Page) InsertDirectoryEntryAndSplit(entry DirEntry) (*DirEntry, error) {
+	if err := page.InsertDirectoryEntry(entry); err != nil {
+		return nil, fmt.Errorf("insert B-tree directory entry and split: insert entry: %w", err)
+	}
+	count, err := page.GetNumRecs()
+	if err != nil {
+		return nil, fmt.Errorf("insert B-tree directory entry and split in block %v: read record count: %w", page.block, err)
+	}
+	if count < 0 {
+		return nil, fmt.Errorf("insert B-tree directory entry and split in block %v: record count %d is negative", page.block, count)
+	}
+	blockSize, err := page.transaction.BlockSize()
+	if err != nil {
+		return nil, fmt.Errorf("insert B-tree directory entry and split in block %v: read block size: %w", page.block, err)
+	}
+	if blockSize < 8 {
+		return nil, fmt.Errorf("insert B-tree directory entry and split in block %v: block size %d is smaller than the page header", page.block, blockSize)
+	}
+	capacity := (blockSize - 8) / page.layout.SlotSize()
+	if int64(count) < int64(capacity) {
+		return nil, nil
+	}
+	if int64(count) > int64(capacity) {
+		return nil, fmt.Errorf("insert B-tree directory entry and split in block %v: record count %d exceeds physical capacity %d", page.block, count, capacity)
+	}
+	separator, err := page.SplitDirectoryPage()
+	if err != nil {
+		return nil, fmt.Errorf("insert B-tree directory entry and split in block %v: split full page: %w", page.block, err)
+	}
+	return &separator, nil
+}
+
 // InsertDir opens a directory slot and stores its key and child block number.
 func (page *Page) InsertDir(slot int, value query.Constant, childBlock int32) error {
 	count, err := page.insertSlot(slot, value)
