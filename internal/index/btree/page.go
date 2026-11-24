@@ -569,6 +569,59 @@ func (page *Page) InsertLeaf(slot int, value query.Constant, rid record.RID) err
 	return nil
 }
 
+// Delete removes the record at slot and shifts every later page record left.
+func (page *Page) Delete(slot int) error {
+	if page == nil {
+		return fmt.Errorf("delete B-tree page slot %d: page is nil", slot)
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("delete B-tree page slot %d: page is closed", slot)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("delete B-tree page slot %d in block %v: transaction is nil", slot, page.block)
+	}
+	if page.layout == nil {
+		return fmt.Errorf("delete B-tree page slot %d in block %v: layout is nil", slot, page.block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return fmt.Errorf("delete B-tree page slot %d in block %v: invalid layout: %w", slot, page.block, err)
+	}
+	count, err := page.GetNumRecs()
+	if err != nil {
+		return fmt.Errorf("delete B-tree page slot %d in block %v: read record count: %w", slot, page.block, err)
+	}
+	if count < 0 {
+		return fmt.Errorf("delete B-tree page slot %d in block %v: record count %d is negative", slot, page.block, count)
+	}
+	if slot < 0 || int64(slot) >= int64(count) {
+		return fmt.Errorf("delete B-tree page slot %d in block %v: slot is outside [0,%d)", slot, page.block, count)
+	}
+
+	lastSlot := int(count) - 1
+	lastPositions := make([]int, len(fields))
+	for i, field := range fields {
+		position, err := pageSlotFieldPosition(lastSlot, page.layout.SlotSize(), field.offset)
+		if err != nil {
+			return fmt.Errorf("delete B-tree page slot %d in block %v: field %q position: %w", slot, page.block, field.name, err)
+		}
+		if position > math.MaxInt32 {
+			return fmt.Errorf("delete B-tree page slot %d in block %v: field %q offset %d exceeds int32 range", slot, page.block, field.name, position)
+		}
+		lastPositions[i] = position
+	}
+
+	for fromSlot := slot + 1; fromSlot <= lastSlot; fromSlot++ {
+		if err := page.copyRecordBetween(lastSlot, fromSlot, fromSlot-1, fields, lastPositions); err != nil {
+			return fmt.Errorf("delete B-tree page slot %d in block %v: shift record from slot %d: %w", slot, page.block, fromSlot, err)
+		}
+	}
+	if err := page.setNumRecs(count - 1); err != nil {
+		return fmt.Errorf("delete B-tree page slot %d in block %v: write record count: %w", slot, page.block, err)
+	}
+	return nil
+}
+
 func (page *Page) insertSlot(slot int, value query.Constant) (int32, error) {
 	if page == nil {
 		return 0, fmt.Errorf("page is nil")
@@ -699,27 +752,32 @@ func btreeRecordFields(layout *record.Layout) ([]btreePageField, error) {
 }
 
 func (page *Page) copyRecord(maxSlot, toSlot int, fields []btreePageField, lastPositions []int) error {
+	return page.copyRecordBetween(maxSlot, toSlot-1, toSlot, fields, lastPositions)
+}
+
+func (page *Page) copyRecordBetween(maxSlot, fromSlot, toSlot int, fields []btreePageField, lastPositions []int) error {
 	slotSize := page.layout.SlotSize()
+	fromDelta := (maxSlot - fromSlot) * slotSize
 	toDelta := (maxSlot - toSlot) * slotSize
 	for i, field := range fields {
+		fromPosition := lastPositions[i] - fromDelta
 		toPosition := lastPositions[i] - toDelta
-		fromPosition := toPosition - slotSize
 		switch field.typeOf {
 		case record.IntegerField:
 			value, err := page.transaction.GetInt(page.block, fromPosition)
 			if err != nil {
-				return fmt.Errorf("copy B-tree page field %q from slot %d to %d: read integer: %w", field.name, toSlot-1, toSlot, err)
+				return fmt.Errorf("copy B-tree page field %q from slot %d to %d: read integer: %w", field.name, fromSlot, toSlot, err)
 			}
 			if err := page.transaction.SetInt(page.block, int32(toPosition), value, true); err != nil {
-				return fmt.Errorf("copy B-tree page field %q from slot %d to %d at offset %d: write integer: %w", field.name, toSlot-1, toSlot, toPosition, err)
+				return fmt.Errorf("copy B-tree page field %q from slot %d to %d at offset %d: write integer: %w", field.name, fromSlot, toSlot, toPosition, err)
 			}
 		case record.VarcharField:
 			value, err := page.transaction.GetString(page.block, fromPosition)
 			if err != nil {
-				return fmt.Errorf("copy B-tree page field %q from slot %d to %d: read varchar: %w", field.name, toSlot-1, toSlot, err)
+				return fmt.Errorf("copy B-tree page field %q from slot %d to %d: read varchar: %w", field.name, fromSlot, toSlot, err)
 			}
 			if err := page.transaction.SetString(page.block, int32(toPosition), value, true); err != nil {
-				return fmt.Errorf("copy B-tree page field %q from slot %d to %d at offset %d: write varchar: %w", field.name, toSlot-1, toSlot, toPosition, err)
+				return fmt.Errorf("copy B-tree page field %q from slot %d to %d at offset %d: write varchar: %w", field.name, fromSlot, toSlot, toPosition, err)
 			}
 		}
 	}

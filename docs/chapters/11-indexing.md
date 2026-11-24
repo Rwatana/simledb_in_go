@@ -692,6 +692,22 @@ varchar key and both RID fields, append to an empty page, exact logged write ord
 RID range validation before mutation, unchanged pin state, and wrapped count, shift, count-write, key-write, and either
 RID-write failures.
 
+## Feature 52: Delete a B-tree page entry
+
+Java `BTPage.delete` copies each later record into the preceding slot in ascending order, then decrements the record
+count. Go's `Page.Delete` validates the page, schema, count, slot, and all field offsets before writing; it shifts each
+schema field with transaction logging and updates the count only after all copies succeed. Deleting the last entry skips
+the copy loop. Storage failures return wrapped errors, and the caller's transaction rollback restores any earlier
+logged writes. The [page deletion diagram](../diagrams/ch11-btree-page-delete.svg) shows the left shift and count
+change; its editable source is [`ch11-btree-page-delete.drawio`](../diagrams/ch11-btree-page-delete.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.Delete` was undefined. Tests cover removal from the middle of a page with
+varchar and integer fields, ascending copy order, last-slot deletion without copy reads, logged writes, invalid and
+typed-nil page state, negative counts and out-of-range slots, malformed layouts, int and int32 offset overflow, and
+wrapped count-read, field-copy, and count-write errors.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
