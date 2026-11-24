@@ -374,6 +374,16 @@ left scan. The selected string is returned unchanged, and errors retain their wr
 The focused tests first failed because `IndexJoinScan.GetString` was undefined. Tests verify right-table and left-scan
 routing, returned strings, invalid receiver/dependencies, and wrapped errors from either selected scan.
 
+## Feature 29: Report index-join field membership
+
+`IndexJoinScan.HasField` checks the right table schema first and otherwise delegates to the left scan. It returns false
+for a nil receiver or unavailable scan dependencies; a field declared on the right short-circuits the left check.
+
+### Test-first record
+
+The focused tests first failed because `IndexJoinScan.HasField` was undefined. Tests verify right-side precedence,
+left-side fallback, absent fields, invalid state, and short-circuit behavior.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
