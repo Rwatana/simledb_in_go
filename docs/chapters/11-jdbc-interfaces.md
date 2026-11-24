@@ -57,6 +57,12 @@ is only the socket-opening boundary; it does not implement the Java RMI handshak
 session lifecycle. The [network dial diagram](../diagrams/ch11-network-dial.svg) shows validation, address construction,
 and connection ownership; its [editable Draw.io source](../diagrams/ch11-network-dial.drawio) is kept beside the SVG.
 
+`ConnectRPCSession` sends `SimpleDB.Connect` through a caller-supplied `rpc.Client` and retains the returned transaction ID
+on a `RemoteSession`. The client and underlying transport remain caller-owned; a failed RPC returns no session. The
+[network RPC client-session diagram](../diagrams/ch11-network-rpc-client-session.svg) shows the request, server-side
+START boundary, returned ID, and ownership; its [editable Draw.io source](../diagrams/ch11-network-rpc-client-session.drawio)
+is kept beside the SVG.
+
 `network.ServeConnection` registers a small gob-based `net/rpc` service for one accepted connection. A successful
 `SimpleDB.Connect` creates one transaction through the shared manager set, retains it on that connection's service, and
 returns its transaction ID. The [network RPC session diagram](../diagrams/ch11-network-rpc-session.svg) shows the connect
@@ -74,8 +80,8 @@ maintained beside the SVG. The caller still owns the transport `net.Conn`.
 `DriverService.ExecuteUpdate` parses and dispatches a SQL update using that same retained transaction, returning the
 affected-row count without committing or replacing the transaction. Its [network RPC update diagram](../diagrams/ch11-network-rpc-exec-update.svg)
 shows the manager/parser/planner boundary and caller-owned completion; its [editable Draw.io source](../diagrams/ch11-network-rpc-exec-update.drawio)
-is kept beside the SVG. Parse and planner errors return through RPC with a zero server-side result; remote SELECT and
-client-side JDBC adaptation remain separate.
+is kept beside the SVG. Parse and planner errors return through RPC with a zero server-side result; remote SELECT is
+handled by `ExecuteQuery` below, while client-side JDBC adaptation remains separate.
 `DriverService.ExecuteQuery` materializes a SELECT scan into gob-friendly scalar values, preserving schema column order
 and the session transaction. Its [network RPC query diagram](../diagrams/ch11-network-rpc-query.svg) shows planning,
 scan cleanup, typed rows, and explicit transaction ownership; its [editable Draw.io source](../diagrams/ch11-network-rpc-query.drawio)
@@ -231,6 +237,9 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestServeConnectionCreatesOneTransactionOnRemoteConnect` | RPC Connect creates one START-logged transaction retained for the connection and rejects replacement |
 | `TestServeConnectionReportsManagerTransactionFailureOverRPC` | START-record failures are returned over RPC without a transaction ID |
 | `TestServeConnectionRejectsNilAndIncompleteInputs` | Nil connections/managers and incomplete transaction manager sets are rejected |
+| `TestConnectRPCSessionRetainsTransactionIDAndLeavesClientOpen` | The client constructor stores the returned transaction ID and leaves the caller-owned RPC client usable |
+| `TestConnectRPCSessionRejectsNilClient` | Nil clients return no session and a nil session reports transaction ID zero |
+| `TestConnectRPCSessionWrapsRemoteConnectErrorWithoutReturningSession` | A failed server-side Connect is contextual and returns no client session |
 | `TestDriverServiceConnectRejectsInvalidReceiverAndReply` | Nil service/reply and incomplete managers fail, clearing any partial transaction ID |
 | `TestRegisterDriverServiceRejectsInvalidInputsAndDuplicateRegistration` | RPC service registration validates dependencies and wraps duplicate-name failures |
 | `TestDriverServiceCommitCommitsAndStartsNextTransactionOverRPC` | RPC Commit persists the current outcome, returns a new transaction ID, and retains exactly one successor |
@@ -366,6 +375,10 @@ The network RPC-query test-first run initially failed because `ExecuteQueryReque
 verify the session transaction remains active until explicit Commit. Direct tests cover parse/planner/open failures,
 invalid state, schema/scan validation, materialization cleanup, partial-open cleanup, no partial results, and empty results.
 The response uses concrete gob-friendly structs rather than interface-valued cells.
+
+The network RPC client-session test-first run initially failed because `RemoteSession`, `ConnectRPCSession`, and
+`TransactionID` were undefined. Tests verify the transaction ID returned by the `SimpleDB.Connect` RPC, nil-client
+validation, contextual server errors with no session, and continued use of the caller-owned RPC client.
 
 ## Intentional differences
 
