@@ -45,6 +45,12 @@ for use; a recovery or final commit error is returned with restart context.
 | `simpledb/jdbc/network/NetworkDriver.java`, `NetworkConnection.java`, `NetworkStatement.java`, `NetworkResultSet.java`, `NetworkMetaData.java` | Adapt a network client to the same JDBC-facing contract |
 | `simpledb/jdbc/network/Remote*` | Implement the server-side remote objects used by the Java RMI transport |
 
+The Java network driver strips `jdbc:simpledb://` from its data-source name and contacts the RMI registry on the
+host's default port 1099. The Go `network.ParseNetworkURL` behavior keeps this URL interpretation explicit: it returns
+the hostname, rejects URL port overrides and non-host components, and does not dial or create a remote session. The
+[network URL diagram](../diagrams/ch11-network-url.svg) shows the parser boundary and the separate caller-owned dial;
+its [editable Draw.io source](../diagrams/ch11-network-url.drawio) is maintained beside the SVG.
+
 ## Go design and current status
 
 The Go repository has lower-level file, log, buffer, transaction, metadata, query, and planning packages, plus an initial
@@ -144,11 +150,12 @@ source](../diagrams/ch11-embedded-statement.drawio) is kept beside the SVG.
 The [update execution diagram](../diagrams/ch11-embedded-update-execution.svg) shows transaction ownership during a
 statement call; its [editable Draw.io source](../diagrams/ch11-embedded-update-execution.drawio) is maintained too.
 
-The embedded and network drivers share a client contract in Java, but Go should introduce an adapter only when a concrete
-caller needs it. The RMI proxy classes are transport-specific and should not be reproduced as a Go class hierarchy or
-copied into the embedded path. The standard `database/sql/driver` contract is used only for the connection and
-transaction operations currently implemented; its remaining optional interfaces stay out until a concrete use case
-needs them.
+The embedded and network drivers share a client contract in Java. Go's `network.ParseNetworkURL` extracts a host
+from `jdbc:simpledb://host` while preserving the Java driver's default registry-port convention; it rejects explicit
+ports and URL components other than the host. Parsing remains independent from socket dialing and remote-session
+creation. The RMI proxy classes are transport-specific and should not be reproduced as a Go class hierarchy or copied
+into the embedded path. The standard `database/sql/driver` contract is used only for the connection and transaction
+operations currently implemented; its remaining optional interfaces stay out until a concrete use case needs them.
 
 ## Test map
 
@@ -183,6 +190,8 @@ needs them.
 | `TestNewConnectorReturnsFreshDriverConnections` | A connector implements `driver.Connector` and returns distinct connections |
 | `TestParseEmbeddedURL` | The JDBC-compatible embedded URL prefix is removed while relative and absolute database paths are preserved |
 | `TestParseEmbeddedURLRejectsUnsupportedAndEmptyNames` | Missing/unsupported URL prefixes and empty database names return errors |
+| `TestParseNetworkURL` | Network JDBC URLs preserve DNS, IPv4, and bracketed IPv6 hostnames |
+| `TestParseNetworkURLRejectsMalformedDataSourceNames` | Empty or unsupported URLs, ports, and non-host URL components return errors |
 | `TestConnectorConnectValidatesReceiverContextAndCancellation` | Nil state and canceled contexts return errors before creating a connection |
 | `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
@@ -255,6 +264,10 @@ The embedded URL test-first run initially failed to compile because `ParseEmbedd
 does not create directories or managers; URL interpretation, storage configuration, and connector construction remain
 separate responsibilities.
 
+The network URL test-first run initially failed to compile because `ParseNetworkURL` was undefined. It returns only a
+validated hostname; dialing and remote-session creation remain separate responsibilities, and explicit URL ports are
+rejected to preserve the Java driver's default registry port behavior.
+
 ## Intentional differences
 
 - Do not reproduce the Java `java.sql` adapter hierarchy mechanically.
@@ -262,3 +275,4 @@ separate responsibilities.
 - Preserve explicit Go errors for initialization and lifecycle failures rather than relying on JDBC `SQLException` conventions.
 - Keep the upstream Java distribution and book PDF outside Git.
 - Parse the Java-compatible embedded URL prefix, but keep path resolution, database initialization, and manager settings explicit in Go.
+- Parse the Java-compatible network URL into a host, but keep dialing and remote-session lifecycle separate from parsing; the current Go network parser preserves the default registry port convention.
