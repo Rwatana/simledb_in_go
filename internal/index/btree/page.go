@@ -1064,6 +1064,109 @@ func (page *Page) InsertDirectoryEntryRecursive(entry DirEntry) (*DirEntry, erro
 	return separator, nil
 }
 
+// MakeNewRoot moves the current root entries to a child page and installs the two new root children.
+func (page *Page) MakeNewRoot(separator DirEntry) error {
+	if page == nil {
+		return fmt.Errorf("grow B-tree directory root: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("grow B-tree directory root: page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("grow B-tree directory root in block %v: transaction is nil", page.block)
+	}
+	if page.layout == nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: layout is nil", page.block)
+	}
+	if page.block.Number() != 0 {
+		return fmt.Errorf("grow B-tree directory root in block %v: root must remain at block zero", page.block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: invalid layout: %w", page.block, err)
+	}
+	if len(fields) != 2 {
+		return fmt.Errorf("grow B-tree directory root in block %v: layout must contain exactly dataval and block fields", page.block)
+	}
+	var datavalField btreePageField
+	datavalFound, blockFound := false, false
+	for _, field := range fields {
+		switch field.name {
+		case "dataval":
+			datavalField, datavalFound = field, true
+		case "block":
+			blockFound = true
+			if field.typeOf != record.IntegerField {
+				return fmt.Errorf("grow B-tree directory root in block %v: block field is not an integer", page.block)
+			}
+		}
+	}
+	if !datavalFound || !blockFound {
+		return fmt.Errorf("grow B-tree directory root in block %v: layout requires dataval and block fields", page.block)
+	}
+	level, err := page.GetFlag()
+	if err != nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: read level: %w", page.block, err)
+	}
+	if level < 0 || level == math.MaxInt32 {
+		return fmt.Errorf("grow B-tree directory root in block %v: level %d cannot be incremented", page.block, level)
+	}
+	count, err := page.GetNumRecs()
+	if err != nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: read record count: %w", page.block, err)
+	}
+	if count <= 0 {
+		return fmt.Errorf("grow B-tree directory root in block %v: record count %d must be positive", page.block, count)
+	}
+	blockSize, err := page.transaction.BlockSize()
+	if err != nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: read block size: %w", page.block, err)
+	}
+	if blockSize < 8 {
+		return fmt.Errorf("grow B-tree directory root in block %v: block size %d is smaller than the page header", page.block, blockSize)
+	}
+	capacity := (blockSize - 8) / page.layout.SlotSize()
+	if capacity < 2 || int64(count) > int64(capacity) {
+		return fmt.Errorf("grow B-tree directory root in block %v: count %d and capacity %d cannot hold two root entries", page.block, count, capacity)
+	}
+	firstKey, err := page.GetDataVal(0)
+	if err != nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: read first key: %w", page.block, err)
+	}
+	if datavalField.typeOf == record.IntegerField {
+		if _, ok := separator.DataVal().AsInt(); !ok {
+			return fmt.Errorf("grow B-tree directory root in block %v: integer dataval cannot store %s", page.block, separator.DataVal())
+		}
+	} else if _, ok := separator.DataVal().AsString(); !ok {
+		return fmt.Errorf("grow B-tree directory root in block %v: varchar dataval cannot store %s", page.block, separator.DataVal())
+	}
+	lastKey, err := page.GetDataVal(int(count - 1))
+	if err != nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: read last key: %w", page.block, err)
+	}
+	comparison, comparable := compareBTreeKeys(lastKey, separator.DataVal())
+	if !comparable || comparison > 0 {
+		return fmt.Errorf("grow B-tree directory root in block %v: separator %s is not ordered after last key %s", page.block, separator.DataVal(), lastKey)
+	}
+	if childBlock := separator.BlockNumber(); childBlock < 0 || int64(childBlock) > math.MaxInt32 {
+		return fmt.Errorf("grow B-tree directory root in block %v: separator child block %d is outside signed 32-bit range", page.block, childBlock)
+	}
+	newBlock, err := page.Split(0, level)
+	if err != nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: move existing entries: %w", page.block, err)
+	}
+	if err := page.InsertDirectoryEntry(NewDirEntry(firstKey, int(newBlock.Number()))); err != nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: insert moved left child: %w", page.block, err)
+	}
+	if err := page.InsertDirectoryEntry(separator); err != nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: insert split right child: %w", page.block, err)
+	}
+	if err := page.SetFlag(level + 1); err != nil {
+		return fmt.Errorf("grow B-tree directory root in block %v: raise level: %w", page.block, err)
+	}
+	return nil
+}
+
 // InsertDir opens a directory slot and stores its key and child block number.
 func (page *Page) InsertDir(slot int, value query.Constant, childBlock int32) error {
 	count, err := page.insertSlot(slot, value)
