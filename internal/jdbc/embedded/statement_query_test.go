@@ -88,6 +88,12 @@ func TestPreparedStatementQueryReturnsProjectedRowsToDatabaseSQL(t *testing.T) {
 			t.Errorf("column %q length = (%d, %t), want (%d, %t)", columns[index], length, ok, want.length, want.ok)
 		}
 	}
+	for index := range columnTypes {
+		nullable, ok := columnTypes[index].Nullable()
+		if nullable || !ok {
+			t.Errorf("column %q nullable = (%t, %t), want (false, true)", columns[index], nullable, ok)
+		}
+	}
 	if !rows.Next() {
 		t.Fatalf("rows Next() = false, error = %v, want one matching row", rows.Err())
 	}

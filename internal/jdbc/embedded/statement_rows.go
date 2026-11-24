@@ -21,6 +21,7 @@ var _ driver.Rows = (*statementRows)(nil)
 var _ driver.RowsColumnTypeDatabaseTypeName = (*statementRows)(nil)
 var _ driver.RowsColumnTypeScanType = (*statementRows)(nil)
 var _ driver.RowsColumnTypeLength = (*statementRows)(nil)
+var _ driver.RowsColumnTypeNullable = (*statementRows)(nil)
 
 func newStatementRows(scan query.Scan, schema *record.Schema) (*statementRows, error) {
 	if scan == nil {
@@ -94,6 +95,23 @@ func (rows *statementRows) ColumnTypeLength(index int) (int64, bool) {
 		return int64(definition.Length), true
 	default:
 		return 0, false
+	}
+}
+
+// ColumnTypeNullable reports the nullability known from the record value model.
+func (rows *statementRows) ColumnTypeNullable(index int) (bool, bool) {
+	if rows == nil || rows.schema == nil || index < 0 || index >= len(rows.columns) {
+		return false, false
+	}
+	definition, ok := rows.schema.Field(rows.columns[index])
+	if !ok {
+		return false, false
+	}
+	switch definition.Type {
+	case record.IntegerField, record.VarcharField:
+		return false, true
+	default:
+		return false, false
 	}
 }
 
