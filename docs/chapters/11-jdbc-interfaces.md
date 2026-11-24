@@ -99,10 +99,11 @@ adapter is described below; SQL execution and result adapters remain separate.
 `embedded.Connection` is the first concrete client adapter. It implements `driver.Conn`, starts a transaction from the
 manager set in `Begin`, and returns a `driver.Tx` adapter for explicit commit or rollback. Closing the connection prevents
 new begins but leaves already returned transactions caller-owned. Its `driver.Execer` implementation gives a
-database-level `DB.Exec` call its own transaction and commits that update on success. When `database/sql` routes a
-`sql.Tx.Exec` call through the same connection, the connection reuses its active transaction and leaves completion to the
-caller. The [embedded autocommit diagram](../diagrams/ch11-database-autocommit.svg) shows the two transaction-ownership
-paths; its [editable Draw.io source](../diagrams/ch11-database-autocommit.drawio) is maintained beside the SVG. The
+database-level `DB.Exec` call its own transaction and commits that update on success. `driver.ExecerContext` checks for
+nil or canceled contexts before starting work and preserves the same autocommit versus active-transaction behavior.
+When `database/sql` routes a `sql.Tx.Exec` call through the same connection, the connection reuses its active
+transaction and leaves completion to the caller. The [embedded execution diagram](../diagrams/ch11-database-autocommit.svg)
+shows the context check and two transaction-ownership paths; its [editable Draw.io source](../diagrams/ch11-database-autocommit.drawio) is maintained beside the SVG. The
 [embedded transaction lifecycle
 diagram](../diagrams/ch11-embedded-transaction-lifecycle.svg) shows the connection ownership boundaries and its
 [editable Draw.io source](../diagrams/ch11-embedded-transaction-lifecycle.drawio) is maintained beside the SVG.
@@ -119,7 +120,7 @@ beside the SVG.
 `NumInput` remains `-1` until parameter parsing is implemented. `Stmt.Exec` routes zero-argument update SQL through
 `Managers.ExecuteUpdate` using the active connection transaction and returns the planner's affected-row count; the
 transaction remains open for explicit completion. `Stmt.Query` still returns `driver.ErrSkip`. Parameter binding,
-context-aware execution, SELECT rows, and result metadata remain independent behaviors. The [statement lifecycle diagram](../diagrams/ch11-embedded-statement.svg)
+prepared-statement context execution, SELECT rows, and result metadata remain independent behaviors. The [statement lifecycle diagram](../diagrams/ch11-embedded-statement.svg)
 shows preparation; its [editable Draw.io source](../diagrams/ch11-embedded-statement.drawio) is kept beside the SVG.
 The [update execution diagram](../diagrams/ch11-embedded-update-execution.svg) shows transaction ownership during a
 statement call; its [editable Draw.io source](../diagrams/ch11-embedded-update-execution.drawio) is maintained too.
@@ -172,6 +173,8 @@ needs them.
 | `TestConnectionExecRejectsInvalidStateAndUpdateFailures` | Autocommit rejects invalid connections and arguments, rolls back failures, and accepts a later update |
 | `TestConnectionExecReportsCommitAndRollbackFailures` | Durable commit and recovery failures retain autocommit context |
 | `TestStatementExecLeavesCallerTransactionOpen` | Prepared statement updates remain caller-owned and are undone by rollback |
+| `TestDatabaseExecContextUsesAndHonorsContext` | `DB.ExecContext` commits on success, rejects cancellation before mutation, and keeps an explicit transaction usable |
+| `TestConnectionExecContextRejectsNilCanceledAndArgumentInputs` | Context execution rejects nil/canceled contexts and unsupported parameters before dispatch |
 | `TestManagersComposeBasicUpdatePlannerWithTheirMetadata` | A manager set's update planner registers a table through shared metadata and a caller-owned transaction |
 | `TestManagersCreateQueryPlanParsesAndPlansSelect` | SELECT text is parsed and planned through the manager set without taking ownership of its transaction |
 | `TestManagersCreateQueryPlanReportsInvalidInputsAndFailures` | Incomplete managers, nil transactions, parse errors, and plan errors are returned with context |
@@ -194,10 +197,12 @@ The embedded-connection tests first failed because `Connection`, `NewConnection`
 undefined. Connector tests first failed because `Connector`, `NewConnector`, and the driver adapter were undefined.
 Statement tests first failed because the connection returned no statement handle and the `statement` adapter was
 undefined. Statement-execution tests first failed because the connection did not expose an active transaction to the
-prepared statement. Autocommit tests first failed because `Connection` did not implement `driver.Execer`.
+prepared statement. Autocommit tests first failed because `Connection` did not implement `driver.Execer`. Context-execution
+tests first failed because `Connection` did not implement `driver.ExecerContext`.
 These tests use temporary database directories and keep catalog initialization, explicit process-restart recovery,
 planner composition and strategy selection, embedded connection lifecycle, connector creation, statement preparation,
-transaction-bound SQL updates, database-level autocommit, query rows, and JDBC client operations as separate behaviors.
+transaction-bound SQL updates, database-level autocommit, context-aware connection execution, query rows, and JDBC client
+operations as separate behaviors.
 
 ## Intentional differences
 

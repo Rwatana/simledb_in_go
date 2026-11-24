@@ -2,6 +2,7 @@
 package embedded
 
 import (
+	"context"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ type Connection struct {
 
 var _ driver.Conn = (*Connection)(nil)
 var _ driver.Execer = (*Connection)(nil)
+var _ driver.ExecerContext = (*Connection)(nil)
 
 // NewConnection creates an embedded connection backed by managers.
 func NewConnection(managers *server.Managers) (*Connection, error) {
@@ -84,6 +86,20 @@ func (connection *Connection) Exec(query string, arguments []driver.Value) (driv
 		return nil, autocommitError("execute embedded autocommit: commit failed", err, rollbackErr)
 	}
 	return driver.RowsAffected(rows), nil
+}
+
+// ExecContext executes an update unless its context is canceled before execution begins.
+func (connection *Connection) ExecContext(ctx context.Context, query string, arguments []driver.NamedValue) (driver.Result, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("execute embedded statement with context: context is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("execute embedded statement with context: %w", err)
+	}
+	if len(arguments) != 0 {
+		return nil, fmt.Errorf("execute embedded statement with context: arguments are not supported")
+	}
+	return connection.Exec(query, nil)
 }
 
 func autocommitError(operation string, err, rollbackErr error) error {
