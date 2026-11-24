@@ -118,6 +118,21 @@ func (index *BTreeIndex) closeDirectoryAfterFailure(page *Page) error {
 	return nil
 }
 
+// Next advances the positioned B-tree index cursor to its next matching entry.
+func (index *BTreeIndex) Next() (bool, error) {
+	if index == nil {
+		return false, fmt.Errorf("advance B-tree index: index is nil")
+	}
+	if index.leaf == nil {
+		return false, fmt.Errorf("advance B-tree index %q: cursor is not positioned", index.indexName)
+	}
+	found, err := index.leaf.Next()
+	if err != nil {
+		return false, fmt.Errorf("advance B-tree index %q: %w", index.indexName, err)
+	}
+	return found, nil
+}
+
 // NewBTreeIndex initializes the files and retained state for one B-tree index.
 // The caller must roll back the transaction if construction fails after an append.
 func NewBTreeIndex(transaction btreeFileTransaction, indexName string, leafLayout *record.Layout) (*BTreeIndex, error) {
