@@ -34,6 +34,22 @@ func NewLeaf(transaction PageTransaction, block storage.BlockID, layout *record.
 	return &Leaf{contents: contents, searchKey: searchKey, currentSlot: currentSlot}, nil
 }
 
+// Close releases the page pin retained by the leaf cursor.
+func (leaf *Leaf) Close() error {
+	if leaf == nil {
+		return fmt.Errorf("close B-tree leaf cursor: leaf is nil")
+	}
+	if leaf.contents == nil {
+		return nil
+	}
+	block := leaf.contents.block
+	if err := leaf.contents.Close(); err != nil {
+		return fmt.Errorf("close B-tree leaf cursor for %s in block %v: %w", leaf.searchKey, block, err)
+	}
+	leaf.contents = nil
+	return nil
+}
+
 // Next advances the cursor to its next matching leaf entry, following a matching overflow page when needed.
 func (leaf *Leaf) Next() (bool, error) {
 	if leaf == nil {
