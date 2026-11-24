@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"io"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -116,6 +117,166 @@ func TestPreparedStatementQueryReturnsProjectedRowsToDatabaseSQL(t *testing.T) {
 	}
 	if err := transaction.Rollback(); err != nil {
 		t.Fatalf("transaction Rollback() error = %v", err)
+	}
+}
+
+func TestPreparedStatementBindsScalarParametersThroughDatabaseSQL(t *testing.T) {
+	managers, err := server.NewManagers(filepath.Join(t.TempDir(), "database"), 400, 8)
+	if err != nil {
+		t.Fatalf("server.NewManagers() error = %v", err)
+	}
+	initializeEmbeddedCatalogs(t, managers)
+	connector, err := NewConnector(managers)
+	if err != nil {
+		t.Fatalf("NewConnector() error = %v", err)
+	}
+	database := sql.OpenDB(connector)
+	database.SetMaxOpenConns(1)
+	t.Cleanup(func() {
+		if err := database.Close(); err != nil {
+			t.Errorf("database Close() error = %v", err)
+		}
+	})
+
+	transaction, err := database.Begin()
+	if err != nil {
+		t.Fatalf("database Begin() error = %v", err)
+	}
+	if _, err := transaction.Exec("create table student (id int, name varchar(40))"); err != nil {
+		t.Fatalf("transaction Exec(CREATE TABLE) error = %v", err)
+	}
+	context := context.Background()
+	insert, err := transaction.PrepareContext(context, "insert into student (id, name) values (?, ?)")
+	if err != nil {
+		t.Fatalf("transaction PrepareContext(INSERT) error = %v", err)
+	}
+	if result, err := insert.ExecContext(context, int64(1), "O'Neil"); err != nil {
+		t.Fatalf("prepared INSERT ExecContext() error = %v", err)
+	} else if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		t.Errorf("prepared INSERT RowsAffected() = (%d, %v), want (1, nil)", affected, err)
+	}
+	if _, err := insert.ExecContext(context, int64(2)); err == nil || !strings.Contains(err.Error(), "expected 2 arguments") {
+		t.Errorf("prepared INSERT with too few parameters error = %v, want argument-count error", err)
+	}
+	if _, err := insert.ExecContext(context, int64(2), "Grace", "extra"); err == nil || !strings.Contains(err.Error(), "expected 2 arguments") {
+		t.Errorf("prepared INSERT with too many parameters error = %v, want argument-count error", err)
+	}
+	if _, err := insert.ExecContext(context, int64(2), []byte("unsupported")); err == nil || !strings.Contains(err.Error(), "unsupported") {
+		t.Errorf("prepared INSERT with unsupported value error = %v, want unsupported-value error", err)
+	}
+	if _, err := insert.ExecContext(context, int64(2), sql.Named("name", "named")); err == nil || !strings.Contains(err.Error(), "named") {
+		t.Errorf("prepared INSERT with named value error = %v, want named-argument error", err)
+	}
+
+	selectByIDAndName, err := transaction.PrepareContext(context, "select name, id from student where id = ? and name = ?")
+	if err != nil {
+		t.Fatalf("transaction PrepareContext(SELECT) error = %v", err)
+	}
+	rows, err := selectByIDAndName.QueryContext(context, int64(1), "O'Neil")
+	if err != nil {
+		t.Fatalf("prepared SELECT QueryContext() error = %v", err)
+	}
+	if !rows.Next() {
+		t.Fatalf("prepared SELECT Next() = false, error = %v, want matching row", rows.Err())
+	}
+	var name string
+	var id int64
+	if err := rows.Scan(&name, &id); err != nil {
+		t.Fatalf("prepared SELECT Scan() error = %v", err)
+	}
+	if name != "O'Neil" || id != 1 {
+		t.Errorf("prepared SELECT row = (%q, %d), want (%q, 1)", name, id, "O'Neil")
+	}
+	if next := rows.Next(); next || rows.Err() != nil {
+		t.Errorf("prepared SELECT after row = (next %t, error %v), want clean exhaustion", next, rows.Err())
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatalf("prepared SELECT Close() error = %v", err)
+	}
+
+	update, err := transaction.PrepareContext(context, "update student set name = ? where id = ?")
+	if err != nil {
+		t.Fatalf("transaction PrepareContext(UPDATE) error = %v", err)
+	}
+	result, err := update.ExecContext(context, "Grace", int64(1))
+	if err != nil {
+		t.Fatalf("prepared UPDATE ExecContext() error = %v", err)
+	}
+	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		t.Errorf("prepared UPDATE RowsAffected() = (%d, %v), want (1, nil)", affected, err)
+	}
+	rows, err = selectByIDAndName.QueryContext(context, int64(1), "Grace")
+	if err != nil {
+		t.Fatalf("prepared SELECT after UPDATE error = %v", err)
+	}
+	if !rows.Next() {
+		t.Fatalf("prepared SELECT after UPDATE Next() = false, error = %v", rows.Err())
+	}
+	if err := rows.Scan(&name, &id); err != nil {
+		t.Fatalf("prepared SELECT after UPDATE Scan() error = %v", err)
+	}
+	if name != "Grace" || id != 1 {
+		t.Errorf("prepared SELECT after UPDATE row = (%q, %d), want (%q, 1)", name, id, "Grace")
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatalf("prepared SELECT after UPDATE Close() error = %v", err)
+	}
+	if err := transaction.Rollback(); err != nil {
+		t.Fatalf("transaction Rollback() error = %v", err)
+	}
+}
+
+func TestPreparedStatementLegacyExecAndQueryBindScalarValues(t *testing.T) {
+	managers, err := server.NewManagers(filepath.Join(t.TempDir(), "database"), 400, 8)
+	if err != nil {
+		t.Fatalf("server.NewManagers() error = %v", err)
+	}
+	initializeEmbeddedCatalogs(t, managers)
+	connection, err := NewConnection(managers)
+	if err != nil {
+		t.Fatalf("NewConnection() error = %v", err)
+	}
+	transaction, err := connection.Begin()
+	if err != nil {
+		t.Fatalf("connection Begin() error = %v", err)
+	}
+	if _, err := connection.Exec("create table student (id int, name varchar(40))", nil); err != nil {
+		t.Fatalf("connection Exec(CREATE TABLE) error = %v", err)
+	}
+	insertHandle, err := connection.Prepare("insert into student (id, name) values (?, ?)")
+	if err != nil {
+		t.Fatalf("connection Prepare(INSERT) error = %v", err)
+	}
+	result, err := insertHandle.Exec([]driver.Value{int64(7), "O'Neil"})
+	if err != nil {
+		t.Fatalf("legacy prepared INSERT Exec() error = %v", err)
+	}
+	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		t.Errorf("legacy prepared INSERT RowsAffected() = (%d, %v), want (1, nil)", affected, err)
+	}
+	queryHandle, err := connection.Prepare("select name from student where id = ?")
+	if err != nil {
+		t.Fatalf("connection Prepare(SELECT) error = %v", err)
+	}
+	rows, err := queryHandle.Query([]driver.Value{int64(7)})
+	if err != nil {
+		t.Fatalf("legacy prepared SELECT Query() error = %v", err)
+	}
+	destination := make([]driver.Value, len(rows.Columns()))
+	if err := rows.Next(destination); err != nil {
+		t.Fatalf("legacy prepared SELECT Next() error = %v, want one row", err)
+	}
+	if len(destination) != 1 || destination[0] != "O'Neil" {
+		t.Errorf("legacy prepared SELECT row = %v, want [O'Neil]", destination)
+	}
+	if err := rows.Next(destination); err != io.EOF {
+		t.Errorf("legacy prepared SELECT exhaustion error = %v, want io.EOF", err)
+	}
+	if err := rows.Close(); err != nil {
+		t.Errorf("legacy prepared SELECT Close() error = %v", err)
+	}
+	if err := transaction.Rollback(); err != nil {
+		t.Errorf("transaction Rollback() error = %v", err)
 	}
 }
 
