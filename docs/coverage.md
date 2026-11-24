@@ -104,6 +104,11 @@ Issue #1163 adds `network.ParseNetworkURL` for the Java-compatible `jdbc:simpled
 
 Issue #1165 adds `network.DialNetworkURL`, which parses a network JDBC URL, uses `net.JoinHostPort` with the Java-compatible default registry port 1099, and forwards the caller context to TCP dialing. Tests cover DNS/IPv4/IPv6 address construction, invalid-input rejection before dialing, cancellation, dial-error wrapping, nil dependencies, and caller ownership of a successful connection. The coverage workflow continues to enforce 100.0% statement coverage.
 
+Issue #1167 adds `network.ServeConnection` and the `SimpleDB.Connect` RPC method. `net.Pipe` tests exercise the gob
+RPC protocol without a listener, verify that Connect appends exactly one START record and retains that transaction on
+the connection service, and cover duplicate connects, incomplete managers, registration failures, and START-log errors.
+Every executable package and function remains subject to the separate 100.0% coverage workflow.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
