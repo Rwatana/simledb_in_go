@@ -9,7 +9,7 @@ operations.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
-| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own a bounded block range, traverse it in block/slot order, and read current integer or string fields |
+| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
 
 ## Feature 1: Choose a safe buffer root
 
@@ -99,6 +99,26 @@ independent behaviors.
 
 The focused tests cover every executable statement and function. The module coverage workflow continues to require
 100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 8: Report declared field membership
+
+`ChunkScan.HasField` consults the scan layout's schema and does not depend on cursor position or page lifecycle. A nil
+receiver, zero-value scan, or layout without a schema reports false. The method does not pin pages or read record data.
+
+### Test-first record
+
+Focused compilation first failed because `ChunkScan.HasField` was undefined. Tests cover integer and varchar fields,
+missing and empty names, nil and zero-value scans, closed scans, and the absence of transaction reads or new pins.
+
+### Design decision
+
+The chunk scan delegates membership to `record.Schema` because field existence is schema metadata rather than a current
+record value. Query-value conversion and query-plan integration remain separate behaviors.
+
+### Validation
+
+The focused package suite covers every executable statement and function. The module coverage workflow continues to
+require 100.0% statement coverage for every executable package, function, and module total.
 
 ## Feature 4: Advance within the active chunk block
 
