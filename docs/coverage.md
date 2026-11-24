@@ -163,6 +163,10 @@ new/existing temporary files, invalid descriptors, wrapped initialization failur
 caller-owned scan pin. The separate coverage workflow continues to require 100.0% in every executable package,
 function, and the module.
 
+Issue #1202 adds `materialize.RecordComparator` for ordered lexicographic comparison of query scan values. Tests cover
+numeric and string order, short-circuit and tie behavior, copied field order, empty fields, invalid state, read failures,
+and incomparable constants. The independent coverage workflow continues to require 100.0% statement coverage.
+
 Issue #1195 adds `storage.Page.SetString`, converting UTF-8 bytes through the existing `SetBytes` length-prefix path.
 Tests round-trip empty text, embedded NUL, and multibyte text through both string and byte APIs, and verify a failed
 capacity write preserves the original page. The separate coverage workflow continues to enforce 100.0% package,

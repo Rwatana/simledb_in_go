@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560" role="img" aria-labelledby="title desc">
+  <title id="title">Lexicographic record comparison</title>
+  <desc id="desc">A comparator reads left and right query values for each sort field in order. It returns at the first unequal pair or returns zero when all fields match.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52677d"/></marker>
+    <style>
+      text { font: 16px sans-serif; fill: #172b4d; text-anchor: middle; }
+      .small { font-size: 13px; }
+      .source { fill: #dae8fc; stroke: #6c8ebf; }
+      .scan { fill: #d5e8d4; stroke: #82b366; }
+      .compare { fill: #fff2cc; stroke: #d6b656; }
+      .next { fill: #e1d5e7; stroke: #9673a6; }
+      .result { fill: #f8cecc; stroke: #b85450; }
+      .box { stroke-width: 2; rx: 12; }
+      .edge { fill: none; stroke: #52677d; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1000" height="560" fill="#ffffff"/>
+  <rect class="source box" x="40" y="215" width="160" height="70"/>
+  <text x="120" y="244">Sort fields</text><text class="small" x="120" y="267">[dept, name]</text>
+  <rect class="scan box" x="40" y="80" width="180" height="70"/>
+  <text x="130" y="109">Left ValueScan</text><text class="small" x="130" y="132">dept, then name</text>
+  <rect class="scan box" x="40" y="350" width="180" height="70"/>
+  <text x="130" y="379">Right ValueScan</text><text class="small" x="130" y="402">dept, then name</text>
+  <rect class="compare box" x="340" y="215" width="210" height="70"/>
+  <text x="445" y="244">query.Constant.Compare</text><text class="small" x="445" y="267">current field pair</text>
+  <polygon class="compare" points="685,205 750,260 685,315 620,260" stroke-width="2"/>
+  <text x="685" y="265">non-zero?</text>
+  <rect class="result box" x="820" y="95" width="170" height="75"/>
+  <text x="905" y="124">Return first ordering</text><text class="small" x="905" y="147">negative or positive</text>
+  <rect class="next box" x="340" y="390" width="220" height="70"/>
+  <text x="450" y="419">Equal: compare next field</text><text class="small" x="450" y="442">dept → name</text>
+  <rect class="result box" x="650" y="405" width="160" height="65"/>
+  <text x="730" y="433">All fields equal</text><text class="small" x="730" y="455">return 0</text>
+  <path class="edge" d="M200 250 L340 250"/>
+  <path class="edge" d="M220 115 C280 115 280 225 340 235"/>
+  <path class="edge" d="M220 385 C285 385 285 275 340 265"/>
+  <path class="edge" d="M550 250 L620 260"/>
+  <path class="edge" d="M728 224 C770 205 785 160 820 145"/>
+  <text class="small" x="775" y="193">yes</text>
+  <path class="edge" d="M685 315 L685 350 C685 375 590 390 560 415"/>
+  <text class="small" x="708" y="350">no</text>
+  <path class="edge" d="M340 425 C285 425 290 300 410 285"/>
+  <text class="small" x="295" y="371">more fields</text>
+  <path class="edge" d="M560 425 L650 438"/>
+  <text class="small" x="605" y="414">last field</text>
+</svg>
