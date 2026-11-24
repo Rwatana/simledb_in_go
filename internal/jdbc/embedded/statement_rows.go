@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"io"
+	"reflect"
 
 	"github.com/Rwatana/simledb_in_go/internal/query"
 	"github.com/Rwatana/simledb_in_go/internal/record"
@@ -18,6 +19,7 @@ type statementRows struct {
 
 var _ driver.Rows = (*statementRows)(nil)
 var _ driver.RowsColumnTypeDatabaseTypeName = (*statementRows)(nil)
+var _ driver.RowsColumnTypeScanType = (*statementRows)(nil)
 
 func newStatementRows(scan query.Scan, schema *record.Schema) (*statementRows, error) {
 	if scan == nil {
@@ -52,6 +54,25 @@ func (rows *statementRows) ColumnTypeDatabaseTypeName(index int) string {
 		return "VARCHAR"
 	default:
 		return ""
+	}
+}
+
+// ColumnTypeScanType reports the Go type used to scan a result column.
+func (rows *statementRows) ColumnTypeScanType(index int) reflect.Type {
+	if rows == nil || rows.schema == nil || index < 0 || index >= len(rows.columns) {
+		return nil
+	}
+	definition, ok := rows.schema.Field(rows.columns[index])
+	if !ok {
+		return nil
+	}
+	switch definition.Type {
+	case record.IntegerField:
+		return reflect.TypeOf(int64(0))
+	case record.VarcharField:
+		return reflect.TypeOf("")
+	default:
+		return nil
 	}
 }
 

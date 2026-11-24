@@ -101,6 +101,46 @@ func TestStatementRowsReportsDatabaseTypeNames(t *testing.T) {
 	}
 }
 
+func TestStatementRowsReportsScanTypes(t *testing.T) {
+	var schema record.Schema
+	schema.AddVarcharField("name", 20)
+	schema.AddIntegerField("id")
+	rows := &statementRows{schema: &schema, columns: schema.Fields()}
+	var driverRows driver.Rows = rows
+	metadata, ok := driverRows.(driver.RowsColumnTypeScanType)
+	if !ok {
+		t.Fatal("statement rows do not implement driver.RowsColumnTypeScanType")
+	}
+	for index, want := range []reflect.Type{reflect.TypeOf(""), reflect.TypeOf(int64(0))} {
+		if got := metadata.ColumnTypeScanType(index); got != want {
+			t.Errorf("ColumnTypeScanType(%d) = %v, want %v", index, got, want)
+		}
+	}
+	for _, index := range []int{-1, 2} {
+		if got := metadata.ColumnTypeScanType(index); got != nil {
+			t.Errorf("ColumnTypeScanType(%d) = %v, want nil", index, got)
+		}
+	}
+	if got := (*statementRows)(nil).ColumnTypeScanType(0); got != nil {
+		t.Errorf("nil ColumnTypeScanType(0) = %v, want nil", got)
+	}
+	if got := (&statementRows{columns: []string{"name"}}).ColumnTypeScanType(0); got != nil {
+		t.Errorf("missing-schema ColumnTypeScanType(0) = %v, want nil", got)
+	}
+
+	missingField := &statementRows{schema: &record.Schema{}, columns: []string{"missing"}}
+	if got := missingField.ColumnTypeScanType(0); got != nil {
+		t.Errorf("missing-field ColumnTypeScanType(0) = %v, want nil", got)
+	}
+
+	var unsupportedSchema record.Schema
+	unsupportedSchema.AddField("unknown", record.FieldType(99), 0)
+	unsupported := &statementRows{schema: &unsupportedSchema, columns: unsupportedSchema.Fields()}
+	if got := unsupported.ColumnTypeScanType(0); got != nil {
+		t.Errorf("unsupported ColumnTypeScanType(0) = %v, want nil", got)
+	}
+}
+
 func TestStatementRowsReportsInvalidStateAndScanFailures(t *testing.T) {
 	destination := []driver.Value{nil}
 	if err := (*statementRows)(nil).Next(destination); err == nil || !strings.Contains(err.Error(), "rows") {

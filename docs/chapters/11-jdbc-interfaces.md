@@ -127,10 +127,11 @@ the active caller-owned transaction and returns its projected fields through `dr
 `Stmt.QueryContext` rejects nil or canceled contexts before creating the plan, then uses the same caller-owned
 transaction and row path. `driver.RowsColumnTypeDatabaseTypeName` reports `VARCHAR` and `INTEGER` from the projected
 schema in column order, so `database/sql.Rows.ColumnTypes()` exposes those database-specific names without advancing
-the scan. Scan types, lengths, precision, and nullability remain independent optional metadata behaviors. The
-[statement lifecycle and query diagram](../diagrams/ch11-embedded-statement.svg) shows how a prepared statement opens
-a scan and returns rows plus database type names; its [editable Draw.io source](../diagrams/ch11-embedded-statement.drawio)
-is kept beside the SVG.
+the scan. `driver.RowsColumnTypeScanType` reports `string` for varchar values and `int64` for integer values, matching
+the driver's row values. Varchar lengths, precision, and nullability remain independent optional metadata behaviors.
+The [statement lifecycle and query diagram](../diagrams/ch11-embedded-statement.svg) shows how a prepared statement
+opens a scan and returns rows plus database and Go scan type metadata; its [editable Draw.io
+source](../diagrams/ch11-embedded-statement.drawio) is kept beside the SVG.
 The [update execution diagram](../diagrams/ch11-embedded-update-execution.svg) shows transaction ownership during a
 statement call; its [editable Draw.io source](../diagrams/ch11-embedded-update-execution.drawio) is maintained too.
 
@@ -184,6 +185,7 @@ needs them.
 | `TestNewStatementRowsValidatesScanAndSchema` | Result rows reject missing scans and schemas |
 | `TestStatementRowsReturnsTypedValuesAndClosesUnderlyingScan` | Rows expose defensive column names, map supported values, report EOF, and close once |
 | `TestStatementRowsReportsDatabaseTypeNames` | Driver rows and `database/sql.Rows.ColumnTypes()` report projected integer and varchar database type names |
+| `TestStatementRowsReportsScanTypes` | Driver rows and `database/sql.Rows.ColumnTypes()` report the Go types used to scan projected integer and varchar values |
 | `TestStatementRowsReportsInvalidStateAndScanFailures` | Closed rows, wrong destinations, scan/read errors, unsupported types, and close failures are returned |
 | `TestDatabaseSQLExecutesUpdatesInsideExplicitTransaction` | CREATE TABLE and INSERT execute through `sql.Tx`, report affected rows, commit, and roll back independently |
 | `TestConnectionTracksOneActiveTransactionForStatementExecution` | A connection rejects nested transactions and becomes reusable after explicit completion |
