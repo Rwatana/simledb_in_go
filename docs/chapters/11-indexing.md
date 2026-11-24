@@ -508,6 +508,21 @@ The focused tests first failed because `Page.Close` was undefined. Tests verify 
 close, closed-page search rejection, absent-block no-op, nil and typed-nil state, wrapped unpin failure, preserved state,
 and successful retry.
 
+## Feature 39: Check B-tree page capacity
+
+Java `BTPage.isFull` checks whether the position of the next record slot is at or beyond the transaction block size.
+Go's `Page.IsFull` uses the same eight-byte page header and the retained layout slot size, and reports whether
+`8 + (recordCount + 1) * slotSize >= blockSize`. It returns errors for invalid or closed page state, malformed counts
+or sizes, position overflow, and record-count/block-size read failures while preserving the underlying error causes.
+The [B-tree page capacity diagram](../diagrams/ch11-btree-page-capacity.svg) shows the boundary comparison and its
+editable source is [`ch11-btree-page-capacity.drawio`](../diagrams/ch11-btree-page-capacity.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.IsFull` was undefined. Tests cover a fitting next slot, exact capacity,
+an over-capacity position, invalid and closed state, negative counts, invalid block sizes, position overflow, and
+wrapped count/block-size read failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -525,3 +540,4 @@ and successful retry.
 - `IndexJoinScan.Close` attempts all retained resources in Java order and joins Go close errors while preserving each cause.
 - `btree.NewPage` rejects invalid transaction, layout, and block inputs before pinning and returns pin failures as Go errors with their original causes.
 - `btree.Page.Close` preserves the current block after an unpin error so the caller can retry; repeated successful close calls are no-ops.
+- `btree.Page.IsFull` returns contextual Go errors for invalid page state, invalid capacity metadata, arithmetic overflow, and block-size reads instead of relying on Java's unchecked transaction calls.
