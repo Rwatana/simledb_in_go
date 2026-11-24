@@ -16,6 +16,16 @@ type chunkTransactionProbe struct {
 	unpins      []storage.BlockID
 	pinErrors   map[int]error
 	unpinErrors map[int][]error
+	blockSize   int
+	blockErr    error
+	intReads    []chunkRead
+	intValues   map[int]map[int]int32
+	intErrors   map[int]map[int]error
+}
+
+type chunkRead struct {
+	block  storage.BlockID
+	offset int
 }
 
 func (transaction *chunkTransactionProbe) Pin(block storage.BlockID) error {
@@ -23,9 +33,17 @@ func (transaction *chunkTransactionProbe) Pin(block storage.BlockID) error {
 	return transaction.pinErrors[block.Number()]
 }
 
-func (transaction *chunkTransactionProbe) BlockSize() (int, error) { return 0, nil }
+func (transaction *chunkTransactionProbe) BlockSize() (int, error) {
+	return transaction.blockSize, transaction.blockErr
+}
 
-func (*chunkTransactionProbe) GetInt(storage.BlockID, int) (int32, error) { return 0, nil }
+func (transaction *chunkTransactionProbe) GetInt(block storage.BlockID, offset int) (int32, error) {
+	transaction.intReads = append(transaction.intReads, chunkRead{block: block, offset: offset})
+	if err := transaction.intErrors[block.Number()][offset]; err != nil {
+		return 0, err
+	}
+	return transaction.intValues[block.Number()][offset], nil
+}
 
 func (*chunkTransactionProbe) GetString(storage.BlockID, int) (string, error) { return "", nil }
 
@@ -195,6 +213,129 @@ func TestChunkScanCloseAcceptsNilReceiver(t *testing.T) {
 	}
 	if err := (&ChunkScan{}).Close(); err != nil {
 		t.Fatalf("Close() on zero-value scan = %v, want nil", err)
+	}
+}
+
+func TestChunkScanNextWalksOccupiedSlotsOnlyInCurrentBlockAndRewinds(t *testing.T) {
+	transaction := &chunkTransactionProbe{
+		blockSize: 24,
+		intValues: map[int]map[int]int32{
+			5: {0: 0, 8: 1, 16: 1},
+			6: {0: 1, 8: 1, 16: 1},
+		},
+	}
+	scan, err := NewChunkScan(transaction, "records.tbl", chunkLayout(), 5, 6)
+	if err != nil {
+		t.Fatalf("NewChunkScan() error = %v", err)
+	}
+	if scan.currentPage != 0 || scan.currentSlot != -1 || !scan.ready {
+		t.Fatalf("initial cursor = page %d, slot %d, ready %v; want page 0, slot -1, ready", scan.currentPage, scan.currentSlot, scan.ready)
+	}
+	for _, wantSlot := range []int{1, 2} {
+		got, err := scan.Next()
+		if err != nil || !got || scan.currentSlot != wantSlot {
+			t.Fatalf("Next() at slot %d = (%v, %v) with current slot %d, want (true, nil) at %d", wantSlot, got, err, scan.currentSlot, wantSlot)
+		}
+	}
+	if got, err := scan.Next(); got || err != nil {
+		t.Fatalf("Next() at end of first block = (%v, %v), want (false, nil)", got, err)
+	}
+	readsAtExhaustion := len(transaction.intReads)
+	if got, err := scan.Next(); got || err != nil || len(transaction.intReads) != readsAtExhaustion {
+		t.Fatalf("repeated Next() at end of first block = (%v, %v), reads %d; want no row, error, or additional read", got, err, len(transaction.intReads))
+	}
+	if got, want := transaction.intReads[len(transaction.intReads)-1].block.Number(), 5; got != want {
+		t.Fatalf("last read block = %d, want current block %d without rollover", got, want)
+	}
+	if got, want := transaction.pins, chunkBlocks(5, 6); !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins after traversal = %v, want unchanged %v", got, want)
+	}
+	if err := scan.BeforeFirst(); err != nil {
+		t.Fatalf("BeforeFirst() error = %v", err)
+	}
+	if scan.currentPage != 0 || scan.currentSlot != -1 || scan.exhausted {
+		t.Fatalf("cursor after rewind = page %d, slot %d, exhausted %v; want page 0, slot -1, not exhausted", scan.currentPage, scan.currentSlot, scan.exhausted)
+	}
+	if got, err := scan.Next(); err != nil || !got || scan.currentSlot != 1 {
+		t.Fatalf("Next() after rewind = (%v, %v) at slot %d, want (true, nil) at 1", got, err, scan.currentSlot)
+	}
+	if got, want := transaction.pins, chunkBlocks(5, 6); !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins after rewind = %v, want unchanged %v", got, want)
+	}
+}
+
+func TestChunkScanNextReportsPageErrorsWithoutMovingCursor(t *testing.T) {
+	blockErr := errors.New("block size failed")
+	transaction := &chunkTransactionProbe{blockErr: blockErr}
+	scan, err := NewChunkScan(transaction, "records.tbl", chunkLayout(), 3, 3)
+	if err != nil {
+		t.Fatalf("NewChunkScan() error = %v", err)
+	}
+	if got, err := scan.Next(); got || !errors.Is(err, blockErr) || !strings.Contains(err.Error(), "block 3") {
+		t.Fatalf("Next() with block-size error = (%v, %v), want wrapped cause and block context", got, err)
+	}
+	if scan.currentSlot != -1 {
+		t.Fatalf("current slot after block-size error = %d, want -1", scan.currentSlot)
+	}
+
+	readErr := errors.New("record flag read failed")
+	transaction = &chunkTransactionProbe{blockSize: 8, intErrors: map[int]map[int]error{4: {0: readErr}}}
+	scan, err = NewChunkScan(transaction, "records.tbl", chunkLayout(), 4, 4)
+	if err != nil {
+		t.Fatalf("second NewChunkScan() error = %v", err)
+	}
+	if got, err := scan.Next(); got || !errors.Is(err, readErr) || !strings.Contains(err.Error(), "block 4") {
+		t.Fatalf("Next() with record-read error = (%v, %v), want wrapped cause and block context", got, err)
+	}
+	if scan.currentSlot != -1 {
+		t.Fatalf("current slot after record-read error = %d, want -1", scan.currentSlot)
+	}
+}
+
+func TestChunkScanBeforeFirstAndNextRejectUnavailableCursor(t *testing.T) {
+	cleanupErr := errors.New("cleanup failed")
+	partialTransaction := &chunkTransactionProbe{
+		pinErrors:   map[int]error{5: errors.New("pin failed")},
+		unpinErrors: map[int][]error{4: {cleanupErr}},
+	}
+	partialScan, err := NewChunkScan(partialTransaction, "records.tbl", chunkLayout(), 4, 5)
+	if partialScan == nil || !errors.Is(err, cleanupErr) {
+		t.Fatalf("partial NewChunkScan() = (%v, %v), want a scan retaining the failed cleanup", partialScan, err)
+	}
+	closedScan, err := NewChunkScan(&chunkTransactionProbe{}, "records.tbl", chunkLayout(), 0, 0)
+	if err != nil {
+		t.Fatalf("closed scan setup error = %v", err)
+	}
+	if err := closedScan.Close(); err != nil {
+		t.Fatalf("close scan setup = %v", err)
+	}
+	badCursor, err := NewChunkScan(&chunkTransactionProbe{}, "records.tbl", chunkLayout(), 0, 0)
+	if err != nil {
+		t.Fatalf("bad cursor setup error = %v", err)
+	}
+	badCursor.currentPage = 1
+	tests := []struct {
+		name string
+		scan *ChunkScan
+	}{
+		{name: "nil receiver"},
+		{name: "zero value", scan: &ChunkScan{}},
+		{name: "partial initialization", scan: partialScan},
+		{name: "closed", scan: closedScan},
+		{name: "invalid page index", scan: badCursor},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.scan.BeforeFirst(); err == nil {
+				t.Fatal("BeforeFirst() error = nil, want unavailable cursor error")
+			}
+			if got, err := test.scan.Next(); got || err == nil {
+				t.Fatalf("Next() = (%v, %v), want unavailable cursor error", got, err)
+			}
+		})
+	}
+	if err := partialScan.Close(); err != nil {
+		t.Fatalf("retry partial scan cleanup = %v", err)
 	}
 }
 
