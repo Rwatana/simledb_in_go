@@ -1,39 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title description">
-  <title id="title">Chapter 11 Feature 1: Compose the SimpleDB managers</title>
-  <desc id="description">Explicit database settings build a file manager, then a log manager, then a buffer manager. A successful result returns the complete set; any construction failure returns a contextual error and no partial set.</desc>
+  <title id="title">Chapter 11 Feature 3: Compose server managers and metadata</title>
+  <desc id="description">Explicit database settings create the file manager, log manager, and buffer manager in order. A fresh in-memory metadata facade is then composed into the successful manager set. A low-level initialization error returns no partial set; catalog files are initialized separately.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#374151"/></marker>
     <marker id="error-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#dc2626"/></marker>
     <style>
-      .title{font:700 27px system-ui,sans-serif;fill:#1f2937}.label{font:700 18px system-ui,sans-serif;fill:#111827}.small{font:15px system-ui,sans-serif;fill:#374151}.box{stroke-width:2}.line{fill:none;stroke:#374151;stroke-width:2;marker-end:url(#arrow)}.errorline{fill:none;stroke:#dc2626;stroke-width:2;stroke-dasharray:7 5;marker-end:url(#error-arrow)}
+      .title{font:700 26px system-ui,sans-serif;fill:#1f2937}.label{font:700 17px system-ui,sans-serif;fill:#111827}.small{font:14px system-ui,sans-serif;fill:#374151}.box{stroke-width:2}.line{fill:none;stroke:#374151;stroke-width:2;marker-end:url(#arrow)}.errorline{fill:none;stroke:#dc2626;stroke-width:2;stroke-dasharray:7 5;marker-end:url(#error-arrow)}
     </style>
   </defs>
   <rect width="1280" height="720" fill="#ffffff"/>
-  <text class="title" x="640" y="60" text-anchor="middle">Chapter 11 / Feature 1: Compose the SimpleDB managers</text>
-  <rect class="box" x="55" y="245" width="200" height="145" rx="16" fill="#e0f2fe" stroke="#0284c7"/>
-  <text class="label" x="155" y="285" text-anchor="middle">Database settings</text>
-  <text class="small" x="155" y="318" text-anchor="middle">directory</text>
-  <text class="small" x="155" y="343" text-anchor="middle">block size · buffer count</text>
-  <rect class="box" x="315" y="260" width="190" height="110" rx="16" fill="#dcfce7" stroke="#16a34a"/>
-  <text class="label" x="410" y="304" text-anchor="middle">File Manager</text>
-  <text class="small" x="410" y="335" text-anchor="middle">fixed-size blocks</text>
-  <rect class="box" x="565" y="260" width="190" height="110" rx="16" fill="#fef3c7" stroke="#d97706"/>
-  <text class="label" x="660" y="304" text-anchor="middle">Log Manager</text>
-  <text class="small" x="660" y="335" text-anchor="middle">simpledb.log</text>
-  <rect class="box" x="815" y="260" width="205" height="110" rx="16" fill="#ede9fe" stroke="#7c3aed"/>
-  <text class="label" x="917" y="304" text-anchor="middle">Buffer Manager</text>
-  <text class="small" x="917" y="335" text-anchor="middle">configured frame pool</text>
-  <rect class="box" x="1080" y="260" width="170" height="110" rx="16" fill="#f3f4f6" stroke="#4b5563"/>
-  <text class="label" x="1165" y="301" text-anchor="middle">Complete set</text>
-  <text class="small" x="1165" y="332" text-anchor="middle">returned on success</text>
-  <path class="line" d="M255 317 H315"/><text class="small" x="285" y="300" text-anchor="middle">1</text>
-  <path class="line" d="M505 315 H565"/><text class="small" x="535" y="298" text-anchor="middle">2</text>
-  <path class="line" d="M755 315 H815"/><text class="small" x="785" y="298" text-anchor="middle">3</text>
-  <path class="line" d="M1020 315 H1080"/>
-  <rect class="box" x="475" y="505" width="330" height="95" rx="16" fill="#fee2e2" stroke="#dc2626"/>
-  <text class="label" x="640" y="544" text-anchor="middle">Any stage fails</text>
-  <text class="small" x="640" y="573" text-anchor="middle">contextual error · nil manager set</text>
-  <path class="errorline" d="M410 370 V440 H540 V505"/>
-  <path class="errorline" d="M660 370 V505"/>
-  <path class="errorline" d="M917 370 V440 H740 V505"/>
+  <text class="title" x="640" y="60" text-anchor="middle">Chapter 11 / Feature 3: Compose server managers and metadata</text>
+  <rect class="box" x="35" y="245" width="175" height="130" rx="16" fill="#e0f2fe" stroke="#0284c7"/>
+  <text class="label" x="122" y="282" text-anchor="middle">Database settings</text>
+  <text class="small" x="122" y="314" text-anchor="middle">directory</text>
+  <text class="small" x="122" y="339" text-anchor="middle">block size · buffer count</text>
+  <rect class="box" x="250" y="255" width="155" height="110" rx="16" fill="#dcfce7" stroke="#16a34a"/>
+  <text class="label" x="327" y="298" text-anchor="middle">File Manager</text>
+  <text class="small" x="327" y="329" text-anchor="middle">fixed-size blocks</text>
+  <rect class="box" x="440" y="255" width="155" height="110" rx="16" fill="#fef3c7" stroke="#d97706"/>
+  <text class="label" x="517" y="298" text-anchor="middle">Log Manager</text>
+  <text class="small" x="517" y="329" text-anchor="middle">simpledb.log</text>
+  <rect class="box" x="630" y="255" width="160" height="110" rx="16" fill="#ede9fe" stroke="#7c3aed"/>
+  <text class="label" x="710" y="298" text-anchor="middle">Buffer Manager</text>
+  <text class="small" x="710" y="329" text-anchor="middle">configured frame pool</text>
+  <rect class="box" x="825" y="255" width="190" height="110" rx="16" fill="#fce7f3" stroke="#db2777"/>
+  <text class="label" x="920" y="298" text-anchor="middle">Metadata Manager</text>
+  <text class="small" x="920" y="329" text-anchor="middle">fresh in-memory facade</text>
+  <rect class="box" x="1050" y="255" width="190" height="110" rx="16" fill="#f3f4f6" stroke="#4b5563"/>
+  <text class="label" x="1145" y="298" text-anchor="middle">Complete set</text>
+  <text class="small" x="1145" y="329" text-anchor="middle">returned on success</text>
+  <path class="line" d="M210 310 H250"/>
+  <path class="line" d="M405 310 H440"/><text class="small" x="422" y="292" text-anchor="middle">1</text>
+  <path class="line" d="M595 310 H630"/><text class="small" x="612" y="292" text-anchor="middle">2</text>
+  <path class="line" d="M790 310 H825"/><text class="small" x="807" y="292" text-anchor="middle">3</text>
+  <path class="line" d="M1015 310 H1050"/><text class="small" x="1032" y="292" text-anchor="middle">4</text>
+  <rect class="box" x="460" y="500" width="360" height="95" rx="16" fill="#fee2e2" stroke="#dc2626"/>
+  <text class="label" x="640" y="538" text-anchor="middle">Any low-level stage fails</text>
+  <text class="small" x="640" y="567" text-anchor="middle">contextual error · nil manager set</text>
+  <path class="errorline" d="M327 365 V440 H530 V500"/>
+  <path class="errorline" d="M517 365 V500"/>
+  <path class="errorline" d="M710 365 V440 H750 V500"/>
+  <text class="small" x="640" y="640" text-anchor="middle">Catalog file initialization is a separate, transaction-backed operation.</text>
 </svg>

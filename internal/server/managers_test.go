@@ -51,6 +51,25 @@ func TestNewManagersUsesConfiguredFileLogAndBufferManagers(t *testing.T) {
 	}
 }
 
+func TestNewManagersCreatesIndependentMetadataManagers(t *testing.T) {
+	t.Parallel()
+
+	first, err := NewManagers(filepath.Join(t.TempDir(), "first"), 64, 2)
+	if err != nil {
+		t.Fatalf("NewManagers(first) error = %v", err)
+	}
+	second, err := NewManagers(filepath.Join(t.TempDir(), "second"), 64, 2)
+	if err != nil {
+		t.Fatalf("NewManagers(second) error = %v", err)
+	}
+	if first.Metadata == nil || second.Metadata == nil {
+		t.Fatal("NewManagers() returned a nil metadata manager")
+	}
+	if first.Metadata == second.Metadata {
+		t.Fatal("NewManagers() shared a metadata manager between independent server sets")
+	}
+}
+
 func TestNewManagersReturnsNoManagersWhenFileManagerFails(t *testing.T) {
 	t.Parallel()
 

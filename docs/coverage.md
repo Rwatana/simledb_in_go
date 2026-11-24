@@ -9,6 +9,33 @@ Documentation, Go coverage, Go test, Go vet, Issue closing reference, Issue poli
 title. Issue policy runs on issue events; the other checks validate pull requests. There is no current
 `pull-request-policy.yml` workflow.
 
+## Latest audit checkpoint: 2026-11-24
+
+The uncached full-module command `go test ./... -count=1 -coverprofile=coverage.out` reports 100.0% statement
+coverage in every executable package. `go tool cover -func=coverage.out` reports 100.0% for every executable function
+and the module total; the profile has no uncovered statements. The interface-only `internal/index` package contains no
+statements.
+
+| Package | Statement coverage |
+| --- | ---: |
+| `internal/buffer` | 100.0% |
+| `internal/concurrency` | 100.0% |
+| `internal/index` | No statements |
+| `internal/index/btree` | 100.0% |
+| `internal/index/hash` | 100.0% |
+| `internal/index/query` | 100.0% |
+| `internal/infrastructure/file` | 100.0% |
+| `internal/log` | 100.0% |
+| `internal/metadata` | 100.0% |
+| `internal/parse` | 100.0% |
+| `internal/plan` | 100.0% |
+| `internal/query` | 100.0% |
+| `internal/record` | 100.0% |
+| `internal/recovery` | 100.0% |
+| `internal/server` | 100.0% |
+| `internal/storage` | 100.0% |
+| `internal/transaction` | 100.0% |
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
