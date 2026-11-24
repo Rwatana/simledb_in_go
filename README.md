@@ -78,7 +78,7 @@
 
 ## 次の一歩
 
-Chapter 11 JDBC Interfacesでは、`internal/server.NewManagers`でfile・log・buffer managerを明示設定から組み立て、独立したmetadata managerとbasic query/update plannerを加えた共有管理セットからSTART記録付きtransactionを生成します。呼び出し側が所有するtransactionを使ったcatalog初期化、明示呼び出しによるprocess-restart recovery、SQL SELECTの解析とplanning、SQL update commandのplanner dispatch、Query plannerのbasic/cost-aware選択を追加しました。Embedded connectionはtransactionの開始とcommit/rollbackをGo標準driver contractで公開し、Connectorはそのmanager setを`sql.OpenDB`と結び付けます。statementはSQL updateを明示的な`sql.Tx`内で実行しaffected-row数を返し、`sql.DB.Exec`は独立transactionでcommitします。connection-level `ExecContext`は開始前のcontext cancellationを確認します。parameter binding、prepared statement context execution、SQL SELECT実行とrows、connector URL parsing、network clientは別の振る舞いとして後続に分けます。
+Chapter 11 JDBC Interfacesでは、`internal/server.NewManagers`でfile・log・buffer managerを明示設定から組み立て、独立したmetadata managerとbasic query/update plannerを加えた共有管理セットからSTART記録付きtransactionを生成します。呼び出し側が所有するtransactionを使ったcatalog初期化、明示呼び出しによるprocess-restart recovery、SQL SELECTの解析とplanning、SQL update commandのplanner dispatch、Query plannerのbasic/cost-aware選択を追加しました。Embedded connectionはtransactionの開始とcommit/rollbackをGo標準driver contractで公開し、Connectorはそのmanager setを`sql.OpenDB`と結び付けます。statementはSQL updateを明示的な`sql.Tx`内で実行しaffected-row数を返し、`sql.DB.Exec`は独立transactionでcommitします。connectionとprepared statementの`ExecContext`は開始前のcontext cancellationを確認します。parameter binding、SQL SELECT実行とrows、connector URL parsing、network clientは別の振る舞いとして後続に分けます。
 
 Chapter 12 Indexingでは、値/RIDベースの索引走査契約、100個の静的hash bucketへのJava互換キー割当、静的hash indexの探索コスト見積もり、hashとB-treeの初期化・走査・挿入・削除、索引scan/plan、B-tree page・分割・root growthを実装しています。葉とdirectory pageを同時にpinせず、1 frameでも探索できるようにしています。
 
