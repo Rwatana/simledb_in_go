@@ -1,0 +1,95 @@
+package embedded
+
+import (
+	"database/sql/driver"
+	"fmt"
+	"io"
+
+	"github.com/Rwatana/simledb_in_go/internal/query"
+	"github.com/Rwatana/simledb_in_go/internal/record"
+)
+
+type statementRows struct {
+	scan    query.Scan
+	schema  *record.Schema
+	columns []string
+	closed  bool
+}
+
+var _ driver.Rows = (*statementRows)(nil)
+
+func newStatementRows(scan query.Scan, schema *record.Schema) (*statementRows, error) {
+	if scan == nil {
+		return nil, fmt.Errorf("create embedded statement rows: scan is nil")
+	}
+	if schema == nil {
+		return nil, fmt.Errorf("create embedded statement rows: schema is nil")
+	}
+	return &statementRows{scan: scan, schema: schema, columns: schema.Fields()}, nil
+}
+
+func (rows *statementRows) Columns() []string {
+	if rows == nil {
+		return nil
+	}
+	return append([]string(nil), rows.columns...)
+}
+
+func (rows *statementRows) Close() error {
+	if rows == nil {
+		return fmt.Errorf("close embedded statement rows: rows are nil")
+	}
+	if rows.closed {
+		return nil
+	}
+	rows.closed = true
+	if rows.scan == nil {
+		return fmt.Errorf("close embedded statement rows: scan is nil")
+	}
+	if err := rows.scan.Close(); err != nil {
+		return fmt.Errorf("close embedded statement rows scan: %w", err)
+	}
+	return nil
+}
+
+func (rows *statementRows) Next(destination []driver.Value) error {
+	if rows == nil {
+		return fmt.Errorf("advance embedded statement rows: rows are nil")
+	}
+	if rows.closed {
+		return fmt.Errorf("advance embedded statement rows: rows are closed")
+	}
+	if rows.scan == nil || rows.schema == nil {
+		return fmt.Errorf("advance embedded statement rows: scan or schema is nil")
+	}
+	if len(destination) != len(rows.columns) {
+		return fmt.Errorf("advance embedded statement rows: destination has %d values for %d columns", len(destination), len(rows.columns))
+	}
+	available, err := rows.scan.Next()
+	if err != nil {
+		return fmt.Errorf("advance embedded statement rows scan: %w", err)
+	}
+	if !available {
+		return io.EOF
+	}
+	for index, name := range rows.columns {
+		definition, _ := rows.schema.Field(name)
+		switch definition.Type {
+		case record.IntegerField:
+			value, err := rows.scan.GetInt(name)
+			if err != nil {
+				return fmt.Errorf("read embedded statement integer column %q: %w", name, err)
+			}
+			destination[index] = int64(value)
+		case record.VarcharField:
+			value, err := rows.scan.GetString(name)
+			if err != nil {
+				return fmt.Errorf("read embedded statement string column %q: %w", name, err)
+			}
+			destination[index] = value
+		default:
+			return fmt.Errorf("advance embedded statement rows: column %q has unsupported type %d", name, definition.Type)
+		}
+	}
+	return nil
+}

@@ -118,12 +118,16 @@ beside the SVG.
 
 `Connection.Prepare` retains the SQL string and connection in a `driver.Stmt` handle. `Close` is idempotent, and
 `NumInput` reports `0` because the currently supported statements accept no arguments; parameter parsing and binding
-remain a separate behavior. `database/sql` can therefore reject extra arguments before statement dispatch. `Stmt.Exec` routes zero-argument update SQL through
-`Managers.ExecuteUpdate` using the active connection transaction and returns the planner's affected-row count; the
-transaction remains open for explicit completion. `Stmt.ExecContext` applies the same behavior after rejecting nil or
-canceled contexts and unsupported parameters. `Stmt.Query` still returns `driver.ErrSkip`. Parameter binding, SELECT
-rows, and result metadata remain independent behaviors. The [statement lifecycle diagram](../diagrams/ch11-embedded-statement.svg)
-shows preparation; its [editable Draw.io source](../diagrams/ch11-embedded-statement.drawio) is kept beside the SVG.
+remain a separate behavior. `database/sql` can therefore reject extra arguments before statement dispatch. `Stmt.Exec`
+routes zero-argument update SQL through `Managers.ExecuteUpdate` using the active connection transaction and returns the
+planner's affected-row count; the transaction remains open for explicit completion. `Stmt.ExecContext` applies the same
+behavior after rejecting nil or canceled contexts and unsupported parameters. `Stmt.Query` creates a query plan using
+the active caller-owned transaction and returns its projected fields through `driver.Rows`. Integer columns become
+`int64` driver values, strings remain strings, exhaustion returns `io.EOF`, and closing rows closes the underlying scan.
+Query contexts, parameter binding, and optional result type metadata remain independent behaviors. The
+[statement lifecycle and query diagram](../diagrams/ch11-embedded-statement.svg) shows how a prepared statement opens
+a scan and returns rows; its [editable Draw.io source](../diagrams/ch11-embedded-statement.drawio) is kept beside the
+SVG.
 The [update execution diagram](../diagrams/ch11-embedded-update-execution.svg) shows transaction ownership during a
 statement call; its [editable Draw.io source](../diagrams/ch11-embedded-update-execution.drawio) is maintained too.
 
@@ -169,6 +173,12 @@ needs them.
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
 | `TestStatementRejectsNilAndClosedOperations` | Nil and closed statements return contextual lifecycle errors |
 | `TestPreparedStatementDeclaresZeroInputsToDatabaseSQL` | Extra prepared-statement arguments are rejected by `database/sql` before driver dispatch |
+| `TestPreparedStatementQueryReturnsProjectedRowsToDatabaseSQL` | Prepared SELECT returns ordered columns and typed rows through `database/sql` |
+| `TestStatementQueryRejectsInvalidStateAndArguments` | Prepared queries reject nil, closed, unbound, inactive, and argument-bearing calls |
+| `TestStatementQueryWrapsPlannerOpenAndRowsCreationFailures` | Planner, scan-open, and rejected-result cleanup failures retain query context |
+| `TestNewStatementRowsValidatesScanAndSchema` | Result rows reject missing scans and schemas |
+| `TestStatementRowsReturnsTypedValuesAndClosesUnderlyingScan` | Rows expose defensive column names, map supported values, report EOF, and close once |
+| `TestStatementRowsReportsInvalidStateAndScanFailures` | Closed rows, wrong destinations, scan/read errors, unsupported types, and close failures are returned |
 | `TestDatabaseSQLExecutesUpdatesInsideExplicitTransaction` | CREATE TABLE and INSERT execute through `sql.Tx`, report affected rows, commit, and roll back independently |
 | `TestConnectionTracksOneActiveTransactionForStatementExecution` | A connection rejects nested transactions and becomes reusable after explicit completion |
 | `TestStatementExecRejectsInvalidStateAndWrapsUpdateErrors` | Exec rejects nil, closed, unbound, argument-bearing, malformed, and planner-failing calls |
@@ -205,6 +215,7 @@ undefined. Statement-execution tests first failed because the connection did not
 prepared statement. Autocommit tests first failed because `Connection` did not implement `driver.Execer`. Context-execution
 tests first failed because `Connection` did not implement `driver.ExecerContext`. Prepared-statement context tests first
 failed because the statement adapter did not implement `driver.StmtExecContext`.
+Prepared-query integration tests first failed because `Stmt.Query` returned `driver.ErrSkip` rather than opening a SELECT plan.
 The prepared-statement arity test first failed because `NumInput` reported unknown arity and the driver rejected the
 argument only after dispatch.
 These tests use temporary database directories and keep catalog initialization, explicit process-restart recovery,

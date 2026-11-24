@@ -3,6 +3,7 @@ package embedded
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 )
 
@@ -76,12 +77,47 @@ func (statement *statement) Exec(arguments []driver.Value) (driver.Result, error
 	return driver.RowsAffected(rows), nil
 }
 
-func (statement *statement) Query(_ []driver.Value) (driver.Rows, error) {
+func (statement *statement) Query(arguments []driver.Value) (driver.Rows, error) {
 	if statement == nil {
 		return nil, fmt.Errorf("query embedded statement: statement is nil")
 	}
 	if statement.closed {
 		return nil, fmt.Errorf("query embedded statement: statement is closed")
 	}
-	return nil, driver.ErrSkip
+	if statement.connection == nil {
+		return nil, fmt.Errorf("query embedded statement: connection is nil")
+	}
+	if statement.connection.closed {
+		return nil, fmt.Errorf("query embedded statement: connection is closed")
+	}
+	if statement.connection.managers == nil {
+		return nil, fmt.Errorf("query embedded statement: manager set is nil")
+	}
+	if statement.connection.activeTransaction == nil {
+		return nil, fmt.Errorf("query embedded statement: no active transaction")
+	}
+	if len(arguments) != 0 {
+		return nil, fmt.Errorf("query embedded statement: arguments are not supported")
+	}
+	queryPlan, err := statement.connection.managers.CreateQueryPlan(statement.query, statement.connection.activeTransaction)
+	if err != nil {
+		return nil, fmt.Errorf("query embedded statement: create query plan: %w", err)
+	}
+	if queryPlan == nil {
+		return nil, fmt.Errorf("query embedded statement: query planner returned a nil plan")
+	}
+	scan, err := queryPlan.Open()
+	if err != nil {
+		return nil, fmt.Errorf("query embedded statement: open query scan: %w", err)
+	}
+	rows, err := newStatementRows(scan, queryPlan.Schema())
+	if err != nil {
+		if scan != nil {
+			if closeErr := scan.Close(); closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("close rejected query scan: %w", closeErr))
+			}
+		}
+		return nil, fmt.Errorf("query embedded statement: create result rows: %w", err)
+	}
+	return rows, nil
 }

@@ -41,8 +41,8 @@ func TestNewConnectionValidatesManagersAndImplementsDriverConnection(t *testing.
 	if statement.NumInput() != 0 {
 		t.Errorf("NumInput() = %d, want 0 while parameter binding is unsupported", statement.NumInput())
 	}
-	if rows, err := statement.Query(nil); rows != nil || !errors.Is(err, driver.ErrSkip) {
-		t.Errorf("Query() = (%v, %v), want unsupported query and driver.ErrSkip", rows, err)
+	if rows, err := statement.Query(nil); rows != nil || err == nil || !strings.Contains(err.Error(), "transaction") {
+		t.Errorf("Query() without active transaction = (%v, %v), want transaction error", rows, err)
 	}
 	if err := statement.Close(); err != nil {
 		t.Errorf("statement Close() error = %v", err)
