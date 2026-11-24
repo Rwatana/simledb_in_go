@@ -27,12 +27,16 @@ func NewTempTable(transaction record.TableScanTransaction, schema *record.Schema
 		return nil, fmt.Errorf("create temporary table: schema must not be nil")
 	}
 
+	return newTempTable(transaction, schema), nil
+}
+
+func newTempTable(transaction record.TableScanTransaction, schema *record.Schema) *TempTable {
 	name := fmt.Sprintf("temp%d", nextTemporaryTableNumber.Add(1))
 	return &TempTable{
 		transaction: transaction,
 		tableName:   name,
 		layout:      record.NewLayout(schema),
-	}, nil
+	}
 }
 
 // TableName returns the generated name of the temporary relation.

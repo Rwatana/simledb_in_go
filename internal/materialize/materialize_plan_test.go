@@ -12,24 +12,27 @@ import (
 )
 
 type materializePlan struct {
-	schema        *record.Schema
-	rows          [][]query.Constant
-	records       int
-	blocks        int
-	distinct      map[string]int
-	openErr       error
-	nilScan       bool
-	nextErr       error
-	getValErr     error
-	closeErr      error
-	scan          *materializeSourceScan
-	openCalls     int
-	distinctCalls []string
+	schema          *record.Schema
+	rows            [][]query.Constant
+	records         int
+	blocks          int
+	distinct        map[string]int
+	openErr         error
+	openScanOnError bool
+	nilScan         bool
+	beforeFirstErr  error
+	nextErr         error
+	nextErrAt       int
+	getValErr       error
+	closeErr        error
+	scan            *materializeSourceScan
+	openCalls       int
+	distinctCalls   []string
 }
 
 func (p *materializePlan) Open() (query.Scan, error) {
 	p.openCalls++
-	if p.openErr != nil {
+	if p.openErr != nil && !p.openScanOnError {
 		return nil, p.openErr
 	}
 	if p.nilScan {
@@ -37,7 +40,10 @@ func (p *materializePlan) Open() (query.Scan, error) {
 	}
 	p.scan = &materializeSourceScan{
 		schema: p.schema, rows: p.rows, position: -1,
-		nextErr: p.nextErr, getValErr: p.getValErr, closeErr: p.closeErr,
+		beforeFirstErr: p.beforeFirstErr, nextErr: p.nextErr, nextErrAt: p.nextErrAt, getValErr: p.getValErr, closeErr: p.closeErr,
+	}
+	if p.openErr != nil {
+		return p.scan, p.openErr
 	}
 	return p.scan, nil
 }
@@ -58,6 +64,7 @@ type materializeSourceScan struct {
 	rows           [][]query.Constant
 	position       int
 	nextErr        error
+	nextErrAt      int
 	getValErr      error
 	beforeFirstErr error
 	closeErr       error
@@ -75,7 +82,7 @@ func (s *materializeSourceScan) BeforeFirst() error {
 
 func (s *materializeSourceScan) Next() (bool, error) {
 	s.nextCalls++
-	if s.nextErr != nil {
+	if s.nextErr != nil && (s.nextErrAt == 0 || s.nextCalls == s.nextErrAt) {
 		return false, s.nextErr
 	}
 	if s.position+1 >= len(s.rows) {

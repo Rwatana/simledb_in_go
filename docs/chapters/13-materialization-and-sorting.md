@@ -12,6 +12,7 @@ a file or issue transaction operations.
 | `internal/materialize.MaterializePlan` | `simpledb/materialize/MaterializePlan.java` | Copy an underlying query scan into a temporary table and expose its output scan and cost estimates |
 | `internal/materialize.RecordComparator` | `simpledb/materialize/RecordComparator.java` | Compare the current values of two scans lexicographically in sort-field order |
 | `internal/materialize.SortScan` | `simpledb/materialize/SortScan.java` | Merge one or two sorted temporary-table scans and expose the selected row as a query scan |
+| `internal/materialize.SortPlan` | `simpledb/materialize/SortPlan.java` | Split source rows into sorted runs and merge them in passes into a sorted query scan |
 
 ## Feature 1: Describe a temporary table
 
@@ -132,3 +133,33 @@ Java's `SortScan` exposes a broad `Scan` API and compares its two current run he
 the narrower `query.Scan` contract, opens the runs from their `TempTable` descriptors, and returns errors for failed
 storage operations rather than relying on Java's unchecked exceptions. The returned scan owns and closes both input
 scans; the sort plan that creates runs remains a separate behavior.
+
+## Feature 6: Sort a query plan through temporary runs
+
+`NewSortPlan` validates and retains a transaction, source plan, output schema, and copied sort-field order. `Open`
+rewinds the source and copies rows into temporary tables in their original order. Whenever an adjacent row compares
+lower than the previous row, it closes the current run and starts another. It closes the source after splitting, then
+merges adjacent run pairs through `SortScan` and a destination temporary table until at most two runs remain. The
+returned `SortScan` performs the final merge. Empty input is represented by one empty run, so callers always receive a
+valid query scan. The [sort-plan flow diagram](../diagrams/ch13-sort-plan.svg) shows run detection, repeated merge
+passes, and the final scan; the editable source is
+[`ch13-sort-plan.drawio`](../diagrams/ch13-sort-plan.drawio).
+
+`Schema`, `RecordsOutput`, and `DistinctValues` delegate to the source. `BlocksAccessed` reuses the
+`MaterializePlan` output-size estimate and excludes the one-time sorting work. Errors identify the source, split,
+comparison, merge, or final-open phase and preserve their causes. Scans acquired before a failure are closed; this
+storage API does not provide temporary-file deletion.
+
+### Test-first record
+
+The focused test-first build failed because `SortPlan` and `NewSortPlan` were undefined. Tests cover already-sorted,
+empty, single-run, multiple-run, odd-run, and tie-order results; metadata; incomplete dependencies; source open/rewind/
+read/close and partial-open cleanup; temporary-run initialization, comparison, insert, and field-write failures; merge
+input/destination open, read, write, and close failures; and joined cleanup errors. Every executable statement in
+`internal/materialize` is covered.
+
+### Design decision
+
+Java's `SortPlan` uses a mutable list of temporary tables and unchecked scan operations. Go retains the source plan and
+uses explicit scan interfaces and wrapped errors. Sorted runs are merged pairwise in repeated passes; an unpaired final
+run advances unchanged to the next pass. The final `SortScan` owns the remaining run scans, and callers close it.

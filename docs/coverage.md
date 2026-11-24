@@ -178,6 +178,11 @@ heads. Tests cover interleaving and Java-compatible tie order, single/empty runs
 invalid inputs before storage use, initialization/advance/compare errors, and scan cleanup. The independent workflow
 continues to require 100.0% package, function, and module statement coverage.
 
+Issue #1208 adds `materialize.SortPlan`, splitting source records into comparator-ascending temporary runs and
+merging run pairs over repeated passes. Tests cover sorted, empty, single, odd, and multi-pass runs; Java-compatible
+ties; delegated statistics; source/split/merge/final-open errors; scan cleanup; and preserved causes. The separate
+coverage workflow requires 100.0% statement coverage in every executable package, function, and module total.
+
 Issue #1195 adds `storage.Page.SetString`, converting UTF-8 bytes through the existing `SetBytes` length-prefix path.
 Tests round-trip empty text, embedded NUL, and multibyte text through both string and byte APIs, and verify a failed
 capacity write preserves the original page. The separate coverage workflow continues to enforce 100.0% package,
