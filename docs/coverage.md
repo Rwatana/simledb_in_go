@@ -59,6 +59,13 @@ uncached command `GOCACHE=/tmp/simpledb-go-cache go test ./... -count=1 -coverpr
 reports 100.0% statement coverage for every executable package; `go tool cover -func` reports every executable
 function and module total at 100.0%, with no zero-count statements.
 
+Issue #1125 adds `Managers.CreateQueryPlan`, joining SQL SELECT parsing to the manager set's query planner while
+leaving the supplied transaction caller-owned. Tests cover the successful plan, incomplete managers, a nil
+transaction, parse failures, and planner failures. Uncached
+`GOCACHE=/tmp/simpledb-go-cache go test ./... -count=1 -coverprofile=/tmp/simpledb-coverage-1125-final.out` reports
+100.0% statement coverage in every executable package; `go tool cover -func` reports every executable function and the
+module total at 100.0%, with no zero-count statements. The 100.0% workflow remains an independent status check.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
