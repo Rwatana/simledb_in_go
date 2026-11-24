@@ -119,6 +119,11 @@ Issue #1171 adds `DriverService.Rollback`, which durably rolls back the connecti
 Tests inspect the ROLLBACK/START record sequence and cover invalid state, rollback failure, and a failed successor START
 that leaves the completed transaction detached. The independent coverage workflow keeps all executable code at 100.0%.
 
+Issue #1173 adds `DriverService.Close`, which commits the active network RPC transaction and closes the session without
+starting a successor. RPC tests inspect the final COMMIT record, confirm subsequent session operations fail, and cover
+missing state, repeated close, and commit failure without losing the still-open transaction. The separate coverage
+workflow requires every executable package, function, and module statement to remain at 100.0%.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
