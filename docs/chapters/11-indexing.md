@@ -538,6 +538,19 @@ The focused tests first failed because `Page.GetDataVal` was undefined. Tests co
 layout-derived positions, unchanged pin state, invalid and typed-nil state, missing schema/field/offset, unsupported
 types, negative and overflowing slots, malformed offsets, and wrapped read failures.
 
+## Feature 41: Read a B-tree page flag
+
+Java `BTPage.getFlag` reads the four-byte flag stored at byte offset zero of the current page block. Go's
+`Page.GetFlag` reads that same signed 32-bit value without requiring record-layout metadata or changing the page's pin
+state. It returns contextual errors for nil or closed page state, a nil transaction, and a failed storage read while
+preserving the underlying cause.
+
+### Test-first record
+
+The focused tests first failed because `Page.GetFlag` was undefined. Tests verify positive, zero, and negative flag
+values at offset zero, the absence of layout and pin-state requirements, invalid and typed-nil state, and wrapped read
+failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -557,3 +570,4 @@ types, negative and overflowing slots, malformed offsets, and wrapped read failu
 - `btree.Page.Close` preserves the current block after an unpin error so the caller can retry; repeated successful close calls are no-ops.
 - `btree.Page.IsFull` returns contextual Go errors for invalid page state, invalid capacity metadata, arithmetic overflow, and block-size reads instead of relying on Java's unchecked transaction calls.
 - `btree.Page.GetDataVal` returns typed query constants and contextual Go errors for invalid slots, layout metadata, and storage reads instead of relying on Java's unchecked field access.
+- `btree.Page.GetFlag` reports transaction read failures as Go errors while preserving the signed Java flag value.

@@ -188,6 +188,24 @@ func (page *Page) GetDataVal(slot int) (query.Constant, error) {
 	return query.NewStringConstant(value), nil
 }
 
+// GetFlag reads the B-tree page's flag field from the page header.
+func (page *Page) GetFlag() (int32, error) {
+	if page == nil {
+		return 0, fmt.Errorf("read B-tree page flag: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return 0, fmt.Errorf("read B-tree page flag: page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return 0, fmt.Errorf("read B-tree page flag in block %v: transaction is nil", page.block)
+	}
+	flag, err := page.transaction.GetInt(page.block, 0)
+	if err != nil {
+		return 0, fmt.Errorf("read B-tree page flag in block %v: %w", page.block, err)
+	}
+	return flag, nil
+}
+
 func pageSlotFieldPosition(slot, slotSize, fieldOffset int) (int, error) {
 	return pageSlotFieldPositionForCount(int64(slot), slotSize, fieldOffset)
 }
