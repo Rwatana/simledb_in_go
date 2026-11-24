@@ -364,6 +364,16 @@ delegates to the left scan. Errors identify the selected side and retain their c
 The focused test run first failed because `IndexJoinScan.GetVal` was undefined. Tests verify right-side integer and
 string constants, left-side fallback, invalid receiver/dependencies, and wrapped errors from both selected scans.
 
+## Feature 28: Read string fields from index join scans
+
+`IndexJoinScan.GetString` reads from the right table when it declares the requested field; otherwise it delegates to the
+left scan. The selected string is returned unchanged, and errors retain their wrapped causes.
+
+### Test-first record
+
+The focused tests first failed because `IndexJoinScan.GetString` was undefined. Tests verify right-table and left-scan
+routing, returned strings, invalid receiver/dependencies, and wrapped errors from either selected scan.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

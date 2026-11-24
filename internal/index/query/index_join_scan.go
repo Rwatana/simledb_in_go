@@ -161,3 +161,28 @@ func (scan *IndexJoinScan) GetVal(fieldName string) (query.Constant, error) {
 	}
 	return value, nil
 }
+
+// GetString reads a string field from the right scan when present, otherwise from the left scan.
+func (scan *IndexJoinScan) GetString(fieldName string) (string, error) {
+	if scan == nil {
+		return "", fmt.Errorf("read string field %q through nil index join scan", fieldName)
+	}
+	if scan.lhs == nil {
+		return "", fmt.Errorf("read string field %q through index join scan: left scan is nil", fieldName)
+	}
+	if scan.rhs == nil || scan.rhs.TableScan == nil {
+		return "", fmt.Errorf("read string field %q through index join scan: right table scan is nil", fieldName)
+	}
+	if scan.rhs.HasField(fieldName) {
+		value, err := scan.rhs.GetString(fieldName)
+		if err != nil {
+			return "", fmt.Errorf("read string field %q through index join scan right table: %w", fieldName, err)
+		}
+		return value, nil
+	}
+	value, err := scan.lhs.GetString(fieldName)
+	if err != nil {
+		return "", fmt.Errorf("read string field %q through index join scan left scan: %w", fieldName, err)
+	}
+	return value, nil
+}
