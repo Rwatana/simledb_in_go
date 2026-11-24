@@ -2,6 +2,7 @@ package indexquery
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -34,6 +35,8 @@ type indexJoinIntegerTransaction struct {
 	getStringCalls int
 	getIntBlock    storage.BlockID
 	getIntOffset   int
+	closeEvents    *[]string
+	unpinErr       error
 }
 
 func (transaction *indexJoinIntegerTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
@@ -52,6 +55,16 @@ func (transaction *indexJoinIntegerTransaction) GetString(storage.BlockID, int) 
 		return "", transaction.getStringErr
 	}
 	return transaction.stringValue, nil
+}
+
+func (transaction *indexJoinIntegerTransaction) Unpin(block storage.BlockID) error {
+	if transaction.closeEvents != nil {
+		*transaction.closeEvents = append(*transaction.closeEvents, "right")
+	}
+	if transaction.unpinErr != nil {
+		return transaction.unpinErr
+	}
+	return transaction.positioningTransaction.Unpin(block)
 }
 
 func TestNewIndexJoinScanPositionsIndexFromFirstLeftRow(t *testing.T) {
@@ -477,10 +490,92 @@ func TestIndexJoinScanHasFieldReturnsFalseForInvalidState(t *testing.T) {
 	}
 }
 
+func TestIndexJoinScanCloseClosesAllResourcesInJavaOrder(t *testing.T) {
+	var events []string
+	left := &indexJoinLeftScan{closeEvents: &events}
+	index := &indexJoinPositioningIndex{closeEvents: &events}
+	transaction := &indexJoinIntegerTransaction{positioningTransaction: &positioningTransaction{}, closeEvents: &events}
+	right := newIndexJoinIntegerRecordScan(t, transaction, "id")
+	scan := &IndexJoinScan{lhs: left, index: index, rhs: right}
+
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() error = %v, want nil", err)
+	}
+	if !reflect.DeepEqual(events, []string{"left", "index", "right"}) {
+		t.Fatalf("close order = %v, want left, index, right", events)
+	}
+}
+
+func TestIndexJoinScanCloseAttemptsAllResourcesAndPreservesErrors(t *testing.T) {
+	leftErr := errors.New("left close failed")
+	indexErr := errors.New("index close failed")
+	rightErr := errors.New("right close failed")
+	var events []string
+	left := &indexJoinLeftScan{closeEvents: &events, closeErr: leftErr}
+	index := &indexJoinPositioningIndex{closeEvents: &events, closeErr: indexErr}
+	transaction := &indexJoinIntegerTransaction{
+		positioningTransaction: &positioningTransaction{},
+		closeEvents:            &events,
+		unpinErr:               rightErr,
+	}
+	right := newIndexJoinIntegerRecordScan(t, transaction, "id")
+
+	err := (&IndexJoinScan{lhs: left, index: index, rhs: right}).Close()
+	if !errors.Is(err, leftErr) || !errors.Is(err, indexErr) || !errors.Is(err, rightErr) {
+		t.Fatalf("Close() error = %v, want all three wrapped causes", err)
+	}
+	if !strings.Contains(err.Error(), "index join scan") {
+		t.Fatalf("Close() error = %v, want index join scan context", err)
+	}
+	if !reflect.DeepEqual(events, []string{"left", "index", "right"}) {
+		t.Fatalf("close order after failures = %v, want every resource attempted in order", events)
+	}
+}
+
+func TestIndexJoinScanCloseHandlesNilReceiverAndPartialResources(t *testing.T) {
+	var nilScan *IndexJoinScan
+	if err := nilScan.Close(); err == nil || !strings.Contains(err.Error(), "nil index join scan") {
+		t.Fatalf("Close() on nil receiver error = %v, want nil-receiver error", err)
+	}
+	if err := (&IndexJoinScan{}).Close(); err != nil {
+		t.Fatalf("Close() without resources error = %v, want nil", err)
+	}
+
+	var leftEvents []string
+	if err := (&IndexJoinScan{lhs: &indexJoinLeftScan{closeEvents: &leftEvents}}).Close(); err != nil {
+		t.Fatalf("Close() with only left scan error = %v, want nil", err)
+	}
+	if !reflect.DeepEqual(leftEvents, []string{"left"}) {
+		t.Fatalf("left-only close events = %v, want [left]", leftEvents)
+	}
+
+	var indexEvents []string
+	if err := (&IndexJoinScan{index: &indexJoinPositioningIndex{closeEvents: &indexEvents}}).Close(); err != nil {
+		t.Fatalf("Close() with only index error = %v, want nil", err)
+	}
+	if !reflect.DeepEqual(indexEvents, []string{"index"}) {
+		t.Fatalf("index-only close events = %v, want [index]", indexEvents)
+	}
+
+	var rightEvents []string
+	right := newIndexJoinIntegerRecordScan(t, &indexJoinIntegerTransaction{positioningTransaction: &positioningTransaction{}, closeEvents: &rightEvents}, "id")
+	if err := (&IndexJoinScan{rhs: right}).Close(); err != nil {
+		t.Fatalf("Close() with only right scan error = %v, want nil", err)
+	}
+	if !reflect.DeepEqual(rightEvents, []string{"right"}) {
+		t.Fatalf("right-only close events = %v, want [right]", rightEvents)
+	}
+	if err := (&IndexJoinScan{rhs: &query.RecordScan{}}).Close(); err != nil {
+		t.Fatalf("Close() with absent embedded table scan error = %v, want nil", err)
+	}
+}
+
 type indexJoinPositioningIndex struct {
 	keys        []query.Constant
 	positionErr error
 	closeCalls  int
+	closeEvents *[]string
+	closeErr    error
 }
 
 func (index *indexJoinPositioningIndex) BeforeFirst(key query.Constant) error {
@@ -498,7 +593,10 @@ func (*indexJoinPositioningIndex) Delete(query.Constant, record.RID) error { ret
 
 func (index *indexJoinPositioningIndex) Close() error {
 	index.closeCalls++
-	return nil
+	if index.closeEvents != nil {
+		*index.closeEvents = append(*index.closeEvents, "index")
+	}
+	return index.closeErr
 }
 
 type indexJoinLeftScan struct {
@@ -521,6 +619,8 @@ type indexJoinLeftScan struct {
 	getStringErr     error
 	hasFieldCalls    []string
 	closeCalls       int
+	closeEvents      *[]string
+	closeErr         error
 }
 
 func (scan *indexJoinLeftScan) BeforeFirst() error {
@@ -577,4 +677,10 @@ func (scan *indexJoinLeftScan) HasField(fieldName string) bool {
 	}
 	return scan.fieldNames[fieldName]
 }
-func (scan *indexJoinLeftScan) Close() error { scan.closeCalls++; return nil }
+func (scan *indexJoinLeftScan) Close() error {
+	scan.closeCalls++
+	if scan.closeEvents != nil {
+		*scan.closeEvents = append(*scan.closeEvents, "left")
+	}
+	return scan.closeErr
+}

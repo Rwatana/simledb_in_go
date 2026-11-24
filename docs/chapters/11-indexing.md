@@ -384,6 +384,16 @@ for a nil receiver or unavailable scan dependencies; a field declared on the rig
 The focused tests first failed because `IndexJoinScan.HasField` was undefined. Tests verify right-side precedence,
 left-side fallback, absent fields, invalid state, and short-circuit behavior.
 
+## Feature 30: Close index-join scan resources
+
+`IndexJoinScan.Close` releases the left scan, index, and right table scan in Java order. It attempts every available
+resource and joins contextual errors so each underlying cause remains detectable; a nil receiver returns an error.
+
+### Test-first record
+
+The focused tests first failed because `IndexJoinScan.Close` was undefined. Tests verify close order, all three failures
+being returned, partial resources, an absent embedded right table scan, and nil receiver handling.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -398,3 +408,4 @@ left-side fallback, absent fields, invalid state, and short-circuit behavior.
 - `IndexSelectScan.GetVal` uses the query-level record adapter to return schema-typed constants without making the record package depend on query types.
 - `IndexSelectScan.HasField` reports false for invalid scan state and otherwise delegates to the table schema.
 - `IndexSelectScan.Close` attempts both retained resources in Java order and joins all Go close errors.
+- `IndexJoinScan.Close` attempts all retained resources in Java order and joins Go close errors while preserving each cause.
