@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 11: Initialize catalogs with a caller-owned transaction</title>
+  <desc id="description">Server managers validate a caller transaction, adapt it to the record-scan interface, and ask the metadata manager to create and register its catalogs. The transaction remains active for the caller to commit or roll back.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#374151"/></marker>
+    <marker id="error-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#dc2626"/></marker>
+    <style>
+      .title{font:700 25px system-ui,sans-serif;fill:#1f2937}.label{font:700 17px system-ui,sans-serif;fill:#111827}.small{font:14px system-ui,sans-serif;fill:#374151}.box{stroke-width:2}.line{fill:none;stroke:#374151;stroke-width:2;marker-end:url(#arrow)}.errorline{fill:none;stroke:#dc2626;stroke-width:2;stroke-dasharray:7 5;marker-end:url(#error-arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="680" fill="#ffffff"/>
+  <text class="title" x="600" y="60" text-anchor="middle">Chapter 11 / Initialize catalogs with a caller-owned transaction</text>
+  <rect class="box" x="35" y="225" width="175" height="105" rx="16" fill="#e0f2fe" stroke="#0284c7"/>
+  <text class="label" x="122" y="264" text-anchor="middle">Caller</text>
+  <text class="small" x="122" y="294" text-anchor="middle">active transaction</text>
+  <rect class="box" x="255" y="215" width="190" height="125" rx="16" fill="#dcfce7" stroke="#16a34a"/>
+  <text class="label" x="350" y="260" text-anchor="middle">Server Managers</text>
+  <text class="small" x="350" y="291" text-anchor="middle">validate set and input</text>
+  <rect class="box" x="500" y="215" width="205" height="125" rx="16" fill="#fef3c7" stroke="#d97706"/>
+  <text class="label" x="602" y="258" text-anchor="middle">tableScanTransaction</text>
+  <text class="small" x="602" y="290" text-anchor="middle">record-scan adapter</text>
+  <rect class="box" x="760" y="215" width="205" height="125" rx="16" fill="#ede9fe" stroke="#7c3aed"/>
+  <text class="label" x="862" y="258" text-anchor="middle">MetadataManager</text>
+  <text class="small" x="862" y="290" text-anchor="middle">InitializeCatalogs</text>
+  <rect class="box" x="1010" y="185" width="175" height="185" rx="16" fill="#fce7f3" stroke="#db2777"/>
+  <text class="label" x="1097" y="224" text-anchor="middle">Catalog data</text>
+  <text class="small" x="1097" y="253" text-anchor="middle">Files:</text>
+  <text class="small" x="1097" y="276" text-anchor="middle">tblcat · fldcat</text>
+  <text class="small" x="1097" y="312" text-anchor="middle">Layouts:</text>
+  <text class="small" x="1097" y="335" text-anchor="middle">viewcat · idxcat</text>
+  <rect class="box" x="390" y="455" width="480" height="100" rx="16" fill="#f3f4f6" stroke="#4b5563"/>
+  <text class="label" x="630" y="489" text-anchor="middle">Transaction I/O</text>
+  <text class="small" x="630" y="516" text-anchor="middle">Size · Append · Pin · Read · Write · Unpin</text>
+  <text class="small" x="630" y="540" text-anchor="middle">Caller chooses commit or rollback</text>
+  <rect class="box" x="915" y="460" width="245" height="90" rx="16" fill="#fee2e2" stroke="#dc2626"/>
+  <text class="label" x="1037" y="496" text-anchor="middle">Validation or catalog error</text>
+  <text class="small" x="1037" y="525" text-anchor="middle">wrapped with server context</text>
+  <path class="line" d="M210 277 H255"/>
+  <text class="small" x="232" y="264" text-anchor="middle">pass tx</text>
+  <path class="line" d="M445 277 H500"/>
+  <text class="small" x="472" y="264" text-anchor="middle">adapt</text>
+  <path class="line" d="M705 277 H760"/>
+  <text class="small" x="732" y="264" text-anchor="middle">initialize</text>
+  <path class="line" d="M965 277 H1010"/>
+  <text class="small" x="987" y="264" text-anchor="middle">register</text>
+  <path class="line" d="M602 340 V405 H630 V455"/>
+  <text class="small" x="610" y="398" text-anchor="start">record reads and writes</text>
+  <path class="errorline" d="M350 340 V405 H915 V505"/>
+  <text class="small" x="670" y="397" text-anchor="middle">failure path</text>
+  <path class="line" d="M255 294 H220 V360 H122 V330"/>
+  <text class="small" x="170" y="355" text-anchor="middle">success; transaction stays active</text>
+</svg>
