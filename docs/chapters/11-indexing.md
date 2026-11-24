@@ -897,6 +897,22 @@ The focused tests first failed because `NewLeaf` and `Leaf` were undefined. Test
 positioning, varchar ordering, an empty page, validation before pinning, cleanup after key/layout/count read failures,
 joined positioning and unpin errors, and wrapped pin failures.
 
+## Feature 64: Advance a B-tree leaf search cursor
+
+Java `BTreeLeaf.next` increments the slot, returns a match when the new key equals the retained search key, and otherwise
+tries an overflow page. Go's `Leaf.Next` first advances through `Page.NextLeafSlot`; when that candidate does not match
+or the page is exhausted, it consults `Page.FindOverflowBlock` and uses `Page.OpenOverflowPage` to transfer the pin
+before continuing at overflow slot zero. It returns false when there is no eligible overflow page and wraps read or
+pin-transition failures. This keeps lower-level slot selection, overflow eligibility, and page ownership as separate
+reusable behaviors while exposing one cursor-advance result. RID retrieval, deletion, insertion, and cursor close remain
+separate; no diagram is needed for the next-entry transition.
+
+### Test-first record
+
+The focused tests first failed because `Leaf.Next` was undefined. Tests cover consecutive duplicates, a different key,
+same-file overflow traversal with one active page at a time, integer/varchar keys, no-overflow termination, wrapped
+count/value/flag reads, unpin/pin transition failures, and invalid cursor state.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

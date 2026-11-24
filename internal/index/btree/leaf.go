@@ -33,3 +33,35 @@ func NewLeaf(transaction PageTransaction, block storage.BlockID, layout *record.
 	}
 	return &Leaf{contents: contents, searchKey: searchKey, currentSlot: currentSlot}, nil
 }
+
+// Next advances the cursor to its next matching leaf entry, following a matching overflow page when needed.
+func (leaf *Leaf) Next() (bool, error) {
+	if leaf == nil {
+		return false, fmt.Errorf("advance B-tree leaf cursor: leaf is nil")
+	}
+	if leaf.contents == nil {
+		return false, fmt.Errorf("advance B-tree leaf cursor for %s: page is nil", leaf.searchKey)
+	}
+	nextSlot, found, err := leaf.contents.NextLeafSlot(leaf.searchKey, leaf.currentSlot)
+	if err != nil {
+		return false, fmt.Errorf("advance B-tree leaf cursor for %s in block %v: %w", leaf.searchKey, leaf.contents.block, err)
+	}
+	leaf.currentSlot = nextSlot
+	if found {
+		return true, nil
+	}
+	overflowBlock, hasOverflow, err := leaf.contents.FindOverflowBlock(leaf.searchKey)
+	if err != nil {
+		return false, fmt.Errorf("advance B-tree leaf cursor for %s in block %v: find overflow: %w", leaf.searchKey, leaf.contents.block, err)
+	}
+	if !hasOverflow {
+		return false, nil
+	}
+	overflow, err := leaf.contents.OpenOverflowPage(overflowBlock)
+	if err != nil {
+		return false, fmt.Errorf("advance B-tree leaf cursor for %s to overflow block %v: %w", leaf.searchKey, overflowBlock, err)
+	}
+	leaf.contents = overflow
+	leaf.currentSlot = 0
+	return true, nil
+}
