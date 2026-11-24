@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 11 Feature 50: B-tree directory insertion</title>
+  <desc id="desc">Insert a directory entry at slot one by shifting existing records from right to left, incrementing the count, then writing the new key and child block.</desc>
+  <style>.title{font-family:Arial,sans-serif;font-size:27px;font-weight:700;fill:#1f2937}.head{font-family:Arial,sans-serif;font-size:20px;font-weight:700;fill:#1f2937}.body{font-family:Arial,sans-serif;font-size:17px;fill:#1f2937}.small{font-family:Arial,sans-serif;font-size:15px;fill:#475569}</style>
+  <rect width="1280" height="720" fill="#fff"/>
+  <text class="title" x="640" y="58" text-anchor="middle">Chapter 11 / Feature 50: Insert a B-tree directory entry</text>
+  <text class="head" x="640" y="112" text-anchor="middle">Before · count = 3 · insert at slot 1</text>
+  <g stroke="#6c8ebf" stroke-width="2">
+    <rect x="100" y="145" width="250" height="96" rx="10" fill="#dae8fc"/>
+    <rect x="365" y="145" width="250" height="96" rx="10" fill="#dae8fc"/>
+    <rect x="630" y="145" width="250" height="96" rx="10" fill="#dae8fc"/>
+    <rect x="895" y="145" width="250" height="96" rx="10" fill="#f8cecc"/>
+  </g>
+  <text class="head" x="225" y="181" text-anchor="middle">slot 0</text><text class="body" x="225" y="216" text-anchor="middle">key 10 · child A</text>
+  <text class="head" x="490" y="181" text-anchor="middle">slot 1</text><text class="body" x="490" y="216" text-anchor="middle">key 20 · child B</text>
+  <text class="head" x="755" y="181" text-anchor="middle">slot 2</text><text class="body" x="755" y="216" text-anchor="middle">key 30 · child C</text>
+  <text class="head" x="1020" y="181" text-anchor="middle">slot 3</text><text class="body" x="1020" y="216" text-anchor="middle">unused</text>
+  <rect x="225" y="286" width="830" height="92" rx="12" fill="#e1d5e7" stroke="#9673a6" stroke-width="2"/>
+  <text class="head" x="640" y="326" text-anchor="middle">Shift complete records from right to left</text>
+  <text class="body" x="640" y="358" text-anchor="middle">slot 2 → 3, then slot 1 → 2 · log each field write</text>
+  <path d="M755 241V268H1020V241 M490 241V270H755V241" fill="none" stroke="#475569" stroke-width="3"/>
+  <polygon points="1020,241 1012,256 1028,256" fill="#475569"/><polygon points="755,241 747,256 763,256" fill="#475569"/>
+  <path d="M640 378V418" stroke="#475569" stroke-width="3"/><polygon points="640,418 632,403 648,403" fill="#475569"/>
+  <rect x="240" y="430" width="800" height="82" rx="12" fill="#fff2cc" stroke="#d6b656" stroke-width="2"/>
+  <text class="head" x="640" y="466" text-anchor="middle">Increment record count, then write dataval and block</text>
+  <text class="body" x="640" y="497" text-anchor="middle">All updates request transaction logging</text>
+  <path d="M640 512V548" stroke="#475569" stroke-width="3"/><polygon points="640,548 632,533 648,533" fill="#475569"/>
+  <text class="head" x="640" y="590" text-anchor="middle">After · count = 4</text>
+  <g stroke="#82b366" stroke-width="2">
+    <rect x="100" y="612" width="250" height="80" rx="10" fill="#d5e8d4"/>
+    <rect x="365" y="612" width="250" height="80" rx="10" fill="#d5e8d4"/>
+    <rect x="630" y="612" width="250" height="80" rx="10" fill="#d5e8d4"/>
+    <rect x="895" y="612" width="250" height="80" rx="10" fill="#d5e8d4"/>
+  </g>
+  <text class="head" x="225" y="646" text-anchor="middle">slot 0 · 10 / A</text><text class="head" x="490" y="646" text-anchor="middle">slot 1 · 15 / X</text>
+  <text class="head" x="755" y="646" text-anchor="middle">slot 2 · 20 / B</text><text class="head" x="1020" y="646" text-anchor="middle">slot 3 · 30 / C</text>
+  <text class="small" x="640" y="708" text-anchor="middle">Capacity checks and page splitting remain the caller's responsibility.</text>
+</svg>
