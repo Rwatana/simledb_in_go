@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 12 Feature 39: B-tree page capacity</title>
+  <desc id="desc">The next record slot starts at byte offset eight plus record count plus one times slot size. The page is full when that offset reaches or exceeds the block size.</desc>
+  <style>.title{font-family:Arial,sans-serif;font-size:28px;font-weight:700;fill:#1f2937}.head{font-family:Arial,sans-serif;font-size:21px;font-weight:700;fill:#1f2937}.body{font-family:Arial,sans-serif;font-size:18px;fill:#1f2937}</style>
+  <rect width="1200" height="680" fill="#fff"/>
+  <text class="title" x="600" y="72" text-anchor="middle">Chapter 12 / Feature 39: Check B-tree page capacity</text>
+  <rect x="100" y="140" width="1000" height="120" rx="12" fill="#dae8fc" stroke="#6c8ebf" stroke-width="2"/>
+  <text class="head" x="600" y="185" text-anchor="middle">Page inputs</text>
+  <text class="body" x="600" y="225" text-anchor="middle">8-byte header · recordCount · layout.slotSize · transaction.blockSize</text>
+  <rect x="280" y="320" width="640" height="110" rx="12" fill="#e1d5e7" stroke="#9673a6" stroke-width="2"/>
+  <text class="head" x="600" y="365" text-anchor="middle">nextSlotStart = 8 + (recordCount + 1) × slotSize</text>
+  <text class="body" x="600" y="405" text-anchor="middle">checked for integer overflow before comparison</text>
+  <path d="M600 260V320" fill="none" stroke="#475569" stroke-width="3"/>
+  <polygon points="600,320 592,305 608,305" fill="#475569"/>
+  <path d="M600 430V485 M600 485H325V525 M600 485H875V525" fill="none" stroke="#475569" stroke-width="3"/>
+  <polygon points="325,525 317,510 333,510" fill="#475569"/>
+  <polygon points="875,525 867,510 883,510" fill="#475569"/>
+  <text class="body" x="360" y="478" text-anchor="middle">nextSlotStart ≥ blockSize</text>
+  <text class="body" x="800" y="478" text-anchor="middle">nextSlotStart &lt; blockSize</text>
+  <rect x="170" y="535" width="310" height="90" rx="12" fill="#f8cecc" stroke="#b85450" stroke-width="2"/>
+  <text class="head" x="325" y="590" text-anchor="middle">Full</text>
+  <rect x="720" y="535" width="310" height="90" rx="12" fill="#d5e8d4" stroke="#82b366" stroke-width="2"/>
+  <text class="head" x="875" y="590" text-anchor="middle">Has room</text>
+</svg>

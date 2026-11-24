@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 12 Features 36 and 38: B-tree page lifecycle</title>
+  <desc id="desc">NewPage validates, pins, and retains one block. Page.Close unpins and clears the block after success, and retains it after failure for retry.</desc>
+  <style>.title{font-family:Arial,sans-serif;font-size:28px;font-weight:700;fill:#1f2937}.head{font-family:Arial,sans-serif;font-size:21px;font-weight:700;fill:#1f2937}.body{font-family:Arial,sans-serif;font-size:18px;fill:#1f2937}</style>
+  <rect width="1200" height="680" fill="#fff"/>
+  <text class="title" x="600" y="78" text-anchor="middle">Chapter 12 / Features 36 and 38: B-tree page lifecycle</text>
+  <rect x="80" y="250" width="250" height="150" rx="12" fill="#dae8fc" stroke="#6c8ebf" stroke-width="2"/>
+  <text class="head" x="205" y="290" text-anchor="middle">Caller</text>
+  <text class="body" x="205" y="330" text-anchor="middle">transaction · block ID</text>
+  <text class="body" x="205" y="365" text-anchor="middle">record layout</text>
+  <rect x="420" y="220" width="370" height="210" rx="12" fill="#e1d5e7" stroke="#9673a6" stroke-width="2"/>
+  <text class="head" x="605" y="265" text-anchor="middle">NewPage / Page.Close</text>
+  <text class="body" x="605" y="315" text-anchor="middle">validate · pin once · retain</text>
+  <text class="body" x="605" y="355" text-anchor="middle">Close unpins then clears block</text>
+  <text class="body" x="605" y="395" text-anchor="middle">failure keeps block for retry</text>
+  <rect x="900" y="235" width="220" height="180" rx="12" fill="#d5e8d4" stroke="#82b366" stroke-width="2"/>
+  <text class="head" x="1010" y="285" text-anchor="middle">Transaction</text>
+  <text class="body" x="1010" y="330" text-anchor="middle">Pin(block)</text>
+  <text class="body" x="1010" y="370" text-anchor="middle">Unpin(block)</text>
+  <rect x="390" y="500" width="300" height="110" rx="12" fill="#fff2cc" stroke="#d6b656" stroke-width="2"/>
+  <text class="head" x="540" y="545" text-anchor="middle">Open state</text>
+  <text class="body" x="540" y="582" text-anchor="middle">pinned block · layout retained</text>
+  <rect x="760" y="500" width="360" height="110" rx="12" fill="#f8cecc" stroke="#b85450" stroke-width="2"/>
+  <text class="head" x="940" y="545" text-anchor="middle">Closed state</text>
+  <text class="body" x="940" y="582" text-anchor="middle">block cleared · repeat close is a no-op</text>
+  <path d="M300 325H420 M790 300H900 M790 370H900 M540 430V500 M690 400L760 500" fill="none" stroke="#475569" stroke-width="3"/>
+  <polygon points="420,325 405,317 405,333" fill="#475569"/>
+  <polygon points="900,300 885,292 885,308" fill="#475569"/>
+  <polygon points="900,370 885,362 885,378" fill="#475569"/>
+  <polygon points="540,500 532,485 548,485" fill="#475569"/>
+  <polygon points="760,500 747,488 763,482" fill="#475569"/>
+</svg>

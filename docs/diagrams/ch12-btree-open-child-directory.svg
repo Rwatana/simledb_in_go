@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Open one child B-tree directory page</title>
+  <desc id="desc">A positive-level directory page selects and pins one directory child with the same transaction and layout. The parent remains open. Level zero points to leaves and is rejected by this operation.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 z" fill="#475569" />
+    </marker>
+    <style>
+      text { font-family: system-ui, sans-serif; fill: #172033; }
+      .title { font-size: 26px; font-weight: 700; }
+      .box { stroke-width: 2; rx: 12; }
+      .parent { fill: #dae8fc; stroke: #6c8ebf; }
+      .child { fill: #d5e8d4; stroke: #82b366; }
+      .reject { fill: #f8cecc; stroke: #b85450; }
+      .label { font-size: 19px; font-weight: 600; }
+      .arrow { stroke: #475569; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .dashed { stroke: #b85450; stroke-dasharray: 8 6; }
+    </style>
+  </defs>
+  <text class="title" x="600" y="58" text-anchor="middle">Chapter 12 / Feature 57: Open one child directory page</text>
+  <rect class="box parent" x="90" y="145" width="430" height="130" />
+  <text class="label" x="305" y="185" text-anchor="middle">
+    <tspan x="305">Parent directory page · flag = 2</tspan>
+    <tspan x="305" dy="30">Search key selects child block 8</tspan>
+    <tspan x="305" dy="30">Parent pin remains owned by caller</tspan>
+  </text>
+  <rect class="box child" x="680" y="145" width="430" height="130" />
+  <text class="label" x="895" y="185" text-anchor="middle">
+    <tspan x="895">Child directory page · block 8</tspan>
+    <tspan x="895" dy="30">Same transaction and directory layout</tspan>
+    <tspan x="895" dy="30">New pin belongs to caller</tspan>
+  </text>
+  <rect class="box reject" x="365" y="425" width="470" height="120" />
+  <text class="label" x="600" y="465" text-anchor="middle">
+    <tspan x="600">Level 0 page points to leaves</tspan>
+    <tspan x="600" dy="30">OpenChildDirectory rejects it</tspan>
+    <tspan x="600" dy="30">Leaf pages use a different layout</tspan>
+  </text>
+  <path class="arrow" d="M520 210 H672" />
+  <text x="596" y="195" text-anchor="middle" font-size="16">FindChildBlock + Pin</text>
+  <path class="arrow dashed" d="M300 280 C300 380 420 385 420 417" />
+  <text x="335" y="362" font-size="16" fill="#b85450">flag = 0</text>
+</svg>
