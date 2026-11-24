@@ -120,6 +120,14 @@ func (join *IndexJoinPlan) BlocksAccessed() int {
 	return int(leftBlocks + leftRecords*indexBlocks32 + leftRecords*indexRecords)
 }
 
+// RecordsOutput estimates the number of index-join records from the left and index estimates.
+func (join *IndexJoinPlan) RecordsOutput() int {
+	if join == nil || join.left == nil || join.indexInfo == nil {
+		return 0
+	}
+	return int(int32(join.left.RecordsOutput()) * int32(join.indexInfo.RecordsOutput()))
+}
+
 func isNilIndexJoinPlanScan(scan query.Scan) bool {
 	if scan == nil {
 		return true
