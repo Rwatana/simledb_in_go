@@ -188,6 +188,11 @@ remaining count. Boundary, exact-root, non-perfect-root, invalid-size, maximum-i
 tests keep the new package at 100.0% statement coverage; the separate coverage workflow continues to enforce the same
 target across the module.
 
+Issue #1212 adds `multibuffer.BestFactor`, selecting the first floating-point ceiling quotient that fits after the
+two-buffer reservation. Binary search preserves the increasing-divisor result while avoiding a linear pass over large
+sizes. Reservation, quotient, invalid-input, maximum-int, and exhaustive Java-formula tests keep the package at
+100.0%; the independent coverage workflow enforces the module-wide target.
+
 Issue #1195 adds `storage.Page.SetString`, converting UTF-8 bytes through the existing `SetBytes` length-prefix path.
 Tests round-trip empty text, embedded NUL, and multibyte text through both string and byte APIs, and verify a failed
 capacity write preserves the original page. The separate coverage workflow continues to enforce 100.0% package,

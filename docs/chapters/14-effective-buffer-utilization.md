@@ -8,7 +8,7 @@ operations.
 
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
-| `internal/multibuffer.BestRoot` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`) | Choose a ceiling root of a relation's block count within the usable buffer budget |
+| `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
 
 ## Feature 1: Choose a safe buffer root
 
@@ -31,9 +31,35 @@ Java uses floating-point `Math.pow` and casts its ceiling to `int`; Go retains t
 rounding at exact-root boundaries remains compatible. Before converting the result, Go saturates at the maximum
 representable `int` so a large input cannot wrap to a negative allocation. A nonpositive block count returns one as a
 safe allocation fallback; the Java helper does not define that invalid-input case. This helper performs no transaction
-or buffer-manager operations. `BestFactor` and chunk scanning remain separate behaviors.
+or buffer-manager operations.
 
 ### Validation
 
 The focused package tests cover every executable statement and function. The module coverage workflow continues to
 require 100.0% statement coverage for every executable package, function, and the module total.
+
+## Feature 2: Choose a safe buffer factor
+
+`multibuffer.BestFactor` reserves the same two buffers and selects the first ceiling quotient `ceil(size/divisor)`
+that fits the remaining budget. The
+[buffer-factor estimator diagram](../diagrams/ch14-buffer-needs-best-factor.svg) shows the quotient search; the
+editable source is [`ch14-buffer-needs-best-factor.drawio`](../diagrams/ch14-buffer-needs-best-factor.drawio).
+
+### Test-first record
+
+Focused tests first failed to compile because `BestFactor` was undefined. Table-driven tests cover buffer reservation,
+exact and ceiling quotients, one and invalid sizes, and maximum Go integers. An exhaustive small-input test compares
+the selected value with Java's increasing-divisor formula.
+
+### Design decision
+
+Java tries divisors linearly and evaluates each quotient with floating-point `Math.ceil`. Go keeps that quotient
+calculation and its rounding behavior, but uses binary search over the monotone quotient sequence to find the same
+first divisor without a linear walk through very large block counts. Conversion saturates at the maximum Go `int`,
+preventing wraparound for large sizes. Nonpositive sizes return one as a safe fallback; Java leaves that input
+undefined. This estimator performs no transaction or buffer-manager operations; chunk scanning remains separate.
+
+### Validation
+
+The focused package tests cover every executable statement and function. The full module coverage workflow continues
+to require 100.0% statement coverage for every executable package, function, and module total.
