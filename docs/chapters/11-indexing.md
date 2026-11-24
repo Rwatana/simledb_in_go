@@ -778,6 +778,23 @@ the first exact match among duplicates, a greatest-predecessor match, keys above
 key boundary, empty and malformed pages, invalid typed keys, negative children, wrapped count/key/child errors, and
 unchanged page contents and pin ownership.
 
+## Feature 57: Open one child B-tree directory page
+
+Java `BTreeDir.search` opens the selected child page while descending through directory levels. Go's
+`Page.OpenChildDirectory` performs one level transition: it requires a positive page flag, selects the child through
+`Page.FindChildBlock`, and pins a new `Page` with the same transaction and directory layout. The parent page remains
+open and unchanged; the caller owns and closes the returned child page. A level-zero page points to leaf blocks, so this
+operation rejects it rather than interpreting a leaf with the directory layout. Repeated descent, final leaf opening,
+and index-search state remain separate behaviors. The [child directory-page diagram](../diagrams/ch11-btree-open-child-directory.svg)
+shows the one-level pin transfer and caller ownership; its editable source is
+[`ch11-btree-open-child-directory.drawio`](../diagrams/ch11-btree-open-child-directory.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.OpenChildDirectory` was undefined. Tests verify same-file child selection,
+retention of the parent pin, the returned page's transaction/layout, caller-controlled child close, rejection of level
+zero and negative flags, and wrapped flag, selection, and child-pin failures without changing parent state.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

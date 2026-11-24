@@ -220,6 +220,29 @@ func (page *Page) FindChildBlock(searchKey query.Constant) (storage.BlockID, err
 	return storage.NewBlockID(page.block.FileName(), int(childNumber)), nil
 }
 
+// OpenChildDirectory opens the selected child page when this page is above the leaf level.
+func (page *Page) OpenChildDirectory(searchKey query.Constant) (*Page, error) {
+	if page == nil {
+		return nil, fmt.Errorf("open B-tree child directory for %s: page is nil", searchKey)
+	}
+	level, err := page.GetFlag()
+	if err != nil {
+		return nil, fmt.Errorf("open B-tree child directory for %s in block %v: read page level: %w", searchKey, page.block, err)
+	}
+	if level <= 0 {
+		return nil, fmt.Errorf("open B-tree child directory for %s in block %v: page level %d has no directory children", searchKey, page.block, level)
+	}
+	childBlock, err := page.FindChildBlock(searchKey)
+	if err != nil {
+		return nil, fmt.Errorf("open B-tree child directory for %s in block %v: select child: %w", searchKey, page.block, err)
+	}
+	child, err := NewPage(page.transaction, childBlock, page.layout)
+	if err != nil {
+		return nil, fmt.Errorf("open B-tree child directory block %v for %s: %w", childBlock, searchKey, err)
+	}
+	return child, nil
+}
+
 // GetDataVal reads the dataval field from the specified B-tree page slot.
 func (page *Page) GetDataVal(slot int) (query.Constant, error) {
 	if page == nil {
