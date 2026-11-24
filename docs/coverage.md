@@ -130,6 +130,10 @@ INSERT commands, verify the row count, and confirm that explicit Commit complete
 tests cover parse/planner errors, zeroed responses, missing dependencies, and closed sessions. The independent coverage
 workflow continues to require 100.0% in all executable packages, functions, and the module total.
 
+Issue #1177 adds `RemoteSession.Commit`, which calls the server's Commit RPC and updates the retained transaction ID only
+after a successful response. Tests cover successor-ID replacement, nil session/client state, RPC failure, and ID
+preservation. The separate coverage workflow requires 100.0% package, function, and module statement coverage.
+
 Issue #1176 adds `ConnectRPCSession` and `RemoteSession`, which send one `SimpleDB.Connect` request through a caller-owned
 RPC client and retain the returned transaction ID without closing the client. Tests verify the ID, a subsequent client
 call, nil input, and a server-side START failure that returns no session. The coverage workflow enforces 100.0% for all

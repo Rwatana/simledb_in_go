@@ -35,3 +35,21 @@ func (s *RemoteSession) TransactionID() int64 {
 	defer s.mu.RUnlock()
 	return s.transactionID
 }
+
+// Commit commits the remote transaction and stores the server's successor transaction ID.
+func (s *RemoteSession) Commit() error {
+	if s == nil {
+		return fmt.Errorf("commit network RPC client session: session is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.client == nil {
+		return fmt.Errorf("commit network RPC client session: client is nil")
+	}
+	var response CommitResponse
+	if err := s.client.Call("SimpleDB.Commit", CommitRequest{}, &response); err != nil {
+		return fmt.Errorf("commit network RPC client session: %w", err)
+	}
+	s.transactionID = response.TransactionID
+	return nil
+}
