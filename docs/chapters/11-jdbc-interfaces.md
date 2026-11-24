@@ -76,6 +76,10 @@ affected-row count without committing or replacing the transaction. Its [network
 shows the manager/parser/planner boundary and caller-owned completion; its [editable Draw.io source](../diagrams/ch11-network-rpc-exec-update.drawio)
 is kept beside the SVG. Parse and planner errors return through RPC with a zero server-side result; remote SELECT and
 client-side JDBC adaptation remain separate.
+`DriverService.ExecuteQuery` materializes a SELECT scan into gob-friendly scalar values, preserving schema column order
+and the session transaction. Its [network RPC query diagram](../diagrams/ch11-network-rpc-query.svg) shows planning,
+scan cleanup, typed rows, and explicit transaction ownership; its [editable Draw.io source](../diagrams/ch11-network-rpc-query.drawio)
+is kept beside the SVG. The caller may then commit, roll back, or close the session independently of result materialization.
 
 ## Go design and current status
 
@@ -244,6 +248,11 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestDriverServiceExecuteUpdateRunsWithinActiveTransactionOverRPC` | RPC updates return affected rows, preserve the session transaction, and defer commit to an explicit request |
 | `TestDriverServiceExecuteUpdateRejectsInvalidStateAndClosedSession` | Nil service/reply, missing manager/transaction, and closed sessions return errors with cleared results |
 | `TestDriverServiceExecuteUpdatePreservesSessionAfterStatementAndPlannerErrors` | Parse/planner failures clear results while keeping the current transaction available for completion |
+| `TestDriverServiceExecuteQueryReturnsTypedProjectedRowsOverRPC` | RPC SELECT returns projected column metadata and typed row values without completing the active transaction |
+| `TestDriverServiceExecuteQueryRejectsInvalidStateAndResetsResponse` | Nil service/reply, missing manager/transaction, and closed sessions return errors with cleared results |
+| `TestDriverServiceExecuteQueryReturnsPlanningAndOpeningErrors` | Parse/planner, nil plan/schema/scan, and scan-open errors return no partial rows |
+| `TestDriverServiceExecuteQueryClosesScansOnMaterializationFailures` | Position, advance, value, unsupported-type, and close failures release the opened scan and clear results |
+| `TestDriverServiceExecuteQueryClosesPartiallyOpenedScans` | A plan that returns a scan with an open error still closes that scan and joins cleanup errors |
 | `TestConnectorConnectValidatesReceiverContextAndCancellation` | Nil state and canceled contexts return errors before creating a connection |
 | `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
@@ -352,6 +361,12 @@ count, and verify that the same transaction remains active until explicit Commit
 planner errors, cleared results, missing state, and closed-session rejection. Query RPCs and client-side JDBC adaptation
 remain separate.
 
+The network RPC-query test-first run initially failed because `ExecuteQueryRequest`, `ExecuteQueryResponse`, and
+`DriverService.ExecuteQuery` were undefined. RPC tests execute typed, projected rows after catalog-backed updates and
+verify the session transaction remains active until explicit Commit. Direct tests cover parse/planner/open failures,
+invalid state, schema/scan validation, materialization cleanup, partial-open cleanup, no partial results, and empty results.
+The response uses concrete gob-friendly structs rather than interface-valued cells.
+
 ## Intentional differences
 
 - Do not reproduce the Java `java.sql` adapter hierarchy mechanically.
@@ -360,4 +375,4 @@ remain separate.
 - Keep the upstream Java distribution and book PDF outside Git.
 - Parse the Java-compatible embedded URL prefix, but keep path resolution, database initialization, and manager settings explicit in Go.
 - Parse the Java-compatible network URL into a host, but keep dialing and remote-session lifecycle separate from parsing; the current Go network parser preserves the default registry port convention.
-- Open a TCP socket to the parsed network host with caller context, then serve Go `net/rpc` Connect, Commit, Rollback, Close, and ExecuteUpdate requests. Commit and Rollback start successor transactions; Close commits without a successor and ends the RPC session while leaving the transport `net.Conn` caller-owned. ExecuteUpdate uses the active transaction but does not complete it. Keep remote query and client-side JDBC operations separate.
+- Open a TCP socket to the parsed network host with caller context, then serve Go `net/rpc` Connect, Commit, Rollback, Close, ExecuteUpdate, and ExecuteQuery requests. Commit and Rollback start successor transactions; Close commits without a successor and ends the RPC session while leaving the transport `net.Conn` caller-owned. ExecuteUpdate and ExecuteQuery use the active transaction without completing it. Keep client-side JDBC operations separate.
