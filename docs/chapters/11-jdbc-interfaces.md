@@ -57,6 +57,13 @@ is only the socket-opening boundary; it does not implement the Java RMI handshak
 session lifecycle. The [network dial diagram](../diagrams/ch11-network-dial.svg) shows validation, address construction,
 and connection ownership; its [editable Draw.io source](../diagrams/ch11-network-dial.drawio) is kept beside the SVG.
 
+`network.ServeConnection` registers a small gob-based `net/rpc` service for one accepted connection. A successful
+`SimpleDB.Connect` creates one transaction through the shared manager set, retains it on that connection's service, and
+returns its transaction ID. The [network RPC session diagram](../diagrams/ch11-network-rpc-session.svg) shows the connect
+request, START-log boundary, and per-connection transaction; its [editable Draw.io source](../diagrams/ch11-network-rpc-session.drawio)
+is maintained beside the SVG. This is a Go-native server boundary and does not implement Java RMI framing. Remote
+commit/rollback/close and SQL operations remain separate behaviors.
+
 ## Go design and current status
 
 The Go repository has lower-level file, log, buffer, transaction, metadata, query, and planning packages, plus an initial
@@ -204,6 +211,11 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestDialNetworkURLRejectsNilConnection` | A dialer that succeeds without a connection returns an error |
 | `TestDialNetworkURLRejectsNilDialer` | Missing dial dependencies are rejected before dialing |
 | `TestDialNetworkURLHonorsCanceledContext` | Canceled contexts stop the default dial path |
+| `TestServeConnectionCreatesOneTransactionOnRemoteConnect` | RPC Connect creates one START-logged transaction retained for the connection and rejects replacement |
+| `TestServeConnectionReportsManagerTransactionFailureOverRPC` | START-record failures are returned over RPC without a transaction ID |
+| `TestServeConnectionRejectsNilAndIncompleteInputs` | Nil connections/managers and incomplete transaction manager sets are rejected |
+| `TestDriverServiceConnectRejectsInvalidReceiverAndReply` | Nil service/reply and incomplete managers fail, clearing any partial transaction ID |
+| `TestRegisterDriverServiceRejectsInvalidInputsAndDuplicateRegistration` | RPC service registration validates dependencies and wraps duplicate-name failures |
 | `TestConnectorConnectValidatesReceiverContextAndCancellation` | Nil state and canceled contexts return errors before creating a connection |
 | `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
@@ -284,6 +296,12 @@ The network dial test-first run initially failed to compile because `DialNetwork
 were undefined. The implementation passes the caller's context to the TCP dialer, uses the default port, and returns a
 caller-owned connection without starting an RPC or SQL session.
 
+The network RPC-session test-first run initially failed to compile because `ConnectRequest`, `ConnectResponse`,
+`DriverService`, and `ServeConnection` were undefined. Tests exercise the gob RPC method through `net.Pipe`, verify one
+START record and the returned transaction ID, check manager and registration errors, and confirm a second Connect cannot
+replace the connection transaction. The service retains transaction ownership for later remote methods; finalization and
+SQL execution remain independent.
+
 ## Intentional differences
 
 - Do not reproduce the Java `java.sql` adapter hierarchy mechanically.
@@ -292,4 +310,4 @@ caller-owned connection without starting an RPC or SQL session.
 - Keep the upstream Java distribution and book PDF outside Git.
 - Parse the Java-compatible embedded URL prefix, but keep path resolution, database initialization, and manager settings explicit in Go.
 - Parse the Java-compatible network URL into a host, but keep dialing and remote-session lifecycle separate from parsing; the current Go network parser preserves the default registry port convention.
-- Open a TCP socket to the parsed network host with caller context, but defer RMI/RPC framing and database-session operations to separate behaviors.
+- Open a TCP socket to the parsed network host with caller context, then serve a Go `net/rpc` Connect request that creates one connection-bound transaction; defer transaction finalization and remote SQL operations to separate behaviors.
