@@ -148,6 +148,29 @@ func (index *BTreeIndex) GetDataRID() (record.RID, error) {
 	return rid, nil
 }
 
+// Close releases the pages retained by the B-tree index cursor.
+func (index *BTreeIndex) Close() error {
+	if index == nil {
+		return fmt.Errorf("close B-tree index: index is nil")
+	}
+	var closeErrors []error
+	if index.leaf != nil {
+		if err := index.leaf.Close(); err != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("close B-tree index %q leaf cursor: %w", index.indexName, err))
+		} else {
+			index.leaf = nil
+		}
+	}
+	if index.pendingDirectory != nil {
+		if err := index.pendingDirectory.Close(); err != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("close B-tree index %q pending directory page: %w", index.indexName, err))
+		} else {
+			index.pendingDirectory = nil
+		}
+	}
+	return errors.Join(closeErrors...)
+}
+
 // NewBTreeIndex initializes the files and retained state for one B-tree index.
 // The caller must roll back the transaction if construction fails after an append.
 func NewBTreeIndex(transaction btreeFileTransaction, indexName string, leafLayout *record.Layout) (*BTreeIndex, error) {
