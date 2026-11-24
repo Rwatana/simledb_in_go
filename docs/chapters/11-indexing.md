@@ -523,6 +523,21 @@ The focused tests first failed because `Page.IsFull` was undefined. Tests cover 
 an over-capacity position, invalid and closed state, negative counts, invalid block sizes, position overflow, and
 wrapped count/block-size read failures.
 
+## Feature 40: Read a B-tree page data value
+
+Java `BTPage.getDataVal` reads the `dataval` field from the requested slot and returns its schema type. Go's
+`Page.GetDataVal` computes the field position from the eight-byte page header, slot index, layout slot size, and
+`dataval` offset, then returns an integer or varchar `query.Constant`. It checks the slot calculation for overflow,
+rejects invalid or closed page/layout state and unsupported field types, and wraps storage read errors. The accessor
+does not change page pin state. The [B-tree data value diagram](../diagrams/ch11-btree-page-data-value.svg) shows the
+field-offset calculation and its editable source is [`ch11-btree-page-data-value.drawio`](../diagrams/ch11-btree-page-data-value.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.GetDataVal` was undefined. Tests cover typed integer and varchar reads at
+layout-derived positions, unchanged pin state, invalid and typed-nil state, missing schema/field/offset, unsupported
+types, negative and overflowing slots, malformed offsets, and wrapped read failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -541,3 +556,4 @@ wrapped count/block-size read failures.
 - `btree.NewPage` rejects invalid transaction, layout, and block inputs before pinning and returns pin failures as Go errors with their original causes.
 - `btree.Page.Close` preserves the current block after an unpin error so the caller can retry; repeated successful close calls are no-ops.
 - `btree.Page.IsFull` returns contextual Go errors for invalid page state, invalid capacity metadata, arithmetic overflow, and block-size reads instead of relying on Java's unchecked transaction calls.
+- `btree.Page.GetDataVal` returns typed query constants and contextual Go errors for invalid slots, layout metadata, and storage reads instead of relying on Java's unchecked field access.

@@ -139,6 +139,55 @@ func (page *Page) FindSlotBefore(searchKey query.Constant) (int, error) {
 	return int(countValue) - 1, nil
 }
 
+// GetDataVal reads the dataval field from the specified B-tree page slot.
+func (page *Page) GetDataVal(slot int) (query.Constant, error) {
+	if page == nil {
+		return query.Constant{}, fmt.Errorf("read B-tree page data value at slot %d: page is nil", slot)
+	}
+	if page.block.FileName() == "" {
+		return query.Constant{}, fmt.Errorf("read B-tree page data value at slot %d: page is closed", slot)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return query.Constant{}, fmt.Errorf("read B-tree page data value at slot %d in block %v: transaction is nil", slot, page.block)
+	}
+	if page.layout == nil {
+		return query.Constant{}, fmt.Errorf("read B-tree page data value at slot %d in block %v: layout is nil", slot, page.block)
+	}
+	schema := page.layout.Schema()
+	if schema == nil {
+		return query.Constant{}, fmt.Errorf("read B-tree page data value at slot %d in block %v: layout schema is nil", slot, page.block)
+	}
+	definition, ok := schema.Field("dataval")
+	if !ok {
+		return query.Constant{}, fmt.Errorf("read B-tree page data value at slot %d in block %v: layout has no dataval field", slot, page.block)
+	}
+	fieldOffset, ok := page.layout.Offset("dataval")
+	if !ok {
+		return query.Constant{}, fmt.Errorf("read B-tree page data value at slot %d in block %v: layout has no dataval offset", slot, page.block)
+	}
+	switch definition.Type {
+	case record.IntegerField, record.VarcharField:
+	default:
+		return query.Constant{}, fmt.Errorf("read B-tree page data value at slot %d in block %v: unsupported dataval type %d", slot, page.block, definition.Type)
+	}
+	position, err := pageSlotFieldPosition(slot, page.layout.SlotSize(), fieldOffset)
+	if err != nil {
+		return query.Constant{}, fmt.Errorf("read B-tree page data value at slot %d in block %v: %w", slot, page.block, err)
+	}
+	if definition.Type == record.IntegerField {
+		value, err := page.transaction.GetInt(page.block, position)
+		if err != nil {
+			return query.Constant{}, fmt.Errorf("read integer dataval at slot %d in block %v: %w", slot, page.block, err)
+		}
+		return query.NewIntConstant(value), nil
+	}
+	value, err := page.transaction.GetString(page.block, position)
+	if err != nil {
+		return query.Constant{}, fmt.Errorf("read varchar dataval at slot %d in block %v: %w", slot, page.block, err)
+	}
+	return query.NewStringConstant(value), nil
+}
+
 func pageSlotFieldPosition(slot, slotSize, fieldOffset int) (int, error) {
 	return pageSlotFieldPositionForCount(int64(slot), slotSize, fieldOffset)
 }
