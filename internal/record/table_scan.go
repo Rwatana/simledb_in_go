@@ -1,6 +1,7 @@
 package record
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Rwatana/simledb_in_go/internal/storage"
@@ -48,7 +49,12 @@ func NewTableScan(transaction TableScanTransaction, tableName string, layout *La
 	}
 	if format {
 		if err := page.Format(); err != nil {
-			return nil, fmt.Errorf("initialize table scan for %q: format first block %v: %w", tableName, block, err)
+			formatErr := fmt.Errorf("initialize table scan for %q: format first block %v: %w", tableName, block, err)
+			if unpinErr := transaction.Unpin(block); unpinErr != nil {
+				cleanupErr := fmt.Errorf("initialize table scan for %q: unpin first block %v after format failure: %w", tableName, block, unpinErr)
+				return nil, errors.Join(formatErr, cleanupErr)
+			}
+			return nil, formatErr
 		}
 	}
 	return &TableScan{

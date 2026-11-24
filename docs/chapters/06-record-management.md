@@ -838,6 +838,21 @@ The tests first failed to compile because `TableScan.MoveToRID` did not exist.
 
 This maps Java `TableScan.moveToRid` with explicit coordinate validation and retryable state transitions.
 
-## Next behavior
+## Feature 48: Release a page pin after table-scan format failure
 
-Begin Chapter 7 metadata management with table-catalog schema construction.
+When `NewTableScan` has appended and pinned a new first block but formatting it fails, initialization now attempts to
+unpin that page before returning. The format error remains discoverable through `errors.Is`; if unpin also fails, the
+returned joined error preserves both causes and table/block context. Failures before a page is acquired do not call
+`Unpin`, and existing-table initialization does not enter the format cleanup path.
+
+### Test-first record
+
+The regression tests first failed because formatting errors returned without attempting to unpin the acquired block.
+
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewTableScanReportsEmptyTableAppendPinAndFormatFailures` | Successful cleanup releases the newly pinned block after formatting fails, while earlier failures do not unpin |
+| `TestNewTableScanPreservesFormatAndCleanupFailures` | Both formatting and cleanup errors remain discoverable when cleanup also fails |
+
+This amends the empty-table constructor branch of Java `TableScan.TableScan`; it prevents a leaked buffer pin on the Go
+error path without changing successful initialization.
