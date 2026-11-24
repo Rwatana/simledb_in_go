@@ -11,7 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java` | Retain and pin a B-tree block, then position before a sorted search key |
+| `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries and propagate split separators |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
 | `internal/metadata.IndexInfo` | `simpledb/metadata/IndexInfo.java` | Open the configured static hash index using the retained transaction and index-record layout |
@@ -1087,6 +1087,24 @@ insertion without splitting, the final-slot insertion followed by midpoint split
 varchar ordering, preserved page levels, refusal when the page is already full, and wrapped insertion/count/capacity/
 split errors. The new method is 100.0% covered.
 
+## Feature 76: Propagate directory splits through parent pages
+
+Java `BTreeDir.insert` descends through the child selected by the new entry's key. It closes that child after recursion,
+then inserts the child's separator into the current directory only when the child split. Go's
+`Page.InsertDirectoryEntryRecursive` follows the same level-zero and internal-page behavior, returning a separator only
+when the current page splits as well. It closes every opened child before changing the parent and joins recursive and
+close failures so callers can retain every cause. Root growth and formatting a replacement root remain separate
+operations. The existing [directory insertion diagram](../diagrams/ch11-btree-insert-dir.svg) and
+[B-tree page split diagram](../diagrams/ch11-btree-page-split.svg) show the ordered parent insertion and split boundary;
+their editable Draw.io sources are reused.
+
+### Test-first record
+
+The focused run first failed because `Page.InsertDirectoryEntryRecursive` was undefined. Tests cover direct level-zero
+insertion and splitting, two-level recursive propagation, child and parent split propagation, parent immutability when a
+child does not split, invalid pages and levels, child-open and recursive failures, child-close failures, joined
+recursive/close causes, full-parent refusal, and parent-split append errors. The new method is 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1113,3 +1131,4 @@ split errors. The new method is 100.0% covered.
 - `btree.Page.InsertDirectoryEntry` validates directory level and physical capacity before finding the ordered insertion point; directory splitting remains a separate operation.
 - `btree.Page.SplitDirectoryPage` splits only an already full directory page and returns a parent separator; recursive propagation and root growth remain separate operations.
 - `btree.Page.InsertDirectoryEntryAndSplit` combines insertion with the page-full split decision but leaves parent recursion and root growth to separate operations.
+- `btree.Page.InsertDirectoryEntryRecursive` recurses through existing directory pages and returns split separators upward; creating a new root remains the caller's responsibility.
