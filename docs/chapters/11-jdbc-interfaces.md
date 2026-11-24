@@ -60,7 +60,12 @@ Each successful `Managers` set also exposes a `plan.QueryPlanner`, currently com
 `CreatePlan`, so the planner can resolve the table schema and statistics through that transaction without owning
 transaction lifecycle. The [query planner composition diagram](../diagrams/ch11-query-planner-composition.svg)
 shows this dependency and the returned query plan; its [editable Draw.io source](../diagrams/ch11-query-planner-composition.drawio)
-is maintained beside it.
+is maintained beside it. `Managers.SetQueryPlannerStrategy` can replace this default with a basic or cost-aware
+`plan.BetterQueryPlanner`; both choices receive the manager set's existing metadata facade. The
+[query-planner strategy diagram](../diagrams/ch11-query-planner-strategy.svg) shows that selection while keeping the
+metadata and transaction shared; its [editable Draw.io source](../diagrams/ch11-query-planner-strategy.drawio) is
+maintained beside the SVG. The zero-valued strategy preserves the basic default, and a rejected selection leaves the
+current planner intact.
 
 Each manager set also exposes a `plan.UpdatePlanner`, currently composed as a `plan.BasicUpdatePlanner` backed by
 that same metadata facade. Callers pass the transaction to update operations, so the planner can create catalog rows
@@ -86,7 +91,8 @@ the caller's responsibility.
 `Managers.NewTransaction` uses one ID allocator and lock table shared by the manager set, while each returned transaction
 keeps its own buffer ownership. Creation appends a START record to the shared log and supplies the log iterator needed
 for transaction rollback. A failed START append returns no transaction. Restart recovery through `Managers.Recover`, catalog
-initialization, planner selection, ordinary transaction completion, and client adapters remain separate behaviors.
+initialization, update-planner strategy selection, ordinary transaction completion, and client adapters remain separate
+behaviors.
 
 The embedded and network drivers share a client contract in Java, but Go should introduce an adapter only when a concrete
 caller needs it. The RMI proxy classes are transport-specific and should not be reproduced as a Go class hierarchy or
@@ -116,6 +122,8 @@ actual scope requires SQL driver compatibility.
 | `TestManagersRecoverPreservesRestartHistoryError` | Corrupt durable history returns contextual restart-recovery failure |
 | `TestFinishRestartRecoveryReportsRecoveryAndCommitFailures` | Recovery failure prevents commit, while commit failure preserves the durable checkpoint LSN |
 | `TestManagersComposeBasicQueryPlannerWithTheirMetadata` | A manager set's SELECT planner resolves an initialized table through that set's metadata and caller-owned transaction |
+| `TestManagersSetQueryPlannerStrategyUsesSharedMetadata` | Basic and cost-aware choices replace the default planner and both plan through shared metadata |
+| `TestManagersSetQueryPlannerStrategyRejectsInvalidInputsWithoutReplacingPlanner` | Nil manager sets, missing metadata, and unknown strategies leave the current planner unchanged |
 | `TestManagersComposeBasicUpdatePlannerWithTheirMetadata` | A manager set's update planner registers a table through shared metadata and a caller-owned transaction |
 | `TestManagersCreateQueryPlanParsesAndPlansSelect` | SELECT text is parsed and planned through the manager set without taking ownership of its transaction |
 | `TestManagersCreateQueryPlanReportsInvalidInputsAndFailures` | Incomplete managers, nil transactions, parse errors, and plan errors are returned with context |
@@ -130,7 +138,8 @@ first failed because `Managers.Recover` and its recovery-transaction lifecycle h
 test first failed because `Managers.QueryPlanner` was undefined. The update planner test first failed because
 `Managers.UpdatePlanner` was undefined. The SQL SELECT dispatch test first failed because `Managers.CreateQueryPlan` was
 undefined. The SQL update dispatch tests first failed because `Managers.ExecuteUpdate` and its command dispatcher were
-undefined. These tests use temporary database directories and keep catalog initialization, explicit process-restart
+undefined. The planner-strategy tests first failed because `QueryPlannerStrategy` and
+`Managers.SetQueryPlannerStrategy` were undefined. These tests use temporary database directories and keep catalog initialization, explicit process-restart
 recovery, SELECT planner composition, update planner composition, SQL SELECT planning, SQL update dispatch, ordinary
 transaction completion, and JDBC client operations as separate behaviors.
 
