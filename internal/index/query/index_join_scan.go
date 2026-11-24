@@ -1,6 +1,7 @@
 package indexquery
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Rwatana/simledb_in_go/internal/index"
@@ -193,4 +194,28 @@ func (scan *IndexJoinScan) HasField(fieldName string) bool {
 		return false
 	}
 	return scan.rhs.HasField(fieldName) || scan.lhs.HasField(fieldName)
+}
+
+// Close closes the left scan, index, and right table scan in Java order.
+func (scan *IndexJoinScan) Close() error {
+	if scan == nil {
+		return fmt.Errorf("close nil index join scan")
+	}
+	var closeErrors []error
+	if scan.lhs != nil {
+		if err := scan.lhs.Close(); err != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("close index join scan left input: %w", err))
+		}
+	}
+	if scan.index != nil {
+		if err := scan.index.Close(); err != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("close index join scan index: %w", err))
+		}
+	}
+	if scan.rhs != nil && scan.rhs.TableScan != nil {
+		if err := scan.rhs.Close(); err != nil {
+			closeErrors = append(closeErrors, fmt.Errorf("close index join scan right table: %w", err))
+		}
+	}
+	return errors.Join(closeErrors...)
 }
