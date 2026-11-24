@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/Rwatana/simledb_in_go/internal/query"
 	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
@@ -42,4 +43,19 @@ func (t *TempTable) TableName() string {
 // Layout returns the physical record layout derived from the temporary relation schema.
 func (t *TempTable) Layout() *record.Layout {
 	return t.layout
+}
+
+// Open creates a query update scan for the temporary relation and returns it to the caller.
+func (t *TempTable) Open() (query.UpdateScan, error) {
+	if t == nil {
+		return nil, fmt.Errorf("open temporary table: descriptor must not be nil")
+	}
+	if t.transaction == nil || t.tableName == "" || t.layout == nil {
+		return nil, fmt.Errorf("open temporary table: descriptor is incomplete")
+	}
+	scan, err := query.NewRecordScan(t.transaction, t.tableName, t.layout)
+	if err != nil {
+		return nil, fmt.Errorf("open temporary table %q: %w", t.tableName, err)
+	}
+	return scan, nil
 }

@@ -28,7 +28,7 @@ and zero transaction calls during construction.
 
 Java synchronizes an integer counter and `TempTable.open` immediately creates a `TableScan`. Go uses an atomic counter
 for concurrent name allocation and introduces descriptor construction independently. That keeps this behavior
-observable without touching storage; scan creation will be implemented separately. No catalog registration is added,
+observable without touching storage; scan creation remains a distinct behavior. No catalog registration is added,
 matching the temporary-table contract.
 
 ### Validation
@@ -36,3 +36,24 @@ matching the temporary-table contract.
 The constructor, metadata accessors, and generated-name behavior are covered together with the current 100% statement
 coverage target. The test transaction records every operation so descriptor construction cannot silently perform file
 or buffer access.
+
+## Feature 2: Open the temporary table scan
+
+`TempTable.Open` passes the retained transaction, generated `tempN` name, and schema-derived layout to
+`query.NewRecordScan`, which adapts the record-level scan to the `query.UpdateScan` contract. Its underlying
+`record.NewTableScan` reads the temporary file size, appends and formats the first block when needed, and pins the
+initial record page. Errors retain their causes and gain temporary-table context. The returned update scan owns its page
+pin; the caller releases it through `Close`. The descriptor-boundary diagram shows query adaptation between the
+metadata-only descriptor and physical access.
+
+### Test-first record
+
+The first focused build failed because `TempTable.Open` was undefined. Tests cover new and existing files, forwarding of
+the descriptor name and schema layout, nil or incomplete descriptors without I/O, contextual failures at size/append/
+pin/format steps, cleanup after format errors, and caller-owned scan close.
+
+### Design decision
+
+Java `TempTable.open` returns an `UpdateScan`. Go returns the narrow `query.UpdateScan` interface and uses the existing
+`query.NewRecordScan` adapter to expose query constants while keeping `record` independent of `query`. The temporary
+table remains outside the metadata catalog, and descriptor construction still performs no storage I/O.

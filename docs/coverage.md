@@ -157,6 +157,12 @@ attempts to unpin the acquired page and preserves both formatting and cleanup er
 not unpin. Tests cover successful release, both-cause error wrapping, and early-failure behavior. The independent
 coverage workflow continues to enforce 100.0% statement coverage.
 
+Issue #1200 adds `materialize.TempTable.Open`, returning a `query.UpdateScan` through `query.NewRecordScan` and
+delegating first-file initialization and page pinning to `record.NewTableScan`. Tests cover query-value reads/writes,
+new/existing temporary files, invalid descriptors, wrapped initialization failures, format-error cleanup, and the
+caller-owned scan pin. The separate coverage workflow continues to require 100.0% in every executable package,
+function, and the module.
+
 Issue #1195 adds `storage.Page.SetString`, converting UTF-8 bytes through the existing `SetBytes` length-prefix path.
 Tests round-trip empty text, embedded NUL, and multibyte text through both string and byte APIs, and verify a failed
 capacity write preserves the original page. The separate coverage workflow continues to enforce 100.0% package,
