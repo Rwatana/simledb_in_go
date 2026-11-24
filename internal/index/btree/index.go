@@ -171,6 +171,56 @@ func (index *BTreeIndex) Close() error {
 	return errors.Join(closeErrors...)
 }
 
+// Insert adds a value/RID entry and propagates any resulting B-tree page splits.
+// The caller must roll back the transaction if insertion returns an error after logged writes.
+func (index *BTreeIndex) Insert(dataValue query.Constant, dataRID record.RID) error {
+	if index == nil {
+		return fmt.Errorf("insert B-tree index entry %s -> %s: index is nil", dataValue, dataRID)
+	}
+	if err := index.BeforeFirst(dataValue); err != nil {
+		return fmt.Errorf("insert B-tree index entry %s -> %s: position cursor: %w", dataValue, dataRID, err)
+	}
+	leaf := index.leaf
+	separator, insertErr := leaf.Insert(dataRID)
+	leafCloseErr := leaf.Close()
+	if leafCloseErr != nil {
+		leafCloseErr = fmt.Errorf("close leaf cursor after inserting %s -> %s: %w", dataValue, dataRID, leafCloseErr)
+	} else {
+		index.leaf = nil
+	}
+	if insertErr != nil {
+		insertErr = fmt.Errorf("insert leaf entry: %w", insertErr)
+	}
+	if insertErr != nil || leafCloseErr != nil {
+		return fmt.Errorf("insert B-tree index entry %s -> %s: %w", dataValue, dataRID, errors.Join(insertErr, leafCloseErr))
+	}
+	if separator == nil {
+		return nil
+	}
+
+	rootPage, err := NewPage(index.transaction, index.rootBlock, index.directoryLayout)
+	if err != nil {
+		return fmt.Errorf("insert B-tree index entry %s -> %s: open directory root: %w", dataValue, dataRID, err)
+	}
+	rootSeparator, directoryErr := rootPage.InsertDirectoryEntryRecursive(*separator)
+	if directoryErr != nil {
+		directoryErr = fmt.Errorf("insert leaf split into directory: %w", directoryErr)
+	} else if rootSeparator != nil {
+		if err := rootPage.MakeNewRoot(*rootSeparator); err != nil {
+			directoryErr = fmt.Errorf("grow directory root after split: %w", err)
+		}
+	}
+	rootCloseErr := rootPage.Close()
+	if rootCloseErr != nil {
+		index.pendingDirectory = rootPage
+		rootCloseErr = fmt.Errorf("close directory root after inserting %s -> %s: %w", dataValue, dataRID, rootCloseErr)
+	}
+	if directoryErr != nil || rootCloseErr != nil {
+		return fmt.Errorf("insert B-tree index entry %s -> %s: %w", dataValue, dataRID, errors.Join(directoryErr, rootCloseErr))
+	}
+	return nil
+}
+
 // NewBTreeIndex initializes the files and retained state for one B-tree index.
 // The caller must roll back the transaction if construction fails after an append.
 func NewBTreeIndex(transaction btreeFileTransaction, indexName string, leafLayout *record.Layout) (*BTreeIndex, error) {

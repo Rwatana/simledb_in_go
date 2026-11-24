@@ -11,7 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/btree.BTreeIndex`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTreeIndex.java` | Retain index state; derive the directory layout; initialize files; position and advance a search cursor; read its current RID; close retained pages |
+| `internal/index/btree.BTreeIndex`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTreeIndex.java` | Retain index state; derive the directory layout; initialize files; position and advance a search cursor; read its current RID; insert entries and propagate splits; close retained pages |
 | `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
@@ -1301,6 +1301,22 @@ The focused compilation first failed because `BTreeIndex.Close` was undefined. T
 order, idempotency, simultaneous unpin failures, retention and retry of both pages, and a nil receiver. The method is
 100.0% covered.
 
+## Feature 88: Insert an entry through the B-tree index
+
+Java `BTreeIndex.insert` positions the leaf for the search value, inserts the RID, and propagates a returned separator
+through the directory. Go's `BTreeIndex.Insert` delegates the ordered leaf mutation, closes that leaf before opening
+the block-zero directory root, inserts split separators recursively, and grows the root in place when propagation
+reaches it. A leaf insert that does not split performs no directory I/O. Errors preserve their causes, and the caller
+must roll back the transaction if logged changes preceded a failure. The existing [root-growth diagram](../diagrams/ch11-btree-root-growth.svg)
+shows the fixed block-zero root receiving two children; its editable Draw.io source is reused.
+
+### Test-first record
+
+The focused compilation first failed because `BTreeIndex.Insert` was undefined. Tests cover an in-page insert without
+directory changes, leaf split propagation, root growth and block-zero retention, nil and invalid-key rejection before
+pinning, joined leaf-write/close failures, root-repin failure, and a directory split error combined with retryable root
+cleanup. The method is 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1313,6 +1329,7 @@ order, idempotency, simultaneous unpin failures, retention and retry of both pag
 - `btree.BTreeIndex.Next` reports an unpositioned cursor and leaf-advance failures as Go errors while preserving wrapped storage causes.
 - `btree.BTreeIndex.GetDataRID` reports nil or unpositioned cursor state as Go errors and preserves wrapped leaf/page-read causes.
 - `btree.BTreeIndex.Close` attempts both retained page closes, joins errors, and preserves failed handles for retry.
+- `btree.BTreeIndex.Insert` closes the modified leaf before directory access, propagates splits, retains root block zero, and leaves transaction rollback to the caller after an error.
 - `IndexSelectScan` reports index-position failures as Go errors and leaves index lifetime management to its caller.
 - `IndexSelectScan.Next` reports index and table-scan failures as errors, and avoids moving the data scan after exhaustion.
 - `IndexSelectScan.GetInt` reports data-scan read failures as Go errors while preserving their wrapped causes.
