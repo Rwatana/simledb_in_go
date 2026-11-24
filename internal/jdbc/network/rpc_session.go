@@ -102,6 +102,26 @@ func (s *RemoteSession) ExecuteUpdate(statement string) (int64, error) {
 	return response.RowsAffected, nil
 }
 
+// ExecuteQuery returns typed, schema-ordered rows from the active remote transaction.
+func (s *RemoteSession) ExecuteQuery(statement string) (ExecuteQueryResponse, error) {
+	if s == nil {
+		return ExecuteQueryResponse{}, fmt.Errorf("execute network RPC client query: session is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return ExecuteQueryResponse{}, fmt.Errorf("execute network RPC client query: session is closed")
+	}
+	if s.client == nil {
+		return ExecuteQueryResponse{}, fmt.Errorf("execute network RPC client query: client is nil")
+	}
+	var response ExecuteQueryResponse
+	if err := s.client.Call("SimpleDB.ExecuteQuery", ExecuteQueryRequest{Statement: statement}, &response); err != nil {
+		return ExecuteQueryResponse{}, fmt.Errorf("execute network RPC client query: %w", err)
+	}
+	return response, nil
+}
+
 // Close closes the remote database session without closing the caller-owned RPC client.
 func (s *RemoteSession) Close() error {
 	if s == nil {

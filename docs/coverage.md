@@ -144,6 +144,11 @@ affected rows, and leaves the current transaction ID and completion to the calle
 are contextual and preserve the ID. The independent coverage workflow continues to require 100.0% package, function,
 and module statement coverage.
 
+Issue #1183 adds `RemoteSession.ExecuteQuery`, which returns the server's ordered column metadata and typed rows without
+completing the active transaction or changing its ID. Nil, client-less, and closed sessions return empty results with
+contextual errors; RPC failures preserve their cause and suppress partial results. The coverage workflow continues to
+enforce 100.0% statement coverage in every executable package, function, and the module total.
+
 Issue #1177 adds `RemoteSession.Commit`, which calls the server's Commit RPC and updates the retained transaction ID only
 after a successful response. Tests cover successor-ID replacement, nil session/client state, RPC failure, and ID
 preservation. The separate coverage workflow requires 100.0% package, function, and module statement coverage.

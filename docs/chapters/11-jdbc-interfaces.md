@@ -94,6 +94,8 @@ Close. The client and transport remain caller-owned.
 and the session transaction. Its [network RPC query diagram](../diagrams/ch11-network-rpc-query.svg) shows planning,
 scan cleanup, typed rows, and explicit transaction ownership; its [editable Draw.io source](../diagrams/ch11-network-rpc-query.drawio)
 is kept beside the SVG. The caller may then commit, roll back, or close the session independently of result materialization.
+`RemoteSession.ExecuteQuery` returns that ordered metadata and typed rows, uses an empty response when the RPC fails, and
+preserves the active transaction ID for both success and failure. The RPC client and transport stay caller-owned.
 
 ## Go design and current status
 
@@ -256,6 +258,8 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestRemoteSessionCloseRejectsNilState` | Nil session/client state returns contextual errors and preserves the transaction ID |
 | `TestRemoteSessionExecuteUpdateReturnsAffectedRowsWithoutCompletingTransaction` | Client updates return affected rows while preserving the active transaction ID until explicit completion |
 | `TestRemoteSessionExecuteUpdateRejectsInvalidStateAndWrapsRPCFailure` | Nil, closed, and client-less sessions fail contextually, and a remote error preserves the transaction ID |
+| `TestRemoteSessionExecuteQueryReturnsTypedRowsWithoutCompletingTransaction` | Client queries return ordered typed rows and keep the active transaction ID unchanged |
+| `TestRemoteSessionExecuteQueryRejectsInvalidStateAndHidesRPCFailureResults` | Nil, closed, and client-less sessions return empty results with errors; remote partial results are hidden |
 | `TestDriverServiceConnectRejectsInvalidReceiverAndReply` | Nil service/reply and incomplete managers fail, clearing any partial transaction ID |
 | `TestRegisterDriverServiceRejectsInvalidInputsAndDuplicateRegistration` | RPC service registration validates dependencies and wraps duplicate-name failures |
 | `TestDriverServiceCommitCommitsAndStartsNextTransactionOverRPC` | RPC Commit persists the current outcome, returns a new transaction ID, and retains exactly one successor |
@@ -411,6 +415,10 @@ Commit, and Rollback locally; and the caller-owned RPC client remains open.
 The network RPC client-update test-first run initially failed because `RemoteSession.ExecuteUpdate` was undefined. Tests
 execute catalog-backed CREATE TABLE and INSERT statements, verify affected-row counts, and confirm that updates retain
 the active transaction ID. Nil/closed/client-less sessions and a wrapped remote failure are also covered.
+
+The network RPC client-query test-first run initially failed because `RemoteSession.ExecuteQuery` was undefined. Tests
+verify an empty result, ordered VARCHAR/INTEGER metadata and typed rows, unchanged transaction ID, invalid local session
+state, a wrapped remote error, and suppression of partial response data.
 
 ## Intentional differences
 
