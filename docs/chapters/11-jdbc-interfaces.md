@@ -64,7 +64,10 @@ START boundary, returned ID, and ownership; its [editable Draw.io source](../dia
 is kept beside the SVG. `RemoteSession.Commit` sends `SimpleDB.Commit` on that client and replaces its retained ID with
 the server's successor ID only after a successful response; a failed call preserves the previous ID and does not close
 the client. `RemoteSession.Rollback` applies the same client-side state rule to `SimpleDB.Rollback`: it retains the
-successor ID after success and keeps the last known ID if the request fails.
+successor ID after success and keeps the last known ID if the request fails. `RemoteSession.Close` sends
+`SimpleDB.Close`; on success it marks the client session closed and clears the retained ID, while failure preserves the
+active ID for retry. Closed sessions reject Commit, Rollback, and another Close locally. The supplied `rpc.Client` and
+transport remain caller-owned.
 
 `network.ServeConnection` registers a small gob-based `net/rpc` service for one accepted connection. A successful
 `SimpleDB.Connect` creates one transaction through the shared manager set, retains it on that connection's service, and
@@ -247,6 +250,8 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestRemoteSessionCommitRejectsInvalidStateAndPreservesIDOnRPCFailure` | Nil session/client and RPC errors are contextual, and a failed Commit retains the last known ID |
 | `TestRemoteSessionRollbackRetainsSuccessorTransactionID` | Rollback replaces the retained ID with the successor transaction ID and keeps the caller's RPC client usable |
 | `TestRemoteSessionRollbackRejectsInvalidStateAndPreservesIDOnRPCFailure` | Nil session/client and RPC errors are contextual, and a failed Rollback retains the last known ID |
+| `TestRemoteSessionCloseClosesRemoteSessionAndRetainsCallerClient` | A successful Close clears the client-side ID, rejects later operations, and leaves the RPC client open; failed Close can be retried |
+| `TestRemoteSessionCloseRejectsNilState` | Nil session/client state returns contextual errors and preserves the transaction ID |
 | `TestDriverServiceConnectRejectsInvalidReceiverAndReply` | Nil service/reply and incomplete managers fail, clearing any partial transaction ID |
 | `TestRegisterDriverServiceRejectsInvalidInputsAndDuplicateRegistration` | RPC service registration validates dependencies and wraps duplicate-name failures |
 | `TestDriverServiceCommitCommitsAndStartsNextTransactionOverRPC` | RPC Commit persists the current outcome, returns a new transaction ID, and retains exactly one successor |
@@ -394,6 +399,10 @@ known ID after a remote error, and continued use of the caller-owned RPC client.
 The network RPC client-rollback test-first run initially failed because `RemoteSession.Rollback` was undefined. Tests
 verify the successor transaction ID after successful RPC completion, nil session/client validation, preservation of the
 last known ID after a remote error, and continued use of the caller-owned RPC client.
+
+The network RPC client-close test-first run initially failed because `RemoteSession.Close` was undefined. Tests verify
+that a failed server call preserves the active ID for retry; successful closure clears it and rejects repeated Close,
+Commit, and Rollback locally; and the caller-owned RPC client remains open.
 
 ## Intentional differences
 

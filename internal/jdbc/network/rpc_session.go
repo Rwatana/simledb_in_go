@@ -11,6 +11,7 @@ type RemoteSession struct {
 	mu            sync.RWMutex
 	client        *rpc.Client
 	transactionID int64
+	closed        bool
 }
 
 // ConnectRPCSession requests one server-side transaction over the supplied RPC client.
@@ -26,13 +27,16 @@ func ConnectRPCSession(client *rpc.Client) (*RemoteSession, error) {
 	return &RemoteSession{client: client, transactionID: response.TransactionID}, nil
 }
 
-// TransactionID returns the active remote transaction ID, or zero for a nil session.
+// TransactionID returns the active remote transaction ID, or zero for a nil or closed session.
 func (s *RemoteSession) TransactionID() int64 {
 	if s == nil {
 		return 0
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.closed {
+		return 0
+	}
 	return s.transactionID
 }
 
@@ -43,6 +47,9 @@ func (s *RemoteSession) Commit() error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("commit network RPC client session: session is closed")
+	}
 	if s.client == nil {
 		return fmt.Errorf("commit network RPC client session: client is nil")
 	}
@@ -61,6 +68,9 @@ func (s *RemoteSession) Rollback() error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("roll back network RPC client session: session is closed")
+	}
 	if s.client == nil {
 		return fmt.Errorf("roll back network RPC client session: client is nil")
 	}
@@ -69,5 +79,26 @@ func (s *RemoteSession) Rollback() error {
 		return fmt.Errorf("roll back network RPC client session: %w", err)
 	}
 	s.transactionID = response.TransactionID
+	return nil
+}
+
+// Close closes the remote database session without closing the caller-owned RPC client.
+func (s *RemoteSession) Close() error {
+	if s == nil {
+		return fmt.Errorf("close network RPC client session: session is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("close network RPC client session: session is closed")
+	}
+	if s.client == nil {
+		return fmt.Errorf("close network RPC client session: client is nil")
+	}
+	if err := s.client.Call("SimpleDB.Close", CloseRequest{}, &CloseResponse{}); err != nil {
+		return fmt.Errorf("close network RPC client session: %w", err)
+	}
+	s.closed = true
+	s.transactionID = 0
 	return nil
 }
