@@ -277,6 +277,53 @@ func (page *Page) FindLeafBlock(searchKey query.Constant) (storage.BlockID, erro
 	}
 }
 
+// OpenLeafPage replaces an open level-zero directory page with a pinned leaf page.
+func (page *Page) OpenLeafPage(leafBlock storage.BlockID, leafLayout *record.Layout) (*Page, error) {
+	if page == nil {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: directory page is nil", leafBlock)
+	}
+	if page.block.FileName() == "" {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: directory page is closed", leafBlock)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: directory transaction is nil", leafBlock)
+	}
+	if page.layout == nil {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: directory layout is nil", leafBlock)
+	}
+	if page.layout.Schema() == nil {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: directory layout schema is nil", leafBlock)
+	}
+	if leafBlock.FileName() == "" {
+		return nil, fmt.Errorf("open B-tree leaf page: leaf block file name is empty")
+	}
+	if leafBlock.Number() < 0 {
+		return nil, fmt.Errorf("open B-tree leaf page for file %q: leaf block number %d is negative", leafBlock.FileName(), leafBlock.Number())
+	}
+	if leafLayout == nil {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: leaf layout is nil", leafBlock)
+	}
+	if leafLayout.Schema() == nil {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: leaf layout schema is nil", leafBlock)
+	}
+	level, err := page.GetFlag()
+	if err != nil {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: read directory level: %w", leafBlock, err)
+	}
+	if level != 0 {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: directory level is %d, want zero", leafBlock, level)
+	}
+	directoryBlock := page.block
+	if err := page.Close(); err != nil {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: close directory block %v: %w", leafBlock, directoryBlock, err)
+	}
+	leaf, err := NewPage(page.transaction, leafBlock, leafLayout)
+	if err != nil {
+		return nil, fmt.Errorf("open B-tree leaf page for block %v: %w", leafBlock, err)
+	}
+	return leaf, nil
+}
+
 // GetDataVal reads the dataval field from the specified B-tree page slot.
 func (page *Page) GetDataVal(slot int) (query.Constant, error) {
 	if page == nil {

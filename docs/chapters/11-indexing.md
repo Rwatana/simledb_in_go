@@ -815,6 +815,26 @@ directory, exact pin/unpin order, a maximum of one active directory pin, caller 
 closed state, a negative level, wrapped flag and child-selection failures, retryable unpin failure, and a failed next
 pin that leaves the receiver closed.
 
+## Feature 59: Open the selected B-tree leaf page
+
+Java `BTreeIndex.beforeFirst` closes the directory after `BTreeDir.search` and then constructs `BTreeLeaf`, which pins
+the selected leaf block using a different record layout. Go's `Page.OpenLeafPage` expresses only that pin transition:
+it requires an open level-zero directory page, validates the target block and leaf layout before releasing the directory,
+closes the directory, then opens the selected leaf with the same transaction and supplied leaf layout. The returned page
+pin belongs to the caller, while the directory receiver is closed. Closing before opening supports a one-frame buffer.
+If directory unpin fails, no leaf pin is attempted and the directory remains open for retry; if leaf pinning fails after
+the directory closes, the receiver remains closed. Search-key positioning remains the separate `Page.FindSlotBefore`
+operation, and leaf iteration/overflow state remain separate behaviors. The [directory-to-leaf pin diagram](../diagrams/ch11-btree-open-leaf-page.svg)
+shows the layout and ownership transition; its editable source is
+[`ch11-btree-open-leaf-page.drawio`](../diagrams/ch11-btree-open-leaf-page.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.OpenLeafPage` was undefined. Tests cover same-transaction leaf pinning
+with a distinct layout, directory-close-before-leaf-pin order, one active pin maximum, caller leaf cleanup, invalid
+directory and leaf inputs before unpinning, rejection of positive and negative directory levels, wrapped flag and
+directory-unpin failures, retry after unpin failure, and a wrapped leaf-pin failure that leaves the receiver closed.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
