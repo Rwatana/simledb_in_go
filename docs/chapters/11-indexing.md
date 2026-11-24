@@ -394,6 +394,18 @@ resource and joins contextual errors so each underlying cause remains detectable
 The focused tests first failed because `IndexJoinScan.Close` was undefined. Tests verify close order, all three failures
 being returned, partial resources, an absent embedded right table scan, and nil receiver handling.
 
+## Feature 31: Expose the schema of index join plans
+
+Java `IndexJoinPlan` builds its schema by appending the left plan schema and then the right plan schema. Go's
+`NewIndexJoinPlan` retains both plans, the right index metadata, and the join field while copying both available child
+schemas into a plan-owned schema; `Schema` exposes that combined value.
+
+### Test-first record
+
+The focused tests first failed because `IndexJoinPlan` was undefined. Tests verify retained inputs, left-to-right field
+order and definitions, that the combined schema is independent of later child schema changes, missing child schemas,
+and nil receiver behavior.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
