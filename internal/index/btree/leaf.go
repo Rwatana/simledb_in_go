@@ -142,6 +142,13 @@ func (leaf *Leaf) Insert(dataRID record.RID) (*DirEntry, error) {
 	if leaf.currentSlot == maxInt {
 		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s: current slot overflows int", dataRID, leaf.searchKey)
 	}
+	handled, entry, err := leaf.insertBeforeFirst(dataRID)
+	if err != nil {
+		return nil, err
+	}
+	if handled {
+		return entry, nil
+	}
 	full, err := leaf.contents.IsFull()
 	if err != nil {
 		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: check capacity: %w", dataRID, leaf.searchKey, leaf.contents.block, err)
@@ -155,4 +162,50 @@ func (leaf *Leaf) Insert(dataRID record.RID) (*DirEntry, error) {
 	}
 	leaf.currentSlot = slot
 	return nil, nil
+}
+
+func (leaf *Leaf) insertBeforeFirst(dataRID record.RID) (bool, *DirEntry, error) {
+	page := leaf.contents
+	count, err := page.GetNumRecs()
+	if err != nil {
+		return true, nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read record count: %w", dataRID, leaf.searchKey, page.block, err)
+	}
+	if count < 0 {
+		return true, nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: record count %d is negative", dataRID, leaf.searchKey, page.block, count)
+	}
+	if count == 0 {
+		return false, nil, nil
+	}
+	flag, err := page.GetFlag()
+	if err != nil {
+		return true, nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read page flag: %w", dataRID, leaf.searchKey, page.block, err)
+	}
+	if flag < 0 {
+		return false, nil, nil
+	}
+	firstKey, err := page.GetDataVal(0)
+	if err != nil {
+		return true, nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read first key: %w", dataRID, leaf.searchKey, page.block, err)
+	}
+	comparison, comparable := compareBTreeKeys(firstKey, leaf.searchKey)
+	if !comparable {
+		return true, nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: first key %s is not comparable to the search key", dataRID, leaf.searchKey, page.block, firstKey)
+	}
+	if comparison <= 0 {
+		return false, nil, nil
+	}
+
+	rightBlock, err := page.Split(0, flag)
+	if err != nil {
+		return true, nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: split old page: %w", dataRID, leaf.searchKey, page.block, err)
+	}
+	if err := page.SetFlag(-1); err != nil {
+		return true, nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: mark left page as overflow: %w", dataRID, leaf.searchKey, page.block, err)
+	}
+	if err := page.InsertLeaf(0, leaf.searchKey, dataRID); err != nil {
+		return true, nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v at slot 0: %w", dataRID, leaf.searchKey, page.block, err)
+	}
+	leaf.currentSlot = 0
+	entry := NewDirEntry(firstKey, rightBlock.Number())
+	return true, &entry, nil
 }

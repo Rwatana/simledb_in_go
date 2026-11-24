@@ -980,6 +980,22 @@ The focused tests first failed because `Leaf.Close` was undefined. They verify o
 close, closed-cursor errors from the other public operations, preservation of the page after a wrapped unpin failure,
 successful retry, and nil-receiver validation.
 
+## Feature 70: Insert a new minimum key into a B-tree leaf
+
+Java `BTreeLeaf.insert` moves a key smaller than the current first key into a new left leaf page. When the page is not an
+overflow page, Go's `Leaf.Insert` splits the old contents at slot zero, keeps the old flag on the new right page, marks
+the left page with flag -1, inserts the new key/RID at slot zero, and returns a `DirEntry` for the former first key and
+the new right block. The cursor advances only after the insert succeeds. Key comparison preserves Java's UTF-16 order
+for varchar values. If a storage failure occurs after logged writes begin, the caller must roll back the transaction;
+the existing [B-tree page split diagram](../diagrams/ch11-btree-page-split.svg) already illustrates the suffix transfer
+and is reused instead of adding a duplicate diagram.
+
+### Test-first record
+
+Focused tests first failed because `Leaf.Insert` returned no directory entry and did not split when given a new minimum
+key. Tests cover integer and varchar split results, old/new page flags and records, cursor and pin ownership,
+empty pages and non-minimum keys, validation/read/split/write failures, and Java-compatible UTF-16 comparison.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
