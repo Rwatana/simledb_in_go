@@ -64,7 +64,10 @@ request, START-log boundary, and per-connection transaction; its [editable Draw.
 is maintained beside the SVG. This is a Go-native server boundary and does not implement Java RMI framing. `DriverService.Commit` commits the retained transaction and starts its successor on the same connection, matching the
 Java server connection cycle without exposing RMI. Its [network commit diagram](../diagrams/ch11-network-rpc-commit.svg)
 shows the durable COMMIT marker followed by the next START record; its [editable Draw.io source](../diagrams/ch11-network-rpc-commit.drawio)
-is maintained beside the SVG. Rollback, connection close, and SQL operations remain separate behaviors.
+is maintained beside the SVG. `DriverService.Rollback` also completes the current transaction and opens the next one,
+using the distinct durable rollback path. The [network RPC rollback diagram](../diagrams/ch11-network-rpc-rollback.svg)
+shows the ROLLBACK record and successor START; its [editable Draw.io source](../diagrams/ch11-network-rpc-rollback.drawio)
+is maintained beside the SVG. Connection close and SQL operations remain separate behaviors.
 
 ## Go design and current status
 
@@ -222,6 +225,10 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestDriverServiceCommitRejectsInvalidStateAndReply` | Nil state, manager set, reply, and active transaction are rejected |
 | `TestDriverServiceCommitKeepsTransactionWhenCommitFails` | A failed commit returns no new ID and does not replace the active transaction |
 | `TestDriverServiceCommitLeavesNoStaleTransactionWhenNextStartFails` | Successful commit followed by successor-start failure leaves no completed transaction attached and permits reconnect |
+| `TestDriverServiceRollbackRollsBackAndStartsNextTransactionOverRPC` | RPC Rollback persists the current rollback, returns a new transaction ID, and retains exactly one successor |
+| `TestDriverServiceRollbackRejectsInvalidStateAndReply` | Nil state, manager set, reply, and active transaction are rejected |
+| `TestDriverServiceRollbackKeepsTransactionWhenRollbackFails` | A failed rollback returns no new ID and does not replace the active transaction |
+| `TestDriverServiceRollbackLeavesNoStaleTransactionWhenNextStartFails` | Successful rollback followed by successor-start failure leaves no completed transaction attached and permits reconnect |
 | `TestConnectorConnectValidatesReceiverContextAndCancellation` | Nil state and canceled contexts return errors before creating a connection |
 | `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
@@ -314,6 +321,11 @@ were undefined. Tests verify the COMMIT and successor START records through RPC,
 errors, and the case where the commit succeeds but the next START cannot be created. In that last case the completed
 transaction is not retained and Connect can be retried; rollback and connection close remain independent.
 
+The network RPC-rollback test-first run initially failed because `RollbackRequest`, `RollbackResponse`, and
+`DriverService.Rollback` were undefined. Tests verify the ROLLBACK and successor START records through RPC, invalid state,
+completed-transaction errors, and a failed successor START after durable rollback. In that last case the completed
+transaction is detached and Connect can be retried; connection close and SQL dispatch remain separate.
+
 ## Intentional differences
 
 - Do not reproduce the Java `java.sql` adapter hierarchy mechanically.
@@ -322,4 +334,4 @@ transaction is not retained and Connect can be retried; rollback and connection 
 - Keep the upstream Java distribution and book PDF outside Git.
 - Parse the Java-compatible embedded URL prefix, but keep path resolution, database initialization, and manager settings explicit in Go.
 - Parse the Java-compatible network URL into a host, but keep dialing and remote-session lifecycle separate from parsing; the current Go network parser preserves the default registry port convention.
-- Open a TCP socket to the parsed network host with caller context, then serve Go `net/rpc` Connect and Commit requests, with Commit persisting the current transaction and opening its successor; defer rollback, connection close, and remote SQL operations to separate behaviors.
+- Open a TCP socket to the parsed network host with caller context, then serve Go `net/rpc` Connect, Commit, and Rollback requests, with each transaction outcome opening a successor; defer connection close and remote SQL operations to separate behaviors.

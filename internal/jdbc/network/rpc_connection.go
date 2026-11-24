@@ -27,6 +27,14 @@ type CommitResponse struct {
 	TransactionID int64
 }
 
+// RollbackRequest is the empty request for rolling back a remote database session.
+type RollbackRequest struct{}
+
+// RollbackResponse contains the transaction identifier created after rollback.
+type RollbackResponse struct {
+	TransactionID int64
+}
+
 // DriverService serves requests over one RPC connection and retains its transaction.
 type DriverService struct {
 	managers    *server.Managers
@@ -133,6 +141,38 @@ func (s *DriverService) Commit(_ CommitRequest, reply *CommitResponse) error {
 	created, err := s.managers.NewTransaction()
 	if err != nil {
 		return fmt.Errorf("start network RPC transaction after commit: %w", err)
+	}
+	s.transaction = created
+	reply.TransactionID = int64(created.ID())
+	return nil
+}
+
+// Rollback rolls back the active transaction and starts its successor for this RPC connection.
+func (s *DriverService) Rollback(_ RollbackRequest, reply *RollbackResponse) error {
+	if reply != nil {
+		*reply = RollbackResponse{}
+	}
+	if s == nil {
+		return fmt.Errorf("rollback network RPC session: service is nil")
+	}
+	if reply == nil {
+		return fmt.Errorf("rollback network RPC session: reply is nil")
+	}
+	if s.managers == nil {
+		return fmt.Errorf("rollback network RPC session: manager set is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.transaction == nil {
+		return fmt.Errorf("rollback network RPC session: active transaction is nil")
+	}
+	if _, err := s.transaction.Rollback(); err != nil {
+		return fmt.Errorf("rollback network RPC transaction: %w", err)
+	}
+	s.transaction = nil
+	created, err := s.managers.NewTransaction()
+	if err != nil {
+		return fmt.Errorf("start network RPC transaction after rollback: %w", err)
 	}
 	s.transaction = created
 	reply.TransactionID = int64(created.ID())
