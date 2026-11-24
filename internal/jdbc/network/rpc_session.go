@@ -82,6 +82,26 @@ func (s *RemoteSession) Rollback() error {
 	return nil
 }
 
+// ExecuteUpdate runs a SQL update in the active remote transaction and returns its affected-row count.
+func (s *RemoteSession) ExecuteUpdate(statement string) (int64, error) {
+	if s == nil {
+		return 0, fmt.Errorf("execute network RPC client update: session is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return 0, fmt.Errorf("execute network RPC client update: session is closed")
+	}
+	if s.client == nil {
+		return 0, fmt.Errorf("execute network RPC client update: client is nil")
+	}
+	var response ExecuteUpdateResponse
+	if err := s.client.Call("SimpleDB.ExecuteUpdate", ExecuteUpdateRequest{Statement: statement}, &response); err != nil {
+		return 0, fmt.Errorf("execute network RPC client update: %w", err)
+	}
+	return response.RowsAffected, nil
+}
+
 // Close closes the remote database session without closing the caller-owned RPC client.
 func (s *RemoteSession) Close() error {
 	if s == nil {

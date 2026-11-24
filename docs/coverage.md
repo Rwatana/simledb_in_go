@@ -139,6 +139,11 @@ successful reply. It clears the transaction ID on success, preserves it after re
 rejects later Commit, Rollback, and Close calls locally without closing the caller-owned RPC client. The separate coverage
 workflow continues to enforce 100.0% package, function, and module statement coverage.
 
+Issue #1181 adds `RemoteSession.ExecuteUpdate`, which sends one SQL statement through `SimpleDB.ExecuteUpdate`, returns
+affected rows, and leaves the current transaction ID and completion to the caller. Client validation and remote errors
+are contextual and preserve the ID. The independent coverage workflow continues to require 100.0% package, function,
+and module statement coverage.
+
 Issue #1177 adds `RemoteSession.Commit`, which calls the server's Commit RPC and updates the retained transaction ID only
 after a successful response. Tests cover successor-ID replacement, nil session/client state, RPC failure, and ID
 preservation. The separate coverage workflow requires 100.0% package, function, and module statement coverage.
