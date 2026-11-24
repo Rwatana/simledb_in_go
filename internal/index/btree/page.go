@@ -4,6 +4,7 @@ package btree
 import (
 	"cmp"
 	"fmt"
+	"math"
 	"reflect"
 	"slices"
 	"unicode/utf16"
@@ -186,6 +187,67 @@ func (page *Page) GetDataVal(slot int) (query.Constant, error) {
 		return query.Constant{}, fmt.Errorf("read varchar dataval at slot %d in block %v: %w", slot, page.block, err)
 	}
 	return query.NewStringConstant(value), nil
+}
+
+// SetDataVal writes the typed dataval field in the specified B-tree page slot.
+func (page *Page) SetDataVal(slot int, value query.Constant) error {
+	if page == nil {
+		return fmt.Errorf("write B-tree page data value at slot %d: page is nil", slot)
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("write B-tree page data value at slot %d: page is closed", slot)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("write B-tree page data value at slot %d in block %v: transaction is nil", slot, page.block)
+	}
+	if page.layout == nil {
+		return fmt.Errorf("write B-tree page data value at slot %d in block %v: layout is nil", slot, page.block)
+	}
+	schema := page.layout.Schema()
+	if schema == nil {
+		return fmt.Errorf("write B-tree page data value at slot %d in block %v: layout schema is nil", slot, page.block)
+	}
+	definition, ok := schema.Field("dataval")
+	if !ok {
+		return fmt.Errorf("write B-tree page data value at slot %d in block %v: layout has no dataval field", slot, page.block)
+	}
+	var integer int32
+	var text string
+	switch definition.Type {
+	case record.IntegerField:
+		integer, ok = value.AsInt()
+		if !ok {
+			return fmt.Errorf("write B-tree page data value at slot %d in block %v: integer dataval cannot store %s", slot, page.block, value)
+		}
+	case record.VarcharField:
+		text, ok = value.AsString()
+		if !ok {
+			return fmt.Errorf("write B-tree page data value at slot %d in block %v: varchar dataval cannot store %s", slot, page.block, value)
+		}
+	default:
+		return fmt.Errorf("write B-tree page data value at slot %d in block %v: unsupported dataval type %d", slot, page.block, definition.Type)
+	}
+	fieldOffset, ok := page.layout.Offset("dataval")
+	if !ok {
+		return fmt.Errorf("write B-tree page data value at slot %d in block %v: layout has no dataval offset", slot, page.block)
+	}
+	position, err := pageSlotFieldPosition(slot, page.layout.SlotSize(), fieldOffset)
+	if err != nil {
+		return fmt.Errorf("write B-tree page data value at slot %d in block %v: %w", slot, page.block, err)
+	}
+	if position > math.MaxInt32 {
+		return fmt.Errorf("write B-tree page data value at slot %d in block %v: offset %d exceeds int32 range", slot, page.block, position)
+	}
+	if definition.Type == record.IntegerField {
+		if err := page.transaction.SetInt(page.block, int32(position), integer, true); err != nil {
+			return fmt.Errorf("write integer dataval at slot %d in block %v at offset %d: %w", slot, page.block, position, err)
+		}
+		return nil
+	}
+	if err := page.transaction.SetString(page.block, int32(position), text, true); err != nil {
+		return fmt.Errorf("write varchar dataval at slot %d in block %v at offset %d: %w", slot, page.block, position, err)
+	}
+	return nil
 }
 
 // GetFlag reads the B-tree page's flag field from the page header.
