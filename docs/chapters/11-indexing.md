@@ -601,6 +601,19 @@ The focused tests first failed because `Page.GetChildNum` was undefined. Tests c
 layout-derived offset, invalid and typed-nil page/layout/field state, negative and overflowing slots, and wrapped read
 failures without changing the pin lifecycle.
 
+## Feature 46: Read a B-tree leaf record identifier
+
+Java `BTPage.getDataRid` reads the integer `block` and `id` fields from one leaf slot and constructs a record RID.
+Go's `Page.GetDataRID` reads those fields at layout-derived positions after the eight-byte page header, preserves the
+stored values, and returns no partial identifier if either read fails. It validates both field definitions and slot
+metadata, wraps storage errors, and leaves the page pin unchanged.
+
+### Test-first record
+
+The focused tests first failed because `Page.GetDataRID` was undefined. Tests verify the block-then-id read order and
+positions, invalid and typed-nil state, missing or noninteger field metadata, negative/overflowing slots, and wrapped
+errors from both reads without returning a partial RID.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

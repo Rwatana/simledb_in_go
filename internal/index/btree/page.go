@@ -297,6 +297,35 @@ func (page *Page) GetChildNum(slot int) (int32, error) {
 	return child, nil
 }
 
+// GetDataRID reads the data record identifier stored in the specified leaf slot.
+func (page *Page) GetDataRID(slot int) (record.RID, error) {
+	blockNumber, err := page.GetChildNum(slot)
+	if err != nil {
+		return record.RID{}, fmt.Errorf("read B-tree page data RID at slot %d: %w", slot, err)
+	}
+	schema := page.layout.Schema()
+	definition, ok := schema.Field("id")
+	if !ok {
+		return record.RID{}, fmt.Errorf("read B-tree page data RID at slot %d in block %v: layout has no id field", slot, page.block)
+	}
+	if definition.Type != record.IntegerField {
+		return record.RID{}, fmt.Errorf("read B-tree page data RID at slot %d in block %v: id field is not an integer", slot, page.block)
+	}
+	fieldOffset, ok := page.layout.Offset("id")
+	if !ok {
+		return record.RID{}, fmt.Errorf("read B-tree page data RID at slot %d in block %v: layout has no id offset", slot, page.block)
+	}
+	position, err := pageSlotFieldPosition(slot, page.layout.SlotSize(), fieldOffset)
+	if err != nil {
+		return record.RID{}, fmt.Errorf("read B-tree page data RID id at slot %d in block %v: %w", slot, page.block, err)
+	}
+	id, err := page.transaction.GetInt(page.block, position)
+	if err != nil {
+		return record.RID{}, fmt.Errorf("read B-tree page data RID id at slot %d in block %v: %w", slot, page.block, err)
+	}
+	return record.NewRID(int(blockNumber), int(id)), nil
+}
+
 func pageSlotFieldPosition(slot, slotSize, fieldOffset int) (int, error) {
 	return pageSlotFieldPositionForCount(int64(slot), slotSize, fieldOffset)
 }
