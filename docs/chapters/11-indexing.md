@@ -11,7 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/btree.Page`, `ensureLeafFile` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java`, `simpledb/index/btree/BTreeIndex.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries and initialize an empty leaf file |
+| `internal/index/btree.Page`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java`, `simpledb/index/btree/BTreeIndex.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries and initialize empty leaf and directory files |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
 | `internal/metadata.IndexInfo` | `simpledb/metadata/IndexInfo.java` | Open the configured static hash index using the retained transaction and index-record layout |
@@ -1180,6 +1180,28 @@ integer and varchar files, existing files, append/pin/format/unpin behavior, mal
 wrapped storage and cleanup errors. `leafPageFields` is shared with `Page.InitializeLeafPage` so both entry points
 validate the same record shape. Every statement in the new helper and every executable function remain 100.0% covered.
 
+## Feature 81: Ensure an empty B-tree directory file has its root
+
+Java `BTreeIndex` appends directory block zero when the directory file is empty, formats it at level zero, and inserts
+the minimum-key entry for leaf block zero. Go's internal `ensureDirectoryFile` performs that file-level behavior for a
+caller-supplied directory layout: it leaves a nonempty file untouched, validates the `dataval` and integer `block`
+fields before append, and chooses Java's minimum signed integer or empty-string sentinel from the key type. It opens the
+new root page, delegates formatting and insertion to `Page.InitializeDirectoryRoot`, and releases the pin. The
+transaction owns appended blocks, so callers must roll back when a later pin, format, entry-write, or close operation
+fails; initialization and cleanup causes are both preserved. Building the directory schema and composing the full
+B-tree index remain separate. The existing [B-tree page format](../diagrams/ch11-btree-page-format.svg) and
+[directory insertion](../diagrams/ch11-btree-insert-dir.svg) diagrams show the root header and initial child entry; the
+editable Draw.io sources are reused.
+
+### Test-first record
+
+The focused compilation first failed because `ensureDirectoryFile` and `directoryPageKeyType` were undefined. Tests
+cover empty and existing files, integer and varchar sentinels, block-zero root level/count/child, unlogged format and
+logged entry writes, invalid dependencies/layouts and append results, wrapped size/append/pin/format/entry/close errors,
+and joined initialization/cleanup failures. `directoryPageKeyType` is shared with `Page.InitializeDirectoryRoot` so
+both entry points apply the same directory-layout validation. Every statement in the new helper and every executable
+function remain 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1211,3 +1233,4 @@ validate the same record shape. Every statement in the new helper and every exec
 - `btree.Page.InitializeDirectoryRoot` formats an allocated block-zero directory root and adds the initial minimum-key entry for leaf block zero.
 - `btree.Page.InitializeLeafPage` formats an already allocated leaf block with overflow flag -1 and an empty record count.
 - `btree.ensureLeafFile` appends and initializes the first leaf block only when the index leaf file is empty, then releases the temporary page pin.
+- `btree.ensureDirectoryFile` creates the block-zero minimum-key root only when the directory file is empty and chooses Java's integer or varchar sentinel from the key schema.

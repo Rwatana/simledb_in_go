@@ -9,13 +9,13 @@ import (
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
 
-type leafFileTransaction interface {
+type btreeFileTransaction interface {
 	PageTransaction
 	Size(string) (int, error)
 	Append(string) (storage.BlockID, error)
 }
 
-func ensureLeafFile(transaction leafFileTransaction, fileName string, layout *record.Layout) error {
+func ensureLeafFile(transaction btreeFileTransaction, fileName string, layout *record.Layout) error {
 	if isNilPageTransaction(transaction) {
 		return fmt.Errorf("ensure B-tree leaf file %q: transaction is nil", fileName)
 	}
