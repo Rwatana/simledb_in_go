@@ -882,6 +882,21 @@ The focused tests first failed because `Page.OpenOverflowPage` was undefined. Te
 one active pin maximum, target and dependency retention, caller cleanup, pre-close rejection of invalid state and
 cross-file/negative targets, retry after unpin failure, and a failed target pin that leaves the receiver closed.
 
+## Feature 63: Initialize a B-tree leaf search cursor
+
+Java `BTreeLeaf` opens a leaf page and positions its current slot immediately before the first entry whose key is not
+less than the search key. Go's `NewLeaf` retains the pinned page, typed search key, and result of
+`Page.FindSlotBefore`; an empty page starts before slot zero. If positioning fails after opening, it attempts to close
+the acquired page and joins any close failure with the original cause. Page contents are unchanged. Advancing the
+cursor, handling overflow blocks, retrieving RIDs, mutating entries, and exposing a close operation remain separate
+behaviors; the initial slot state does not need a diagram.
+
+### Test-first record
+
+The focused tests first failed because `NewLeaf` and `Leaf` were undefined. Tests cover integer duplicate-key
+positioning, varchar ordering, an empty page, validation before pinning, cleanup after key/layout/count read failures,
+joined positioning and unpin errors, and wrapped pin failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
