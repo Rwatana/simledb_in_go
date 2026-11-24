@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title description">
+  <title id="title">Chapter 11: Execute SQL update over RPC</title>
+  <desc id="description">ExecuteUpdate sends one SQL update through the network RPC service, parses and dispatches it to the update planner with the session's active transaction, and returns affected rows. It leaves transaction completion to explicit Commit, Rollback, or Close. Parse and planner errors do not replace the transaction.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#374151"/></marker>
+    <style>.title{font:700 24px system-ui,sans-serif;fill:#1f2937}.label{font:700 16px system-ui,sans-serif;fill:#111827}.small{font:13px system-ui,sans-serif;fill:#374151}.box{stroke-width:2}.line{fill:none;stroke:#374151;stroke-width:2;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1200" height="700" fill="#fff"/><text class="title" x="600" y="52" text-anchor="middle">Chapter 11 / Execute SQL update over RPC</text>
+  <rect class="box" x="40" y="155" width="220" height="95" rx="14" fill="#e0f2fe" stroke="#0284c7"/><text class="label" x="150" y="192" text-anchor="middle">RPC client</text><text class="small" x="150" y="222" text-anchor="middle">ExecuteUpdateRequest</text>
+  <rect class="box" x="330" y="155" width="230" height="95" rx="14" fill="#ede9fe" stroke="#7c3aed"/><text class="label" x="445" y="192" text-anchor="middle">DriverService</text><text class="small" x="445" y="222" text-anchor="middle">active transaction 2</text>
+  <rect class="box" x="640" y="155" width="260" height="95" rx="14" fill="#fef3c7" stroke="#d97706"/><text class="label" x="770" y="192" text-anchor="middle">Managers.ExecuteUpdate</text><text class="small" x="770" y="222" text-anchor="middle">parse then dispatch</text>
+  <rect class="box" x="980" y="155" width="210" height="95" rx="14" fill="#dbeafe" stroke="#2563eb"/><text class="label" x="1085" y="192" text-anchor="middle">UpdatePlanner</text><text class="small" x="1085" y="222" text-anchor="middle">uses transaction 2</text>
+  <rect class="box" x="700" y="400" width="250" height="95" rx="14" fill="#dcfce7" stroke="#16a34a"/><text class="label" x="825" y="438" text-anchor="middle">ExecuteUpdateResponse</text><text class="small" x="825" y="468" text-anchor="middle">rows affected</text>
+  <rect class="box" x="250" y="565" width="700" height="75" rx="14" fill="#e0f2fe" stroke="#0284c7"/><text class="label" x="600" y="594" text-anchor="middle">No implicit transaction completion</text><text class="small" x="600" y="620" text-anchor="middle">caller chooses Commit, Rollback, or Close</text>
+  <rect class="box" x="270" y="300" width="660" height="60" rx="14" fill="#fee2e2" stroke="#dc2626"/><text class="small" x="600" y="336" text-anchor="middle">Parse or planner error returns no affected rows and preserves the active transaction.</text>
+  <path class="line" d="M260 202 H330"/><path class="line" d="M560 202 H640"/><path class="line" d="M900 202 H980"/><path class="line" d="M1085 250 V325 H950 V400"/><path class="line" d="M445 250 V500 H600 V565"/><path class="line" d="M770 250 V300"/>
+  <text class="small" x="295" y="187" text-anchor="middle">SQL</text><text class="small" x="600" y="187" text-anchor="middle">same transaction</text><text class="small" x="940" y="187" text-anchor="middle">parsed command</text><text class="small" x="1000" y="325" text-anchor="middle">row count</text>
+</svg>
