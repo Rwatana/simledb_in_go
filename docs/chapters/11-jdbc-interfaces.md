@@ -117,7 +117,8 @@ both standard-library entry points; its [editable Draw.io source](../diagrams/ch
 beside the SVG.
 
 `Connection.Prepare` retains the SQL string and connection in a `driver.Stmt` handle. `Close` is idempotent, and
-`NumInput` remains `-1` until parameter parsing is implemented. `Stmt.Exec` routes zero-argument update SQL through
+`NumInput` reports `0` because the currently supported statements accept no arguments; parameter parsing and binding
+remain a separate behavior. `database/sql` can therefore reject extra arguments before statement dispatch. `Stmt.Exec` routes zero-argument update SQL through
 `Managers.ExecuteUpdate` using the active connection transaction and returns the planner's affected-row count; the
 transaction remains open for explicit completion. `Stmt.ExecContext` applies the same behavior after rejecting nil or
 canceled contexts and unsupported parameters. `Stmt.Query` still returns `driver.ErrSkip`. Parameter binding, SELECT
@@ -167,6 +168,7 @@ needs them.
 | `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
 | `TestStatementRejectsNilAndClosedOperations` | Nil and closed statements return contextual lifecycle errors |
+| `TestPreparedStatementDeclaresZeroInputsToDatabaseSQL` | Extra prepared-statement arguments are rejected by `database/sql` before driver dispatch |
 | `TestDatabaseSQLExecutesUpdatesInsideExplicitTransaction` | CREATE TABLE and INSERT execute through `sql.Tx`, report affected rows, commit, and roll back independently |
 | `TestConnectionTracksOneActiveTransactionForStatementExecution` | A connection rejects nested transactions and becomes reusable after explicit completion |
 | `TestStatementExecRejectsInvalidStateAndWrapsUpdateErrors` | Exec rejects nil, closed, unbound, argument-bearing, malformed, and planner-failing calls |
@@ -203,6 +205,8 @@ undefined. Statement-execution tests first failed because the connection did not
 prepared statement. Autocommit tests first failed because `Connection` did not implement `driver.Execer`. Context-execution
 tests first failed because `Connection` did not implement `driver.ExecerContext`. Prepared-statement context tests first
 failed because the statement adapter did not implement `driver.StmtExecContext`.
+The prepared-statement arity test first failed because `NumInput` reported unknown arity and the driver rejected the
+argument only after dispatch.
 These tests use temporary database directories and keep catalog initialization, explicit process-restart recovery,
 planner composition and strategy selection, embedded connection lifecycle, connector creation, statement preparation,
 transaction-bound SQL updates, database-level autocommit, context-aware connection and prepared-statement execution,

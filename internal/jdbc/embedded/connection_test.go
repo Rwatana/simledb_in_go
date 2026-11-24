@@ -38,8 +38,8 @@ func TestNewConnectionValidatesManagersAndImplementsDriverConnection(t *testing.
 	if statement.query != "select id from student" || statement.connection != connection {
 		t.Fatalf("Prepare() state = (%q, %p), want original SQL and connection", statement.query, statement.connection)
 	}
-	if statement.NumInput() != -1 {
-		t.Errorf("NumInput() = %d, want -1 until parameter parsing exists", statement.NumInput())
+	if statement.NumInput() != 0 {
+		t.Errorf("NumInput() = %d, want 0 while parameter binding is unsupported", statement.NumInput())
 	}
 	if rows, err := statement.Query(nil); rows != nil || !errors.Is(err, driver.ErrSkip) {
 		t.Errorf("Query() = (%v, %v), want unsupported query and driver.ErrSkip", rows, err)
@@ -169,8 +169,8 @@ func TestStatementRejectsNilAndClosedOperations(t *testing.T) {
 	if rows, err := nilStatement.Query(nil); rows != nil || err == nil || !strings.Contains(err.Error(), "statement") {
 		t.Errorf("Query() on nil statement = (%v, %v), want statement error", rows, err)
 	}
-	if nilStatement.NumInput() != -1 {
-		t.Errorf("NumInput() on nil statement = %d, want -1", nilStatement.NumInput())
+	if nilStatement.NumInput() != 0 {
+		t.Errorf("NumInput() on nil statement = %d, want 0", nilStatement.NumInput())
 	}
 
 	closed := &statement{}

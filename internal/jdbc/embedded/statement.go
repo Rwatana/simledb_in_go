@@ -24,7 +24,7 @@ func (statement *statement) Close() error {
 }
 
 func (*statement) NumInput() int {
-	return -1
+	return 0
 }
 
 // ExecContext executes a prepared update using the statement's caller-owned transaction.
