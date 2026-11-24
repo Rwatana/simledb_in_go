@@ -822,6 +822,80 @@ func (page *Page) SetDataRID(slot int, rid record.RID) error {
 	return nil
 }
 
+// InsertDirectoryEntry inserts entry at its key-ordered directory slot without splitting the page.
+func (page *Page) InsertDirectoryEntry(entry DirEntry) error {
+	if page == nil {
+		return fmt.Errorf("insert B-tree directory entry: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("insert B-tree directory entry: page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("insert B-tree directory entry in block %v: transaction is nil", page.block)
+	}
+	if page.layout == nil {
+		return fmt.Errorf("insert B-tree directory entry in block %v: layout is nil", page.block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return fmt.Errorf("insert B-tree directory entry in block %v: invalid layout: %w", page.block, err)
+	}
+	if len(fields) != 2 {
+		return fmt.Errorf("insert B-tree directory entry in block %v: directory layout must contain exactly dataval and block fields", page.block)
+	}
+	hasDataVal := fields[0].name == "dataval" || fields[1].name == "dataval"
+	hasBlock := fields[0].name == "block" || fields[1].name == "block"
+	if !hasDataVal || !hasBlock {
+		return fmt.Errorf("insert B-tree directory entry in block %v: layout requires dataval and block fields", page.block)
+	}
+	for _, field := range fields {
+		if field.name == "block" && field.typeOf != record.IntegerField {
+			return fmt.Errorf("insert B-tree directory entry in block %v: block field is not an integer", page.block)
+		}
+	}
+	childBlock := entry.BlockNumber()
+	if childBlock < 0 || int64(childBlock) > math.MaxInt32 {
+		return fmt.Errorf("insert B-tree directory entry in block %v: child block number %d is outside signed 32-bit range", page.block, childBlock)
+	}
+	level, err := page.GetFlag()
+	if err != nil {
+		return fmt.Errorf("insert B-tree directory entry in block %v: read directory level: %w", page.block, err)
+	}
+	if level < 0 {
+		return fmt.Errorf("insert B-tree directory entry in block %v: page level %d is negative", page.block, level)
+	}
+	count, err := page.GetNumRecs()
+	if err != nil {
+		return fmt.Errorf("insert B-tree directory entry in block %v: read record count: %w", page.block, err)
+	}
+	if count < 0 {
+		return fmt.Errorf("insert B-tree directory entry in block %v: record count %d is negative", page.block, count)
+	}
+	if count == math.MaxInt32 {
+		return fmt.Errorf("insert B-tree directory entry in block %v: record count cannot grow beyond int32", page.block)
+	}
+	blockSize, err := page.transaction.BlockSize()
+	if err != nil {
+		return fmt.Errorf("insert B-tree directory entry in block %v: read block size: %w", page.block, err)
+	}
+	if blockSize < 8 {
+		return fmt.Errorf("insert B-tree directory entry in block %v: block size %d is smaller than the page header", page.block, blockSize)
+	}
+	slotSize := page.layout.SlotSize()
+	capacity := (blockSize - 8) / slotSize
+	if int64(count) >= int64(capacity) {
+		return fmt.Errorf("insert B-tree directory entry in block %v: page has no physical slot for another record", page.block)
+	}
+	slotBefore, err := page.FindSlotBefore(entry.DataVal())
+	if err != nil {
+		return fmt.Errorf("insert B-tree directory entry %s in block %v: find ordered slot: %w", entry.DataVal(), page.block, err)
+	}
+	if err := page.InsertDir(slotBefore+1, entry.DataVal(), int32(childBlock)); err != nil {
+		return fmt.Errorf("insert B-tree directory entry %s in block %v: write ordered entry: %w", entry.DataVal(), page.block, err)
+	}
+	return nil
+}
+
 // InsertDir opens a directory slot and stores its key and child block number.
 func (page *Page) InsertDir(slot int, value query.Constant, childBlock int32) error {
 	count, err := page.insertSlot(slot, value)
