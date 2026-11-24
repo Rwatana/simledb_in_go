@@ -443,6 +443,18 @@ missing. The right plan is not required because it does not participate in this 
 The focused tests first failed because `IndexJoinPlan.RecordsOutput` was undefined. Tests verify the product, nil
 receiver/left/index metadata, independence from the right plan, and signed 32-bit overflow.
 
+## Feature 35: Estimate distinct values for index join plans
+
+Java `IndexJoinPlan.distinctValues` uses the left estimate when the left schema declares `fieldName`, and otherwise
+delegates to the right plan. Go's `IndexJoinPlan.DistinctValues` preserves that left-side precedence and fallback,
+including delegation for a field not declared by either schema. It returns zero for a nil receiver, absent left plan,
+or an unavailable fallback plan without panicking. `IndexJoinPlan` now satisfies the complete `Plan` interface.
+
+### Test-first record
+
+The focused tests first failed because `IndexJoinPlan.DistinctValues` was undefined. Tests verify left/right routing,
+duplicate-name precedence, unknown-field fallback, missing schemas/plans, nil receiver, and interface conformance.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
