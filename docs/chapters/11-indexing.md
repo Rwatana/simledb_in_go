@@ -759,6 +759,25 @@ The focused tests first failed because `Page.Split` was undefined. Tests verify 
 full split boundaries, record order and logged copies, source/destination flags and counts, capacity/offset validation
 before append, append/pin/read/write/count/flag/unpin failures, cause preservation, and destination cleanup.
 
+## Feature 56: Select a child block from a B-tree directory page
+
+Java `BTreeDir.findChildBlock` positions before a search key, then advances to the first exact match when one exists;
+otherwise it follows the greatest directory key below the search key. Go's `Page.FindChildBlock` applies this rule
+to one open directory page and returns a `storage.BlockID` in that page's file. It rejects empty pages and keys below
+the first directory key, which the B-tree directory invariant reserves as its minimum-key entry. Page schema, typed
+key, integer child field, count, candidate slot, and nonnegative child number are checked. Read failures preserve their
+causes, and selection does not change page contents or pin ownership. It selects one level only; recursive descent,
+leaf traversal, and index planning remain separate behaviors. The [directory child selection diagram](../diagrams/ch11-btree-find-child-block.svg)
+shows exact-match and predecessor routing; its editable source is
+[`ch11-btree-find-child-block.drawio`](../diagrams/ch11-btree-find-child-block.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.FindChildBlock` was undefined. Tests cover integer/varchar routing,
+the first exact match among duplicates, a greatest-predecessor match, keys above the final directory key, the minimum
+key boundary, empty and malformed pages, invalid typed keys, negative children, wrapped count/key/child errors, and
+unchanged page contents and pin ownership.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

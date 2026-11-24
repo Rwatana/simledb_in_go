@@ -58,74 +58,79 @@ func NewPage(transaction PageTransaction, block storage.BlockID, layout *record.
 
 // FindSlotBefore returns the slot immediately before the first dataval not less than searchKey.
 func (page *Page) FindSlotBefore(searchKey query.Constant) (int, error) {
+	slot, _, err := page.findSlotBeforeWithCount(searchKey)
+	return slot, err
+}
+
+func (page *Page) findSlotBeforeWithCount(searchKey query.Constant) (int, int32, error) {
 	if page == nil {
-		return -1, fmt.Errorf("find B-tree page slot before %s: page is nil", searchKey)
+		return -1, 0, fmt.Errorf("find B-tree page slot before %s: page is nil", searchKey)
 	}
 	if page.block.FileName() == "" {
-		return -1, fmt.Errorf("find B-tree page slot before %s: page is closed", searchKey)
+		return -1, 0, fmt.Errorf("find B-tree page slot before %s: page is closed", searchKey)
 	}
 	if isNilPageTransaction(page.transaction) {
-		return -1, fmt.Errorf("find B-tree page slot before %s in block %v: transaction is nil", searchKey, page.block)
+		return -1, 0, fmt.Errorf("find B-tree page slot before %s in block %v: transaction is nil", searchKey, page.block)
 	}
 	if page.layout == nil {
-		return -1, fmt.Errorf("find B-tree page slot before %s in block %v: layout is nil", searchKey, page.block)
+		return -1, 0, fmt.Errorf("find B-tree page slot before %s in block %v: layout is nil", searchKey, page.block)
 	}
 	schema := page.layout.Schema()
 	if schema == nil {
-		return -1, fmt.Errorf("find B-tree page slot before %s in block %v: layout schema is nil", searchKey, page.block)
+		return -1, 0, fmt.Errorf("find B-tree page slot before %s in block %v: layout schema is nil", searchKey, page.block)
 	}
 	dataval, ok := schema.Field("dataval")
 	if !ok {
-		return -1, fmt.Errorf("find B-tree page slot before %s in block %v: layout has no dataval field", searchKey, page.block)
+		return -1, 0, fmt.Errorf("find B-tree page slot before %s in block %v: layout has no dataval field", searchKey, page.block)
 	}
 	fieldOffset, ok := page.layout.Offset("dataval")
 	if !ok {
-		return -1, fmt.Errorf("find B-tree page slot before %s in block %v: layout has no dataval offset", searchKey, page.block)
+		return -1, 0, fmt.Errorf("find B-tree page slot before %s in block %v: layout has no dataval offset", searchKey, page.block)
 	}
 	slotSize := page.layout.SlotSize()
 	if slotSize <= 0 || fieldOffset < 0 || fieldOffset >= slotSize {
-		return -1, fmt.Errorf("find B-tree page slot before %s in block %v: invalid dataval offset %d for slot size %d", searchKey, page.block, fieldOffset, slotSize)
+		return -1, 0, fmt.Errorf("find B-tree page slot before %s in block %v: invalid dataval offset %d for slot size %d", searchKey, page.block, fieldOffset, slotSize)
 	}
 	if _, ok := searchKey.HashCode(); !ok {
-		return -1, fmt.Errorf("find B-tree page slot in block %v: search key is unset", page.block)
+		return -1, 0, fmt.Errorf("find B-tree page slot in block %v: search key is unset", page.block)
 	}
 	switch dataval.Type {
 	case record.IntegerField:
 		if _, ok := searchKey.AsInt(); !ok {
-			return -1, fmt.Errorf("find B-tree page slot in block %v: integer dataval cannot be compared with %s", page.block, searchKey)
+			return -1, 0, fmt.Errorf("find B-tree page slot in block %v: integer dataval cannot be compared with %s", page.block, searchKey)
 		}
 	case record.VarcharField:
 		if _, ok := searchKey.AsString(); !ok {
-			return -1, fmt.Errorf("find B-tree page slot in block %v: varchar dataval cannot be compared with %s", page.block, searchKey)
+			return -1, 0, fmt.Errorf("find B-tree page slot in block %v: varchar dataval cannot be compared with %s", page.block, searchKey)
 		}
 	default:
-		return -1, fmt.Errorf("find B-tree page slot in block %v: unsupported dataval type %d", page.block, dataval.Type)
+		return -1, 0, fmt.Errorf("find B-tree page slot in block %v: unsupported dataval type %d", page.block, dataval.Type)
 	}
 
 	countValue, err := page.transaction.GetInt(page.block, 4)
 	if err != nil {
-		return -1, fmt.Errorf("find B-tree page slot in block %v: read record count: %w", page.block, err)
+		return -1, 0, fmt.Errorf("find B-tree page slot in block %v: read record count: %w", page.block, err)
 	}
 	if countValue < 0 {
-		return -1, fmt.Errorf("find B-tree page slot in block %v: record count %d is negative", page.block, countValue)
+		return -1, 0, fmt.Errorf("find B-tree page slot in block %v: record count %d is negative", page.block, countValue)
 	}
 	for slot := 0; slot < int(countValue); slot++ {
 		position, err := pageSlotFieldPosition(slot, slotSize, fieldOffset)
 		if err != nil {
-			return -1, fmt.Errorf("find B-tree page slot %d in block %v: %w", slot, page.block, err)
+			return -1, 0, fmt.Errorf("find B-tree page slot %d in block %v: %w", slot, page.block, err)
 		}
 		var value query.Constant
 		switch dataval.Type {
 		case record.IntegerField:
 			integer, err := page.transaction.GetInt(page.block, position)
 			if err != nil {
-				return -1, fmt.Errorf("find B-tree page slot %d in block %v: read integer dataval: %w", slot, page.block, err)
+				return -1, 0, fmt.Errorf("find B-tree page slot %d in block %v: read integer dataval: %w", slot, page.block, err)
 			}
 			value = query.NewIntConstant(integer)
 		case record.VarcharField:
 			text, err := page.transaction.GetString(page.block, position)
 			if err != nil {
-				return -1, fmt.Errorf("find B-tree page slot %d in block %v: read varchar dataval: %w", slot, page.block, err)
+				return -1, 0, fmt.Errorf("find B-tree page slot %d in block %v: read varchar dataval: %w", slot, page.block, err)
 			}
 			value = query.NewStringConstant(text)
 		}
@@ -140,10 +145,79 @@ func (page *Page) FindSlotBefore(searchKey query.Constant) (int, error) {
 			comparison = slices.Compare(utf16.Encode([]rune(valueText)), utf16.Encode([]rune(searchText)))
 		}
 		if comparison >= 0 {
-			return slot - 1, nil
+			return slot - 1, countValue, nil
 		}
 	}
-	return int(countValue) - 1, nil
+	return int(countValue) - 1, countValue, nil
+}
+
+// FindChildBlock selects the directory child whose key is the greatest key not greater than searchKey.
+func (page *Page) FindChildBlock(searchKey query.Constant) (storage.BlockID, error) {
+	if page == nil {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s: page is nil", searchKey)
+	}
+	if page.block.FileName() == "" {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s: page is closed", searchKey)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: transaction is nil", searchKey, page.block)
+	}
+	if page.layout == nil {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: layout is nil", searchKey, page.block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: %w", searchKey, page.block, err)
+	}
+	datavalFound := false
+	blockFound := false
+	for _, field := range fields {
+		switch field.name {
+		case "dataval":
+			datavalFound = true
+		case "block":
+			blockFound = true
+			if field.typeOf != record.IntegerField {
+				return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: block field is not an integer", searchKey, page.block)
+			}
+		}
+	}
+	if !datavalFound {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: layout has no dataval field", searchKey, page.block)
+	}
+	if !blockFound {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: layout has no block field", searchKey, page.block)
+	}
+
+	slotBefore, count, err := page.findSlotBeforeWithCount(searchKey)
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: %w", searchKey, page.block, err)
+	}
+	if count == 0 {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: directory page is empty", searchKey, page.block)
+	}
+	selected := slotBefore
+	nextSlot := slotBefore + 1
+	if nextSlot < int(count) {
+		key, err := page.GetDataVal(nextSlot)
+		if err != nil {
+			return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: read candidate key at slot %d: %w", searchKey, page.block, nextSlot, err)
+		}
+		if key.Equal(searchKey) {
+			selected = nextSlot
+		}
+	}
+	if selected < 0 {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: key is smaller than the first directory key", searchKey, page.block)
+	}
+	childNumber, err := page.GetChildNum(selected)
+	if err != nil {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: read child at slot %d: %w", searchKey, page.block, selected, err)
+	}
+	if childNumber < 0 {
+		return storage.BlockID{}, fmt.Errorf("find B-tree child block for %s in block %v: child block number %d is negative", searchKey, page.block, childNumber)
+	}
+	return storage.NewBlockID(page.block.FileName(), int(childNumber)), nil
 }
 
 // GetDataVal reads the dataval field from the specified B-tree page slot.
