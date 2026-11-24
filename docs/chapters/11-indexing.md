@@ -941,6 +941,18 @@ The focused tests first failed because `Leaf.Delete` was undefined. Tests cover 
 traversal, no-match behavior, wrapped advance/RID/delete errors, retained pin ownership, and cursor position on deletion
 failure.
 
+## Feature 67: Represent B-tree directory entries
+
+Java `DirEntry` is a value pairing the first key in a child block with that block's number. Go's `DirEntry` retains a
+`query.Constant` and the block number and exposes both through accessors. It performs no I/O or validation; consuming
+page operations validate block identifiers at the point where they are used. Leaf insertion and split decisions remain
+separate behaviors; no diagram is needed for this small value type.
+
+### Test-first record
+
+The focused test first failed because `NewDirEntry` was undefined. Tests verify integer and varchar keys and preserve
+block number zero and negative values without side effects.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
