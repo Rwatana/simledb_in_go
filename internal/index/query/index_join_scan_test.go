@@ -8,7 +8,40 @@ import (
 	"github.com/Rwatana/simledb_in_go/internal/index"
 	"github.com/Rwatana/simledb_in_go/internal/query"
 	"github.com/Rwatana/simledb_in_go/internal/record"
+	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
+
+func newIndexJoinIntegerRecordScan(t *testing.T, transaction record.TableScanTransaction, fields ...string) *query.RecordScan {
+	t.Helper()
+	schema := &record.Schema{}
+	for _, field := range fields {
+		schema.AddIntegerField(field)
+	}
+	scan, err := query.NewRecordScan(transaction, "students", record.NewLayout(schema))
+	if err != nil {
+		t.Fatalf("NewRecordScan() error = %v", err)
+	}
+	return scan
+}
+
+type indexJoinIntegerTransaction struct {
+	*positioningTransaction
+	value        int32
+	getIntErr    error
+	getIntCalls  int
+	getIntBlock  storage.BlockID
+	getIntOffset int
+}
+
+func (transaction *indexJoinIntegerTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
+	transaction.getIntCalls++
+	transaction.getIntBlock = block
+	transaction.getIntOffset = offset
+	if transaction.getIntErr != nil {
+		return 0, transaction.getIntErr
+	}
+	return transaction.value, nil
+}
 
 func TestNewIndexJoinScanPositionsIndexFromFirstLeftRow(t *testing.T) {
 	key := query.NewIntConstant(42)
@@ -132,6 +165,89 @@ func TestNewIndexJoinScanPreservesPositioningFailures(t *testing.T) {
 	}
 }
 
+func TestIndexJoinScanGetIntReadsRightTableField(t *testing.T) {
+	transaction := &indexJoinIntegerTransaction{positioningTransaction: &positioningTransaction{}, value: 73}
+	right := newIndexJoinIntegerRecordScan(t, transaction, "id")
+	if err := right.MoveToRID(record.NewRID(0, 2)); err != nil {
+		t.Fatalf("right MoveToRID() error = %v", err)
+	}
+	left := &indexJoinLeftScan{fieldNames: map[string]bool{"id": true}, intValues: map[string]int32{"id": 11}}
+	scan := &IndexJoinScan{lhs: left, rhs: right}
+
+	got, err := scan.GetInt("id")
+	if err != nil || got != 73 {
+		t.Fatalf("GetInt(\"id\") = (%d, %v), want (73, nil)", got, err)
+	}
+	if transaction.getIntCalls != 1 || transaction.getIntBlock.Number() != 0 || transaction.getIntOffset < 0 {
+		t.Fatalf("right integer reads = %d at %v/%d, want one read for current record", transaction.getIntCalls, transaction.getIntBlock, transaction.getIntOffset)
+	}
+	if len(left.getIntFields) != 0 {
+		t.Fatalf("left GetInt calls = %v, want none when right declares the field", left.getIntFields)
+	}
+}
+
+func TestIndexJoinScanGetIntReadsLeftWhenRightDoesNotDeclareField(t *testing.T) {
+	transaction := &indexJoinIntegerTransaction{positioningTransaction: &positioningTransaction{}, value: 73}
+	right := newIndexJoinIntegerRecordScan(t, transaction, "id")
+	left := &indexJoinLeftScan{fieldNames: map[string]bool{"student_id": true}, intValues: map[string]int32{"student_id": 41}}
+	scan := &IndexJoinScan{lhs: left, rhs: right}
+
+	got, err := scan.GetInt("student_id")
+	if err != nil || got != 41 {
+		t.Fatalf("GetInt(\"student_id\") = (%d, %v), want (41, nil)", got, err)
+	}
+	if len(left.getIntFields) != 1 || left.getIntFields[0] != "student_id" {
+		t.Fatalf("left GetInt calls = %v, want [student_id]", left.getIntFields)
+	}
+	if transaction.getIntCalls != 0 {
+		t.Fatalf("right integer reads = %d, want none for a left-only field", transaction.getIntCalls)
+	}
+}
+
+func TestIndexJoinScanGetIntValidatesReceiverAndDependencies(t *testing.T) {
+	right := newPositioningTableScan(t)
+	left := &indexJoinLeftScan{}
+	tests := []struct {
+		name string
+		scan *IndexJoinScan
+		want string
+	}{
+		{name: "nil receiver", want: "nil index join scan"},
+		{name: "left scan", scan: &IndexJoinScan{rhs: right}, want: "left scan is nil"},
+		{name: "right scan", scan: &IndexJoinScan{lhs: left}, want: "right table scan is nil"},
+		{name: "right table scan", scan: &IndexJoinScan{lhs: left, rhs: &query.RecordScan{}}, want: "right table scan is nil"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := test.scan.GetInt("id")
+			if got != 0 || err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("GetInt() = (%d, %v), want error containing %q", got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestIndexJoinScanGetIntWrapsSelectedScanErrors(t *testing.T) {
+	rightErr := errors.New("right integer read failed")
+	leftErr := errors.New("left integer read failed")
+	rightTransaction := &indexJoinIntegerTransaction{positioningTransaction: &positioningTransaction{}, getIntErr: rightErr}
+	rightScan := newIndexJoinIntegerRecordScan(t, rightTransaction, "id")
+	if err := rightScan.MoveToRID(record.NewRID(0, 2)); err != nil {
+		t.Fatalf("right MoveToRID() error = %v", err)
+	}
+	leftScan := &indexJoinLeftScan{fieldNames: map[string]bool{"id": true}}
+	rightIndexJoinScan := &IndexJoinScan{lhs: leftScan, rhs: rightScan}
+	if _, err := rightIndexJoinScan.GetInt("id"); !errors.Is(err, rightErr) || !strings.Contains(err.Error(), "right table") {
+		t.Fatalf("right GetInt() error = %v, want wrapped cause %v", err, rightErr)
+	}
+
+	leftScan = &indexJoinLeftScan{fieldNames: map[string]bool{"student_id": true}, getIntErr: leftErr}
+	leftIndexJoinScan := &IndexJoinScan{lhs: leftScan, rhs: newPositioningTableScan(t)}
+	if _, err := leftIndexJoinScan.GetInt("student_id"); !errors.Is(err, leftErr) || !strings.Contains(err.Error(), "left scan") {
+		t.Fatalf("left GetInt() error = %v, want wrapped cause %v", err, leftErr)
+	}
+}
+
 type indexJoinPositioningIndex struct {
 	keys        []query.Constant
 	positionErr error
@@ -158,6 +274,8 @@ func (index *indexJoinPositioningIndex) Close() error {
 
 type indexJoinLeftScan struct {
 	rows             []map[string]query.Constant
+	fieldNames       map[string]bool
+	intValues        map[string]int32
 	position         int
 	beforeFirstErr   error
 	nextErr          error
@@ -167,6 +285,8 @@ type indexJoinLeftScan struct {
 	beforeFirstCalls int
 	nextCalls        int
 	getValFields     []string
+	getIntFields     []string
+	getIntErr        error
 	closeCalls       int
 }
 
@@ -203,7 +323,18 @@ func (scan *indexJoinLeftScan) GetVal(fieldName string) (query.Constant, error) 
 	return value, nil
 }
 
-func (*indexJoinLeftScan) GetInt(string) (int32, error)     { return 0, nil }
+func (scan *indexJoinLeftScan) GetInt(fieldName string) (int32, error) {
+	scan.getIntFields = append(scan.getIntFields, fieldName)
+	if scan.getIntErr != nil {
+		return 0, scan.getIntErr
+	}
+	return scan.intValues[fieldName], nil
+}
 func (*indexJoinLeftScan) GetString(string) (string, error) { return "", nil }
-func (*indexJoinLeftScan) HasField(string) bool             { return true }
-func (scan *indexJoinLeftScan) Close() error                { scan.closeCalls++; return nil }
+func (scan *indexJoinLeftScan) HasField(fieldName string) bool {
+	if scan.fieldNames == nil {
+		return true
+	}
+	return scan.fieldNames[fieldName]
+}
+func (scan *indexJoinLeftScan) Close() error { scan.closeCalls++; return nil }
