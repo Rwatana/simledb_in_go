@@ -1,0 +1,33 @@
+name: Issue closing reference
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  issue-closing-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Pull Request issue-closing reference
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [[ "$HEAD_REF" =~ ^feature/#([0-9]+)_[a-z0-9]+(_[a-z0-9]+)*$ ]]; then
+            issue_number="${BASH_REMATCH[1]}"
+          else
+            echo "Cannot verify issue-closing reference for invalid branch name: $HEAD_REF"
+            exit 1
+          fi
+
+          if ! grep -Eq "(Closes|Fixes|Resolves)[[:space:]]+#${issue_number}([^0-9]|$)" <<< "$PR_BODY"; then
+            echo "Pull Request body must close Issue #${issue_number}."
+            exit 1
+          fi

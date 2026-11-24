@@ -103,11 +103,15 @@ Pull Requestでは次を自動検証する。
 
 - IssueとPR titleのprefixが`hack/prefix.yml`に存在する
 - branch名が規約どおりである
-- branch、PR本文のIssue Number、`Closes`の番号が一致する
+- PR本文の`Issue Number`がbranchのIssue番号と一致する
+- PR本文の`Closes`、`Fixes`、または`Resolves`が同じIssueを閉じる
 - PRのcommit数が1である
 - Markdownの相対リンクが存在する
 - Draw.ioファイルが正しいXMLである
 - `go.mod`追加後は`go test ./...`と`go vet ./...`が成功する
+
+それぞれの検査は独立したworkflow fileとstatus checkを持つ。Issue番号の記載とIssueを閉じる記述も
+別々に検証し、一つのPull Request metadata workflowへまとめない。
 
 ## Twitter-Cloneから除外した規則
 
