@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="500" viewBox="0 0 1000 500" role="img" aria-labelledby="title desc">
+  <title id="title">Left-major traversal inside one multibuffer chunk</title>
+  <desc id="desc">For each left row, the product scan emits every row of the current right chunk. It rewinds the right scan for the next left row and stops when the current chunk is exhausted.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#506070" />
+    </marker>
+    <style>
+      text { font: 16px sans-serif; fill: #18212b; }
+      .box { stroke-width: 2; rx: 12; }
+      .arrow { fill: none; stroke: #506070; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1000" height="500" fill="#ffffff" />
+  <text x="40" y="42" font-size="22" font-weight="700">Left-major pairs within the current right chunk</text>
+  <rect class="box" x="45" y="120" width="170" height="75" fill="#dae8fc" stroke="#6c8ebf" />
+  <text x="130" y="163" text-anchor="middle">Current left row</text>
+  <rect class="box" x="340" y="120" width="220" height="75" fill="#d5e8d4" stroke="#82b366" />
+  <text x="450" y="151" text-anchor="middle"><tspan x="450">Current right chunk</tspan><tspan x="450" dy="23">records in block order</tspan></text>
+  <rect class="box" x="685" y="120" width="190" height="75" fill="#fff2cc" stroke="#d6b656" />
+  <text x="780" y="163" text-anchor="middle">Emit one pair</text>
+  <rect class="box" x="340" y="325" width="220" height="80" fill="#e1d5e7" stroke="#9673a6" />
+  <text x="450" y="355" text-anchor="middle"><tspan x="450">More left rows?</tspan><tspan x="450" dy="22">rewind the right chunk</tspan></text>
+  <rect class="box" x="635" y="325" width="280" height="80" fill="#f8cecc" stroke="#b85450" />
+  <text x="775" y="355" text-anchor="middle"><tspan x="775">Current chunk exhausted</tspan><tspan x="775" dy="22">stop; later rollover is separate</tspan></text>
+  <path class="arrow" d="M215 157 H340" />
+  <path class="arrow" d="M560 157 H685" />
+  <path class="arrow" d="M780 195 V255 H450 V195" />
+  <text x="610" y="248" font-size="14" text-anchor="middle">right has next row</text>
+  <path class="arrow" d="M780 195 V275 H560 V325" />
+  <text x="680" y="285" font-size="14" text-anchor="middle">right exhausted</text>
+  <path class="arrow" d="M340 365 H130 V195" />
+  <text x="205" y="348" font-size="14" text-anchor="middle">yes</text>
+  <path class="arrow" d="M560 365 H635" />
+  <text x="595" y="352" font-size="14" text-anchor="middle">no</text>
+</svg>

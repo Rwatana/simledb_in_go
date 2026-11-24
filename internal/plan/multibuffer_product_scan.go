@@ -19,14 +19,16 @@ type MultibufferProductTransaction interface {
 // MultibufferProductScan retains the inputs and current right-hand chunk for a multi-buffer product.
 // It currently owns only the right chunk acquired during initialization; the left scan remains caller-owned.
 type MultibufferProductScan struct {
-	transaction MultibufferProductTransaction
-	left        query.Scan
-	right       *ChunkValueScan
-	fileName    string
-	layout      *record.Layout
-	fileSize    int
-	chunkSize   int
-	nextBlock   int
+	transaction    MultibufferProductTransaction
+	left           query.Scan
+	right          *ChunkValueScan
+	fileName       string
+	layout         *record.Layout
+	fileSize       int
+	chunkSize      int
+	nextBlock      int
+	product        *query.ProductScan
+	newProductScan func(query.Scan, query.Scan) (*query.ProductScan, error)
 }
 
 // NewMultibufferProductScan sizes the right-hand chunks and initializes the first chunk when one exists.
@@ -59,12 +61,13 @@ func NewMultibufferProductScan(transaction MultibufferProductTransaction, left q
 	}
 
 	scan := &MultibufferProductScan{
-		transaction: transaction,
-		left:        left,
-		fileName:    fileName,
-		layout:      layout,
-		fileSize:    fileSize,
-		nextBlock:   0,
+		transaction:    transaction,
+		left:           left,
+		fileName:       fileName,
+		layout:         layout,
+		fileSize:       fileSize,
+		nextBlock:      0,
+		newProductScan: query.NewProductScan,
 	}
 	if fileSize == 0 {
 		return scan, nil
@@ -96,6 +99,65 @@ func NewMultibufferProductScan(transaction MultibufferProductTransaction, left q
 	return scan, nil
 }
 
+// BeforeFirst resets the left and right scans within the current chunk.
+func (scan *MultibufferProductScan) BeforeFirst() error {
+	if scan == nil || scan.transaction == nil || scan.left == nil {
+		return fmt.Errorf("rewind multibuffer product scan: scan is not initialized")
+	}
+	if scan.fileSize == 0 {
+		return nil
+	}
+	if scan.right == nil {
+		return fmt.Errorf("rewind multibuffer product scan for %q: current chunk is unavailable", scan.fileName)
+	}
+	if err := scan.ensureProduct(); err != nil {
+		return err
+	}
+	if err := scan.product.BeforeFirst(); err != nil {
+		return fmt.Errorf("rewind multibuffer product scan for %q: %w", scan.fileName, err)
+	}
+	return nil
+}
+
+// Next advances to the next left-major pair within the currently pinned right-hand chunk.
+func (scan *MultibufferProductScan) Next() (bool, error) {
+	if scan == nil || scan.transaction == nil || scan.left == nil {
+		return false, fmt.Errorf("advance multibuffer product scan: scan is not initialized")
+	}
+	if scan.fileSize == 0 {
+		return false, nil
+	}
+	if scan.right == nil {
+		return false, fmt.Errorf("advance multibuffer product scan for %q: current chunk is unavailable", scan.fileName)
+	}
+	if err := scan.ensureProduct(); err != nil {
+		return false, err
+	}
+	hasRow, err := scan.product.Next()
+	if err != nil {
+		return false, fmt.Errorf("advance multibuffer product scan for %q: %w", scan.fileName, err)
+	}
+	return hasRow, nil
+}
+
+func (scan *MultibufferProductScan) ensureProduct() error {
+	if scan.product != nil {
+		return nil
+	}
+	if scan.newProductScan == nil {
+		return fmt.Errorf("initialize multibuffer product scan for %q: product scan factory is nil", scan.fileName)
+	}
+	product, err := scan.newProductScan(scan.left, scan.right)
+	if err != nil {
+		return fmt.Errorf("initialize multibuffer product scan for %q: create current-chunk product: %w", scan.fileName, err)
+	}
+	if product == nil {
+		return fmt.Errorf("initialize multibuffer product scan for %q: product scan factory returned nil", scan.fileName)
+	}
+	scan.product = product
+	return nil
+}
+
 // Close releases the right-hand chunk retained during initialization.
 // Failed page releases remain available for a later Close retry. The caller retains ownership of the left scan.
 func (scan *MultibufferProductScan) Close() error {
@@ -106,5 +168,6 @@ func (scan *MultibufferProductScan) Close() error {
 		return err
 	}
 	scan.right = nil
+	scan.product = nil
 	return nil
 }

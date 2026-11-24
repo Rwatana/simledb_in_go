@@ -11,7 +11,7 @@ operations.
 | `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
 | `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` (`beforeFirst`, `next`, `getInt`, `getString`, `hasField`) | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
 | `internal/plan.ChunkValueScan` | `simpledb/multibuffer/ChunkScan.java` (`getVal`) | Adapt typed chunk field reads to query constants without making `multibuffer` depend on `query` |
-| `internal/plan.MultibufferProductScan` | `simpledb/multibuffer/MultibufferProductScan.java` (constructor, `beforeFirst`, `useNextChunk`) | Read right-table size and buffer budget, choose a bounded chunk, pin the first range, and reset the left scan |
+| `internal/plan.MultibufferProductScan` | `simpledb/multibuffer/MultibufferProductScan.java` (constructor, `beforeFirst`, `next`, `useNextChunk`) | Read right-table size and buffer budget, choose a bounded chunk, pin the first range, reset the left scan, and enumerate pairs within the active chunk |
 
 
 ## Feature 1: Choose a safe buffer root
@@ -273,3 +273,32 @@ query-facing scan contract. `multibuffer` remains independent of `query`. The fi
 
 The focused tests cover every executable statement and function. The module coverage workflow continues to require
 100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 11: Advance a product scan within its current chunk
+
+`MultibufferProductScan.Next` delegates row pairing to `query.ProductScan` while retaining the first right-hand chunk
+selected during initialization. The product scan is left-major: every right record in the current chunk is paired with
+one left record before the left input advances. `BeforeFirst` rewinds both inputs, and repeated exhaustion does not
+read pages again. An empty right relation returns no rows without touching the left scan. The active chunk remains
+pinned throughout this traversal; replacing it with the next chunk is a separate behavior.
+
+The [in-chunk product traversal diagram](../diagrams/ch14-multibuffer-product-traversal.svg) shows the left-major
+pair order and the right-scan rewind for each left row. Its editable source is
+[`ch14-multibuffer-product-traversal.drawio`](../diagrams/ch14-multibuffer-product-traversal.drawio).
+
+### Test-first record
+
+Focused compilation first failed because `MultibufferProductScan.Next` and `BeforeFirst` were undefined. Tests cover
+left-major pairs, repeated right rows, explicit rewind after exhaustion, stable exhaustion, empty input, left/right
+read and rewind errors, product construction errors, invalid/closed scan states, and unchanged page pins.
+
+### Design decision
+
+The plan scan composes the existing `query.ProductScan` rather than duplicating its pairing state. The product is
+created lazily so the constructor remains limited to acquiring and positioning the first chunk. Field forwarding and
+later chunk rollover remain separate.
+
+### Validation
+
+The focused plan tests cover every executable statement and function. The module coverage workflow continues to
+require 100.0% statement coverage for every executable package, function, and module total.

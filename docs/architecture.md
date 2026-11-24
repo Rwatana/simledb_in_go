@@ -53,7 +53,8 @@ Chapter 14's `multibuffer.ChunkScan` stays independent of query value types. The
 edge; the optimization cursor remains reusable without importing its consumer's value model. The
 `plan.MultibufferProductScan` initialization also belongs at this edge: it combines a left `query.Scan` with the
 transaction operations needed to size and pin a right-hand chunk, while keeping chunk resource management in
-`multibuffer`.
+`multibuffer`. Within that pinned range, the plan delegates left-major pair traversal to `query.ProductScan`; moving to
+the next block range remains a separate multibuffer behavior.
 
 ## テスト方針
 
