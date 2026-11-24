@@ -1,0 +1,38 @@
+<mxfile host="app.diagrams.net" modified="2026-11-25T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ch14-chunk-scan-rollover" name="Chunk scan block rollover">
+    <mxGraphModel dx="1120" dy="560" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1120" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="before" value="BeforeFirst&#xa;page = 0; slot = -1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="210" width="190" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="next" value="Search active page&#xa;NextAfter(current slot)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="300" y="210" width="210" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="found" value="Record found?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="590" y="190" width="145" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="record" value="Return current row&#xa;true" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="850" y="90" width="190" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="more" value="More pages&#xa;in range?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="590" y="380" width="145" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="advance" value="Advance page&#xa;reset slot to -1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="830" y="320" width="210" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="exhausted" value="Return false&#xa;remember exhaustion" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="830" y="465" width="210" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="before-next" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#52677d;" edge="1" parent="1" source="before" target="next"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="next-found" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#52677d;" edge="1" parent="1" source="next" target="found"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="found-record" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#52677d;" edge="1" parent="1" source="found" target="record"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="found-more" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#52677d;" edge="1" parent="1" source="found" target="more"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="more-advance" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#52677d;" edge="1" parent="1" source="more" target="advance"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="more-end" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#52677d;" edge="1" parent="1" source="more" target="exhausted"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="advance-next" value="repeat" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#52677d;" edge="1" parent="1" source="advance" target="next"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="935" y="255" /><mxPoint x="540" y="255" /></Array></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

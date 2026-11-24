@@ -101,17 +101,23 @@ func (scan *ChunkScan) Next() (bool, error) {
 	if scan.exhausted {
 		return false, nil
 	}
-	page := scan.pages[scan.currentPage]
-	slot, err := page.NextAfter(scan.currentSlot)
-	if err != nil {
-		return false, fmt.Errorf("advance chunk scan for %q in block %d: %w", scan.fileName, page.Block().Number(), err)
+	for {
+		page := scan.pages[scan.currentPage]
+		slot, err := page.NextAfter(scan.currentSlot)
+		if err != nil {
+			return false, fmt.Errorf("advance chunk scan for %q in block %d: %w", scan.fileName, page.Block().Number(), err)
+		}
+		if slot >= 0 {
+			scan.currentSlot = slot
+			return true, nil
+		}
+		if scan.currentPage+1 >= len(scan.pages) {
+			scan.exhausted = true
+			return false, nil
+		}
+		scan.currentPage++
+		scan.currentSlot = -1
 	}
-	if slot < 0 {
-		scan.exhausted = true
-		return false, nil
-	}
-	scan.currentSlot = slot
-	return true, nil
 }
 
 // Close releases every retained chunk-page pin and keeps failed releases for a retry.

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560" viewBox="0 0 1120 560" role="img" aria-labelledby="title desc">
+  <title id="title">Chunk scan block rollover</title>
+  <desc id="desc">ChunkScan searches occupied slots in the active page, advances to the next page and resets the slot cursor when a page is empty, and remembers exhaustion only after the inclusive range ends.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52677d"/></marker>
+    <style>
+      text { font: 16px sans-serif; fill: #172b4d; text-anchor: middle; }
+      .small { font-size: 13px; }
+      .input { fill: #dae8fc; stroke: #6c8ebf; }
+      .step { fill: #fff2cc; stroke: #d6b656; }
+      .work { fill: #d5e8d4; stroke: #82b366; }
+      .failure { fill: #f8cecc; stroke: #b85450; }
+      .decision { fill: #e1d5e7; stroke: #9673a6; }
+      .edge { fill: none; stroke: #52677d; stroke-width: 2; marker-end: url(#arrow); }
+      .box { stroke-width: 2; rx: 12; }
+    </style>
+  </defs>
+  <rect width="1120" height="560" fill="#fff"/>
+  <rect class="input box" x="40" y="210" width="190" height="82"/>
+  <text x="135" y="240">BeforeFirst</text><text class="small" x="135" y="266">page = 0; slot = -1</text>
+  <rect class="work box" x="300" y="210" width="210" height="82"/>
+  <text x="405" y="240">Search active page</text><text class="small" x="405" y="266">NextAfter(current slot)</text>
+  <polygon class="decision" points="662,190 735,250 662,310 590,250" stroke-width="2"/>
+  <text x="662" y="255">Record found?</text>
+  <rect class="work box" x="850" y="90" width="190" height="72"/>
+  <text x="945" y="120">Return current row</text><text class="small" x="945" y="144">true</text>
+  <polygon class="decision" points="662,380 735,440 662,500 590,440" stroke-width="2"/>
+  <text class="small" x="662" y="436">More pages</text><text class="small" x="662" y="457">in range?</text>
+  <rect class="step box" x="830" y="320" width="210" height="82"/>
+  <text x="935" y="350">Advance page</text><text class="small" x="935" y="376">reset slot to -1</text>
+  <rect class="failure box" x="830" y="465" width="210" height="72"/>
+  <text x="935" y="495">Return false</text><text class="small" x="935" y="519">remember exhaustion</text>
+  <path class="edge" d="M230 251 H300"/>
+  <path class="edge" d="M510 251 H590"/>
+  <path class="edge" d="M708 220 L850 140"/>
+  <text class="small" x="782" y="173">yes</text>
+  <path class="edge" d="M662 310 V380"/>
+  <text class="small" x="680" y="352">no</text>
+  <path class="edge" d="M735 440 H830"/>
+  <text class="small" x="780" y="430">yes</text>
+  <path class="edge" d="M662 500 V520 H830"/>
+  <text class="small" x="718" y="516">no</text>
+  <path class="edge" d="M935 320 V255 H510"/>
+  <text class="small" x="720" y="248">repeat</text>
+</svg>
