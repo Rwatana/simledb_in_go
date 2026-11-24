@@ -996,6 +996,25 @@ Focused tests first failed because `Leaf.Insert` returned no directory entry and
 key. Tests cover integer and varchar split results, old/new page flags and records, cursor and pin ownership,
 empty pages and non-minimum keys, validation/read/split/write failures, and Java-compatible UTF-16 comparison.
 
+## Feature 71: Link a full duplicate-key B-tree leaf to an overflow page
+
+After a successful ordinary insert makes a leaf full, Java `BTreeLeaf.insert` stores repeated values in an overflow
+chain. Go checks the first and last stored keys; if they match, `Leaf.Insert` splits at slot one, copies the prior
+overflow flag to the new page, and points the original page flag at the new block. The inserted entry remains at the
+cursor-selected slot, and this path returns no directory entry. A full page containing mixed keys returns an explicit
+error until mixed-key page splitting and directory/root propagation are implemented as separate behaviors. The signed
+32-bit page flag range is checked before narrowing the appended block number. Callers must roll back the transaction if
+a storage error occurs after logged page mutations begin. The existing [B-tree page split diagram](../diagrams/ch11-btree-page-split.svg)
+shows this suffix transfer and is reused rather than duplicated.
+
+### Test-first record
+
+Focused tests first failed because ordinary `Leaf.Insert` left duplicate entries in the full source page, returned no
+error for a full mixed-key page, and ignored overflow-block flag range errors. Tests cover integer and varchar duplicate
+chains, preservation of the previous overflow flag and moved RIDs, cursor/page-pin ownership, mixed-key rejection,
+wrapped post-insert capacity/count/key/flag/split/link errors, invalid post-insert counts, and signed 32-bit block
+validation.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

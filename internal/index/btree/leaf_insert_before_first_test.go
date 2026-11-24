@@ -91,7 +91,8 @@ func TestLeafInsertBeforeFirstSupportsVarcharKeys(t *testing.T) {
 
 func TestLeafInsertBeforeFirstUsesOrdinaryPathWhenPageIsEmptyOrFirstKeyIsNotGreater(t *testing.T) {
 	t.Run("empty page", func(t *testing.T) {
-		leaf, tx, source, _, _ := newLeafInsertBeforeFirstFixture(t, nil, query.NewIntConstant(3))
+		leaf, tx, source, _, layout := newLeafInsertBeforeFirstFixture(t, nil, query.NewIntConstant(3))
+		tx.blockSize = 8 + 3*layout.SlotSize()
 		tx.ints[pageSplitLocation{block: source, offset: 0}] = 4
 		entry, err := leaf.Insert(record.NewRID(2, 1))
 		if err != nil || entry != nil {
@@ -106,17 +107,23 @@ func TestLeafInsertBeforeFirstUsesOrdinaryPathWhenPageIsEmptyOrFirstKeyIsNotGrea
 	})
 
 	t.Run("first key equals search key", func(t *testing.T) {
-		leaf, tx, source, _, _ := newLeafInsertBeforeFirstFixture(t, []int32{5}, query.NewIntConstant(5))
+		leaf, tx, source, destination, layout := newLeafInsertBeforeFirstFixture(t, []int32{5}, query.NewIntConstant(5))
 		tx.ints[pageSplitLocation{block: source, offset: 0}] = 0
 		entry, err := leaf.Insert(record.NewRID(2, 1))
 		if err != nil || entry != nil {
 			t.Fatalf("Insert() = (%v, %v), want nil entry and no error", entry, err)
 		}
-		if leaf.currentSlot != 0 || tx.ints[pageSplitLocation{block: source, offset: 4}] != 2 || tx.ints[pageSplitLocation{block: source, offset: 0}] != 0 {
+		if leaf.currentSlot != 0 || tx.ints[pageSplitLocation{block: source, offset: 4}] != 1 || tx.ints[pageSplitLocation{block: source, offset: 0}] != int32(destination.Number()) {
 			t.Fatalf("equal-key insert state = slot %d, count %d, flag %d", leaf.currentSlot, tx.ints[pageSplitLocation{block: source, offset: 4}], tx.ints[pageSplitLocation{block: source, offset: 0}])
 		}
-		if len(tx.appendCalls) != 0 {
-			t.Fatalf("equal-key insertion appended blocks: %v", tx.appendCalls)
+		if tx.ints[pageSplitLocation{block: destination, offset: 0}] != 0 || tx.ints[pageSplitLocation{block: destination, offset: 4}] != 1 {
+			t.Fatalf("destination page state = flag %d, count %d; want original flag 0 and one old duplicate", tx.ints[pageSplitLocation{block: destination, offset: 0}], tx.ints[pageSplitLocation{block: destination, offset: 4}])
+		}
+		if tx.ints[pageSplitLocation{block: source, offset: pageInsertLeafPosition(layout, 0, "block")}] != 2 {
+			t.Fatalf("source RID block = %d, want newly inserted value 2", tx.ints[pageSplitLocation{block: source, offset: pageInsertLeafPosition(layout, 0, "block")}])
+		}
+		if len(tx.appendCalls) != 1 {
+			t.Fatalf("equal-key insertion append calls = %v, want one overflow page", tx.appendCalls)
 		}
 	})
 }
