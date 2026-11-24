@@ -1,0 +1,35 @@
+<mxfile host="app.diagrams.net" modified="2026-11-25T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ch13-sort-scan" name="Sorted run merge scan">
+    <mxGraphModel dx="1100" dy="760" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="520" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="run-one" value="Sorted run 1&#xa;current head" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="85" width="190" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="run-two" value="Sorted run 2&#xa;current head" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="255" width="190" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="comparator" value="RecordComparator&#xa;compare current keys" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="330" y="165" width="220" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="choice" value="lower?&#xa;tie → run 2" style="rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="595" y="150" width="140" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="output" value="query.Scan&#xa;return chosen row" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="820" y="165" width="150" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="advance" value="Advance chosen run&#xa;on the next Next()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="375" y="380" width="260" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="run-one-edge" style="endArrow=block;html=1;" edge="1" parent="1" source="run-one" target="comparator"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="run-two-edge" style="endArrow=block;html=1;" edge="1" parent="1" source="run-two" target="comparator"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="compare-edge" style="endArrow=block;html=1;" edge="1" parent="1" source="comparator" target="choice"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="select-edge" value="choose run 1 or 2" style="endArrow=block;html=1;" edge="1" parent="1" source="choice" target="output"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="output-edge" style="endArrow=block;html=1;" edge="1" parent="1" source="output" target="advance"><mxGeometry relative="1" as="geometry"><mxPoint x="895" y="330" as="sourcePoint" /><mxPoint x="635" y="416" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="advance-edge" value="advance selected head" style="endArrow=block;html=1;rounded=1;" edge="1" parent="1" source="advance" target="run-one"><mxGeometry relative="1" as="geometry"><mxPoint x="280" y="416" as="sourcePoint" /><mxPoint x="135" y="157" as="targetPoint" /></mxGeometry></mxCell>
+        <mxCell id="advance-second-edge" value="or run 2" style="endArrow=block;html=1;rounded=1;" edge="1" parent="1" source="advance" target="run-two"><mxGeometry relative="1" as="geometry"><mxPoint x="715" y="490" as="sourcePoint" /><mxPoint x="135" y="327" as="targetPoint" /></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

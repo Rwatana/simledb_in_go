@@ -173,6 +173,11 @@ block estimates, each source/destination error phase, and scan cleanup with join
 materialization-plan implementation is covered; the independent workflow continues to require 100.0% package,
 function, and module statement coverage.
 
+Issue #1206 adds `materialize.SortScan`, merging one or two sorted temporary-table runs by their current comparator
+heads. Tests cover interleaving and Java-compatible tie order, single/empty runs, rewind, exhaustion, delegated reads,
+invalid inputs before storage use, initialization/advance/compare errors, and scan cleanup. The independent workflow
+continues to require 100.0% package, function, and module statement coverage.
+
 Issue #1195 adds `storage.Page.SetString`, converting UTF-8 bytes through the existing `SetBytes` length-prefix path.
 Tests round-trip empty text, embedded NUL, and multibyte text through both string and byte APIs, and verify a failed
 capacity write preserves the original page. The separate coverage workflow continues to enforce 100.0% package,

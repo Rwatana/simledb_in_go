@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="520" viewBox="0 0 1000 520" role="img" aria-labelledby="title desc">
+  <title id="title">Sorted-run merge scan</title>
+  <desc id="desc">SortScan compares the current heads of two sorted temporary runs, returns the lower record, and advances that run on the next call. If only one run remains, it returns that run's records directly.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52677d"/></marker>
+    <style>
+      text { font: 16px sans-serif; fill: #172b4d; text-anchor: middle; }
+      .small { font-size: 13px; }
+      .run { fill: #d5e8d4; stroke: #82b366; }
+      .merge { fill: #fff2cc; stroke: #d6b656; }
+      .output { fill: #dae8fc; stroke: #6c8ebf; }
+      .decision { fill: #e1d5e7; stroke: #9673a6; }
+      .edge { fill: none; stroke: #52677d; stroke-width: 2; marker-end: url(#arrow); }
+      .box { stroke-width: 2; rx: 12; }
+    </style>
+  </defs>
+  <rect width="1000" height="520" fill="#ffffff"/>
+  <rect class="run box" x="40" y="85" width="190" height="72"/>
+  <text x="135" y="114">Sorted run 1</text><text class="small" x="135" y="138">current head</text>
+  <rect class="run box" x="40" y="255" width="190" height="72"/>
+  <text x="135" y="284">Sorted run 2</text><text class="small" x="135" y="308">current head</text>
+  <rect class="merge box" x="330" y="165" width="220" height="82"/>
+  <text x="440" y="198">RecordComparator</text><text class="small" x="440" y="222">compare current keys</text>
+  <polygon class="decision" points="665,150 735,205 665,260 595,205" stroke-width="2"/>
+  <text x="665" y="202">lower?</text><text class="small" x="665" y="222">tie → run 2</text>
+  <rect class="output box" x="820" y="165" width="150" height="82"/>
+  <text x="895" y="198">query.Scan</text><text class="small" x="895" y="222">return chosen row</text>
+  <rect class="run box" x="375" y="380" width="260" height="72"/>
+  <text x="505" y="410">Advance chosen run</text><text class="small" x="505" y="434">on the next Next()</text>
+  <path class="edge" d="M230 121 C285 121 285 185 330 190"/>
+  <path class="edge" d="M230 291 C285 291 285 225 330 222"/>
+  <path class="edge" d="M550 206 L595 206"/>
+  <path class="edge" d="M735 205 L820 205"/>
+  <path class="edge" d="M895 247 C895 330 690 346 635 406"/>
+  <path class="edge" d="M375 416 C280 416 285 145 230 145"/>
+  <path class="edge" d="M620 452 C715 490 285 495 230 315"/>
+  <text class="small" x="752" y="185">choose run 1 or 2</text>
+  <text class="small" x="515" y="488">advance selected head</text>
+  <text class="small" x="737" y="330">single run: pass through</text>
+</svg>

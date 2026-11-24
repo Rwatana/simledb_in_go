@@ -11,6 +11,7 @@ a file or issue transaction operations.
 | `internal/materialize.TempTable`, `NewTempTable` | `simpledb/materialize/TempTable.java` | Allocate a unique temporary relation name and retain its transaction and record layout before opening a scan |
 | `internal/materialize.MaterializePlan` | `simpledb/materialize/MaterializePlan.java` | Copy an underlying query scan into a temporary table and expose its output scan and cost estimates |
 | `internal/materialize.RecordComparator` | `simpledb/materialize/RecordComparator.java` | Compare the current values of two scans lexicographically in sort-field order |
+| `internal/materialize.SortScan` | `simpledb/materialize/SortScan.java` | Merge one or two sorted temporary-table scans and expose the selected row as a query scan |
 
 ## Feature 1: Describe a temporary table
 
@@ -108,3 +109,26 @@ Java materialization performs the copy imperatively and returns an `UpdateScan`.
 returns the narrow `query.Scan` contract, with the source and temporary destination retaining their existing ownership
 rules. The copy is synchronous and row-at-a-time; it does not introduce a second record representation or include the
 materialization pass in the read-cost estimate.
+
+## Feature 5: Merge sorted runs
+
+`NewSortScan` opens one or two temporary tables that already contain rows in comparator order. `Next` advances the
+previously selected run and compares the remaining heads, exposing the lower record through the `query.Scan` contract.
+When keys tie, the second run is selected first, matching Java `SortScan`. A single run passes through unchanged;
+exhaustion of both runs returns `false`. `BeforeFirst` rewinds both inputs and clears the current record. The
+[sorted-run merge diagram](../diagrams/ch13-sort-scan.svg) shows how the comparator chooses a head and how the selected
+run advances; the editable source is [`ch13-sort-scan.drawio`](../diagrams/ch13-sort-scan.drawio).
+
+### Test-first record
+
+The focused test-first compilation failed because `SortScan` and `NewSortScan` were undefined. Tests cover interleaving
+and tie order, single and empty runs, rewind and exhaustion, delegated field reads, invalid inputs before storage use,
+open and positioning failures, advancement and comparison failures, and joined cleanup errors. Every executable
+statement in `internal/materialize` is covered.
+
+### Design decision
+
+Java's `SortScan` exposes a broad `Scan` API and compares its two current run heads. Go implements the same merge over
+the narrower `query.Scan` contract, opens the runs from their `TempTable` descriptors, and returns errors for failed
+storage operations rather than relying on Java's unchecked exceptions. The returned scan owns and closes both input
+scans; the sort plan that creates runs remains a separate behavior.
