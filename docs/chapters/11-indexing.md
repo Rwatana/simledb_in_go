@@ -795,6 +795,26 @@ The focused tests first failed because `Page.OpenChildDirectory` was undefined. 
 retention of the parent pin, the returned page's transaction/layout, caller-controlled child close, rejection of level
 zero and negative flags, and wrapped flag, selection, and child-pin failures without changing parent state.
 
+## Feature 58: Find a leaf block by descending B-tree directories
+
+Java `BTreeDir.search` follows the selected child until it reaches a directory whose flag is zero, then returns the
+corresponding leaf block. Go's `Page.FindLeafBlock` applies `Page.FindChildBlock` at each level and mutates its receiver
+to retain the last open directory page. It closes each parent before pinning the next directory page, so traversal
+works with a one-frame buffer. At level zero it returns the selected leaf `storage.BlockID` without opening the leaf;
+the caller still owns and must close the retained directory page. A negative level is invalid. Flag, child-selection,
+unpin, and next-page pin errors retain their causes. If an unpin fails, the current page remains open for a close retry;
+if a child pin fails after the parent closes, the receiver remains closed. Opening the leaf page and maintaining B-tree
+index search state remain separate behaviors. The [directory descent diagram](../diagrams/ch11-btree-find-leaf-block.svg)
+shows the one-pin-at-a-time transition and returned leaf block; its editable source is
+[`ch11-btree-find-leaf-block.drawio`](../diagrams/ch11-btree-find-leaf-block.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.FindLeafBlock` was undefined. Tests cover multi-level routing, a level-zero
+directory, exact pin/unpin order, a maximum of one active directory pin, caller cleanup of the final page, invalid and
+closed state, a negative level, wrapped flag and child-selection failures, retryable unpin failure, and a failed next
+pin that leaves the receiver closed.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
