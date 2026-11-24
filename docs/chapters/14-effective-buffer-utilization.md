@@ -9,7 +9,7 @@ operations.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
-| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own the pinned record pages for one bounded block range; traversal is documented separately |
+| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own a bounded block range and advance through records in the active page; page rollover is separate |
 
 ## Feature 1: Choose a safe buffer root
 
@@ -94,6 +94,31 @@ cleanup failure, construction returns both the original error and a partial scan
 need release. Unlike Java's constructor, Go validates the range and exposes cleanup errors rather than silently
 assuming every pin succeeded. This type does not yet implement `query.Scan`; cursor movement and record values are
 independent behaviors.
+
+### Validation
+
+The focused tests cover every executable statement and function. The module coverage workflow continues to require
+100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 4: Advance within the active chunk block
+
+`ChunkScan.BeforeFirst` positions the cursor before slot -1 in the first pinned page. `ChunkScan.Next` uses the active
+`RecordPage.NextAfter` to find one occupied slot and returns false when that block is exhausted. Rewinding clears the
+exhausted state without changing page pins. Advancing into another block remains a separate behavior, so an occupied
+record in a later page is not read by this operation.
+
+### Test-first record
+
+Focused tests first failed because the cursor fields, `BeforeFirst`, and `Next` were missing. Tests cover first-page
+position, occupied and empty slots, repeated exhaustion without more I/O, rewind after scanning, unchanged pins,
+zero-value/partial/closed cursor errors, block-size failures, and record-flag read failures.
+
+### Design decision
+
+The constructor marks a scan ready only after every page is pinned; a partial scan returned for cleanup retry cannot
+be traversed. `Close` marks the scan closed before attempting unpins, so failed releases remain retryable through
+`Close` but cannot be read as if every page were still pinned. `Next` deliberately stops at the active page boundary;
+the next block is not selected implicitly in this feature.
 
 ### Validation
 

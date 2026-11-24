@@ -24,6 +24,11 @@ type ChunkScan struct {
 	startBlock  int
 	endBlock    int
 	pages       []*record.RecordPage
+	currentPage int
+	currentSlot int
+	ready       bool
+	closed      bool
+	exhausted   bool
 }
 
 // NewChunkScan pins each block in the inclusive range from startBlock to endBlock.
@@ -69,7 +74,44 @@ func NewChunkScan(transaction ChunkTransaction, fileName string, layout *record.
 			break
 		}
 	}
+	scan.currentSlot = -1
+	scan.ready = true
 	return scan, nil
+}
+
+// BeforeFirst positions the chunk scan before the first slot of its active block.
+func (scan *ChunkScan) BeforeFirst() error {
+	if err := scan.validateCursor("rewind"); err != nil {
+		return err
+	}
+	scan.currentPage = 0
+	scan.currentSlot = -1
+	scan.exhausted = false
+	return nil
+}
+
+// Next advances to the next occupied record in the active block.
+//
+// It returns false at the end of that block; moving to another block is a
+// separate operation.
+func (scan *ChunkScan) Next() (bool, error) {
+	if err := scan.validateCursor("advance"); err != nil {
+		return false, err
+	}
+	if scan.exhausted {
+		return false, nil
+	}
+	page := scan.pages[scan.currentPage]
+	slot, err := page.NextAfter(scan.currentSlot)
+	if err != nil {
+		return false, fmt.Errorf("advance chunk scan for %q in block %d: %w", scan.fileName, page.Block().Number(), err)
+	}
+	if slot < 0 {
+		scan.exhausted = true
+		return false, nil
+	}
+	scan.currentSlot = slot
+	return true, nil
 }
 
 // Close releases every retained chunk-page pin and keeps failed releases for a retry.
@@ -78,6 +120,7 @@ func (scan *ChunkScan) Close() error {
 		return nil
 	}
 
+	scan.closed = true
 	var remaining []*record.RecordPage
 	var failures []error
 	for _, page := range scan.pages {
@@ -89,4 +132,20 @@ func (scan *ChunkScan) Close() error {
 	}
 	scan.pages = remaining
 	return errors.Join(failures...)
+}
+
+func (scan *ChunkScan) validateCursor(operation string) error {
+	if scan == nil {
+		return fmt.Errorf("%s chunk scan: scan is nil", operation)
+	}
+	if scan.closed {
+		return fmt.Errorf("%s chunk scan for %q: scan is closed", operation, scan.fileName)
+	}
+	if !scan.ready || scan.transaction == nil {
+		return fmt.Errorf("%s chunk scan for %q: scan is not initialized", operation, scan.fileName)
+	}
+	if scan.currentPage < 0 || scan.currentPage >= len(scan.pages) || scan.pages[scan.currentPage] == nil {
+		return fmt.Errorf("%s chunk scan for %q: active page index %d is unavailable", operation, scan.fileName, scan.currentPage)
+	}
+	return nil
 }
