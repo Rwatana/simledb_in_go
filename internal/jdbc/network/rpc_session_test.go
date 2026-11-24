@@ -78,6 +78,51 @@ func TestRemoteSessionCommitRejectsInvalidStateAndPreservesIDOnRPCFailure(t *tes
 	}
 }
 
+func TestRemoteSessionRollbackRetainsSuccessorTransactionID(t *testing.T) {
+	managers, err := server.NewManagers(filepath.Join(t.TempDir(), "database"), 64, 2)
+	if err != nil {
+		t.Fatalf("NewManagers() error = %v", err)
+	}
+	client := newTestRPCClient(t, managers)
+	session, err := ConnectRPCSession(client)
+	if err != nil {
+		t.Fatalf("ConnectRPCSession() error = %v", err)
+	}
+	if err := session.Rollback(); err != nil {
+		t.Fatalf("RemoteSession.Rollback() error = %v", err)
+	}
+	if got := session.TransactionID(); got != 2 {
+		t.Errorf("TransactionID() after Rollback = %d, want 2", got)
+	}
+	var response CloseResponse
+	if err := client.Call("SimpleDB.Close", CloseRequest{}, &response); err != nil {
+		t.Fatalf("caller-owned rpc.Client.Call(Close) error = %v", err)
+	}
+}
+
+func TestRemoteSessionRollbackRejectsInvalidStateAndPreservesIDOnRPCFailure(t *testing.T) {
+	var nilSession *RemoteSession
+	if err := nilSession.Rollback(); err == nil || !strings.Contains(err.Error(), "session is nil") {
+		t.Errorf("nil session Rollback() error = %v, want nil-session error", err)
+	}
+	session := &RemoteSession{transactionID: 11}
+	if err := session.Rollback(); err == nil || !strings.Contains(err.Error(), "client is nil") {
+		t.Errorf("client-less Rollback() error = %v, want nil-client error", err)
+	}
+	if got := session.TransactionID(); got != 11 {
+		t.Errorf("TransactionID() after client-less failure = %d, want 11", got)
+	}
+
+	client := newTestRPCServiceClient(t, &failingRemoteRollbackService{err: errors.New("rollback unavailable")})
+	session.client = client
+	if err := session.Rollback(); err == nil || !strings.Contains(err.Error(), "rollback unavailable") || !strings.Contains(err.Error(), "roll back network RPC client session") {
+		t.Fatalf("RPC-failed Rollback() error = %v, want contextual remote error", err)
+	}
+	if got := session.TransactionID(); got != 11 {
+		t.Errorf("TransactionID() after RPC failure = %d, want unchanged 11", got)
+	}
+}
+
 func newTestRPCServiceClient(t *testing.T, service any) *rpc.Client {
 	t.Helper()
 	serverConn, clientConn := net.Pipe()
@@ -105,6 +150,14 @@ type failingRemoteCommitService struct {
 }
 
 func (service *failingRemoteCommitService) Commit(_ CommitRequest, _ *CommitResponse) error {
+	return service.err
+}
+
+type failingRemoteRollbackService struct {
+	err error
+}
+
+func (service *failingRemoteRollbackService) Rollback(_ RollbackRequest, _ *RollbackResponse) error {
 	return service.err
 }
 
