@@ -1105,6 +1105,26 @@ insertion and splitting, two-level recursive propagation, child and parent split
 child does not split, invalid pages and levels, child-open and recursive failures, child-close failures, joined
 recursive/close causes, full-parent refusal, and parent-split append errors. The new method is 100.0% covered.
 
+## Feature 77: Grow the fixed-block B-tree directory root
+
+Java `BTreeDir.insert` keeps the root at directory block zero. When recursive insertion returns a split separator for
+that root, Go's `Page.MakeNewRoot` appends a page at the current directory level, moves all old root entries into it,
+and inserts two child entries into block zero: the moved page's first key and the returned right-page separator. The
+root level is raised only after both entries are written. Before appending, the method validates that the separator
+does not sort before the old root's final key, so the resulting two-child root remains ordered. It validates page,
+layout, level, count, capacity, key type, and child block bounds before mutation. If a logged operation fails after
+the move starts, the caller must roll back its transaction. Initial root formatting remains a separate behavior. The
+[root growth diagram](../diagrams/ch11-btree-root-growth.svg) shows the fixed block-zero root and moved old entries;
+its editable source is [`ch11-btree-root-growth.drawio`](../diagrams/ch11-btree-root-growth.drawio).
+
+### Test-first record
+
+The focused test first failed because `Page.MakeNewRoot` was undefined. An additional ordered-key case then failed
+because a separator between existing root keys could be accepted and mutate the file. Tests cover integer and varchar
+roots, raising the level from zero and an existing internal level, invalid root/layout/count/capacity/key/child state
+before append, wrapped metadata and last-key reads, and append/pin/unpin/split/entry/level-write errors. The method is
+100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1132,3 +1152,4 @@ recursive/close causes, full-parent refusal, and parent-split append errors. The
 - `btree.Page.SplitDirectoryPage` splits only an already full directory page and returns a parent separator; recursive propagation and root growth remain separate operations.
 - `btree.Page.InsertDirectoryEntryAndSplit` combines insertion with the page-full split decision but leaves parent recursion and root growth to separate operations.
 - `btree.Page.InsertDirectoryEntryRecursive` recurses through existing directory pages and returns split separators upward; creating a new root remains the caller's responsibility.
+- `btree.Page.MakeNewRoot` keeps the root in block zero, moves old entries to a new page, installs two child entries, and raises the level last.
