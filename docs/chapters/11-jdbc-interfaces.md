@@ -66,8 +66,8 @@ Each manager set also exposes a `plan.UpdatePlanner`, currently composed as a `p
 that same metadata facade. Callers pass the transaction to update operations, so the planner can create catalog rows
 without taking transaction ownership. The [update planner composition diagram](../diagrams/ch11-update-planner-composition.svg)
 shows this dependency and the CREATE TABLE metadata path; its [editable Draw.io source](../diagrams/ch11-update-planner-composition.drawio)
-is maintained beside it. Update planner strategy selection, parsed-command dispatch, and transaction lifecycle are
-separate behaviors.
+is maintained beside it. Update planner strategy selection and transaction lifecycle are separate behaviors; parsed
+SQL command dispatch is described below.
 
 `Managers.CreateQueryPlan` is the first SQL-facing query boundary: it accepts a SELECT string, parses it through
 `internal/parse`, and passes the resulting query plus the supplied transaction to the configured query planner. Parse
@@ -75,6 +75,13 @@ and planning failures keep server-query context, while the caller retains transa
 dispatch diagram](../diagrams/ch11-query-dispatch.svg) shows this path and its dependencies; its [editable Draw.io
 source](../diagrams/ch11-query-dispatch.drawio) is maintained beside the SVG. SQL update dispatch and result-cursor
 adaptation remain separate behaviors.
+
+`Managers.ExecuteUpdate` is the matching SQL-facing update boundary. It parses the statement with
+`Parser.ParseUpdateCommand`, routes each concrete command value to the corresponding `UpdatePlanner` operation, and
+returns that operation's affected-row count. The [update dispatch diagram](../diagrams/ch11-update-dispatch.svg) shows
+the six command paths and unchanged transaction ownership; its [editable Draw.io source](../diagrams/ch11-update-dispatch.drawio)
+is kept beside the SVG. Parse and planner failures retain server-update context, and transaction completion remains
+the caller's responsibility.
 
 `Managers.NewTransaction` uses one ID allocator and lock table shared by the manager set, while each returned transaction
 keeps its own buffer ownership. Creation appends a START record to the shared log and supplies the log iterator needed
@@ -112,6 +119,9 @@ actual scope requires SQL driver compatibility.
 | `TestManagersComposeBasicUpdatePlannerWithTheirMetadata` | A manager set's update planner registers a table through shared metadata and a caller-owned transaction |
 | `TestManagersCreateQueryPlanParsesAndPlansSelect` | SELECT text is parsed and planned through the manager set without taking ownership of its transaction |
 | `TestManagersCreateQueryPlanReportsInvalidInputsAndFailures` | Incomplete managers, nil transactions, parse errors, and plan errors are returned with context |
+| `TestManagersExecuteUpdateDispatchesParsedCommands` | INSERT, DELETE, UPDATE, and three CREATE commands reach their matching planner operations |
+| `TestManagersExecuteUpdateReportsInvalidInputsAndFailures` | Incomplete managers, nil transactions, malformed SQL, and planner failures return with context |
+| `TestExecuteUpdateCommandRejectsUnsupportedData` | Unknown parsed command values are rejected instead of disappearing silently |
 
 The manager-composition tests first failed to compile because `NewManagers` did not exist. The transaction tests first
 failed because `Managers.NewTransaction` did not exist, and the metadata test first failed because `Managers.Metadata`
@@ -119,9 +129,10 @@ did not exist. The catalog test first failed because `Managers.InitializeCatalog
 first failed because `Managers.Recover` and its recovery-transaction lifecycle helper were undefined. The query-planner
 test first failed because `Managers.QueryPlanner` was undefined. The update planner test first failed because
 `Managers.UpdatePlanner` was undefined. The SQL SELECT dispatch test first failed because `Managers.CreateQueryPlan` was
+undefined. The SQL update dispatch tests first failed because `Managers.ExecuteUpdate` and its command dispatcher were
 undefined. These tests use temporary database directories and keep catalog initialization, explicit process-restart
-recovery, SELECT planner composition, update planner composition, SQL SELECT parsing and planning, ordinary transaction
-completion, and JDBC client operations as separate behaviors.
+recovery, SELECT planner composition, update planner composition, SQL SELECT planning, SQL update dispatch, ordinary
+transaction completion, and JDBC client operations as separate behaviors.
 
 ## Intentional differences
 

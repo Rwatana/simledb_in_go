@@ -66,6 +66,14 @@ transaction, parse failures, and planner failures. Uncached
 100.0% statement coverage in every executable package; `go tool cover -func` reports every executable function and the
 module total at 100.0%, with no zero-count statements. The 100.0% workflow remains an independent status check.
 
+Issue #1127 adds `Managers.ExecuteUpdate`, dispatching parsed INSERT, DELETE, UPDATE, CREATE TABLE, CREATE VIEW, and
+CREATE INDEX commands to their corresponding update-planner operations without taking transaction ownership. Tests
+cover all six routes, unsupported command data, malformed SQL, and planner errors. Uncached
+`GOCACHE=/tmp/simpledb-go-cache go test ./... -count=1 -coverprofile=/tmp/simpledb-coverage-1127-final.out` reports
+100.0% coverage in all executable packages; the profile has 4,181 statement entries and zero uncovered statements.
+`go tool cover -func` reports all 582 executable functions and the module total at 100.0%. The independent coverage
+workflow continues to enforce this target.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
