@@ -6,6 +6,8 @@ This chapter connects the database engine to client programs. It describes the J
 embedded driver, which creates the engine in the application process, with a network driver, which delegates work to a
 server. The existing [client-boundary diagram](../diagrams/ch02-client-boundary.svg) shows these two paths; its
 [editable Draw.io source](../diagrams/ch02-client-boundary.drawio) is shared with the Chapter 2 concept note.
+The initial Go embedded adapter now lives at `internal/jdbc/embedded`; it uses `database/sql/driver` rather than
+reproducing the JDBC class hierarchy.
 
 The first Go behavior composes the file, log, and buffer managers from explicit database settings. The next adds an
 independent, in-memory metadata facade to each successful manager set. The [manager assembly
@@ -45,8 +47,8 @@ for use; a recovery or final commit error is returned with restart context.
 
 ## Go design and current status
 
-The Go repository has lower-level file, log, buffer, transaction, metadata, query, and planning packages, but does not yet
-have a JDBC adapter. `internal/server.NewManagers` now creates the file manager, then the log manager for `simpledb.log`,
+The Go repository has lower-level file, log, buffer, transaction, metadata, query, and planning packages, plus an initial
+embedded connection adapter. `internal/server.NewManagers` now creates the file manager, then the log manager for `simpledb.log`,
 then the buffer manager using the supplied directory, block size, and buffer count, and finally a fresh in-memory metadata
 facade. It returns the complete manager set only after the fallible storage managers succeed; initialization failures are
 wrapped with the failing stage and no partial set is returned. Every successful server manager set owns an independent
@@ -91,13 +93,21 @@ the caller's responsibility.
 `Managers.NewTransaction` uses one ID allocator and lock table shared by the manager set, while each returned transaction
 keeps its own buffer ownership. Creation appends a START record to the shared log and supplies the log iterator needed
 for transaction rollback. A failed START append returns no transaction. Restart recovery through `Managers.Recover`, catalog
-initialization, update-planner strategy selection, ordinary transaction completion, and client adapters remain separate
-behaviors.
+initialization and update-planner strategy selection remain separate behaviors. The embedded connection's transaction
+adapter is described below; SQL execution and result adapters remain separate.
+
+`embedded.Connection` is the first concrete client adapter. It implements `driver.Conn`, starts a transaction from the
+manager set in `Begin`, and returns a `driver.Tx` adapter for explicit commit or rollback. Closing the connection prevents
+new begins but leaves already returned transactions caller-owned. Statement preparation returns `driver.ErrSkip`; SQL
+execution, connector configuration, rows, and result metadata remain separate behaviors. The [embedded transaction
+lifecycle diagram](../diagrams/ch11-embedded-transaction-lifecycle.svg) shows these ownership boundaries and its
+[editable Draw.io source](../diagrams/ch11-embedded-transaction-lifecycle.drawio) is maintained beside the SVG.
 
 The embedded and network drivers share a client contract in Java, but Go should introduce an adapter only when a concrete
 caller needs it. The RMI proxy classes are transport-specific and should not be reproduced as a Go class hierarchy or
-copied into the embedded path. A future Go client boundary can use the standard `database/sql/driver` contract if its
-actual scope requires SQL driver compatibility.
+copied into the embedded path. The standard `database/sql/driver` contract is used only for the connection and
+transaction operations currently implemented; its remaining optional interfaces stay out until a concrete use case
+needs them.
 
 ## Test map
 
@@ -124,6 +134,11 @@ actual scope requires SQL driver compatibility.
 | `TestManagersComposeBasicQueryPlannerWithTheirMetadata` | A manager set's SELECT planner resolves an initialized table through that set's metadata and caller-owned transaction |
 | `TestManagersSetQueryPlannerStrategyUsesSharedMetadata` | Basic and cost-aware choices replace the default planner and both plan through shared metadata |
 | `TestManagersSetQueryPlannerStrategyRejectsInvalidInputsWithoutReplacingPlanner` | Nil manager sets, missing metadata, and unknown strategies leave the current planner unchanged |
+| `TestNewConnectionValidatesManagersAndImplementsDriverConnection` | A non-nil manager set creates a driver connection and unsupported prepare signals `driver.ErrSkip` |
+| `TestConnectionBeginsAndCompletesCallerControlledTransactions` | Begin creates a driver transaction that delegates commit and rollback, and the connection can begin again |
+| `TestConnectionCloseIsIdempotentAndLeavesReturnedTransactionCallerOwned` | Close prevents new operations without completing a transaction already returned to the caller |
+| `TestConnectionRejectsInvalidReceiversAndManagerState` | Nil, closed, and incomplete connections return contextual errors |
+| `TestTransactionAdapterRejectsNilAndMissingTransactions` | Nil transaction adapters reject commit and rollback safely |
 | `TestManagersComposeBasicUpdatePlannerWithTheirMetadata` | A manager set's update planner registers a table through shared metadata and a caller-owned transaction |
 | `TestManagersCreateQueryPlanParsesAndPlansSelect` | SELECT text is parsed and planned through the manager set without taking ownership of its transaction |
 | `TestManagersCreateQueryPlanReportsInvalidInputsAndFailures` | Incomplete managers, nil transactions, parse errors, and plan errors are returned with context |
@@ -140,8 +155,10 @@ test first failed because `Managers.QueryPlanner` was undefined. The update plan
 undefined. The SQL update dispatch tests first failed because `Managers.ExecuteUpdate` and its command dispatcher were
 undefined. The planner-strategy tests first failed because `QueryPlannerStrategy` and
 `Managers.SetQueryPlannerStrategy` were undefined. These tests use temporary database directories and keep catalog initialization, explicit process-restart
-recovery, SELECT planner composition, update planner composition, SQL SELECT planning, SQL update dispatch, ordinary
-transaction completion, and JDBC client operations as separate behaviors.
+recovery, SELECT planner composition, update planner composition, SQL SELECT planning, SQL update dispatch, embedded
+connection transaction lifecycle, ordinary transaction completion, and JDBC client operations as separate behaviors.
+The embedded-connection tests first failed because `Connection`, `NewConnection`, and its transaction adapter were
+undefined.
 
 ## Intentional differences
 

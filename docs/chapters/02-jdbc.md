@@ -243,15 +243,16 @@ Chapter 2から得られる概念的な境界は次のとおりである。
 | remote接続 | transport adapter | networkから内側へ変換 |
 
 これはGoの型名を決めた表ではない。Clean Architectureでは、interfaceは具体実装の都合ではなく
-利用側が必要とする操作として定義する。現時点では利用するGo applicationが存在しないため、
-`Connection`や`Statement`というinterfaceを先に追加しない。
+利用側が必要とする操作として定義する。Chapter 11では、実際の接続境界が必要になったため
+`internal/jdbc/embedded.Connection`を追加した。これはGo標準の`database/sql/driver.Conn`に従い、
+transactionの開始・明示的な完了だけを提供する。`Statement`、rows、列metadataやnetwork transportは
+まだ別の振る舞いとして残し、JDBCの型階層をそのまま先回りして移植しない。
 
-### 今回実装しないもの
+### Chapter 2で先回りして追加しないもの
 
-- JDBCを模倣したGo package
+- JDBCの型階層を機械的に模倣したGo package
 - network serverと通信protocol
-- transactionとisolation level
-- SQL parser、planner、optimizer
+- isolation levelの切替
 - prepared statement
 - 公開DB APIとerror hierarchy
 

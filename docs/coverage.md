@@ -82,6 +82,22 @@ or an unknown strategy does not replace the installed planner. Uncached
 uncovered statements. `go tool cover -func` reports 583 executable functions and the module total at 100.0%, with
 no function below 100%. The independent coverage workflow remains a separate status check.
 
+Issue #1131 adds the initial `database/sql/driver.Conn` adapter for embedded connections. Tests verify fresh transaction
+creation, explicit Commit/Rollback delegation, repeated-completion errors, connection close behavior, unsupported
+Prepare, and invalid state. Uncached
+`GOCACHE=/tmp/simpledb-go-cache go test ./... -count=1 -coverprofile=/tmp/simpledb-coverage-1131-final.out` reports
+100.0% statement coverage for all 17 executable packages; interface-only `internal/index` has no statements. The
+profile covers 5,388 statements with zero uncovered; `go tool cover -func` reports 589 executable functions and the
+module total at 100.0%, with no function below 100%.
+
+Issue #1131 adds the initial `database/sql/driver.Conn` adapter for embedded connections. Tests verify transaction
+creation and explicit Commit/Rollback delegation, repeated completion errors, connection close behavior, unsupported
+Prepare, and invalid state. Uncached
+`GOCACHE=/tmp/simpledb-go-cache go test ./... -count=1 -coverprofile=/tmp/simpledb-coverage-1131-final.out` reports
+100.0% statement coverage for all 17 executable packages; the interface-only `internal/index` package has no
+statements. The profile covers 5,388 statements with zero uncovered; `go tool cover -func` reports 589 executable
+functions and the module total at 100.0%, with no function below 100%.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
