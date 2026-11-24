@@ -913,6 +913,19 @@ The focused tests first failed because `Leaf.Next` was undefined. Tests cover co
 same-file overflow traversal with one active page at a time, integer/varchar keys, no-overflow termination, wrapped
 count/value/flag reads, unpin/pin transition failures, and invalid cursor state.
 
+## Feature 65: Read the current B-tree leaf entry RID
+
+Java `BTreeLeaf.getDataRid` delegates to its current slot in `BTPage`. Go's `Leaf.GetDataRID` delegates to
+`Page.GetDataRID(currentSlot)`, so the returned table RID follows the slot selected by `Next`, including after that
+method transfers the cursor to an overflow page. It does not advance the cursor or change page pin ownership, and wraps
+page read errors while retaining their causes. Deletion, insertion, and cursor close remain separate behaviors; no
+diagram is needed for this read-only delegation.
+
+### Test-first record
+
+The focused tests first failed because `Leaf.GetDataRID` was undefined. Tests verify the exact current slot, overflow
+page RID, unchanged cursor/page pin state, and wrapped block/id read errors.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

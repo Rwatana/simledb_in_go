@@ -65,3 +65,18 @@ func (leaf *Leaf) Next() (bool, error) {
 	leaf.currentSlot = 0
 	return true, nil
 }
+
+// GetDataRID returns the table record identifier at the current matching leaf entry.
+func (leaf *Leaf) GetDataRID() (record.RID, error) {
+	if leaf == nil {
+		return record.RID{}, fmt.Errorf("read data RID from B-tree leaf cursor: leaf is nil")
+	}
+	if leaf.contents == nil {
+		return record.RID{}, fmt.Errorf("read data RID from B-tree leaf cursor for %s: page is nil", leaf.searchKey)
+	}
+	rid, err := leaf.contents.GetDataRID(leaf.currentSlot)
+	if err != nil {
+		return record.RID{}, fmt.Errorf("read data RID from B-tree leaf cursor for %s in block %v at slot %d: %w", leaf.searchKey, leaf.contents.block, leaf.currentSlot, err)
+	}
+	return rid, nil
+}
