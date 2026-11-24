@@ -430,6 +430,63 @@ func (page *Page) GetDataRID(slot int) (record.RID, error) {
 	return record.NewRID(int(blockNumber), int(id)), nil
 }
 
+// SetDataRID writes the table record identifier to the specified B-tree leaf slot.
+func (page *Page) SetDataRID(slot int, rid record.RID) error {
+	if page == nil {
+		return fmt.Errorf("write B-tree page data RID at slot %d: page is nil", slot)
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("write B-tree page data RID at slot %d: page is closed", slot)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("write B-tree page data RID at slot %d in block %v: transaction is nil", slot, page.block)
+	}
+	if page.layout == nil {
+		return fmt.Errorf("write B-tree page data RID at slot %d in block %v: layout is nil", slot, page.block)
+	}
+	schema := page.layout.Schema()
+	if schema == nil {
+		return fmt.Errorf("write B-tree page data RID at slot %d in block %v: layout schema is nil", slot, page.block)
+	}
+
+	fields := [...]string{"block", "id"}
+	positions := [2]int{}
+	for i, field := range fields {
+		definition, ok := schema.Field(field)
+		if !ok {
+			return fmt.Errorf("write B-tree page data RID at slot %d in block %v: layout has no %s field", slot, page.block, field)
+		}
+		if definition.Type != record.IntegerField {
+			return fmt.Errorf("write B-tree page data RID at slot %d in block %v: %s field is not an integer", slot, page.block, field)
+		}
+		fieldOffset, ok := page.layout.Offset(field)
+		if !ok {
+			return fmt.Errorf("write B-tree page data RID at slot %d in block %v: layout has no %s offset", slot, page.block, field)
+		}
+		position, err := pageSlotFieldPosition(slot, page.layout.SlotSize(), fieldOffset)
+		if err != nil {
+			return fmt.Errorf("write B-tree page data RID %s at slot %d in block %v: %w", field, slot, page.block, err)
+		}
+		if position > math.MaxInt32 {
+			return fmt.Errorf("write B-tree page data RID %s at slot %d in block %v: offset %d exceeds int32 range", field, slot, page.block, position)
+		}
+		positions[i] = position
+	}
+
+	values := [...]int{rid.BlockNumber(), rid.Slot()}
+	for i, value := range values {
+		if int64(value) < math.MinInt32 || int64(value) > math.MaxInt32 {
+			return fmt.Errorf("write B-tree page data RID %s at slot %d in block %v: value %d exceeds int32 range", fields[i], slot, page.block, value)
+		}
+	}
+	for i, value := range values {
+		if err := page.transaction.SetInt(page.block, int32(positions[i]), int32(value), true); err != nil {
+			return fmt.Errorf("write B-tree page data RID %s at slot %d in block %v at offset %d: %w", fields[i], slot, page.block, positions[i], err)
+		}
+	}
+	return nil
+}
+
 func pageSlotFieldPosition(slot, slotSize, fieldOffset int) (int, error) {
 	return pageSlotFieldPositionForCount(int64(slot), slotSize, fieldOffset)
 }

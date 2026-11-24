@@ -641,6 +641,21 @@ The focused tests first failed because `Page.SetChildNum` was undefined. Tests v
 values at the layout-derived offset with logging enabled, no reads/pin changes, nil and typed-nil state, missing or
 noninteger fields, malformed offsets, negative/overflowing slots, int32 offset overflow, and wrapped write failures.
 
+## Feature 49: Write a B-tree leaf record identifier
+
+Java `BTPage.setDataRid` stores a leaf entry's data block number and record slot in the integer `block` and `id`
+fields. Go's `Page.SetDataRID` calculates both positions from the eight-byte page header and the retained layout,
+validates both locations and signed 32-bit values before writing, then performs the two logged integer writes in
+block-then-id order. Invalid page/layout/slot state and storage failures return contextual errors that preserve their
+causes; the operation does not read page data or change the pin lifecycle. The existing index-contract and B-tree
+field-offset diagrams already show the RID and slot boundaries, so another illustration would duplicate them.
+
+### Test-first record
+
+The focused tests first failed because `Page.SetDataRID` was undefined. Tests verify both layout-derived logged writes,
+signed values, no reads or pin changes, invalid and typed-nil state, absent/noninteger/malformed field metadata,
+negative/overflowing slots and RID values, and wrapped errors from either field write.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -662,3 +677,4 @@ noninteger fields, malformed offsets, negative/overflowing slots, int32 offset o
 - `btree.Page.GetDataVal` returns typed query constants and contextual Go errors for invalid slots, layout metadata, and storage reads instead of relying on Java's unchecked field access.
 - `btree.Page.GetFlag` reports transaction read failures as Go errors while preserving the signed Java flag value.
 - `btree.Page.SetFlag` reports transaction write failures as Go errors while preserving the signed Java flag value and logging request.
+- `btree.Page.SetDataRID` reports invalid or out-of-range identifiers and transaction write failures as Go errors, and logs both leaf RID fields separately.
