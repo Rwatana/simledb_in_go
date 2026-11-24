@@ -124,7 +124,8 @@ planner's affected-row count; the transaction remains open for explicit completi
 behavior after rejecting nil or canceled contexts and unsupported parameters. `Stmt.Query` creates a query plan using
 the active caller-owned transaction and returns its projected fields through `driver.Rows`. Integer columns become
 `int64` driver values, strings remain strings, exhaustion returns `io.EOF`, and closing rows closes the underlying scan.
-Query contexts, parameter binding, and optional result type metadata remain independent behaviors. The
+`Stmt.QueryContext` rejects nil or canceled contexts before creating the plan, then uses the same caller-owned
+transaction and row path. Parameter binding and optional result type metadata remain independent behaviors. The
 [statement lifecycle and query diagram](../diagrams/ch11-embedded-statement.svg) shows how a prepared statement opens
 a scan and returns rows; its [editable Draw.io source](../diagrams/ch11-embedded-statement.drawio) is kept beside the
 SVG.
@@ -176,6 +177,8 @@ needs them.
 | `TestPreparedStatementQueryReturnsProjectedRowsToDatabaseSQL` | Prepared SELECT returns ordered columns and typed rows through `database/sql` |
 | `TestStatementQueryRejectsInvalidStateAndArguments` | Prepared queries reject nil, closed, unbound, inactive, and argument-bearing calls |
 | `TestStatementQueryWrapsPlannerOpenAndRowsCreationFailures` | Planner, scan-open, and rejected-result cleanup failures retain query context |
+| `TestPreparedStatementQueryContextHonorsCancellationAndTransaction` | A canceled query does not prevent a valid prepared query in the same caller-owned transaction |
+| `TestStatementQueryContextImplementsDriverContractAndRejectsInvalidInputs` | Context-aware query rejects nil/closed statements, nil/canceled contexts, and arguments |
 | `TestNewStatementRowsValidatesScanAndSchema` | Result rows reject missing scans and schemas |
 | `TestStatementRowsReturnsTypedValuesAndClosesUnderlyingScan` | Rows expose defensive column names, map supported values, report EOF, and close once |
 | `TestStatementRowsReportsInvalidStateAndScanFailures` | Closed rows, wrong destinations, scan/read errors, unsupported types, and close failures are returned |
@@ -216,6 +219,7 @@ prepared statement. Autocommit tests first failed because `Connection` did not i
 tests first failed because `Connection` did not implement `driver.ExecerContext`. Prepared-statement context tests first
 failed because the statement adapter did not implement `driver.StmtExecContext`.
 Prepared-query integration tests first failed because `Stmt.Query` returned `driver.ErrSkip` rather than opening a SELECT plan.
+Prepared-query context tests first failed to compile because the statement did not implement `driver.StmtQueryContext`.
 The prepared-statement arity test first failed because `NumInput` reported unknown arity and the driver rejected the
 argument only after dispatch.
 These tests use temporary database directories and keep catalog initialization, explicit process-restart recovery,

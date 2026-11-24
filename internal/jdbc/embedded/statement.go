@@ -15,6 +15,7 @@ type statement struct {
 
 var _ driver.Stmt = (*statement)(nil)
 var _ driver.StmtExecContext = (*statement)(nil)
+var _ driver.StmtQueryContext = (*statement)(nil)
 
 func (statement *statement) Close() error {
 	if statement == nil {
@@ -46,6 +47,26 @@ func (statement *statement) ExecContext(ctx context.Context, arguments []driver.
 		return nil, fmt.Errorf("execute embedded statement with context: arguments are not supported")
 	}
 	return statement.Exec(nil)
+}
+
+// QueryContext executes a prepared SELECT after checking its caller's context.
+func (statement *statement) QueryContext(ctx context.Context, arguments []driver.NamedValue) (driver.Rows, error) {
+	if statement == nil {
+		return nil, fmt.Errorf("query embedded statement with context: statement is nil")
+	}
+	if statement.closed {
+		return nil, fmt.Errorf("query embedded statement with context: statement is closed")
+	}
+	if ctx == nil {
+		return nil, fmt.Errorf("query embedded statement with context: context is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("query embedded statement with context: %w", err)
+	}
+	if len(arguments) != 0 {
+		return nil, fmt.Errorf("query embedded statement with context: arguments are not supported")
+	}
+	return statement.Query(nil)
 }
 
 func (statement *statement) Exec(arguments []driver.Value) (driver.Result, error) {
