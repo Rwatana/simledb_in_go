@@ -11,7 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/btree.BTreeIndex`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTreeIndex.java` | Retain index state; derive the directory layout; initialize files; position and advance a search cursor |
+| `internal/index/btree.BTreeIndex`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTreeIndex.java` | Retain index state; derive the directory layout; initialize files; position and advance a search cursor; read its current RID |
 | `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
@@ -1271,6 +1271,21 @@ The focused compilation first failed because `BTreeIndex.Next` was undefined. Te
 exhaustion, nil and unpositioned states without page access, closed cursors, and wrapped leaf-advance errors. The method
 is 100.0% covered.
 
+## Feature 86: Read the current B-tree index record identifier
+
+Java `BTreeIndex.getDataRid` returns the RID stored in the current matching leaf entry. Go's
+`BTreeIndex.GetDataRID` delegates to the retained `Leaf.GetDataRID` cursor and returns the same `record.RID`; it rejects
+a nil index or a cursor that has not been positioned before reading a page. Wrapped leaf and page-read failures retain
+their causes. Advancing matches remains the separate `Next` behavior. The existing
+[index-contract diagram](../diagrams/ch11-index-contract.svg) shows the search key to RID boundary, and its editable
+Draw.io source is reused.
+
+### Test-first record
+
+The focused compilation first failed because `BTreeIndex.GetDataRID` was undefined. Tests cover retrieval from the
+current slot, unchanged cursor and page ownership, nil and unpositioned state without I/O, and wrapped block-read
+failure. The method is 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1281,6 +1296,7 @@ is 100.0% covered.
 - `btree.NewBTreeIndex` returns Go errors with wrapped storage causes and no partial index; the caller rolls back transaction-owned appended blocks after construction fails.
 - `btree.BTreeIndex.BeforeFirst` reports traversal and pin failures as Go errors; a page whose unpin failed remains owned by the index for a later cleanup retry.
 - `btree.BTreeIndex.Next` reports an unpositioned cursor and leaf-advance failures as Go errors while preserving wrapped storage causes.
+- `btree.BTreeIndex.GetDataRID` reports nil or unpositioned cursor state as Go errors and preserves wrapped leaf/page-read causes.
 - `IndexSelectScan` reports index-position failures as Go errors and leaves index lifetime management to its caller.
 - `IndexSelectScan.Next` reports index and table-scan failures as errors, and avoids moving the data scan after exhaustion.
 - `IndexSelectScan.GetInt` reports data-scan read failures as Go errors while preserving their wrapped causes.

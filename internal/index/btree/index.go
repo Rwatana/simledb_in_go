@@ -133,6 +133,21 @@ func (index *BTreeIndex) Next() (bool, error) {
 	return found, nil
 }
 
+// GetDataRID returns the table record identifier at the current matching index entry.
+func (index *BTreeIndex) GetDataRID() (record.RID, error) {
+	if index == nil {
+		return record.RID{}, fmt.Errorf("read current B-tree index RID: index is nil")
+	}
+	if index.leaf == nil {
+		return record.RID{}, fmt.Errorf("read current B-tree index RID for %q: cursor is not positioned", index.indexName)
+	}
+	rid, err := index.leaf.GetDataRID()
+	if err != nil {
+		return record.RID{}, fmt.Errorf("read current B-tree index RID for %q: %w", index.indexName, err)
+	}
+	return rid, nil
+}
+
 // NewBTreeIndex initializes the files and retained state for one B-tree index.
 // The caller must roll back the transaction if construction fails after an append.
 func NewBTreeIndex(transaction btreeFileTransaction, indexName string, leafLayout *record.Layout) (*BTreeIndex, error) {
