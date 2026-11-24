@@ -1001,10 +1001,10 @@ empty pages and non-minimum keys, validation/read/split/write failures, and Java
 After a successful ordinary insert makes a leaf full, Java `BTreeLeaf.insert` stores repeated values in an overflow
 chain. Go checks the first and last stored keys; if they match, `Leaf.Insert` splits at slot one, copies the prior
 overflow flag to the new page, and points the original page flag at the new block. The inserted entry remains at the
-cursor-selected slot, and this path returns no directory entry. A full page containing mixed keys returns an explicit
-error until mixed-key page splitting and directory/root propagation are implemented as separate behaviors. The signed
-32-bit page flag range is checked before narrowing the appended block number. Callers must roll back the transaction if
-a storage error occurs after logged page mutations begin. The existing [B-tree page split diagram](../diagrams/ch11-btree-page-split.svg)
+cursor-selected slot, and this path returns no directory entry. A full page containing mixed keys follows Feature 72's
+separate separator-split behavior instead of entering this duplicate-only path. The signed 32-bit page
+flag range is checked before narrowing the appended block number. Callers must roll back the transaction if a storage
+error occurs after logged page mutations begin. The existing [B-tree page split diagram](../diagrams/ch11-btree-page-split.svg)
 shows this suffix transfer and is reused rather than duplicated.
 
 ### Test-first record
@@ -1014,6 +1014,24 @@ error for a full mixed-key page, and ignored overflow-block flag range errors. T
 chains, preservation of the previous overflow flag and moved RIDs, cursor/page-pin ownership, mixed-key rejection,
 wrapped post-insert capacity/count/key/flag/split/link errors, invalid post-insert counts, and signed 32-bit block
 validation.
+
+## Feature 72: Split a full mixed-key B-tree leaf
+
+When a full leaf contains more than one key value, Java `BTreeLeaf.insert` chooses a midpoint but moves the boundary
+to the edge of the midpoint key's duplicate group. If the midpoint key is the first key, Go scans right to the next
+key group; otherwise it scans left to the first slot of the midpoint group. `Leaf.Insert` splits at that boundary with
+destination flag -1 and returns a `DirEntry` for the first key and block in the new page. It keeps the source page flag
+and cursor slot unchanged. Parent directory insertion and root growth remain separate behaviors. The appended block
+number is checked before it can be stored in a signed 32-bit directory field, and callers must roll back logged page
+mutations after a later error. The existing [B-tree page split diagram](../diagrams/ch11-btree-page-split.svg) already
+shows the source/destination record transfer and is reused.
+
+### Test-first record
+
+The focused test-first run failed because full mixed-key pages returned the duplicate-only path's error rather than a
+directory separator. Tests cover midpoint boundaries on either side of repeated key groups, integer and varchar
+separators, preserved flags/cursor/pin ownership, wrapped middle/right/left key reads, split failures, and signed
+32-bit directory block validation.
 
 ## Intentional differences from Java
 

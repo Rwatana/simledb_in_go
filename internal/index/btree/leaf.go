@@ -128,7 +128,7 @@ func (leaf *Leaf) Delete(dataRID record.RID) error {
 	}
 }
 
-// Insert adds dataRID with the cursor's search key and links full duplicate-key pages into an overflow chain.
+// Insert adds dataRID with the cursor's search key and splits full leaf pages when needed.
 func (leaf *Leaf) Insert(dataRID record.RID) (*DirEntry, error) {
 	if leaf == nil {
 		return nil, fmt.Errorf("insert B-tree leaf entry for %s: leaf is nil", dataRID)
@@ -162,55 +162,90 @@ func (leaf *Leaf) Insert(dataRID record.RID) (*DirEntry, error) {
 		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v at slot %d: %w", dataRID, leaf.searchKey, leaf.contents.block, slot, err)
 	}
 	leaf.currentSlot = slot
-	if err := leaf.splitDuplicateOverflowIfFull(dataRID); err != nil {
+	entry, err = leaf.splitFullPageIfNeeded(dataRID)
+	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	return entry, nil
 }
 
-func (leaf *Leaf) splitDuplicateOverflowIfFull(dataRID record.RID) error {
+func (leaf *Leaf) splitFullPageIfNeeded(dataRID record.RID) (*DirEntry, error) {
 	page := leaf.contents
 	full, err := page.IsFull()
 	if err != nil {
-		return fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: check capacity after insert: %w", dataRID, leaf.searchKey, page.block, err)
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: check capacity after insert: %w", dataRID, leaf.searchKey, page.block, err)
 	}
 	if !full {
-		return nil
+		return nil, nil
 	}
 	count, err := page.GetNumRecs()
 	if err != nil {
-		return fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read record count after insert: %w", dataRID, leaf.searchKey, page.block, err)
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read record count after insert: %w", dataRID, leaf.searchKey, page.block, err)
 	}
 	if count < 1 {
-		return fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: record count %d is invalid after insert", dataRID, leaf.searchKey, page.block, count)
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: record count %d is invalid after insert", dataRID, leaf.searchKey, page.block, count)
 	}
 	firstKey, err := page.GetDataVal(0)
 	if err != nil {
-		return fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read first key after insert: %w", dataRID, leaf.searchKey, page.block, err)
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read first key after insert: %w", dataRID, leaf.searchKey, page.block, err)
 	}
 	lastSlot := int(count) - 1
 	lastKey, err := page.GetDataVal(lastSlot)
 	if err != nil {
-		return fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read last key at slot %d after insert: %w", dataRID, leaf.searchKey, page.block, lastSlot, err)
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read last key at slot %d after insert: %w", dataRID, leaf.searchKey, page.block, lastSlot, err)
 	}
-	if !firstKey.Equal(lastKey) {
-		return fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: full page contains mixed keys %s and %s; mixed-key split is not implemented", dataRID, leaf.searchKey, page.block, firstKey, lastKey)
+	if firstKey.Equal(lastKey) {
+		flag, err := page.GetFlag()
+		if err != nil {
+			return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read overflow flag: %w", dataRID, leaf.searchKey, page.block, err)
+		}
+		overflowBlock, err := page.Split(1, flag)
+		if err != nil {
+			return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: split duplicate overflow page: %w", dataRID, leaf.searchKey, page.block, err)
+		}
+		if int64(overflowBlock.Number()) > math.MaxInt32 {
+			return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: overflow block number %d exceeds signed 32-bit flag range", dataRID, leaf.searchKey, page.block, overflowBlock.Number())
+		}
+		if err := page.SetFlag(int32(overflowBlock.Number())); err != nil {
+			return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: link duplicate overflow block %d: %w", dataRID, leaf.searchKey, page.block, overflowBlock.Number(), err)
+		}
+		return nil, nil
 	}
-	flag, err := page.GetFlag()
+
+	splitSlot := int(count) / 2
+	splitKey, err := page.GetDataVal(splitSlot)
 	if err != nil {
-		return fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read overflow flag: %w", dataRID, leaf.searchKey, page.block, err)
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: read middle key at slot %d: %w", dataRID, leaf.searchKey, page.block, splitSlot, err)
 	}
-	overflowBlock, err := page.Split(1, flag)
+	if splitKey.Equal(firstKey) {
+		for splitKey.Equal(firstKey) {
+			splitSlot++
+			splitKey, err = page.GetDataVal(splitSlot)
+			if err != nil {
+				return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: find next key after slot %d: %w", dataRID, leaf.searchKey, page.block, splitSlot-1, err)
+			}
+		}
+	} else {
+		for splitSlot > 0 {
+			previousKey, err := page.GetDataVal(splitSlot - 1)
+			if err != nil {
+				return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: inspect key before slot %d: %w", dataRID, leaf.searchKey, page.block, splitSlot, err)
+			}
+			if !previousKey.Equal(splitKey) {
+				break
+			}
+			splitSlot--
+		}
+	}
+	rightBlock, err := page.Split(splitSlot, -1)
 	if err != nil {
-		return fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: split duplicate overflow page: %w", dataRID, leaf.searchKey, page.block, err)
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: split mixed-key page at slot %d: %w", dataRID, leaf.searchKey, page.block, splitSlot, err)
 	}
-	if int64(overflowBlock.Number()) > math.MaxInt32 {
-		return fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: overflow block number %d exceeds signed 32-bit flag range", dataRID, leaf.searchKey, page.block, overflowBlock.Number())
+	if int64(rightBlock.Number()) > math.MaxInt32 {
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: split block number %d exceeds signed 32-bit directory range", dataRID, leaf.searchKey, page.block, rightBlock.Number())
 	}
-	if err := page.SetFlag(int32(overflowBlock.Number())); err != nil {
-		return fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: link duplicate overflow block %d: %w", dataRID, leaf.searchKey, page.block, overflowBlock.Number(), err)
-	}
-	return nil
+	entry := NewDirEntry(splitKey, rightBlock.Number())
+	return &entry, nil
 }
 
 func (leaf *Leaf) insertBeforeFirst(dataRID record.RID) (bool, *DirEntry, error) {
