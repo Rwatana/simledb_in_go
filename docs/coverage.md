@@ -144,6 +144,11 @@ affected rows, and leaves the current transaction ID and completion to the calle
 are contextual and preserve the ID. The independent coverage workflow continues to require 100.0% package, function,
 and module statement coverage.
 
+Issue #1195 adds `storage.Page.SetString`, converting UTF-8 bytes through the existing `SetBytes` length-prefix path.
+Tests round-trip empty text, embedded NUL, and multibyte text through both string and byte APIs, and verify a failed
+capacity write preserves the original page. The separate coverage workflow continues to enforce 100.0% package,
+function, and module statement coverage.
+
 Issue #1193 adds `storage.Page.GetString` as a read view over the existing four-byte length-prefixed payload. Tests
 cover empty text, embedded NUL, multibyte UTF-8, unchanged page bytes, truncated prefix, negative length, and truncated
 payload errors. The separate coverage workflow continues to enforce 100.0% package, function, and module statement

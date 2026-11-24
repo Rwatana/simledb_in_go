@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850" role="img" aria-labelledby="title description">
   <title id="title">Chapter 3 Feature 2: Page memory encoding</title>
-  <desc id="description">固定長Pageにbig-endianの4-byte整数と、4-byte length prefix付きpayloadを格納する。GetStringは同じpayloadをUTF-8文字列として読む。</desc>
+  <desc id="description">固定長Pageにbig-endianの4-byte整数と、4-byte length prefix付きpayloadを格納する。byte APIとstring APIは同じencodingを共有する。</desc>
   <defs>
     <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#6c8ebf"/></marker>
     <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#82b366"/></marker>
@@ -27,7 +27,7 @@
   <path class="blue-line" d="M315 485 V430 H200 V320"/>
 
   <rect class="box" x="760" y="485" width="480" height="160" rx="12" fill="#d5e8d4" stroke="#82b366"/>
-  <text class="heading" x="1000" y="525" text-anchor="middle">SetBytes / GetBytes / GetString</text><text class="text" x="1000" y="570" text-anchor="middle">shared 4-byte length prefix + payload</text><text class="text" x="1000" y="602" text-anchor="middle">GetString reads payload as UTF-8</text>
+  <text class="heading" x="1000" y="525" text-anchor="middle">SetBytes / GetBytes / SetString / GetString</text><text class="text" x="1000" y="570" text-anchor="middle">shared 4-byte length prefix + payload</text><text class="text" x="1000" y="602" text-anchor="middle">string helpers use UTF-8 bytes</text>
   <path class="green-line" d="M1000 485 V430 H865 V320"/>
 
   <rect class="box" x="315" y="720" width="770" height="70" rx="12" fill="#f8cecc" stroke="#b85450"/>
