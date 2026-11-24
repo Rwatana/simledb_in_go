@@ -33,6 +33,9 @@ func TestDatabaseSQLExecutesUpdatesInsideExplicitTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("database Begin() error = %v", err)
 	}
+	if _, err := transaction.Exec("not valid SQL"); err == nil {
+		t.Fatal("transaction Exec(invalid SQL) error = nil, want parse failure")
+	}
 	createResult, err := transaction.Exec("create table course (id int)")
 	if err != nil {
 		t.Fatalf("transaction Exec(CREATE TABLE) error = %v", err)

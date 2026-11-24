@@ -1,0 +1,44 @@
+<mxfile host="app.diagrams.net" modified="2026-11-24T14:25:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch11-database-autocommit" name="Database-level Autocommit">
+    <mxGraphModel dx="1200" dy="680" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="680" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Chapter 11 / database/sql autocommit ownership" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1">
+          <mxGeometry x="120" y="20" width="960" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="dbexec" value="application&#xa;sql.DB.Exec(query)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2fe;strokeColor=#0284c7;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="35" y="140" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="connexec" value="embedded.Connection&#xa;driver.Execer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="345" y="140" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="newtx" value="Managers.NewTransaction&#xa;when no transaction is active" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="700" y="100" width="300" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="execupdate" value="Managers.ExecuteUpdate&#xa;parse and plan with transaction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#7c3aed;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="700" y="280" width="300" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="commit" value="Commit on success&#xa;Rollback on update failure" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce7f3;strokeColor=#db2777;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="700" y="450" width="300" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="result" value="driver.RowsAffected&#xa;returned to application" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="345" y="450" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="txexec" value="sql.Tx.Exec(query)&#xa;reuses the active transaction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3f4f6;strokeColor=#6b7280;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="35" y="320" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="callerowns" value="Caller completes&#xa;explicit Commit / Rollback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce7f3;strokeColor=#db2777;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="35" y="500" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-db-conn" value="zero-argument SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=12;" edge="1" parent="1" source="dbexec" target="connexec"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-conn-tx" value="no active transaction" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=12;" edge="1" parent="1" source="connexec" target="newtx"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-tx-update" value="new transaction" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=12;" edge="1" parent="1" source="newtx" target="execupdate"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-update-commit" value="success or failure" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=12;" edge="1" parent="1" source="execupdate" target="commit"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-commit-result" value="affected count" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#374151;strokeWidth=2;fontSize=12;" edge="1" parent="1" source="commit" target="result"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-tx-conn" value="active transaction path" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6b7280;strokeWidth=2;fontSize=12;" edge="1" parent="1" source="txexec" target="connexec"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge-tx-owner" value="never auto-complete" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6b7280;strokeWidth=2;fontSize=12;" edge="1" parent="1" source="txexec" target="callerowns"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
