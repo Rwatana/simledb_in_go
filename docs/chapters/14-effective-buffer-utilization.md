@@ -9,7 +9,7 @@ operations.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
-| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own a bounded block range and advance through pages in block/slot order; field access is separate |
+| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own a bounded block range, traverse it in block/slot order, and read the current integer field |
 
 ## Feature 1: Choose a safe buffer root
 
@@ -145,6 +145,29 @@ The cursor advances one page only after `RecordPage.NextAfter` completes success
 failure therefore leaves the cursor on that destination page at slot -1 so a caller can retry. The scan does not pin
 or unpin during traversal; its resource-lifecycle contract remains in the preceding feature. Typed value reads remain
 separate.
+
+### Validation
+
+The focused tests cover every executable statement and function. The module coverage workflow continues to require
+100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 6: Read an integer field from the current chunk record
+
+`ChunkScan.GetInt` reads through the active `RecordPage` at the current slot. It uses the page selected by block-order
+traversal and does not move the cursor or change pin ownership. The accessor rejects scans without a current record,
+including before-first and exhausted states, before reading a field.
+
+### Test-first record
+
+Focused tests first failed because `ChunkScan.GetInt` was undefined. Tests cover integer values before and after page
+rollover, unchanged cursor and pins, missing field names, wrapped transaction read errors, and nil, zero-value, partial,
+closed, before-first, and exhausted scan states.
+
+### Design decision
+
+The accessor delegates offset calculation and field lookup to `RecordPage.GetInt`; the chunk scan adds block context
+while preserving the underlying error. A failed next call at end-of-range cannot leave the previous record readable.
+String reads, query constants, and field-membership checks remain separate behaviors.
 
 ### Validation
 

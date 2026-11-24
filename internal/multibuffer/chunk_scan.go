@@ -120,6 +120,20 @@ func (scan *ChunkScan) Next() (bool, error) {
 	}
 }
 
+// GetInt reads an integer field from the current chunk record.
+func (scan *ChunkScan) GetInt(fieldName string) (int32, error) {
+	operation := fmt.Sprintf("read integer field %q", fieldName)
+	if err := scan.validateCurrentRecord(operation); err != nil {
+		return 0, err
+	}
+	page := scan.pages[scan.currentPage]
+	value, err := page.GetInt(scan.currentSlot, fieldName)
+	if err != nil {
+		return 0, fmt.Errorf("read integer field %q from chunk scan block %d: %w", fieldName, page.Block().Number(), err)
+	}
+	return value, nil
+}
+
 // Close releases every retained chunk-page pin and keeps failed releases for a retry.
 func (scan *ChunkScan) Close() error {
 	if scan == nil || scan.transaction == nil {
@@ -152,6 +166,16 @@ func (scan *ChunkScan) validateCursor(operation string) error {
 	}
 	if scan.currentPage < 0 || scan.currentPage >= len(scan.pages) || scan.pages[scan.currentPage] == nil {
 		return fmt.Errorf("%s chunk scan for %q: active page index %d is unavailable", operation, scan.fileName, scan.currentPage)
+	}
+	return nil
+}
+
+func (scan *ChunkScan) validateCurrentRecord(operation string) error {
+	if err := scan.validateCursor(operation); err != nil {
+		return err
+	}
+	if scan.exhausted || scan.currentSlot < 0 {
+		return fmt.Errorf("%s chunk scan for %q: no current record", operation, scan.fileName)
 	}
 	return nil
 }

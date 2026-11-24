@@ -318,6 +318,122 @@ func TestChunkScanNextWrapsReadErrorAfterMovingToLaterBlock(t *testing.T) {
 	}
 }
 
+func TestChunkScanGetIntReadsCurrentRecordWithoutMovingCursor(t *testing.T) {
+	transaction := &chunkTransactionProbe{
+		blockSize: 8,
+		intValues: map[int]map[int]int32{
+			5: {0: 1, 4: 17},
+			6: {0: 1, 4: 42},
+		},
+	}
+	scan, err := NewChunkScan(transaction, "records.tbl", chunkLayout(), 5, 6)
+	if err != nil {
+		t.Fatalf("NewChunkScan() error = %v", err)
+	}
+	for _, want := range []int32{17, 42} {
+		got, err := scan.Next()
+		if err != nil || !got {
+			t.Fatalf("Next() = (%v, %v), want a current record", got, err)
+		}
+		currentPage, currentSlot, pins := scan.currentPage, scan.currentSlot, len(transaction.pins)
+		value, err := scan.GetInt("id")
+		if err != nil || value != want {
+			t.Fatalf("GetInt(id) = (%d, %v), want (%d, nil)", value, err, want)
+		}
+		if scan.currentPage != currentPage || scan.currentSlot != currentSlot || len(transaction.pins) != pins {
+			t.Fatalf("GetInt changed cursor/page ownership: page %d slot %d pins %d", scan.currentPage, scan.currentSlot, len(transaction.pins))
+		}
+	}
+}
+
+func TestChunkScanGetIntWrapsReadErrorAndRejectsMissingField(t *testing.T) {
+	readErr := errors.New("integer field read failed")
+	transaction := &chunkTransactionProbe{
+		blockSize: 8,
+		intValues: map[int]map[int]int32{4: {0: 1}},
+		intErrors: map[int]map[int]error{4: {4: readErr}},
+	}
+	scan, err := NewChunkScan(transaction, "records.tbl", chunkLayout(), 4, 4)
+	if err != nil {
+		t.Fatalf("NewChunkScan() error = %v", err)
+	}
+	if got, err := scan.Next(); err != nil || !got {
+		t.Fatalf("Next() = (%v, %v), want one record", got, err)
+	}
+	if _, err := scan.GetInt("missing"); err == nil || !strings.Contains(err.Error(), "missing") {
+		t.Fatalf("GetInt(missing) error = %v, want a field lookup error", err)
+	}
+	if _, err := scan.GetInt("id"); !errors.Is(err, readErr) || !strings.Contains(err.Error(), "block 4") {
+		t.Fatalf("GetInt(id) error = %v, want wrapped cause and block context", err)
+	}
+}
+
+func TestChunkScanGetIntRejectsUnavailableCurrentRecordBeforeFieldIO(t *testing.T) {
+	validTransaction := func() *chunkTransactionProbe {
+		return &chunkTransactionProbe{blockSize: 8, intValues: map[int]map[int]int32{0: {0: 1, 4: 7}}}
+	}
+	beforeFirst, err := NewChunkScan(validTransaction(), "records.tbl", chunkLayout(), 0, 0)
+	if err != nil {
+		t.Fatalf("before-first setup error = %v", err)
+	}
+	closedTransaction := validTransaction()
+	closed, err := NewChunkScan(closedTransaction, "records.tbl", chunkLayout(), 0, 0)
+	if err != nil {
+		t.Fatalf("closed setup error = %v", err)
+	}
+	if got, err := closed.Next(); err != nil || !got {
+		t.Fatalf("closed setup Next() = (%v, %v), want one record", got, err)
+	}
+	if err := closed.Close(); err != nil {
+		t.Fatalf("Close() setup error = %v", err)
+	}
+	exhaustedTransaction := &chunkTransactionProbe{blockSize: 8}
+	exhausted, err := NewChunkScan(exhaustedTransaction, "records.tbl", chunkLayout(), 0, 0)
+	if err != nil {
+		t.Fatalf("exhausted setup error = %v", err)
+	}
+	if got, err := exhausted.Next(); err != nil || got {
+		t.Fatalf("exhausted setup Next() = (%v, %v), want no row", got, err)
+	}
+	partialTransaction := &chunkTransactionProbe{
+		pinErrors:   map[int]error{1: errors.New("pin failed")},
+		unpinErrors: map[int][]error{0: {errors.New("unpin failed")}},
+	}
+	partial, err := NewChunkScan(partialTransaction, "records.tbl", chunkLayout(), 0, 1)
+	if partial == nil || err == nil {
+		t.Fatalf("partial setup = (%v, %v), want scan and pin/cleanup errors", partial, err)
+	}
+	tests := []struct {
+		name        string
+		scan        *ChunkScan
+		transaction *chunkTransactionProbe
+	}{
+		{name: "nil receiver"},
+		{name: "zero value", scan: &ChunkScan{}},
+		{name: "before first", scan: beforeFirst, transaction: beforeFirst.transaction.(*chunkTransactionProbe)},
+		{name: "exhausted", scan: exhausted, transaction: exhaustedTransaction},
+		{name: "closed", scan: closed, transaction: closedTransaction},
+		{name: "partial initialization", scan: partial, transaction: partialTransaction},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := test.scan.GetInt("id"); err == nil {
+				t.Fatal("GetInt(id) error = nil, want unavailable-record error")
+			}
+			if test.transaction != nil {
+				for _, read := range test.transaction.intReads {
+					if read.offset == 4 {
+						t.Fatalf("invalid cursor read integer field data: %v", test.transaction.intReads)
+					}
+				}
+			}
+		})
+	}
+	if err := partial.Close(); err != nil {
+		t.Fatalf("retry partial cleanup = %v", err)
+	}
+}
+
 func TestChunkScanNextReportsPageErrorsWithoutMovingCursor(t *testing.T) {
 	blockErr := errors.New("block size failed")
 	transaction := &chunkTransactionProbe{blockErr: blockErr}
