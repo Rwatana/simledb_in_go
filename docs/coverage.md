@@ -130,6 +130,12 @@ INSERT commands, verify the row count, and confirm that explicit Commit complete
 tests cover parse/planner errors, zeroed responses, missing dependencies, and closed sessions. The independent coverage
 workflow continues to require 100.0% in all executable packages, functions, and the module total.
 
+Issue #1175 adds `DriverService.ExecuteQuery`, which parses and plans a SELECT, materializes schema-ordered columns and
+typed scalar rows into gob-friendly DTOs, and closes the scan without completing the session transaction. RPC tests cover
+projected integer/varchar rows; direct fault-injection tests cover planning/open/read/close errors, partial-open cleanup,
+invalid lifecycle state, empty results, and response reset. The separate coverage workflow continues to enforce 100.0%
+package, function, and module statement coverage.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the

@@ -1,12 +1,16 @@
 package network
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/rpc"
+	"reflect"
 	"sync"
 
+	"github.com/Rwatana/simledb_in_go/internal/query"
+	"github.com/Rwatana/simledb_in_go/internal/record"
 	"github.com/Rwatana/simledb_in_go/internal/server"
 	"github.com/Rwatana/simledb_in_go/internal/transaction"
 )
@@ -43,6 +47,30 @@ type ExecuteUpdateRequest struct {
 // ExecuteUpdateResponse reports the number of rows affected by a remote SQL update.
 type ExecuteUpdateResponse struct {
 	RowsAffected int64
+}
+
+// ExecuteQueryRequest carries one SQL SELECT statement for a remote database session.
+type ExecuteQueryRequest struct {
+	Statement string
+}
+
+// QueryColumn describes one projected result column in schema order.
+type QueryColumn struct {
+	Name string
+	Type string
+}
+
+// QueryValue contains one typed scalar result without gob interface registration.
+type QueryValue struct {
+	Kind    string
+	Integer int32
+	String  string
+}
+
+// ExecuteQueryResponse contains ordered result columns and their materialized rows.
+type ExecuteQueryResponse struct {
+	Columns []QueryColumn
+	Rows    [][]QueryValue
 }
 
 // CloseRequest is the empty request for closing a remote database session.
@@ -233,6 +261,124 @@ func (s *DriverService) ExecuteUpdate(request ExecuteUpdateRequest, reply *Execu
 	}
 	reply.RowsAffected = int64(rows)
 	return nil
+}
+
+// ExecuteQuery materializes a SQL SELECT on the active transaction without completing it.
+func (s *DriverService) ExecuteQuery(request ExecuteQueryRequest, reply *ExecuteQueryResponse) error {
+	if reply != nil {
+		*reply = ExecuteQueryResponse{}
+	}
+	if s == nil {
+		return fmt.Errorf("execute network RPC query: service is nil")
+	}
+	if reply == nil {
+		return fmt.Errorf("execute network RPC query: reply is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return fmt.Errorf("execute network RPC query: session is closed")
+	}
+	if s.managers == nil {
+		return fmt.Errorf("execute network RPC query: manager set is nil")
+	}
+	if s.transaction == nil {
+		return fmt.Errorf("execute network RPC query: active transaction is nil")
+	}
+	queryPlan, err := s.managers.CreateQueryPlan(request.Statement, s.transaction)
+	if err != nil {
+		return fmt.Errorf("execute network RPC query: %w", err)
+	}
+	if queryPlan == nil {
+		return fmt.Errorf("execute network RPC query: query planner returned a nil plan")
+	}
+	schema := queryPlan.Schema()
+	if schema == nil {
+		return fmt.Errorf("execute network RPC query: query plan schema is nil")
+	}
+	scan, err := queryPlan.Open()
+	if err != nil {
+		if !isNilNetworkQueryScan(scan) {
+			if closeErr := scan.Close(); closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("close rejected query scan: %w", closeErr))
+			}
+		}
+		return fmt.Errorf("execute network RPC query: open query scan: %w", err)
+	}
+	columns, rows, err := materializeNetworkQuery(scan, schema)
+	if err != nil {
+		return fmt.Errorf("execute network RPC query: %w", err)
+	}
+	reply.Columns = columns
+	reply.Rows = rows
+	return nil
+}
+
+func materializeNetworkQuery(scan query.Scan, schema *record.Schema) (columns []QueryColumn, rows [][]QueryValue, resultErr error) {
+	if isNilNetworkQueryScan(scan) {
+		return nil, nil, fmt.Errorf("materialize network query: scan is nil")
+	}
+	defer func() {
+		if closeErr := scan.Close(); closeErr != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("close query scan: %w", closeErr))
+		}
+		if resultErr != nil {
+			columns = nil
+			rows = nil
+		}
+	}()
+	fields := schema.Fields()
+	columns = make([]QueryColumn, 0, len(fields))
+	for _, field := range fields {
+		definition, _ := schema.Field(field)
+		switch definition.Type {
+		case record.IntegerField:
+			columns = append(columns, QueryColumn{Name: field, Type: "INTEGER"})
+		case record.VarcharField:
+			columns = append(columns, QueryColumn{Name: field, Type: "VARCHAR"})
+		default:
+			return nil, nil, fmt.Errorf("materialize network query: field %q has unsupported type %d", field, definition.Type)
+		}
+	}
+	if err := scan.BeforeFirst(); err != nil {
+		return nil, nil, fmt.Errorf("position query scan: %w", err)
+	}
+	for {
+		available, err := scan.Next()
+		if err != nil {
+			return nil, nil, fmt.Errorf("advance query scan: %w", err)
+		}
+		if !available {
+			break
+		}
+		row := make([]QueryValue, len(fields))
+		for index, field := range fields {
+			switch columns[index].Type {
+			case "INTEGER":
+				value, err := scan.GetInt(field)
+				if err != nil {
+					return nil, nil, fmt.Errorf("read query integer column %q: %w", field, err)
+				}
+				row[index] = QueryValue{Kind: "INTEGER", Integer: value}
+			case "VARCHAR":
+				value, err := scan.GetString(field)
+				if err != nil {
+					return nil, nil, fmt.Errorf("read query string column %q: %w", field, err)
+				}
+				row[index] = QueryValue{Kind: "VARCHAR", String: value}
+			}
+		}
+		rows = append(rows, row)
+	}
+	return columns, rows, nil
+}
+
+func isNilNetworkQueryScan(scan query.Scan) bool {
+	if scan == nil {
+		return true
+	}
+	value := reflect.ValueOf(scan)
+	return value.Kind() == reflect.Pointer && value.IsNil()
 }
 
 // Close commits the active transaction and marks this RPC session closed without starting another one.
