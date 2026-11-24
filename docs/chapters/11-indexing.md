@@ -588,6 +588,19 @@ contextual errors that preserve the original cause.
 The focused tests first failed because `Page.setNumRecs` was undefined. Tests verify signed count writes at offset four
 with logging enabled, no reads/layout/pin changes, nil and typed-nil state, and wrapped write failures.
 
+## Feature 45: Read a B-tree directory child number
+
+Java `BTPage.getChildNum` reads the integer `block` field from a directory page slot. Go's `Page.GetChildNum` derives
+the field position from the eight-byte page header, slot size, and `block` offset, then returns the stored signed
+block number. It validates the page/layout/schema and integer field metadata, checks slot arithmetic, wraps storage
+read errors, and leaves the page pin unchanged.
+
+### Test-first record
+
+The focused tests first failed because `Page.GetChildNum` was undefined. Tests cover a signed block number at the
+layout-derived offset, invalid and typed-nil page/layout/field state, negative and overflowing slots, and wrapped read
+failures without changing the pin lifecycle.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

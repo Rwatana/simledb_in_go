@@ -257,6 +257,46 @@ func (page *Page) setNumRecs(count int32) error {
 	return nil
 }
 
+// GetChildNum reads the child block number from the specified B-tree directory slot.
+func (page *Page) GetChildNum(slot int) (int32, error) {
+	if page == nil {
+		return 0, fmt.Errorf("read B-tree page child number at slot %d: page is nil", slot)
+	}
+	if page.block.FileName() == "" {
+		return 0, fmt.Errorf("read B-tree page child number at slot %d: page is closed", slot)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return 0, fmt.Errorf("read B-tree page child number at slot %d in block %v: transaction is nil", slot, page.block)
+	}
+	if page.layout == nil {
+		return 0, fmt.Errorf("read B-tree page child number at slot %d in block %v: layout is nil", slot, page.block)
+	}
+	schema := page.layout.Schema()
+	if schema == nil {
+		return 0, fmt.Errorf("read B-tree page child number at slot %d in block %v: layout schema is nil", slot, page.block)
+	}
+	definition, ok := schema.Field("block")
+	if !ok {
+		return 0, fmt.Errorf("read B-tree page child number at slot %d in block %v: layout has no block field", slot, page.block)
+	}
+	if definition.Type != record.IntegerField {
+		return 0, fmt.Errorf("read B-tree page child number at slot %d in block %v: block field is not an integer", slot, page.block)
+	}
+	fieldOffset, ok := page.layout.Offset("block")
+	if !ok {
+		return 0, fmt.Errorf("read B-tree page child number at slot %d in block %v: layout has no block offset", slot, page.block)
+	}
+	position, err := pageSlotFieldPosition(slot, page.layout.SlotSize(), fieldOffset)
+	if err != nil {
+		return 0, fmt.Errorf("read B-tree page child number at slot %d in block %v: %w", slot, page.block, err)
+	}
+	child, err := page.transaction.GetInt(page.block, position)
+	if err != nil {
+		return 0, fmt.Errorf("read B-tree page child number at slot %d in block %v: %w", slot, page.block, err)
+	}
+	return child, nil
+}
+
 func pageSlotFieldPosition(slot, slotSize, fieldOffset int) (int, error) {
 	return pageSlotFieldPositionForCount(int64(slot), slotSize, fieldOffset)
 }
