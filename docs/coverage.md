@@ -25,7 +25,10 @@ statements.
 | `internal/index/hash` | 100.0% |
 | `internal/index/query` | 100.0% |
 | `internal/infrastructure/file` | 100.0% |
+| `internal/jdbc/embedded` | 100.0% |
+| `internal/jdbc/network` | 100.0% |
 | `internal/log` | 100.0% |
+| `internal/materialize` | 100.0% |
 | `internal/metadata` | 100.0% |
 | `internal/parse` | 100.0% |
 | `internal/plan` | 100.0% |
@@ -143,6 +146,11 @@ Issue #1181 adds `RemoteSession.ExecuteUpdate`, which sends one SQL statement th
 affected rows, and leaves the current transaction ID and completion to the caller. Client validation and remote errors
 are contextual and preserve the ID. The independent coverage workflow continues to require 100.0% package, function,
 and module statement coverage.
+
+Issue #1197 adds the `materialize.TempTable` descriptor, retaining a table-scan transaction and schema layout while
+allocating concurrent-safe `tempN` names without transaction calls or physical file creation. Tests cover construction,
+metadata access, invalid dependencies, and concurrent allocation. The independent coverage workflow continues to require
+100.0% statement coverage across executable packages, functions, and the module.
 
 Issue #1195 adds `storage.Page.SetString`, converting UTF-8 bytes through the existing `SetBytes` length-prefix path.
 Tests round-trip empty text, embedded NUL, and multibyte text through both string and byte APIs, and verify a failed

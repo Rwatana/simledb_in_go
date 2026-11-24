@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500" role="img" aria-labelledby="title desc">
+  <title id="title">Temporary table descriptor boundary</title>
+  <desc id="desc">A schema and transaction create a metadata-only temporary table descriptor. It exposes a generated name and layout. Physical access starts in a later scan-opening operation.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#52677d"/></marker>
+    <style>
+      text { font: 16px sans-serif; fill: #172b4d; text-anchor: middle; }
+      .small { font-size: 13px; }
+      .source { fill: #dae8fc; stroke: #6c8ebf; }
+      .descriptor { fill: #d5e8d4; stroke: #82b366; }
+      .output { fill: #fff2cc; stroke: #d6b656; }
+      .deferred { fill: #f8cecc; stroke: #b85450; stroke-dasharray: 7 5; }
+      .edge { fill: none; stroke: #52677d; stroke-width: 2; marker-end: url(#arrow); }
+      .dashed { stroke-dasharray: 7 5; }
+    </style>
+  </defs>
+  <rect width="900" height="500" fill="#ffffff"/>
+  <rect class="source" x="40" y="80" width="190" height="70" rx="12"/>
+  <text x="135" y="109">record.Schema</text><text class="small" x="135" y="132">ordered fields</text>
+  <rect class="source" x="40" y="250" width="190" height="70" rx="12"/>
+  <text x="135" y="279">TableScanTransaction</text><text class="small" x="135" y="302">retained for later scan</text>
+  <rect class="descriptor" x="330" y="150" width="220" height="100" rx="14"/>
+  <text x="440" y="183">NewTempTable</text><text class="small" x="440" y="207">metadata only</text><text class="small" x="440" y="229">no transaction calls</text>
+  <rect class="output" x="650" y="75" width="190" height="65" rx="12"/>
+  <text x="745" y="102">TableName()</text><text class="small" x="745" y="124">tempN</text>
+  <rect class="output" x="650" y="180" width="190" height="65" rx="12"/>
+  <text x="745" y="207">Layout()</text><text class="small" x="745" y="229">schema-derived offsets</text>
+  <rect class="deferred" x="330" y="355" width="260" height="75" rx="12"/>
+  <text x="460" y="384">Open / TableScan</text><text class="small" x="460" y="407">later behavior: physical access starts here</text>
+  <path class="edge" d="M230 115 C275 115 285 180 330 180"/>
+  <path class="edge" d="M230 285 C280 285 280 220 330 220"/>
+  <path class="edge" d="M550 175 C600 175 600 108 650 108"/>
+  <path class="edge" d="M550 220 C600 220 600 212 650 212"/>
+  <path class="edge dashed" d="M440 250 L440 355"/>
+  <text class="small" x="483" y="310">separate step</text>
+</svg>
