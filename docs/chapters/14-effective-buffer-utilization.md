@@ -9,7 +9,7 @@ operations.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
-| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own a bounded block range and advance through records in the active page; page rollover is separate |
+| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own a bounded block range and advance through pages in block/slot order; field access is separate |
 
 ## Feature 1: Choose a safe buffer root
 
@@ -119,6 +119,32 @@ The constructor marks a scan ready only after every page is pinned; a partial sc
 be traversed. `Close` marks the scan closed before attempting unpins, so failed releases remain retryable through
 `Close` but cannot be read as if every page were still pinned. `Next` deliberately stops at the active page boundary;
 the next block is not selected implicitly in this feature.
+
+### Validation
+
+The focused tests cover every executable statement and function. The module coverage workflow continues to require
+100.0% statement coverage for every executable package, function, and module total.
+## Feature 5: Advance across chunk blocks
+
+When `ChunkScan.Next` reaches the end of its active page, it advances to each remaining pinned page, resets the slot
+cursor to -1, and searches there. Empty pages are skipped; exhaustion is remembered only after the final page has no
+occupied record. This follows Java `ChunkScan.next` while keeping page ownership fixed for the life of the chunk.
+
+The [chunk rollover diagram](../diagrams/ch14-chunk-scan-rollover.svg) shows the row search, page transition, and
+final exhaustion state. Its editable source is [`ch14-chunk-scan-rollover.drawio`](../diagrams/ch14-chunk-scan-rollover.drawio).
+
+### Test-first record
+
+Focused tests first failed because `Next` returned false at the first page boundary. Tests cover crossing to the next
+page, skipping multiple empty pages, rewinding after crossing, final-range exhaustion without repeated reads, stable
+pin ownership, and a wrapped record-flag error in a later page.
+
+### Design decision
+
+The cursor advances one page only after `RecordPage.NextAfter` completes successfully with no occupied slot. A read
+failure therefore leaves the cursor on that destination page at slot -1 so a caller can retry. The scan does not pin
+or unpin during traversal; its resource-lifecycle contract remains in the preceding feature. Typed value reads remain
+separate.
 
 ### Validation
 

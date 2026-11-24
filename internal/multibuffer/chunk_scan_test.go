@@ -216,12 +216,12 @@ func TestChunkScanCloseAcceptsNilReceiver(t *testing.T) {
 	}
 }
 
-func TestChunkScanNextWalksOccupiedSlotsOnlyInCurrentBlockAndRewinds(t *testing.T) {
+func TestChunkScanNextCrossesBlocksAfterFinishingTheCurrentBlock(t *testing.T) {
 	transaction := &chunkTransactionProbe{
 		blockSize: 24,
 		intValues: map[int]map[int]int32{
 			5: {0: 0, 8: 1, 16: 1},
-			6: {0: 1, 8: 1, 16: 1},
+			6: {0: 1},
 		},
 	}
 	scan, err := NewChunkScan(transaction, "records.tbl", chunkLayout(), 5, 6)
@@ -237,15 +237,21 @@ func TestChunkScanNextWalksOccupiedSlotsOnlyInCurrentBlockAndRewinds(t *testing.
 			t.Fatalf("Next() at slot %d = (%v, %v) with current slot %d, want (true, nil) at %d", wantSlot, got, err, scan.currentSlot, wantSlot)
 		}
 	}
-	if got, err := scan.Next(); got || err != nil {
-		t.Fatalf("Next() at end of first block = (%v, %v), want (false, nil)", got, err)
+	if got, want := transaction.intReads[len(transaction.intReads)-1].block.Number(), 5; got != want {
+		t.Fatalf("block read before exhausting active page = %d, want 5", got)
+	}
+	if got, err := scan.Next(); err != nil || !got || scan.currentPage != 1 || scan.currentSlot != 0 {
+		t.Fatalf("Next() after first block = (%v, %v), page %d slot %d; want next block slot 0", got, err, scan.currentPage, scan.currentSlot)
+	}
+	if got, err := scan.Next(); got || err != nil || !scan.exhausted {
+		t.Fatalf("Next() at end of range = (%v, %v) exhausted %v, want (false, nil) and exhausted", got, err, scan.exhausted)
 	}
 	readsAtExhaustion := len(transaction.intReads)
 	if got, err := scan.Next(); got || err != nil || len(transaction.intReads) != readsAtExhaustion {
-		t.Fatalf("repeated Next() at end of first block = (%v, %v), reads %d; want no row, error, or additional read", got, err, len(transaction.intReads))
+		t.Fatalf("repeated Next() at end of range = (%v, %v), reads %d; want no row, error, or additional read", got, err, len(transaction.intReads))
 	}
-	if got, want := transaction.intReads[len(transaction.intReads)-1].block.Number(), 5; got != want {
-		t.Fatalf("last read block = %d, want current block %d without rollover", got, want)
+	if got, want := transaction.intReads[len(transaction.intReads)-1].block.Number(), 6; got != want {
+		t.Fatalf("last read block = %d, want final block %d", got, want)
 	}
 	if got, want := transaction.pins, chunkBlocks(5, 6); !reflect.DeepEqual(got, want) {
 		t.Fatalf("pins after traversal = %v, want unchanged %v", got, want)
@@ -261,6 +267,54 @@ func TestChunkScanNextWalksOccupiedSlotsOnlyInCurrentBlockAndRewinds(t *testing.
 	}
 	if got, want := transaction.pins, chunkBlocks(5, 6); !reflect.DeepEqual(got, want) {
 		t.Fatalf("pins after rewind = %v, want unchanged %v", got, want)
+	}
+}
+
+func TestChunkScanNextSkipsEmptyPagesAndRewindsAcrossTheRange(t *testing.T) {
+	transaction := &chunkTransactionProbe{
+		blockSize: 16,
+		intValues: map[int]map[int]int32{
+			7: {0: 0, 8: 0},
+			8: {0: 0, 8: 0},
+			9: {0: 1, 8: 0},
+		},
+	}
+	scan, err := NewChunkScan(transaction, "records.tbl", chunkLayout(), 7, 9)
+	if err != nil {
+		t.Fatalf("NewChunkScan() error = %v", err)
+	}
+	if got, err := scan.Next(); err != nil || !got || scan.currentPage != 2 || scan.currentSlot != 0 {
+		t.Fatalf("Next() after empty pages = (%v, %v), page %d slot %d; want page 2 slot 0", got, err, scan.currentPage, scan.currentSlot)
+	}
+	if got, want := transaction.pins, chunkBlocks(7, 9); !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins after rollover = %v, want unchanged %v", got, want)
+	}
+	if err := scan.BeforeFirst(); err != nil {
+		t.Fatalf("BeforeFirst() error = %v", err)
+	}
+	if scan.currentPage != 0 || scan.currentSlot != -1 {
+		t.Fatalf("cursor after rewind = page %d slot %d, want page 0 slot -1", scan.currentPage, scan.currentSlot)
+	}
+	if got, err := scan.Next(); err != nil || !got || scan.currentPage != 2 || scan.currentSlot != 0 {
+		t.Fatalf("Next() after range rewind = (%v, %v), page %d slot %d; want page 2 slot 0", got, err, scan.currentPage, scan.currentSlot)
+	}
+}
+
+func TestChunkScanNextWrapsReadErrorAfterMovingToLaterBlock(t *testing.T) {
+	readErr := errors.New("later record flag read failed")
+	transaction := &chunkTransactionProbe{
+		blockSize: 8,
+		intErrors: map[int]map[int]error{11: {0: readErr}},
+	}
+	scan, err := NewChunkScan(transaction, "records.tbl", chunkLayout(), 10, 11)
+	if err != nil {
+		t.Fatalf("NewChunkScan() error = %v", err)
+	}
+	if got, err := scan.Next(); got || !errors.Is(err, readErr) || !strings.Contains(err.Error(), "block 11") {
+		t.Fatalf("Next() after rollover read failure = (%v, %v), want wrapped cause with block 11 context", got, err)
+	}
+	if scan.currentPage != 1 || scan.currentSlot != -1 {
+		t.Fatalf("cursor after later-block error = page %d slot %d, want page 1 slot -1", scan.currentPage, scan.currentSlot)
 	}
 }
 
