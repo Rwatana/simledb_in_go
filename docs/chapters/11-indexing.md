@@ -1033,6 +1033,24 @@ directory separator. Tests cover midpoint boundaries on either side of repeated 
 separators, preserved flags/cursor/pin ownership, wrapped middle/right/left key reads, split failures, and signed
 32-bit directory block validation.
 
+## Feature 73: Insert a B-tree directory entry by key
+
+Java `BTreeDir.insertEntry` locates the insertion point and delegates the physical record shift to `BTPage.insertDir`.
+Go's `Page.InsertDirectoryEntry` uses `FindSlotBefore` and `InsertDir` to keep directory keys ordered, placing a new
+duplicate before the first equal key. It accepts only a valid two-field directory layout (`dataval`, integer `block`),
+a nonnegative directory level, and a child block number representable as a signed 32-bit value. It checks physical slot
+capacity before the first write; splitting a full directory remains a separate behavior. An error after logged page
+writes requires the caller's transaction rollback. The existing [directory insertion diagram](../diagrams/ch11-btree-insert-dir.svg)
+shows the right-to-left shift and final key/child write; its editable source is
+[`ch11-btree-insert-dir.drawio`](../diagrams/ch11-btree-insert-dir.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.InsertDirectoryEntry` was undefined. They verify integer ordering,
+duplicate placement, varchar end-append, empty-page insertion, use of the last physical slot, rejection of a full page
+before mutation, invalid directory layouts and levels, signed 32-bit child-block bounds, and wrapped page flag, count,
+block-size, key-read, and write errors.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1056,3 +1074,4 @@ separators, preserved flags/cursor/pin ownership, wrapped middle/right/left key 
 - `btree.Page.SetFlag` reports transaction write failures as Go errors while preserving the signed Java flag value and logging request.
 - `btree.Page.SetDataRID` reports invalid or out-of-range identifiers and transaction write failures as Go errors, and logs both leaf RID fields separately.
 - `btree.Page.InsertDir` copies later directory entries from right to left before inserting a key/child pair; storage errors remain explicit and transaction logging enables caller rollback.
+- `btree.Page.InsertDirectoryEntry` validates directory level and physical capacity before finding the ordered insertion point; directory splitting remains a separate operation.
