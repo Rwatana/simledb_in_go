@@ -117,14 +117,17 @@ both standard-library entry points; its [editable Draw.io source](../diagrams/ch
 beside the SVG.
 
 `Connection.Prepare` retains the SQL string and connection in a `driver.Stmt` handle. `Close` is idempotent, and
-`NumInput` reports `0` because the currently supported statements accept no arguments; parameter parsing and binding
-remain a separate behavior. `database/sql` can therefore reject extra arguments before statement dispatch. `Stmt.Exec`
-routes zero-argument update SQL through `Managers.ExecuteUpdate` using the active connection transaction and returns the
-planner's affected-row count; the transaction remains open for explicit completion. `Stmt.ExecContext` applies the same
-behavior after rejecting nil or canceled contexts and unsupported parameters. `Stmt.Query` creates a query plan using
-the active caller-owned transaction and returns its projected fields through `driver.Rows`. Integer columns become
+`NumInput` counts positional `?` markers outside single-quoted literals so `database/sql` can check arity before
+dispatch. Unbalanced SQL quoting reports unknown arity, leaving the parser to return the syntax error. `Stmt.Exec` and
+`Stmt.Query` accept ordered `int64` and `string` values; the adapter formats those values as SQL constants and doubles
+embedded single quotes so a string remains data. Too few or too many arguments, named parameters, and unsupported
+driver values fail before planner dispatch. `Stmt.Exec` routes the bound update through `Managers.ExecuteUpdate` using
+the active connection transaction and returns the planner's affected-row count; the transaction remains open for
+explicit completion. `Stmt.ExecContext` validates its context before applying the same binding behavior. `Stmt.Query`
+creates a query plan using the active caller-owned transaction and returns its projected fields through `driver.Rows`.
+Integer columns become
 `int64` driver values, strings remain strings, exhaustion returns `io.EOF`, and closing rows closes the underlying scan.
-`Stmt.QueryContext` rejects nil or canceled contexts before creating the plan, then uses the same caller-owned
+`Stmt.QueryContext` rejects nil or canceled contexts before binding or creating the plan, then uses the same caller-owned
 transaction and row path. `driver.RowsColumnTypeDatabaseTypeName` reports `VARCHAR` and `INTEGER` from the projected
 schema in column order, so `database/sql.Rows.ColumnTypes()` exposes those database-specific names without advancing
 the scan. `driver.RowsColumnTypeScanType` reports `string` for varchar values and `int64` for integer values, matching
@@ -132,8 +135,8 @@ the driver's row values. `driver.RowsColumnTypeLength` reports the declared varc
 variable-length bound for integer columns. `driver.RowsColumnTypeNullable` reports that supported scalar fields are
 known non-nullable because the current record/query value model cannot represent NULL. Precision/scale remain
 independent optional metadata behaviors.
-The [statement lifecycle and query diagram](../diagrams/ch11-embedded-statement.svg) shows how a prepared statement
-opens a scan and returns rows plus database type names, Go scan types, varchar lengths, and nullability; its [editable Draw.io
+The [statement lifecycle and query diagram](../diagrams/ch11-embedded-statement.svg) shows positional scalar binding,
+scan creation, and rows plus database type names, Go scan types, varchar lengths, and nullability; its [editable Draw.io
 source](../diagrams/ch11-embedded-statement.drawio) is kept beside the SVG.
 The [update execution diagram](../diagrams/ch11-embedded-update-execution.svg) shows transaction ownership during a
 statement call; its [editable Draw.io source](../diagrams/ch11-embedded-update-execution.drawio) is maintained too.
@@ -203,6 +206,10 @@ needs them.
 | `TestConnectionExecContextRejectsNilCanceledAndArgumentInputs` | Context execution rejects nil/canceled contexts and unsupported parameters before dispatch |
 | `TestPreparedStatementExecContextUsesCallerTransaction` | A prepared statement observes cancellation, returns affected rows, and leaves rollback to its caller |
 | `TestStatementExecContextRejectsInvalidInputs` | Context-aware statement calls reject nil/closed state, canceled contexts, missing transactions, and arguments |
+| `TestPreparedStatementCountsParametersOutsideQuotedStrings` | `NumInput` counts positional markers and ignores question marks inside SQL string literals |
+| `TestPreparedStatementParameterBindingValidatesValuesAndSQL` | Binding quotes scalar values safely and rejects invalid arity, quoting, and value types |
+| `TestPreparedStatementBindsScalarParametersThroughDatabaseSQL` | Prepared INSERT, SELECT, and UPDATE bind integer/string values through context calls in the caller transaction |
+| `TestPreparedStatementLegacyExecAndQueryBindScalarValues` | Legacy `driver.Stmt.Exec` and `Query` also bind integer/string values and return projected driver rows |
 | `TestManagersComposeBasicUpdatePlannerWithTheirMetadata` | A manager set's update planner registers a table through shared metadata and a caller-owned transaction |
 | `TestManagersCreateQueryPlanParsesAndPlansSelect` | SELECT text is parsed and planned through the manager set without taking ownership of its transaction |
 | `TestManagersCreateQueryPlanReportsInvalidInputsAndFailures` | Incomplete managers, nil transactions, parse errors, and plan errors are returned with context |
@@ -231,11 +238,13 @@ failed because the statement adapter did not implement `driver.StmtExecContext`.
 Prepared-query integration tests first failed because `Stmt.Query` returned `driver.ErrSkip` rather than opening a SELECT plan.
 Prepared-query context tests first failed to compile because the statement did not implement `driver.StmtQueryContext`.
 The prepared-statement arity test first failed because `NumInput` reported unknown arity and the driver rejected the
-argument only after dispatch.
+argument only after dispatch. Parameter-count tests first failed because the statement reported zero for positional
+markers, and the prepared-statement integration test first failed when `database/sql` rejected a bound INSERT as having
+arguments for a zero-input statement.
 These tests use temporary database directories and keep catalog initialization, explicit process-restart recovery,
 planner composition and strategy selection, embedded connection lifecycle, connector creation, statement preparation,
 transaction-bound SQL updates, database-level autocommit, context-aware connection and prepared-statement execution,
-query rows, and JDBC client operations as separate behaviors.
+scalar prepared-statement binding, query rows, and JDBC client operations as separate behaviors.
 
 ## Intentional differences
 

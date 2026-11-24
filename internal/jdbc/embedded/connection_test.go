@@ -169,8 +169,8 @@ func TestStatementRejectsNilAndClosedOperations(t *testing.T) {
 	if rows, err := nilStatement.Query(nil); rows != nil || err == nil || !strings.Contains(err.Error(), "statement") {
 		t.Errorf("Query() on nil statement = (%v, %v), want statement error", rows, err)
 	}
-	if nilStatement.NumInput() != 0 {
-		t.Errorf("NumInput() on nil statement = %d, want 0", nilStatement.NumInput())
+	if nilStatement.NumInput() != -1 {
+		t.Errorf("NumInput() on nil statement = %d, want -1", nilStatement.NumInput())
 	}
 
 	closed := &statement{}
