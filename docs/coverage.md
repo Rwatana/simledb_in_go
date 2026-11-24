@@ -109,6 +109,12 @@ RPC protocol without a listener, verify that Connect appends exactly one START r
 the connection service, and cover duplicate connects, incomplete managers, registration failures, and START-log errors.
 Every executable package and function remains subject to the separate 100.0% coverage workflow.
 
+
+Issue #1169 adds `DriverService.Commit`. An RPC commit durably completes the current transaction, then creates and retains
+its successor; failures return no transaction ID. Tests inspect the ordered START/COMMIT log records and cover commit
+failure plus the post-commit replacement-start failure. The separate coverage workflow enforces 100.0% in every
+executable package and function.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
