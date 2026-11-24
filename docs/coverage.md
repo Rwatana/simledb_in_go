@@ -152,6 +152,11 @@ allocating concurrent-safe `tempN` names without transaction calls or physical f
 metadata access, invalid dependencies, and concurrent allocation. The independent coverage workflow continues to require
 100.0% statement coverage across executable packages, functions, and the module.
 
+Issue #1198 fixes a pin leak when `record.NewTableScan` fails while formatting a new first block. The constructor now
+attempts to unpin the acquired page and preserves both formatting and cleanup errors; failures before pin acquisition do
+not unpin. Tests cover successful release, both-cause error wrapping, and early-failure behavior. The independent
+coverage workflow continues to enforce 100.0% statement coverage.
+
 Issue #1195 adds `storage.Page.SetString`, converting UTF-8 bytes through the existing `SetBytes` length-prefix path.
 Tests round-trip empty text, embedded NUL, and multibyte text through both string and byte APIs, and verify a failed
 capacity write preserves the original page. The separate coverage workflow continues to enforce 100.0% package,

@@ -135,7 +135,7 @@ func TestNewTableScanReportsEmptyTableAppendPinAndFormatFailures(t *testing.T) {
 	block := storage.NewBlockID("student.tbl", 0)
 	appendErr := errors.New("append failed")
 	appendTransaction := &recordingTableTransaction{appendErr: appendErr}
-	if scan, err := NewTableScan(appendTransaction, "student", NewLayout(&Schema{})); scan != nil || !errors.Is(err, appendErr) || len(appendTransaction.pins) != 0 {
+	if scan, err := NewTableScan(appendTransaction, "student", NewLayout(&Schema{})); scan != nil || !errors.Is(err, appendErr) || len(appendTransaction.pins) != 0 || len(appendTransaction.unpinCalls) != 0 {
 		t.Fatalf("NewTableScan(append failure) = (%v, %v), pins %v", scan, err, appendTransaction.pins)
 	}
 
@@ -144,7 +144,7 @@ func TestNewTableScanReportsEmptyTableAppendPinAndFormatFailures(t *testing.T) {
 		recordingRecordTransaction: recordingRecordTransaction{pinErr: pinErr},
 		appendBlock:                block,
 	}
-	if scan, err := NewTableScan(pinTransaction, "student", NewLayout(&Schema{})); scan != nil || !errors.Is(err, pinErr) {
+	if scan, err := NewTableScan(pinTransaction, "student", NewLayout(&Schema{})); scan != nil || !errors.Is(err, pinErr) || len(pinTransaction.unpinCalls) != 0 {
 		t.Fatalf("NewTableScan(empty pin failure) = (%v, %v), want contextual failure", scan, err)
 	}
 
@@ -155,6 +155,28 @@ func TestNewTableScanReportsEmptyTableAppendPinAndFormatFailures(t *testing.T) {
 	}
 	if scan, err := NewTableScan(formatTransaction, "student", NewLayout(&Schema{})); scan != nil || !errors.Is(err, formatErr) || len(formatTransaction.writes) != 1 {
 		t.Fatalf("NewTableScan(format failure) = (%v, %v), writes %v", scan, err, formatTransaction.writes)
+	}
+	if len(formatTransaction.unpinCalls) != 1 || formatTransaction.unpinCalls[0] != block {
+		t.Fatalf("Unpin calls after format failure = %v, want [%v]", formatTransaction.unpinCalls, block)
+	}
+}
+
+func TestNewTableScanPreservesFormatAndCleanupFailures(t *testing.T) {
+	block := storage.NewBlockID("student.tbl", 0)
+	formatErr := errors.New("format failed")
+	unpinErr := errors.New("cleanup unpin failed")
+	transaction := &recordingTableTransaction{
+		recordingRecordTransaction: recordingRecordTransaction{blockSize: 8, writeErr: formatErr},
+		appendBlock:                block,
+		unpinErr:                   unpinErr,
+	}
+
+	scan, err := NewTableScan(transaction, "student", NewLayout(&Schema{}))
+	if scan != nil || !errors.Is(err, formatErr) || !errors.Is(err, unpinErr) {
+		t.Fatalf("NewTableScan(format and cleanup failure) = (%v, %v), want both causes", scan, err)
+	}
+	if len(transaction.unpinCalls) != 1 || transaction.unpinCalls[0] != block {
+		t.Fatalf("Unpin calls = %v, want one cleanup attempt for %v", transaction.unpinCalls, block)
 	}
 }
 
