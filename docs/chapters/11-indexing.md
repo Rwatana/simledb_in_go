@@ -656,6 +656,25 @@ The focused tests first failed because `Page.SetDataRID` was undefined. Tests ve
 signed values, no reads or pin changes, invalid and typed-nil state, absent/noninteger/malformed field metadata,
 negative/overflowing slots and RID values, and wrapped errors from either field write.
 
+## Feature 50: Insert a B-tree directory entry
+
+Java `BTPage.insertDir` opens the requested slot, copies each later record one position to the right in reverse order,
+increments the page record count, then writes the new `dataval` and child `block` fields. Go's `Page.InsertDir` uses
+the retained schema and layout to copy complete integer/varchar records with transaction logging, then calls the
+existing typed field writers for the new entry. It validates the page, metadata, value type, slot, count growth, field
+bounds, and signed transaction offsets before the first mutation. Each storage write is logged individually; if an
+operation fails after an earlier write, the caller's transaction rollback restores the page. The caller remains
+responsible for checking capacity and choosing when to split. The [directory insertion diagram](../diagrams/ch11-btree-insert-dir.svg)
+shows the right-to-left shift and the final key/child write; its editable source is
+[`ch11-btree-insert-dir.drawio`](../diagrams/ch11-btree-insert-dir.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.InsertDir` was undefined. Tests verify integer and varchar keys, complete
+record shifting in reverse order, append at the end, logged field writes, unchanged pin state, invalid/typed-nil page
+and layout metadata, mismatched value types, negative counts/slots, count and offset overflow, and wrapped count/read/
+copy/count-write/new-key/new-child failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -678,3 +697,4 @@ negative/overflowing slots and RID values, and wrapped errors from either field 
 - `btree.Page.GetFlag` reports transaction read failures as Go errors while preserving the signed Java flag value.
 - `btree.Page.SetFlag` reports transaction write failures as Go errors while preserving the signed Java flag value and logging request.
 - `btree.Page.SetDataRID` reports invalid or out-of-range identifiers and transaction write failures as Go errors, and logs both leaf RID fields separately.
+- `btree.Page.InsertDir` copies later directory entries from right to left before inserting a key/child pair; storage errors remain explicit and transaction logging enables caller rollback.

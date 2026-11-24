@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"slices"
 	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/Rwatana/simledb_in_go/internal/query"
 	"github.com/Rwatana/simledb_in_go/internal/record"
@@ -482,6 +483,181 @@ func (page *Page) SetDataRID(slot int, rid record.RID) error {
 	for i, value := range values {
 		if err := page.transaction.SetInt(page.block, int32(positions[i]), int32(value), true); err != nil {
 			return fmt.Errorf("write B-tree page data RID %s at slot %d in block %v at offset %d: %w", fields[i], slot, page.block, positions[i], err)
+		}
+	}
+	return nil
+}
+
+// InsertDir opens a directory slot and stores its key and child block number.
+func (page *Page) InsertDir(slot int, value query.Constant, childBlock int32) error {
+	count, err := page.insertSlot(slot, value)
+	if err != nil {
+		return fmt.Errorf("insert B-tree directory entry at slot %d: %w", slot, err)
+	}
+	if err := page.setNumRecs(count + 1); err != nil {
+		return fmt.Errorf("insert B-tree directory entry at slot %d in block %v: write record count: %w", slot, page.block, err)
+	}
+	if err := page.SetDataVal(slot, value); err != nil {
+		return fmt.Errorf("insert B-tree directory entry at slot %d in block %v: write dataval: %w", slot, page.block, err)
+	}
+	if err := page.SetChildNum(slot, childBlock); err != nil {
+		return fmt.Errorf("insert B-tree directory entry at slot %d in block %v: write child number: %w", slot, page.block, err)
+	}
+	return nil
+}
+
+func (page *Page) insertSlot(slot int, value query.Constant) (int32, error) {
+	if page == nil {
+		return 0, fmt.Errorf("page is nil")
+	}
+	if page.block.FileName() == "" {
+		return 0, fmt.Errorf("page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return 0, fmt.Errorf("transaction is nil in block %v", page.block)
+	}
+	if page.layout == nil {
+		return 0, fmt.Errorf("layout is nil in block %v", page.block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return 0, fmt.Errorf("invalid layout in block %v: %w", page.block, err)
+	}
+	var datavalType record.FieldType
+	hasDataval, hasBlock := false, false
+	for _, field := range fields {
+		switch field.name {
+		case "dataval":
+			datavalType, hasDataval = field.typeOf, true
+		case "block":
+			hasBlock = true
+			if field.typeOf != record.IntegerField {
+				return 0, fmt.Errorf("block field is not an integer in block %v", page.block)
+			}
+		}
+	}
+	if !hasDataval {
+		return 0, fmt.Errorf("layout has no dataval field in block %v", page.block)
+	}
+	if !hasBlock {
+		return 0, fmt.Errorf("layout has no block field in block %v", page.block)
+	}
+	switch datavalType {
+	case record.IntegerField:
+		if _, ok := value.AsInt(); !ok {
+			return 0, fmt.Errorf("integer dataval cannot store %s in block %v", value, page.block)
+		}
+	case record.VarcharField:
+		if _, ok := value.AsString(); !ok {
+			return 0, fmt.Errorf("varchar dataval cannot store %s in block %v", value, page.block)
+		}
+	}
+
+	count, err := page.GetNumRecs()
+	if err != nil {
+		return 0, fmt.Errorf("read record count in block %v: %w", page.block, err)
+	}
+	if count < 0 {
+		return 0, fmt.Errorf("record count %d is negative in block %v", count, page.block)
+	}
+	if slot < 0 || int64(slot) > int64(count) {
+		return 0, fmt.Errorf("slot %d is outside [0,%d] in block %v", slot, count, page.block)
+	}
+	if count == math.MaxInt32 {
+		return 0, fmt.Errorf("record count cannot grow beyond int32 in block %v", page.block)
+	}
+
+	lastPositions := make([]int, len(fields))
+	for i, field := range fields {
+		position, err := pageSlotFieldPosition(int(count), page.layout.SlotSize(), field.offset)
+		if err != nil {
+			return 0, fmt.Errorf("field %q position in block %v: %w", field.name, page.block, err)
+		}
+		if position > math.MaxInt32 {
+			return 0, fmt.Errorf("field %q offset %d exceeds int32 range in block %v", field.name, position, page.block)
+		}
+		lastPositions[i] = position
+	}
+
+	for toSlot := int(count); toSlot > slot; toSlot-- {
+		if err := page.copyRecord(int(count), toSlot, fields, lastPositions); err != nil {
+			return 0, fmt.Errorf("shift record to slot %d in block %v: %w", toSlot, page.block, err)
+		}
+	}
+	return count, nil
+}
+
+type btreePageField struct {
+	name   string
+	typeOf record.FieldType
+	offset int
+}
+
+func btreeRecordFields(layout *record.Layout) ([]btreePageField, error) {
+	schema := layout.Schema()
+	if schema == nil {
+		return nil, fmt.Errorf("layout schema is nil")
+	}
+	slotSize := layout.SlotSize()
+	if slotSize <= 0 {
+		return nil, fmt.Errorf("layout slot size %d is not positive", slotSize)
+	}
+	names := schema.Fields()
+	fields := make([]btreePageField, 0, len(names))
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if _, exists := seen[name]; exists {
+			return nil, fmt.Errorf("layout contains duplicate field %q", name)
+		}
+		seen[name] = struct{}{}
+		definition, _ := schema.Field(name)
+		fieldSize := 0
+		switch definition.Type {
+		case record.IntegerField:
+			fieldSize = 4
+		case record.VarcharField:
+			if definition.Length < 0 || definition.Length > (math.MaxInt-4)/utf8.UTFMax {
+				return nil, fmt.Errorf("field %q has invalid varchar length %d", name, definition.Length)
+			}
+			fieldSize = 4 + definition.Length*utf8.UTFMax
+		default:
+			return nil, fmt.Errorf("field %q has unsupported type %d", name, definition.Type)
+		}
+		offset, ok := layout.Offset(name)
+		if !ok {
+			return nil, fmt.Errorf("layout has no offset for field %q", name)
+		}
+		if offset < 0 || offset > slotSize-fieldSize {
+			return nil, fmt.Errorf("field %q offset %d does not fit slot size %d", name, offset, slotSize)
+		}
+		fields = append(fields, btreePageField{name: name, typeOf: definition.Type, offset: offset})
+	}
+	return fields, nil
+}
+
+func (page *Page) copyRecord(maxSlot, toSlot int, fields []btreePageField, lastPositions []int) error {
+	slotSize := page.layout.SlotSize()
+	toDelta := (maxSlot - toSlot) * slotSize
+	for i, field := range fields {
+		toPosition := lastPositions[i] - toDelta
+		fromPosition := toPosition - slotSize
+		switch field.typeOf {
+		case record.IntegerField:
+			value, err := page.transaction.GetInt(page.block, fromPosition)
+			if err != nil {
+				return fmt.Errorf("copy B-tree page field %q from slot %d to %d: read integer: %w", field.name, toSlot-1, toSlot, err)
+			}
+			if err := page.transaction.SetInt(page.block, int32(toPosition), value, true); err != nil {
+				return fmt.Errorf("copy B-tree page field %q from slot %d to %d at offset %d: write integer: %w", field.name, toSlot-1, toSlot, toPosition, err)
+			}
+		case record.VarcharField:
+			value, err := page.transaction.GetString(page.block, fromPosition)
+			if err != nil {
+				return fmt.Errorf("copy B-tree page field %q from slot %d to %d: read varchar: %w", field.name, toSlot-1, toSlot, err)
+			}
+			if err := page.transaction.SetString(page.block, int32(toPosition), value, true); err != nil {
+				return fmt.Errorf("copy B-tree page field %q from slot %d to %d at offset %d: write varchar: %w", field.name, toSlot-1, toSlot, toPosition, err)
+			}
 		}
 	}
 	return nil
