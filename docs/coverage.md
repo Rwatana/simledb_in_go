@@ -134,6 +134,11 @@ Issue #1178 adds `RemoteSession.Rollback`, which calls the server's Rollback RPC
 after a successful reply. Tests cover successor-ID replacement, nil session/client state, RPC failure, and ID
 preservation. The independent coverage workflow enforces 100.0% package, function, and module statement coverage.
 
+Issue #1179 adds `RemoteSession.Close`, which calls `SimpleDB.Close` and marks the local session closed only after a
+successful reply. It clears the transaction ID on success, preserves it after remote failure so callers can retry, and
+rejects later Commit, Rollback, and Close calls locally without closing the caller-owned RPC client. The separate coverage
+workflow continues to enforce 100.0% package, function, and module statement coverage.
+
 Issue #1177 adds `RemoteSession.Commit`, which calls the server's Commit RPC and updates the retained transaction ID only
 after a successful response. Tests cover successor-ID replacement, nil session/client state, RPC failure, and ID
 preservation. The separate coverage workflow requires 100.0% package, function, and module statement coverage.
