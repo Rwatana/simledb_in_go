@@ -835,6 +835,22 @@ with a distinct layout, directory-close-before-leaf-pin order, one active pin ma
 directory and leaf inputs before unpinning, rejection of positive and negative directory levels, wrapped flag and
 directory-unpin failures, retry after unpin failure, and a wrapped leaf-pin failure that leaves the receiver closed.
 
+## Feature 60: Advance to the next matching B-tree leaf slot
+
+Java `BTreeLeaf.next` advances the slot, reads its key, and compares it with the active search key before considering
+an overflow page. Go's `Page.NextLeafSlot` examines exactly `currentSlot+1` on the open page and returns the candidate
+slot together with whether its `dataval` equals the supplied key. A mismatch and page exhaustion both return `false`,
+leaving the caller responsible for deciding whether to follow the leaf's overflow flag. The operation validates page,
+transaction, layout, key-field type and position, record count, and slot arithmetic. Count and key read failures keep
+their wrapped causes. It does not change the page contents or pin ownership. Overflow traversal, RID retrieval, and
+index cursor state remain separate behaviors; no diagram is needed for this single-slot comparison.
+
+### Test-first record
+
+The focused tests first failed because `Page.NextLeafSlot` was undefined. Tests cover integer duplicate matches,
+integer mismatches and exhaustion, varchar equality, empty pages, malformed field layouts, invalid page/transaction
+state, negative and overflowing input slots, negative counts, wrapped count/key reads, and unchanged pin ownership.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

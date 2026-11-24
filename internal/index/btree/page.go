@@ -324,6 +324,64 @@ func (page *Page) OpenLeafPage(leafBlock storage.BlockID, leafLayout *record.Lay
 	return leaf, nil
 }
 
+// NextLeafSlot advances one leaf-page slot and reports whether its value matches searchKey.
+func (page *Page) NextLeafSlot(searchKey query.Constant, currentSlot int) (int, bool, error) {
+	if page == nil {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s: page is nil", searchKey)
+	}
+	if page.block.FileName() == "" {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s: page is closed", searchKey)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: transaction is nil", searchKey, page.block)
+	}
+	if page.layout == nil {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: layout is nil", searchKey, page.block)
+	}
+	schema := page.layout.Schema()
+	if schema == nil {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: layout schema is nil", searchKey, page.block)
+	}
+	dataval, ok := schema.Field("dataval")
+	if !ok {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: layout has no dataval field", searchKey, page.block)
+	}
+	if dataval.Type != record.IntegerField && dataval.Type != record.VarcharField {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: unsupported dataval type %d", searchKey, page.block, dataval.Type)
+	}
+	fieldOffset, ok := page.layout.Offset("dataval")
+	if !ok {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: layout has no dataval offset", searchKey, page.block)
+	}
+	slotSize := page.layout.SlotSize()
+	if slotSize <= 0 || fieldOffset < 0 || fieldOffset >= slotSize {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: invalid dataval offset %d for slot size %d", searchKey, page.block, fieldOffset, slotSize)
+	}
+	if currentSlot < -1 {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: current slot %d is less than -1", searchKey, page.block, currentSlot)
+	}
+	maxInt := int(^uint(0) >> 1)
+	if currentSlot == maxInt {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: current slot overflows int", searchKey, page.block)
+	}
+	nextSlot := currentSlot + 1
+	count, err := page.GetNumRecs()
+	if err != nil {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: read record count: %w", searchKey, page.block, err)
+	}
+	if count < 0 {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v: record count %d is negative", searchKey, page.block, count)
+	}
+	if nextSlot >= int(count) {
+		return nextSlot, false, nil
+	}
+	value, err := page.GetDataVal(nextSlot)
+	if err != nil {
+		return -1, false, fmt.Errorf("find next B-tree leaf slot for %s in block %v at slot %d: read data value: %w", searchKey, page.block, nextSlot, err)
+	}
+	return nextSlot, value.Equal(searchKey), nil
+}
+
 // GetDataVal reads the dataval field from the specified B-tree page slot.
 func (page *Page) GetDataVal(slot int) (query.Constant, error) {
 	if page == nil {

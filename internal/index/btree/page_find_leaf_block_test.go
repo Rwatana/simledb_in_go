@@ -17,6 +17,7 @@ type pageFindLeafOffset struct {
 type pageFindLeafTransaction struct {
 	pins            []storage.BlockID
 	unpins          []storage.BlockID
+	intReads        []pageFindLeafOffset
 	active          map[storage.BlockID]bool
 	maxActive       int
 	ints            map[pageFindLeafOffset]int32
@@ -73,6 +74,7 @@ func (*pageFindLeafTransaction) BlockSize() (int, error) { return 4096, nil }
 
 func (tx *pageFindLeafTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
 	position := pageFindLeafOffset{block: block, offset: offset}
+	tx.intReads = append(tx.intReads, position)
 	if err := tx.intErrors[position]; err != nil {
 		return 0, err
 	}
