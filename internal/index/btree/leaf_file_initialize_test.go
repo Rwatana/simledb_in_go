@@ -20,7 +20,7 @@ func TestEnsureLeafFileInitializesOnlyAnEmptyFile(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			layout := pageInsertLeafLayout(test.keyType)
-			transaction := newLeafFileTransaction(layout, test.size)
+			transaction := newBtreeFileTransaction(layout, test.size)
 
 			if err := ensureLeafFile(transaction, "studentsleaf", layout); err != nil {
 				t.Fatalf("ensureLeafFile() error = %v", err)
@@ -54,30 +54,30 @@ func TestEnsureLeafFileInitializesOnlyAnEmptyFile(t *testing.T) {
 
 func TestEnsureLeafFileRejectsInvalidInputsBeforeAppend(t *testing.T) {
 	validLayout := pageInsertLeafLayout(record.IntegerField)
-	var typedNil *leafFileTransactionProbe
+	var typedNil *btreeFileTransactionProbe
 	tests := []struct {
 		name     string
 		fileName string
 		layout   *record.Layout
-		newTx    func() leafFileTransaction
+		newTx    func() btreeFileTransaction
 	}{
 		{name: "nil transaction", fileName: "leaf", layout: validLayout},
-		{name: "typed nil transaction", fileName: "leaf", layout: validLayout, newTx: func() leafFileTransaction { return typedNil }},
-		{name: "empty file name", fileName: "", layout: validLayout, newTx: func() leafFileTransaction { return newLeafFileTransaction(validLayout, 0) }},
-		{name: "whitespace file name", fileName: "  ", layout: validLayout, newTx: func() leafFileTransaction { return newLeafFileTransaction(validLayout, 0) }},
-		{name: "nil layout", fileName: "leaf", newTx: func() leafFileTransaction { return newLeafFileTransaction(validLayout, 0) }},
-		{name: "directory layout", fileName: "leaf", layout: pageInsertDirLayout(record.IntegerField), newTx: func() leafFileTransaction { return newLeafFileTransaction(validLayout, 0) }},
+		{name: "typed nil transaction", fileName: "leaf", layout: validLayout, newTx: func() btreeFileTransaction { return typedNil }},
+		{name: "empty file name", fileName: "", layout: validLayout, newTx: func() btreeFileTransaction { return newBtreeFileTransaction(validLayout, 0) }},
+		{name: "whitespace file name", fileName: "  ", layout: validLayout, newTx: func() btreeFileTransaction { return newBtreeFileTransaction(validLayout, 0) }},
+		{name: "nil layout", fileName: "leaf", newTx: func() btreeFileTransaction { return newBtreeFileTransaction(validLayout, 0) }},
+		{name: "directory layout", fileName: "leaf", layout: pageInsertDirLayout(record.IntegerField), newTx: func() btreeFileTransaction { return newBtreeFileTransaction(validLayout, 0) }},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var tx leafFileTransaction
+			var tx btreeFileTransaction
 			if test.newTx != nil {
 				tx = test.newTx()
 			}
 			if err := ensureLeafFile(tx, test.fileName, test.layout); err == nil {
 				t.Fatal("ensureLeafFile() error = nil, want validation error")
 			}
-			if probe, ok := tx.(*leafFileTransactionProbe); ok && probe != nil && len(probe.appendFiles) != 0 {
+			if probe, ok := tx.(*btreeFileTransactionProbe); ok && probe != nil && len(probe.appendFiles) != 0 {
 				t.Errorf("Append calls = %v, want none", probe.appendFiles)
 			}
 		})
@@ -88,28 +88,28 @@ func TestEnsureLeafFileWrapsStorageAndPageErrors(t *testing.T) {
 	cause := errors.New("leaf file operation failed")
 	tests := []struct {
 		name      string
-		configure func(*leafFileTransactionProbe)
+		configure func(*btreeFileTransactionProbe)
 		wantPins  int
 		wantClose int
 	}{
-		{name: "size", configure: func(tx *leafFileTransactionProbe) { tx.sizeErr = cause }},
-		{name: "negative size", configure: func(tx *leafFileTransactionProbe) { tx.fileSize = -1 }},
-		{name: "append", configure: func(tx *leafFileTransactionProbe) { tx.appendErr = cause }},
-		{name: "wrong appended file", configure: func(tx *leafFileTransactionProbe) { tx.appendBlock = storage.NewBlockID("otherleaf", 0) }},
-		{name: "wrong appended number", configure: func(tx *leafFileTransactionProbe) { tx.appendBlock = storage.NewBlockID("studentsleaf", 1) }},
-		{name: "pin", configure: func(tx *leafFileTransactionProbe) { tx.pinErr = cause }, wantPins: 1},
-		{name: "format", configure: func(tx *leafFileTransactionProbe) { tx.writeErrorAt = 1; tx.writeError = cause }, wantPins: 1, wantClose: 1},
-		{name: "format and close", configure: func(tx *leafFileTransactionProbe) {
+		{name: "size", configure: func(tx *btreeFileTransactionProbe) { tx.sizeErr = cause }},
+		{name: "negative size", configure: func(tx *btreeFileTransactionProbe) { tx.fileSize = -1 }},
+		{name: "append", configure: func(tx *btreeFileTransactionProbe) { tx.appendErr = cause }},
+		{name: "wrong appended file", configure: func(tx *btreeFileTransactionProbe) { tx.appendBlock = storage.NewBlockID("otherleaf", 0) }},
+		{name: "wrong appended number", configure: func(tx *btreeFileTransactionProbe) { tx.appendBlock = storage.NewBlockID("studentsleaf", 1) }},
+		{name: "pin", configure: func(tx *btreeFileTransactionProbe) { tx.pinErr = cause }, wantPins: 1},
+		{name: "format", configure: func(tx *btreeFileTransactionProbe) { tx.writeErrorAt = 1; tx.writeError = cause }, wantPins: 1, wantClose: 1},
+		{name: "format and close", configure: func(tx *btreeFileTransactionProbe) {
 			tx.writeErrorAt = 1
 			tx.writeError = cause
 			tx.unpinErr = errors.New("unpin failed")
 		}, wantPins: 1, wantClose: 1},
-		{name: "close", configure: func(tx *leafFileTransactionProbe) { tx.unpinErr = cause }, wantPins: 1, wantClose: 1},
+		{name: "close", configure: func(tx *btreeFileTransactionProbe) { tx.unpinErr = cause }, wantPins: 1, wantClose: 1},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			layout := pageInsertLeafLayout(record.IntegerField)
-			tx := newLeafFileTransaction(layout, 0)
+			tx := newBtreeFileTransaction(layout, 0)
 			test.configure(tx)
 			err := ensureLeafFile(tx, "studentsleaf", layout)
 			if err == nil {
@@ -125,7 +125,7 @@ func TestEnsureLeafFileWrapsStorageAndPageErrors(t *testing.T) {
 	}
 
 	layout := pageInsertLeafLayout(record.IntegerField)
-	tx := newLeafFileTransaction(layout, 0)
+	tx := newBtreeFileTransaction(layout, 0)
 	other := errors.New("unpin failed")
 	tx.writeErrorAt = 1
 	tx.writeError = cause
@@ -142,7 +142,7 @@ func TestLeafPageFieldsRejectsNilLayout(t *testing.T) {
 	}
 }
 
-type leafFileTransactionProbe struct {
+type btreeFileTransactionProbe struct {
 	*pageFormatTransaction
 	fileSize     int
 	sizeErr      error
@@ -155,33 +155,33 @@ type leafFileTransactionProbe struct {
 	unpinErr     error
 }
 
-func newLeafFileTransaction(layout *record.Layout, fileSize int) *leafFileTransactionProbe {
-	return &leafFileTransactionProbe{
+func newBtreeFileTransaction(layout *record.Layout, fileSize int) *btreeFileTransactionProbe {
+	return &btreeFileTransactionProbe{
 		pageFormatTransaction: newPageFormatTransaction(layout, 8+layout.SlotSize()),
 		fileSize:              fileSize,
 		appendBlock:           storage.NewBlockID("studentsleaf", 0),
 	}
 }
 
-func (tx *leafFileTransactionProbe) Size(fileName string) (int, error) {
+func (tx *btreeFileTransactionProbe) Size(fileName string) (int, error) {
 	tx.sizeCalls++
 	tx.lastSizeFile = fileName
 	return tx.fileSize, tx.sizeErr
 }
 
-func (tx *leafFileTransactionProbe) Append(fileName string) (storage.BlockID, error) {
+func (tx *btreeFileTransactionProbe) Append(fileName string) (storage.BlockID, error) {
 	tx.appendFiles = append(tx.appendFiles, fileName)
 	return tx.appendBlock, tx.appendErr
 }
 
-func (tx *leafFileTransactionProbe) Pin(block storage.BlockID) error {
+func (tx *btreeFileTransactionProbe) Pin(block storage.BlockID) error {
 	tx.pinCount++
 	return tx.pinErr
 }
 
-func (tx *leafFileTransactionProbe) Unpin(storage.BlockID) error {
+func (tx *btreeFileTransactionProbe) Unpin(storage.BlockID) error {
 	tx.unpinCount++
 	return tx.unpinErr
 }
 
-var _ leafFileTransaction = (*leafFileTransactionProbe)(nil)
+var _ btreeFileTransaction = (*btreeFileTransactionProbe)(nil)

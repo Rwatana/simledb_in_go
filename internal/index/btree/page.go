@@ -1388,28 +1388,9 @@ func (page *Page) InitializeDirectoryRoot(minimumKey query.Constant) error {
 	if page.block.Number() != 0 {
 		return fmt.Errorf("initialize B-tree directory root in block %v: root must be at block zero", page.block)
 	}
-	fields, err := btreeRecordFields(page.layout)
+	datavalType, err := directoryPageKeyType(page.layout)
 	if err != nil {
 		return fmt.Errorf("initialize B-tree directory root in block %v: invalid layout: %w", page.block, err)
-	}
-	if len(fields) != 2 {
-		return fmt.Errorf("initialize B-tree directory root in block %v: layout must contain exactly dataval and block fields", page.block)
-	}
-	var datavalType record.FieldType
-	datavalFound, blockFound := false, false
-	for _, field := range fields {
-		switch field.name {
-		case "dataval":
-			datavalType, datavalFound = field.typeOf, true
-		case "block":
-			blockFound = true
-			if field.typeOf != record.IntegerField {
-				return fmt.Errorf("initialize B-tree directory root in block %v: block field is not an integer", page.block)
-			}
-		}
-	}
-	if !datavalFound || !blockFound {
-		return fmt.Errorf("initialize B-tree directory root in block %v: layout requires dataval and block fields", page.block)
 	}
 	if datavalType == record.IntegerField {
 		if _, ok := minimumKey.AsInt(); !ok {
