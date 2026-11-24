@@ -359,6 +359,48 @@ func (page *Page) GetChildNum(slot int) (int32, error) {
 	return child, nil
 }
 
+// SetChildNum writes the child block number to the specified B-tree directory slot.
+func (page *Page) SetChildNum(slot int, childBlock int32) error {
+	if page == nil {
+		return fmt.Errorf("write B-tree page child number at slot %d: page is nil", slot)
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("write B-tree page child number at slot %d: page is closed", slot)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("write B-tree page child number at slot %d in block %v: transaction is nil", slot, page.block)
+	}
+	if page.layout == nil {
+		return fmt.Errorf("write B-tree page child number at slot %d in block %v: layout is nil", slot, page.block)
+	}
+	schema := page.layout.Schema()
+	if schema == nil {
+		return fmt.Errorf("write B-tree page child number at slot %d in block %v: layout schema is nil", slot, page.block)
+	}
+	definition, ok := schema.Field("block")
+	if !ok {
+		return fmt.Errorf("write B-tree page child number at slot %d in block %v: layout has no block field", slot, page.block)
+	}
+	if definition.Type != record.IntegerField {
+		return fmt.Errorf("write B-tree page child number at slot %d in block %v: block field is not an integer", slot, page.block)
+	}
+	fieldOffset, ok := page.layout.Offset("block")
+	if !ok {
+		return fmt.Errorf("write B-tree page child number at slot %d in block %v: layout has no block offset", slot, page.block)
+	}
+	position, err := pageSlotFieldPosition(slot, page.layout.SlotSize(), fieldOffset)
+	if err != nil {
+		return fmt.Errorf("write B-tree page child number at slot %d in block %v: %w", slot, page.block, err)
+	}
+	if position > math.MaxInt32 {
+		return fmt.Errorf("write B-tree page child number at slot %d in block %v: offset %d exceeds int32 range", slot, page.block, position)
+	}
+	if err := page.transaction.SetInt(page.block, int32(position), childBlock, true); err != nil {
+		return fmt.Errorf("write B-tree page child number at slot %d in block %v at offset %d: %w", slot, page.block, position, err)
+	}
+	return nil
+}
+
 // GetDataRID reads the data record identifier stored in the specified leaf slot.
 func (page *Page) GetDataRID(slot int) (record.RID, error) {
 	blockNumber, err := page.GetChildNum(slot)
