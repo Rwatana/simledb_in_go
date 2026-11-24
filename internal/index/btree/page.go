@@ -243,6 +243,40 @@ func (page *Page) OpenChildDirectory(searchKey query.Constant) (*Page, error) {
 	return child, nil
 }
 
+// FindLeafBlock descends the selected directory path and returns its leaf block.
+func (page *Page) FindLeafBlock(searchKey query.Constant) (storage.BlockID, error) {
+	if page == nil {
+		return storage.BlockID{}, fmt.Errorf("find B-tree leaf block for %s: page is nil", searchKey)
+	}
+	for {
+		if page.block.FileName() == "" {
+			return storage.BlockID{}, fmt.Errorf("find B-tree leaf block for %s: page is closed", searchKey)
+		}
+		level, err := page.GetFlag()
+		if err != nil {
+			return storage.BlockID{}, fmt.Errorf("find B-tree leaf block for %s in block %v: read page level: %w", searchKey, page.block, err)
+		}
+		if level < 0 {
+			return storage.BlockID{}, fmt.Errorf("find B-tree leaf block for %s in block %v: page level %d is negative", searchKey, page.block, level)
+		}
+		childBlock, err := page.FindChildBlock(searchKey)
+		if err != nil {
+			return storage.BlockID{}, fmt.Errorf("find B-tree leaf block for %s in block %v: select child: %w", searchKey, page.block, err)
+		}
+		if level == 0 {
+			return childBlock, nil
+		}
+		if err := page.Close(); err != nil {
+			return storage.BlockID{}, fmt.Errorf("find B-tree leaf block for %s in block %v: close directory page: %w", searchKey, page.block, err)
+		}
+		child, err := NewPage(page.transaction, childBlock, page.layout)
+		if err != nil {
+			return storage.BlockID{}, fmt.Errorf("find B-tree leaf block for %s: open child directory block %v: %w", searchKey, childBlock, err)
+		}
+		*page = *child
+	}
+}
+
 // GetDataVal reads the dataval field from the specified B-tree page slot.
 func (page *Page) GetDataVal(slot int) (query.Constant, error) {
 	if page == nil {
