@@ -107,7 +107,9 @@ and the session transaction. Its [network RPC query diagram](../diagrams/ch11-ne
 scan cleanup, typed rows, and explicit transaction ownership; its [editable Draw.io source](../diagrams/ch11-network-rpc-query.drawio)
 is kept beside the SVG. The caller may then commit, roll back, or close the session independently of result materialization.
 `RemoteSession.ExecuteQuery` returns that ordered metadata and typed rows, uses an empty response when the RPC fails, and
-preserves the active transaction ID for both success and failure. The RPC client and transport stay caller-owned.
+preserves the active transaction ID for both success and failure. Each `QueryColumn.DisplaySize` follows the JDBC
+`RemoteMetaData.getColumnDisplaySize` rule: the larger of the field name and type width, plus one; integer width is six
+characters and varchar width is its declared length. The RPC client and transport stay caller-owned.
 
 ## Go design and current status
 
@@ -300,6 +302,7 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestDriverServiceExecuteUpdateRejectsInvalidStateAndClosedSession` | Nil service/reply, missing manager/transaction, and closed sessions return errors with cleared results |
 | `TestDriverServiceExecuteUpdatePreservesSessionAfterStatementAndPlannerErrors` | Parse/planner failures clear results while keeping the current transaction available for completion |
 | `TestDriverServiceExecuteQueryReturnsTypedProjectedRowsOverRPC` | RPC SELECT returns projected column metadata and typed row values without completing the active transaction |
+| `TestMaterializeNetworkQueryReportsColumnDisplaySizes` | Remote column metadata includes integer and varchar display widths and accounts for longer field names |
 | `TestDriverServiceExecuteQueryRejectsInvalidStateAndResetsResponse` | Nil service/reply, missing manager/transaction, and closed sessions return errors with cleared results |
 | `TestDriverServiceExecuteQueryReturnsPlanningAndOpeningErrors` | Parse/planner, nil plan/schema/scan, and scan-open errors return no partial rows |
 | `TestDriverServiceExecuteQueryClosesScansOnMaterializationFailures` | Position, advance, value, unsupported-type, and close failures release the opened scan and clear results |
@@ -450,7 +453,9 @@ the active transaction ID. Nil/closed/client-less sessions and a wrapped remote 
 
 The network RPC client-query test-first run initially failed because `RemoteSession.ExecuteQuery` was undefined. Tests
 verify an empty result, ordered VARCHAR/INTEGER metadata and typed rows, unchanged transaction ID, invalid local session
-state, a wrapped remote error, and suppression of partial response data.
+state, a wrapped remote error, and suppression of partial response data. Remote display-size tests first failed because
+the `QueryColumn.DisplaySize` field was absent; they cover declared varchar width, integer width, long names, and RPC
+transport of the metadata.
 
 The network RPC-client dial test-first run initially failed because `DialNetworkRPCClient` was undefined. An injected
 context dialer proves that the parsed host uses port 1099 and that the returned `rpc.Client` performs a `SimpleDB.Connect`
@@ -461,6 +466,7 @@ closing the returned client ends the owned transport, while session creation rem
 
 - Do not reproduce the Java `java.sql` adapter hierarchy mechanically.
 - Do not introduce RMI merely to match Java's network classes; define a Go transport only when a server/client use case is implemented.
+- `QueryColumn.DisplaySize` preserves the Java remote metadata display-width rule for the supported integer and varchar schema types.
 - Preserve explicit Go errors for initialization and lifecycle failures rather than relying on JDBC `SQLException` conventions.
 - Keep the upstream Java distribution and book PDF outside Git.
 - Parse the Java-compatible embedded URL prefix, but keep path resolution, database initialization, and manager settings explicit in Go.

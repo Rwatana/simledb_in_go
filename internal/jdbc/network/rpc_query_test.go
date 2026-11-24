@@ -43,7 +43,7 @@ func TestDriverServiceExecuteQueryReturnsTypedProjectedRowsOverRPC(t *testing.T)
 	if err := client.Call("SimpleDB.ExecuteQuery", ExecuteQueryRequest{Statement: "select name, id from student"}, &response); err != nil {
 		t.Fatalf("ExecuteQuery() error = %v", err)
 	}
-	wantColumns := []QueryColumn{{Name: "name", Type: "VARCHAR"}, {Name: "id", Type: "INTEGER"}}
+	wantColumns := []QueryColumn{{Name: "name", Type: "VARCHAR", DisplaySize: 21}, {Name: "id", Type: "INTEGER", DisplaySize: 7}}
 	if len(response.Columns) != len(wantColumns) {
 		t.Fatalf("ExecuteQuery() columns = %#v, want %#v", response.Columns, wantColumns)
 	}
@@ -75,6 +75,34 @@ func TestDriverServiceExecuteQueryReturnsTypedProjectedRowsOverRPC(t *testing.T)
 	}
 	if err := client.Call("SimpleDB.Close", CloseRequest{}, &CloseResponse{}); err != nil {
 		t.Fatalf("Close() after commit error = %v", err)
+	}
+}
+
+func TestMaterializeNetworkQueryReportsColumnDisplaySizes(t *testing.T) {
+	schema := &record.Schema{}
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("nickname", 20)
+	schema.AddVarcharField("description", 3)
+
+	columns, rows, err := materializeNetworkQuery(&networkQueryScan{}, schema)
+	if err != nil {
+		t.Fatalf("materializeNetworkQuery() error = %v", err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("materializeNetworkQuery() rows = %#v, want none", rows)
+	}
+	want := []QueryColumn{
+		{Name: "id", Type: "INTEGER", DisplaySize: 7},
+		{Name: "nickname", Type: "VARCHAR", DisplaySize: 21},
+		{Name: "description", Type: "VARCHAR", DisplaySize: 12},
+	}
+	if len(columns) != len(want) {
+		t.Fatalf("materializeNetworkQuery() columns = %#v, want %#v", columns, want)
+	}
+	for index := range want {
+		if columns[index] != want[index] {
+			t.Errorf("column %d = %#v, want %#v", index, columns[index], want[index])
+		}
 	}
 }
 

@@ -58,6 +58,8 @@ type ExecuteQueryRequest struct {
 type QueryColumn struct {
 	Name string
 	Type string
+	// DisplaySize is the JDBC-compatible recommended width for rendering this column.
+	DisplaySize int
 }
 
 // QueryValue contains one typed scalar result without gob interface registration.
@@ -366,14 +368,21 @@ func materializeNetworkQuery(scan query.Scan, schema *record.Schema) (columns []
 	columns = make([]QueryColumn, 0, len(fields))
 	for _, field := range fields {
 		definition, _ := schema.Field(field)
+		displayWidth := 6
+		var typeName string
 		switch definition.Type {
 		case record.IntegerField:
-			columns = append(columns, QueryColumn{Name: field, Type: "INTEGER"})
+			typeName = "INTEGER"
 		case record.VarcharField:
-			columns = append(columns, QueryColumn{Name: field, Type: "VARCHAR"})
+			typeName = "VARCHAR"
+			displayWidth = definition.Length
 		default:
 			return nil, nil, fmt.Errorf("materialize network query: field %q has unsupported type %d", field, definition.Type)
 		}
+		if len(field) > displayWidth {
+			displayWidth = len(field)
+		}
+		columns = append(columns, QueryColumn{Name: field, Type: typeName, DisplaySize: displayWidth + 1})
 	}
 	if err := scan.BeforeFirst(); err != nil {
 		return nil, nil, fmt.Errorf("position query scan: %w", err)
