@@ -11,7 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/btree.Page`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java`, `simpledb/index/btree/BTreeIndex.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries and initialize empty leaf and directory files |
+| `internal/index/btree.Page`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java`, `simpledb/index/btree/BTreeIndex.java` | Retain and pin a B-tree block; derive the directory layout from the leaf schema; position before a sorted search key; recursively insert directory entries and initialize empty leaf and directory files |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
 | `internal/metadata.IndexInfo` | `simpledb/metadata/IndexInfo.java` | Open the configured static hash index using the retained transaction and index-record layout |
@@ -1202,6 +1202,23 @@ and joined initialization/cleanup failures. `directoryPageKeyType` is shared wit
 both entry points apply the same directory-layout validation. Every statement in the new helper and every executable
 function remain 100.0% covered.
 
+## Feature 82: Derive the B-tree directory layout from the leaf schema
+
+Java `BTreeIndex` declares the directory fields in order: integer `block`, followed by `dataval` with the leaf schema's
+key type and conceptual length. Go's pure `directoryLayoutFromLeaf` helper validates the leaf page layout, then builds
+that two-field record layout without reading or changing a file, transaction, or page. The caller's leaf schema remains
+unchanged. Empty-file initialization and composition of the complete B-tree index remain separate behaviors. The
+existing [directory insertion](../diagrams/ch11-btree-insert-dir.svg) diagram shows the directory key and child block;
+its editable Draw.io source is reused.
+
+### Test-first record
+
+The focused compilation first failed because `directoryLayoutFromLeaf` was undefined. Tests cover integer and varchar
+key types, varchar length preservation, directory field order and offsets, derived slot sizes, source-schema
+immutability, and invalid leaf layouts (including nil metadata, missing fields, unsupported key types, and negative
+varchar lengths). The helper performs no storage operations. Every statement in the helper and every executable
+function remain 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1234,3 +1251,4 @@ function remain 100.0% covered.
 - `btree.Page.InitializeLeafPage` formats an already allocated leaf block with overflow flag -1 and an empty record count.
 - `btree.ensureLeafFile` appends and initializes the first leaf block only when the index leaf file is empty, then releases the temporary page pin.
 - `btree.ensureDirectoryFile` creates the block-zero minimum-key root only when the directory file is empty and chooses Java's integer or varchar sentinel from the key schema.
+- `btree.directoryLayoutFromLeaf` derives the directory `block` and `dataval` schema as a pure layout operation; file initialization and full index construction remain separate.
