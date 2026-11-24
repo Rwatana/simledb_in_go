@@ -953,6 +953,19 @@ separate behaviors; no diagram is needed for this small value type.
 The focused test first failed because `NewDirEntry` was undefined. Tests verify integer and varchar keys and preserve
 block number zero and negative values without side effects.
 
+## Feature 68: Insert a B-tree leaf entry into an available slot
+
+Java `BTreeLeaf.insert` advances the cursor and asks `BTPage` to insert the retained search key and data RID. Go's
+`Leaf.Insert` checks the current page capacity, inserts at `currentSlot+1` through `Page.InsertLeaf`, and moves the
+cursor only after that write succeeds. The in-page path returns no `DirEntry` and retains page ownership; a page that is
+already full is rejected before mutation. Overflow relocation and page-full split outcomes remain separate behaviors.
+
+### Test-first record
+
+The focused tests first failed because `Leaf.Insert` was undefined. Tests verify integer/varchar insertion at the cursor
+position, RID fields, nil directory result, capacity rejection, wrapped errors, invalid cursor state, and unchanged page
+ownership on success and failure.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

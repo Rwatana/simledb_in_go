@@ -110,3 +110,33 @@ func (leaf *Leaf) Delete(dataRID record.RID) error {
 		return nil
 	}
 }
+
+// Insert adds dataRID with the cursor's search key when the current page has a free slot.
+func (leaf *Leaf) Insert(dataRID record.RID) (*DirEntry, error) {
+	if leaf == nil {
+		return nil, fmt.Errorf("insert B-tree leaf entry for %s: leaf is nil", dataRID)
+	}
+	if leaf.contents == nil {
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s: page is nil", dataRID, leaf.searchKey)
+	}
+	if leaf.currentSlot < -1 {
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s: current slot %d is less than -1", dataRID, leaf.searchKey, leaf.currentSlot)
+	}
+	maxInt := int(^uint(0) >> 1)
+	if leaf.currentSlot == maxInt {
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s: current slot overflows int", dataRID, leaf.searchKey)
+	}
+	full, err := leaf.contents.IsFull()
+	if err != nil {
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: check capacity: %w", dataRID, leaf.searchKey, leaf.contents.block, err)
+	}
+	if full {
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v: page has no free slot", dataRID, leaf.searchKey, leaf.contents.block)
+	}
+	slot := leaf.currentSlot + 1
+	if err := leaf.contents.InsertLeaf(slot, leaf.searchKey, dataRID); err != nil {
+		return nil, fmt.Errorf("insert B-tree leaf entry %s for %s in block %v at slot %d: %w", dataRID, leaf.searchKey, leaf.contents.block, slot, err)
+	}
+	leaf.currentSlot = slot
+	return nil, nil
+}
