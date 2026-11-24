@@ -1371,6 +1371,69 @@ func (page *Page) Format(block storage.BlockID, flag int32) error {
 	return nil
 }
 
+// InitializeDirectoryRoot formats block zero as a level-zero directory with one minimum-key leaf entry.
+func (page *Page) InitializeDirectoryRoot(minimumKey query.Constant) error {
+	if page == nil {
+		return fmt.Errorf("initialize B-tree directory root: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("initialize B-tree directory root: page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("initialize B-tree directory root in block %v: transaction is nil", page.block)
+	}
+	if page.layout == nil {
+		return fmt.Errorf("initialize B-tree directory root in block %v: layout is nil", page.block)
+	}
+	if page.block.Number() != 0 {
+		return fmt.Errorf("initialize B-tree directory root in block %v: root must be at block zero", page.block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return fmt.Errorf("initialize B-tree directory root in block %v: invalid layout: %w", page.block, err)
+	}
+	if len(fields) != 2 {
+		return fmt.Errorf("initialize B-tree directory root in block %v: layout must contain exactly dataval and block fields", page.block)
+	}
+	var datavalType record.FieldType
+	datavalFound, blockFound := false, false
+	for _, field := range fields {
+		switch field.name {
+		case "dataval":
+			datavalType, datavalFound = field.typeOf, true
+		case "block":
+			blockFound = true
+			if field.typeOf != record.IntegerField {
+				return fmt.Errorf("initialize B-tree directory root in block %v: block field is not an integer", page.block)
+			}
+		}
+	}
+	if !datavalFound || !blockFound {
+		return fmt.Errorf("initialize B-tree directory root in block %v: layout requires dataval and block fields", page.block)
+	}
+	if datavalType == record.IntegerField {
+		if _, ok := minimumKey.AsInt(); !ok {
+			return fmt.Errorf("initialize B-tree directory root in block %v: integer dataval cannot store %s", page.block, minimumKey)
+		}
+	} else if _, ok := minimumKey.AsString(); !ok {
+		return fmt.Errorf("initialize B-tree directory root in block %v: varchar dataval cannot store %s", page.block, minimumKey)
+	}
+	blockSize, err := page.transaction.BlockSize()
+	if err != nil {
+		return fmt.Errorf("initialize B-tree directory root in block %v: read block size: %w", page.block, err)
+	}
+	if blockSize < 8 || (blockSize-8)/page.layout.SlotSize() < 1 {
+		return fmt.Errorf("initialize B-tree directory root in block %v: block size %d cannot hold a directory entry", page.block, blockSize)
+	}
+	if err := page.Format(page.block, 0); err != nil {
+		return fmt.Errorf("initialize B-tree directory root in block %v: format page: %w", page.block, err)
+	}
+	if err := page.InsertDirectoryEntry(NewDirEntry(minimumKey, 0)); err != nil {
+		return fmt.Errorf("initialize B-tree directory root in block %v: insert minimum-key leaf entry: %w", page.block, err)
+	}
+	return nil
+}
+
 // AppendNew appends and formats a block in the current page's file.
 func (page *Page) AppendNew(flag int32) (storage.BlockID, error) {
 	if page == nil {

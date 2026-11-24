@@ -1125,6 +1125,26 @@ roots, raising the level from zero and an existing internal level, invalid root/
 before append, wrapped metadata and last-key reads, and append/pin/unpin/split/entry/level-write errors. The method is
 100.0% covered.
 
+## Feature 78: Initialize an empty B-tree directory root
+
+Java `BTreeIndex` formats a newly appended directory block as level zero and inserts the first minimum-key entry that
+points to leaf block zero. Go's `Page.InitializeDirectoryRoot` applies that initialization to an open block-zero page:
+it validates the directory schema, key type, and capacity before writing, formats the page with level zero, and inserts
+the caller-provided minimum key with child block zero. Java's integer index sentinel is the minimum signed integer and
+its varchar sentinel is the empty string. Formatting retains the existing unlogged page-initialization behavior; the
+directory entry uses the normal logged insertion path. The caller appends the block and must roll back that append if
+initialization fails after a write. Empty leaf-page initialization and full B-tree index construction remain separate.
+The existing [B-tree page format](../diagrams/ch11-btree-page-format.svg) and
+[directory insertion](../diagrams/ch11-btree-insert-dir.svg) diagrams show the composed steps; their editable Draw.io
+sources are reused.
+
+### Test-first record
+
+The focused compilation first failed because `Page.InitializeDirectoryRoot` was undefined. Tests verify integer and
+varchar sentinel entries, level and count, fixed block zero, unlogged format writes followed by logged entry writes,
+invalid pages/layouts/key types and insufficient block capacity before mutation, and wrapped block-size/format/entry
+write errors. The new method is 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1153,3 +1173,4 @@ before append, wrapped metadata and last-key reads, and append/pin/unpin/split/e
 - `btree.Page.InsertDirectoryEntryAndSplit` combines insertion with the page-full split decision but leaves parent recursion and root growth to separate operations.
 - `btree.Page.InsertDirectoryEntryRecursive` recurses through existing directory pages and returns split separators upward; creating a new root remains the caller's responsibility.
 - `btree.Page.MakeNewRoot` keeps the root in block zero, moves old entries to a new page, installs two child entries, and raises the level last.
+- `btree.Page.InitializeDirectoryRoot` formats an allocated block-zero directory root and adds the initial minimum-key entry for leaf block zero.
