@@ -51,6 +51,12 @@ the hostname, rejects URL port overrides and non-host components, and does not d
 [network URL diagram](../diagrams/ch11-network-url.svg) shows the parser boundary and the separate caller-owned dial;
 its [editable Draw.io source](../diagrams/ch11-network-url.drawio) is maintained beside the SVG.
 
+`network.DialNetworkURL` uses the parsed host to open a context-aware TCP connection on port 1099. It wraps dial
+failures with the host while preserving their cause, and the caller owns closing a successful connection. This Go dial
+is only the socket-opening boundary; it does not implement the Java RMI handshake, SQL request protocol, or remote
+session lifecycle. The [network dial diagram](../diagrams/ch11-network-dial.svg) shows validation, address construction,
+and connection ownership; its [editable Draw.io source](../diagrams/ch11-network-dial.drawio) is kept beside the SVG.
+
 ## Go design and current status
 
 The Go repository has lower-level file, log, buffer, transaction, metadata, query, and planning packages, plus an initial
@@ -192,6 +198,12 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestParseEmbeddedURLRejectsUnsupportedAndEmptyNames` | Missing/unsupported URL prefixes and empty database names return errors |
 | `TestParseNetworkURL` | Network JDBC URLs preserve DNS, IPv4, and bracketed IPv6 hostnames |
 | `TestParseNetworkURLRejectsMalformedDataSourceNames` | Empty or unsupported URLs, ports, and non-host URL components return errors |
+| `TestDialNetworkURLUsesContextAndDefaultPort` | URL hosts become TCP addresses on port 1099 and receive the caller context |
+| `TestDialNetworkURLRejectsInvalidInputsBeforeDial` | Nil contexts and invalid URLs fail before dialing |
+| `TestDialNetworkURLWrapsDialFailure` | Dial failures retain their cause and host context |
+| `TestDialNetworkURLRejectsNilConnection` | A dialer that succeeds without a connection returns an error |
+| `TestDialNetworkURLRejectsNilDialer` | Missing dial dependencies are rejected before dialing |
+| `TestDialNetworkURLHonorsCanceledContext` | Canceled contexts stop the default dial path |
 | `TestConnectorConnectValidatesReceiverContextAndCancellation` | Nil state and canceled contexts return errors before creating a connection |
 | `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
@@ -268,6 +280,10 @@ The network URL test-first run initially failed to compile because `ParseNetwork
 validated hostname; dialing and remote-session creation remain separate responsibilities, and explicit URL ports are
 rejected to preserve the Java driver's default registry port behavior.
 
+The network dial test-first run initially failed to compile because `DialNetworkURL` and its injectable dial boundary
+were undefined. The implementation passes the caller's context to the TCP dialer, uses the default port, and returns a
+caller-owned connection without starting an RPC or SQL session.
+
 ## Intentional differences
 
 - Do not reproduce the Java `java.sql` adapter hierarchy mechanically.
@@ -276,3 +292,4 @@ rejected to preserve the Java driver's default registry port behavior.
 - Keep the upstream Java distribution and book PDF outside Git.
 - Parse the Java-compatible embedded URL prefix, but keep path resolution, database initialization, and manager settings explicit in Go.
 - Parse the Java-compatible network URL into a host, but keep dialing and remote-session lifecycle separate from parsing; the current Go network parser preserves the default registry port convention.
+- Open a TCP socket to the parsed network host with caller context, but defer RMI/RPC framing and database-session operations to separate behaviors.

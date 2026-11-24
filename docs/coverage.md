@@ -102,6 +102,8 @@ Issue #1161 adds `embedded.ParseEmbeddedURL` for the Java-compatible `jdbc:simpl
 
 Issue #1163 adds `network.ParseNetworkURL` for the Java-compatible `jdbc:simpledb://` host form. Table-driven tests cover case-preserving DNS names, IPv4 and bracketed IPv6 hosts, plus empty or unsupported URLs, explicit ports, and non-host URL components. Parsing remains independent of dialing and remote-session lifecycle; the default registry port convention is preserved. The separate coverage workflow continues to enforce 100.0% statement coverage.
 
+Issue #1165 adds `network.DialNetworkURL`, which parses a network JDBC URL, uses `net.JoinHostPort` with the Java-compatible default registry port 1099, and forwards the caller context to TCP dialing. Tests cover DNS/IPv4/IPv6 address construction, invalid-input rejection before dialing, cancellation, dial-error wrapping, nil dependencies, and caller ownership of a successful connection. The coverage workflow continues to enforce 100.0% statement coverage.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
