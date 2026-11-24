@@ -614,6 +614,20 @@ The focused tests first failed because `Page.GetDataRID` was undefined. Tests ve
 positions, invalid and typed-nil state, missing or noninteger field metadata, negative/overflowing slots, and wrapped
 errors from both reads without returning a partial RID.
 
+## Feature 47: Write a B-tree page data value
+
+Java's `BTPage.setVal` writes the typed `dataval` field at the calculated position for one slot, with transaction
+logging enabled. Go's `Page.SetDataVal` accepts the matching integer or varchar `query.Constant`, derives the field
+position from the eight-byte header and layout, and checks both slot arithmetic and the transaction's signed 32-bit
+write offset. It rejects unset or mismatched constants and invalid page/layout state, wraps storage failures, and
+does not change the page pin.
+
+### Test-first record
+
+The focused tests first failed because `Page.SetDataVal` was undefined. Tests cover logged integer and varchar writes
+at their layout-derived positions, invalid and typed-nil state, missing/unsupported/malformed field metadata, unset
+and mismatched constants, negative/overflowing slots, int32 offset overflow, and wrapped errors from both write types.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
