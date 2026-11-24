@@ -11,6 +11,7 @@ operations.
 | `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
 | `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` (`beforeFirst`, `next`, `getInt`, `getString`, `hasField`) | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
 | `internal/plan.ChunkValueScan` | `simpledb/multibuffer/ChunkScan.java` (`getVal`) | Adapt typed chunk field reads to query constants without making `multibuffer` depend on `query` |
+| `internal/plan.MultibufferProductScan` | `simpledb/multibuffer/MultibufferProductScan.java` (constructor, `beforeFirst`, `useNextChunk`) | Read right-table size and buffer budget, choose a bounded chunk, pin the first range, and reset the left scan |
 
 
 ## Feature 1: Choose a safe buffer root
@@ -235,6 +236,38 @@ errors, unsupported schema types, and unavailable adapter/cursor states that mus
 The adapter lives in `plan`, which can depend on both `multibuffer` and `query`; `multibuffer` remains independent of
 the query constant type. The wrapper embeds the existing chunk scan to preserve traversal, field access, metadata, and
 close behavior instead of duplicating cursor or resource ownership.
+
+### Validation
+
+The focused tests cover every executable statement and function. The module coverage workflow continues to require
+100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 10: Initialize a multibuffer product scan
+
+`plan.NewMultibufferProductScan` validates the transaction, left scan, right table name, and record layout. It reads the
+right relation's block count from `<table>.tbl`, obtains the available-buffer count only when the relation is
+nonempty, and calls `multibuffer.BestFactor` to choose the first bounded block range. It pins that range through
+`multibuffer.NewChunkScan`, adapts the chunk to query values, and rewinds the left scan before returning. An empty right
+relation is initialized without pins or a left rewind. The scan owns only its acquired right chunk at this stage; the
+left scan remains caller-owned, and `Close` can retry failed page releases. Product-row traversal and later chunk
+rollover remain separate behaviors.
+
+The [product-scan initialization diagram](../diagrams/ch14-multibuffer-product-init.svg) shows the sizing, buffer
+selection, first-range pinning, and left rewind performed before row traversal. Its editable source is
+[`ch14-multibuffer-product-init.drawio`](../diagrams/ch14-multibuffer-product-init.drawio).
+
+### Test-first record
+
+Focused compilation first failed because `MultibufferProductScan` and its constructor were undefined. Tests cover
+nonempty and empty relations, `.tbl` naming, `BestFactor` sizing, invalid inputs and negative sizes/budgets, wrapped
+file-size errors, initial pin failures, left rewind failures, cleanup-error joining, partial-pin retention, and retryable
+close behavior.
+
+### Design decision
+
+The plan package owns this orchestration because it depends on both the storage-oriented multibuffer scan and the
+query-facing scan contract. `multibuffer` remains independent of `query`. The first chunk is represented by
+`ChunkValueScan`, but product-row advancement and subsequent chunk replacement are intentionally not implemented here.
 
 ### Validation
 
