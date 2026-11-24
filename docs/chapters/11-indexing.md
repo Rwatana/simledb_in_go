@@ -11,7 +11,8 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/btree.Page`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java`, `simpledb/index/btree/BTreeIndex.java` | Retain and pin a B-tree block; derive the directory layout from the leaf schema; position before a sorted search key; recursively insert directory entries and initialize empty leaf and directory files |
+| `internal/index/btree.BTreeIndex`, `directoryLayoutFromLeaf`, `ensureLeafFile`, `ensureDirectoryFile` | `simpledb/index/btree/BTreeIndex.java` | Retain index state; derive the directory layout from the leaf schema; initialize empty leaf and directory files |
+| `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java`, `simpledb/index/btree/BTreeDir.java` | Retain and pin a B-tree block; position before a sorted search key; recursively insert directory entries |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
 | `internal/metadata.IndexInfo` | `simpledb/metadata/IndexInfo.java` | Open the configured static hash index using the retained transaction and index-record layout |
@@ -1219,6 +1220,24 @@ immutability, and invalid leaf layouts (including nil metadata, missing fields, 
 varchar lengths). The helper performs no storage operations. Every statement in the helper and every executable
 function remain 100.0% covered.
 
+## Feature 83: Initialize B-tree index state and its files
+
+Java `BTreeIndex` retains the transaction, index name, leaf layout, leaf file, directory layout, directory file, and
+the block-zero directory root. Go's `NewBTreeIndex` derives the directory layout from the leaf schema, uses the Java
+file suffixes `leaf` and `dir`, initializes the leaf file before the directory file, then returns that retained state
+with root block zero. Existing files are preserved by the file initializers. Invalid inputs are rejected before file
+access, and initialization errors return no partial index while wrapping their storage cause. Appended blocks belong
+to the caller's transaction, so callers must roll back after a failed constructor. Searching, mutation, and cost
+estimation remain separate behaviors. The existing [B-tree page format](../diagrams/ch11-btree-page-format.svg) and
+[directory insertion](../diagrams/ch11-btree-insert-dir.svg) diagrams show the initialized files; their editable Draw.io
+sources are reused.
+
+### Test-first record
+
+The focused compilation first failed because `NewBTreeIndex` was undefined. Tests cover integer and varchar indexes,
+retained names/layouts/root, leaf-before-directory initialization, existing files, invalid inputs before file access,
+wrapped initialization errors, and nil partial results. The constructor is 100.0% covered.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -1226,6 +1245,7 @@ function remain 100.0% covered.
 - Static hash bucket selection normalizes Java hash remainders to a nonnegative range, avoiding Java's negative-remainder invalid-index case.
 - Go insertion validates the index-record schema and signed 32-bit RID storage before changing scan state, and wraps storage failures as explicit errors.
 - Go deletion reports storage failures as errors while preserving the Java behavior of removing the first matching RID and treating a missing entry as a successful no-op.
+- `btree.NewBTreeIndex` returns Go errors with wrapped storage causes and no partial index; the caller rolls back transaction-owned appended blocks after construction fails.
 - `IndexSelectScan` reports index-position failures as Go errors and leaves index lifetime management to its caller.
 - `IndexSelectScan.Next` reports index and table-scan failures as errors, and avoids moving the data scan after exhaustion.
 - `IndexSelectScan.GetInt` reports data-scan read failures as Go errors while preserving their wrapped causes.
