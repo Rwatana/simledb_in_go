@@ -206,6 +206,23 @@ func (page *Page) GetFlag() (int32, error) {
 	return flag, nil
 }
 
+// SetFlag writes the B-tree page's flag field in the page header.
+func (page *Page) SetFlag(value int32) error {
+	if page == nil {
+		return fmt.Errorf("write B-tree page flag: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("write B-tree page flag: page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("write B-tree page flag in block %v: transaction is nil", page.block)
+	}
+	if err := page.transaction.SetInt(page.block, 0, value, true); err != nil {
+		return fmt.Errorf("write B-tree page flag in block %v: %w", page.block, err)
+	}
+	return nil
+}
+
 func pageSlotFieldPosition(slot, slotSize, fieldOffset int) (int, error) {
 	return pageSlotFieldPositionForCount(int64(slot), slotSize, fieldOffset)
 }

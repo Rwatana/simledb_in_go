@@ -551,6 +551,19 @@ The focused tests first failed because `Page.GetFlag` was undefined. Tests verif
 values at offset zero, the absence of layout and pin-state requirements, invalid and typed-nil state, and wrapped read
 failures.
 
+## Feature 42: Write a B-tree page flag
+
+Java `BTPage.setFlag` stores the supplied flag at byte offset zero and asks the transaction to log the change. Go's
+`Page.SetFlag` writes the same signed 32-bit value with logging enabled, without requiring layout metadata, reading the
+old value, or changing the page pin. Nil/closed page state, a nil transaction, and storage write failures return
+contextual errors while preserving the original cause.
+
+### Test-first record
+
+The focused tests first failed because `Page.SetFlag` was undefined. Tests verify positive, zero, and negative flag
+values, the exact block/header offset and logging flag, no data read/layout/pin changes, invalid and typed-nil state,
+and wrapped write failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -571,3 +584,4 @@ failures.
 - `btree.Page.IsFull` returns contextual Go errors for invalid page state, invalid capacity metadata, arithmetic overflow, and block-size reads instead of relying on Java's unchecked transaction calls.
 - `btree.Page.GetDataVal` returns typed query constants and contextual Go errors for invalid slots, layout metadata, and storage reads instead of relying on Java's unchecked field access.
 - `btree.Page.GetFlag` reports transaction read failures as Go errors while preserving the signed Java flag value.
+- `btree.Page.SetFlag` reports transaction write failures as Go errors while preserving the signed Java flag value and logging request.
