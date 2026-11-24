@@ -1451,32 +1451,8 @@ func (page *Page) InitializeLeafPage() error {
 	if page.block.Number() < 0 {
 		return fmt.Errorf("initialize B-tree leaf page in block %v: block number is negative", page.block)
 	}
-	fields, err := btreeRecordFields(page.layout)
-	if err != nil {
+	if _, err := leafPageFields(page.layout); err != nil {
 		return fmt.Errorf("initialize B-tree leaf page in block %v: invalid layout: %w", page.block, err)
-	}
-	if len(fields) != 3 {
-		return fmt.Errorf("initialize B-tree leaf page in block %v: layout must contain dataval, block, and id fields", page.block)
-	}
-	datavalFound, blockFound, idFound := false, false, false
-	for _, field := range fields {
-		switch field.name {
-		case "dataval":
-			datavalFound = true
-		case "block":
-			blockFound = true
-			if field.typeOf != record.IntegerField {
-				return fmt.Errorf("initialize B-tree leaf page in block %v: block field is not an integer", page.block)
-			}
-		case "id":
-			idFound = true
-			if field.typeOf != record.IntegerField {
-				return fmt.Errorf("initialize B-tree leaf page in block %v: id field is not an integer", page.block)
-			}
-		}
-	}
-	if !datavalFound || !blockFound || !idFound {
-		return fmt.Errorf("initialize B-tree leaf page in block %v: layout requires dataval, block, and id fields", page.block)
 	}
 	if err := page.Format(page.block, -1); err != nil {
 		return fmt.Errorf("initialize B-tree leaf page in block %v: format page: %w", page.block, err)
