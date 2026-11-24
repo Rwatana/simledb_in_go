@@ -103,6 +103,14 @@ execution, connector configuration, rows, and result metadata remain separate be
 lifecycle diagram](../diagrams/ch11-embedded-transaction-lifecycle.svg) shows these ownership boundaries and its
 [editable Draw.io source](../diagrams/ch11-embedded-transaction-lifecycle.drawio) is maintained beside the SVG.
 
+`embedded.Connector` binds a caller-supplied `server.Managers` set to Go's `driver.Connector` interface. Each
+`Connect(ctx)` call returns a fresh `Connection` and respects context cancellation. Its `Driver()` adapter also creates
+fresh connections from the already-bound manager set; `Driver.Open` ignores the data source name because URL parsing
+and database selection are separate behaviors. `sql.OpenDB(connector)` therefore uses the same in-process database
+without registering a global driver. The [embedded connector diagram](../diagrams/ch11-embedded-connector.svg) shows
+both standard-library entry points; its [editable Draw.io source](../diagrams/ch11-embedded-connector.drawio) is kept
+beside the SVG.
+
 The embedded and network drivers share a client contract in Java, but Go should introduce an adapter only when a concrete
 caller needs it. The RMI proxy classes are transport-specific and should not be reproduced as a Go class hierarchy or
 copied into the embedded path. The standard `database/sql/driver` contract is used only for the connection and
@@ -139,6 +147,10 @@ needs them.
 | `TestConnectionCloseIsIdempotentAndLeavesReturnedTransactionCallerOwned` | Close prevents new operations without completing a transaction already returned to the caller |
 | `TestConnectionRejectsInvalidReceiversAndManagerState` | Nil, closed, and incomplete connections return contextual errors |
 | `TestTransactionAdapterRejectsNilAndMissingTransactions` | Nil transaction adapters reject commit and rollback safely |
+| `TestNewConnectorReturnsFreshDriverConnections` | A connector implements `driver.Connector` and returns distinct connections |
+| `TestConnectorConnectValidatesReceiverContextAndCancellation` | Nil state and canceled contexts return errors before creating a connection |
+| `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
+| `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
 | `TestManagersComposeBasicUpdatePlannerWithTheirMetadata` | A manager set's update planner registers a table through shared metadata and a caller-owned transaction |
 | `TestManagersCreateQueryPlanParsesAndPlansSelect` | SELECT text is parsed and planned through the manager set without taking ownership of its transaction |
 | `TestManagersCreateQueryPlanReportsInvalidInputsAndFailures` | Incomplete managers, nil transactions, parse errors, and plan errors are returned with context |
@@ -158,7 +170,10 @@ undefined. The planner-strategy tests first failed because `QueryPlannerStrategy
 recovery, SELECT planner composition, update planner composition, SQL SELECT planning, SQL update dispatch, embedded
 connection transaction lifecycle, ordinary transaction completion, and JDBC client operations as separate behaviors.
 The embedded-connection tests first failed because `Connection`, `NewConnection`, and its transaction adapter were
-undefined.
+undefined. Connector tests first failed because `Connector`, `NewConnector`, and the driver adapter were undefined.
+These tests use temporary database directories and keep catalog initialization, explicit process-restart recovery,
+planner composition and strategy selection, embedded connection lifecycle, connector creation, SQL execution, and JDBC
+client operations as separate behaviors.
 
 ## Intentional differences
 
