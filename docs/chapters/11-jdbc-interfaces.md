@@ -69,6 +69,13 @@ shows this dependency and the CREATE TABLE metadata path; its [editable Draw.io 
 is maintained beside it. Update planner strategy selection, parsed-command dispatch, and transaction lifecycle are
 separate behaviors.
 
+`Managers.CreateQueryPlan` is the first SQL-facing query boundary: it accepts a SELECT string, parses it through
+`internal/parse`, and passes the resulting query plus the supplied transaction to the configured query planner. Parse
+and planning failures keep server-query context, while the caller retains transaction ownership. The [SELECT query
+dispatch diagram](../diagrams/ch11-query-dispatch.svg) shows this path and its dependencies; its [editable Draw.io
+source](../diagrams/ch11-query-dispatch.drawio) is maintained beside the SVG. SQL update dispatch and result-cursor
+adaptation remain separate behaviors.
+
 `Managers.NewTransaction` uses one ID allocator and lock table shared by the manager set, while each returned transaction
 keeps its own buffer ownership. Creation appends a START record to the shared log and supplies the log iterator needed
 for transaction rollback. A failed START append returns no transaction. Restart recovery through `Managers.Recover`, catalog
@@ -103,14 +110,17 @@ actual scope requires SQL driver compatibility.
 | `TestFinishRestartRecoveryReportsRecoveryAndCommitFailures` | Recovery failure prevents commit, while commit failure preserves the durable checkpoint LSN |
 | `TestManagersComposeBasicQueryPlannerWithTheirMetadata` | A manager set's SELECT planner resolves an initialized table through that set's metadata and caller-owned transaction |
 | `TestManagersComposeBasicUpdatePlannerWithTheirMetadata` | A manager set's update planner registers a table through shared metadata and a caller-owned transaction |
+| `TestManagersCreateQueryPlanParsesAndPlansSelect` | SELECT text is parsed and planned through the manager set without taking ownership of its transaction |
+| `TestManagersCreateQueryPlanReportsInvalidInputsAndFailures` | Incomplete managers, nil transactions, parse errors, and plan errors are returned with context |
 
 The manager-composition tests first failed to compile because `NewManagers` did not exist. The transaction tests first
 failed because `Managers.NewTransaction` did not exist, and the metadata test first failed because `Managers.Metadata`
 did not exist. The catalog test first failed because `Managers.InitializeCatalogs` was undefined. Restart recovery tests
 first failed because `Managers.Recover` and its recovery-transaction lifecycle helper were undefined. The query-planner
 test first failed because `Managers.QueryPlanner` was undefined. The update planner test first failed because
-`Managers.UpdatePlanner` was undefined. These tests use temporary database directories and keep catalog initialization,
-explicit process-restart recovery, SELECT planner composition, update planner composition, ordinary transaction
+`Managers.UpdatePlanner` was undefined. The SQL SELECT dispatch test first failed because `Managers.CreateQueryPlan` was
+undefined. These tests use temporary database directories and keep catalog initialization, explicit process-restart
+recovery, SELECT planner composition, update planner composition, SQL SELECT parsing and planning, ordinary transaction
 completion, and JDBC client operations as separate behaviors.
 
 ## Intentional differences
