@@ -36,6 +36,10 @@ statements.
 | `internal/storage` | 100.0% |
 | `internal/transaction` | 100.0% |
 
+Issue #1117 adds the server-side record-transaction adapter used for catalog initialization. The server manager
+operation and each adapter method are 100.0% covered; the full-module profile still reports 100.0% for every
+executable package and function.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the

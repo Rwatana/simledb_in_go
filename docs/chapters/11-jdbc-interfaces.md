@@ -11,11 +11,18 @@ The first Go behavior composes the file, log, and buffer managers from explicit 
 independent, in-memory metadata facade to each successful manager set. The [manager assembly
 diagram](../diagrams/ch11-server-manager-assembly.svg) shows this composition and the low-level manager failure boundary;
 the [editable Draw.io source](../diagrams/ch11-server-manager-assembly.drawio) is maintained beside it. Creating the
-metadata facade does not create catalog files; catalog initialization remains a separate transaction-backed behavior.
+metadata facade does not create catalog files; catalog initialization is a separate transaction-backed behavior.
 
 The next behavior opens transactions from that shared manager set. The [transaction creation diagram](../diagrams/ch11-server-transaction-creation.svg)
 shows the per-server ID and lock state, shared storage dependencies, START logging, and the no-transaction error path;
 its [editable Draw.io source](../diagrams/ch11-server-transaction-creation.drawio) is maintained beside it.
+
+`Managers.InitializeCatalogs` adapts a caller-owned transaction to the record-scan operations needed by the metadata
+facade. It creates the physical table and field catalog files and registers the table, field, view, and index catalog
+layouts. The [catalog initialization diagram](../diagrams/ch11-server-catalog-initialization.svg) shows the adapter
+boundary and transaction ownership; its [editable Draw.io source](../diagrams/ch11-server-catalog-initialization.drawio)
+is maintained beside it. A successful call leaves commit or rollback to the caller, and failures retain catalog
+initialization context.
 
 ## Java source map
 
@@ -58,6 +65,9 @@ actual scope requires SQL driver compatibility.
 | `TestNewManagersReturnsNoManagersWhenFileManagerFails` | Directory creation failure is wrapped and exposes no partial manager set |
 | `TestNewManagersReturnsNoManagersWhenLogManagerFails` | An unusable log block size is reported after file-manager creation with no partial manager set |
 | `TestNewManagersReturnsNoManagersWhenBufferManagerFails` | Invalid buffer capacity is reported after log initialization with no partial manager set |
+| `TestManagersInitializeCatalogsRegistersCompleteCatalogSet` | All four catalog layouts are registered and the caller commits the physical catalog files |
+| `TestManagersInitializeCatalogsRejectsMissingState` | Nil/incomplete manager sets and a nil transaction fail before catalog work |
+| `TestManagersInitializeCatalogsReportsMetadataCreationFailure` | A catalog-layout failure retains server initialization context |
 | `TestManagersNewTransactionSharesIdentityAndAppendsStartRecords` | Successful transactions share sequential IDs, append START records, and can use the configured log iterator |
 | `TestManagersNewTransactionRejectsNilAndIncompleteManagers` | Nil and zero-value manager sets fail before returning a transaction |
 | `TestManagersNewTransactionRejectsMissingDependencies` | An incomplete dependency is rejected before log access |
@@ -67,8 +77,9 @@ actual scope requires SQL driver compatibility.
 
 The manager-composition tests first failed to compile because `NewManagers` did not exist. The transaction tests first
 failed because `Managers.NewTransaction` did not exist, and the metadata test first failed because `Managers.Metadata`
-did not exist. They use temporary database directories and keep each behavior separate from process-restart recovery,
-catalog initialization, planner setup, and JDBC client operations.
+did not exist. The catalog test first failed because `Managers.InitializeCatalogs` was undefined. These tests use
+temporary database directories and keep catalog initialization separate from process-restart recovery, planner setup,
+transaction completion, and JDBC client operations.
 
 ## Intentional differences
 
