@@ -161,7 +161,9 @@ type indexJoinLeftScan struct {
 	position         int
 	beforeFirstErr   error
 	nextErr          error
+	nextErrCall      int
 	getValErr        error
+	getValErrCall    int
 	beforeFirstCalls int
 	nextCalls        int
 	getValFields     []string
@@ -179,7 +181,7 @@ func (scan *indexJoinLeftScan) BeforeFirst() error {
 
 func (scan *indexJoinLeftScan) Next() (bool, error) {
 	scan.nextCalls++
-	if scan.nextErr != nil {
+	if scan.nextErr != nil && (scan.nextErrCall == 0 || scan.nextErrCall == scan.nextCalls) {
 		return false, scan.nextErr
 	}
 	scan.position++
@@ -188,7 +190,7 @@ func (scan *indexJoinLeftScan) Next() (bool, error) {
 
 func (scan *indexJoinLeftScan) GetVal(fieldName string) (query.Constant, error) {
 	scan.getValFields = append(scan.getValFields, fieldName)
-	if scan.getValErr != nil {
+	if scan.getValErr != nil && (scan.getValErrCall == 0 || scan.getValErrCall == len(scan.getValFields)) {
 		return query.Constant{}, scan.getValErr
 	}
 	if scan.position < 0 || scan.position >= len(scan.rows) {

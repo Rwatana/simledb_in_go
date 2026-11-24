@@ -623,6 +623,11 @@ statement coverage in every executable package and function. `IndexJoinScan` cov
 empty left inputs, missing dependencies, and wrapped errors from the left scan, join-value read, and index. The full
 uncached suite, race tests, vet, docs, gofmt, and diff checks pass.
 
+At the Issue #973 index-join-scan-next checkpoint, `/tmp/simpledb-coverage-973.out` measures 100.0% statement coverage
+in every executable package and function. `IndexJoinScan.Next` covers multiple matches across left keys, final
+exhaustion, empty input, invalid state, and wrapped errors from index iteration/RID access, right-side movement, left
+iteration/key access, and index repositioning. The full uncached suite, race tests, vet, docs, gofmt, and diff checks pass.
+
 At the Issue #893 project-plan-schema checkpoint, `/tmp/simpledb-coverage-893.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `NewProjectPlan` covers nil dependencies, valid ordered fields, empty projections, and missing-field errors; `ProjectPlan.Schema` covers both ordinary and nil receivers. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
 
 At the Issue #891 product-plan-distinct-estimate checkpoint, `/tmp/simpledb-coverage-891.out` measures 100.0% statement coverage in the full module and all twelve executable packages, with no zero-count regions. `ProductPlan.DistinctValues` covers left/right field routing, left-side duplicate-name precedence, nil dependencies, missing schemas, and unknown fields. The full uncached suite, race tests, vet, docs, diagram XML, and diff checks pass.
