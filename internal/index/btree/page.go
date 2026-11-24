@@ -54,6 +54,9 @@ func (page *Page) FindSlotBefore(searchKey query.Constant) (int, error) {
 	if page == nil {
 		return -1, fmt.Errorf("find B-tree page slot before %s: page is nil", searchKey)
 	}
+	if page.block.FileName() == "" {
+		return -1, fmt.Errorf("find B-tree page slot before %s: page is closed", searchKey)
+	}
 	if isNilPageTransaction(page.transaction) {
 		return -1, fmt.Errorf("find B-tree page slot before %s in block %v: transaction is nil", searchKey, page.block)
 	}
@@ -146,6 +149,25 @@ func pageSlotFieldPosition(slot, slotSize, fieldOffset int) (int, error) {
 		return 0, fmt.Errorf("slot %d field position exceeds int range", slot)
 	}
 	return 8 + slot*slotSize + fieldOffset, nil
+}
+
+// Close releases the block pin owned by the page.
+func (page *Page) Close() error {
+	if page == nil {
+		return fmt.Errorf("close nil B-tree page")
+	}
+	if page.block.FileName() == "" {
+		return nil
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("close B-tree page for block %v: transaction is nil", page.block)
+	}
+	block := page.block
+	if err := page.transaction.Unpin(block); err != nil {
+		return fmt.Errorf("close B-tree page for block %v: unpin: %w", block, err)
+	}
+	page.block = storage.BlockID{}
+	return nil
 }
 
 func isNilPageTransaction(transaction PageTransaction) bool {

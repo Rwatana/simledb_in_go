@@ -472,6 +472,10 @@ requested block, retained state, nil and typed-nil transaction rejection, missin
 identifiers, and a pin failure whose original cause remains inspectable. The constructor performs no page reads or
 writes.
 
+The [B-tree page lifecycle diagram](../diagrams/ch11-btree-page-pin.svg) also shows the inverse `Close`/`Unpin`
+operation and the retry-safe state transition; the editable source is
+[`ch11-btree-page-pin.drawio`](../diagrams/ch11-btree-page-pin.drawio).
+
 ## Feature 37: Position before a B-tree search key
 
 Java `BTPage.findSlotBefore` scans sorted `dataval` entries and returns the slot immediately before the first value
@@ -489,6 +493,21 @@ The focused tests first failed because `Page.FindSlotBefore` was undefined. Test
 empty pages, keys below/at/between/above values, duplicates, invalid and typed-nil state, absent or malformed
 `dataval` metadata, unset or mismatched keys, negative counts, offset overflow, and wrapped header/value read failures.
 
+## Feature 38: Close a B-tree page
+
+Java `BTPage.close` unpins the currently retained block and then clears its current-block reference. Go's `Page.Close`
+performs the same release, uses an empty block identifier as its closed state, and is safe to call repeatedly. When
+`Unpin` fails, the page retains the block so callers can retry; successful close preserves the transaction and layout
+configuration but prevents further slot searches. Closing a page without a block is a no-op, while a nil page or an
+active page without its transaction returns a contextual error. The B-tree page lifecycle diagram above shows both
+pin and unpin directions.
+
+### Test-first record
+
+The focused tests first failed because `Page.Close` was undefined. Tests verify exactly-once unpin, idempotent repeated
+close, closed-page search rejection, absent-block no-op, nil and typed-nil state, wrapped unpin failure, preserved state,
+and successful retry.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -505,3 +524,4 @@ empty pages, keys below/at/between/above values, duplicates, invalid and typed-n
 - `IndexSelectScan.Close` attempts both retained resources in Java order and joins all Go close errors.
 - `IndexJoinScan.Close` attempts all retained resources in Java order and joins Go close errors while preserving each cause.
 - `btree.NewPage` rejects invalid transaction, layout, and block inputs before pinning and returns pin failures as Go errors with their original causes.
+- `btree.Page.Close` preserves the current block after an unpin error so the caller can retry; repeated successful close calls are no-ops.
