@@ -9,7 +9,7 @@ operations.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
-| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own a bounded block range, traverse it in block/slot order, and read the current integer field |
+| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own a bounded block range, traverse it in block/slot order, and read current integer or string fields |
 
 ## Feature 1: Choose a safe buffer root
 
@@ -168,6 +168,27 @@ closed, before-first, and exhausted scan states.
 The accessor delegates offset calculation and field lookup to `RecordPage.GetInt`; the chunk scan adds block context
 while preserving the underlying error. A failed next call at end-of-range cannot leave the previous record readable.
 String reads, query constants, and field-membership checks remain separate behaviors.
+
+### Validation
+
+The focused tests cover every executable statement and function. The module coverage workflow continues to require
+100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 7: Read a string field from the current chunk record
+
+`ChunkScan.GetString` reads through the active `RecordPage` at the current slot, including after traversal advances to
+a later block. It leaves cursor position and page pins unchanged. Before-first, exhausted, closed, partial, invalid,
+zero-value, and nil scans return an error before field I/O.
+
+### Test-first record
+
+Focused tests first failed because `ChunkScan.GetString` was undefined. Tests cover string values on the first and later
+pages, unchanged cursor and pins, missing field names, wrapped transaction read errors, and invalid cursor states.
+
+### Design decision
+
+The accessor delegates offset calculation and field lookup to `RecordPage.GetString`; it adds block context while
+preserving the storage error. Query-value conversion and field-membership checks remain separate behaviors.
 
 ### Validation
 
