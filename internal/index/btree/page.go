@@ -223,6 +223,24 @@ func (page *Page) SetFlag(value int32) error {
 	return nil
 }
 
+// GetNumRecs reads the B-tree page's signed record count from the page header.
+func (page *Page) GetNumRecs() (int32, error) {
+	if page == nil {
+		return 0, fmt.Errorf("read B-tree page record count: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return 0, fmt.Errorf("read B-tree page record count: page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return 0, fmt.Errorf("read B-tree page record count in block %v: transaction is nil", page.block)
+	}
+	count, err := page.transaction.GetInt(page.block, 4)
+	if err != nil {
+		return 0, fmt.Errorf("read B-tree page record count in block %v: %w", page.block, err)
+	}
+	return count, nil
+}
+
 func pageSlotFieldPosition(slot, slotSize, fieldOffset int) (int, error) {
 	return pageSlotFieldPositionForCount(int64(slot), slotSize, fieldOffset)
 }

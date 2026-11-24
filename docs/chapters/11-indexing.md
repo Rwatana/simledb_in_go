@@ -564,6 +564,18 @@ The focused tests first failed because `Page.SetFlag` was undefined. Tests verif
 values, the exact block/header offset and logging flag, no data read/layout/pin changes, invalid and typed-nil state,
 and wrapped write failures.
 
+## Feature 43: Read a B-tree page record count
+
+Java `BTPage.getNumRecs` reads the signed 32-bit count at byte offset four in the current page block. Go's
+`Page.GetNumRecs` returns that stored value as-is, leaving malformed-count validation to the operation that consumes
+it, and does not require layout metadata or change the page pin. Nil/closed page state, a nil transaction, and a failed
+header read return contextual errors while preserving the storage error cause.
+
+### Test-first record
+
+The focused tests first failed because `Page.GetNumRecs` was undefined. Tests verify positive, zero, and negative
+counts at header offset four, no layout or pin-state changes, nil and typed-nil state, and wrapped read failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
