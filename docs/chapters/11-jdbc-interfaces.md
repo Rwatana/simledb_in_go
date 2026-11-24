@@ -24,6 +24,13 @@ boundary and transaction ownership; its [editable Draw.io source](../diagrams/ch
 is maintained beside it. A successful call leaves commit or rollback to the caller, and failures retain catalog
 initialization context.
 
+`Managers.Recover` explicitly performs restart recovery before a reopened manager set is used. It creates a fresh
+transaction, asks that transaction to undo unfinished durable history and flush the CHECKPOINT record, then commits
+the recovery transaction to release its locks and buffers. The [restart recovery diagram](../diagrams/ch11-server-restart-recovery.svg)
+shows the durable history scan, undo, checkpoint, and final commit; its [editable Draw.io source](../diagrams/ch11-server-restart-recovery.drawio)
+is kept beside the SVG. Recovery is not hidden inside `NewManagers`, so callers choose when a reopened database is ready
+for use; a recovery or final commit error is returned with restart context.
+
 ## Java source map
 
 | Java source | Responsibility |
@@ -43,13 +50,15 @@ have a JDBC adapter. `internal/server.NewManagers` now creates the file manager,
 then the buffer manager using the supplied directory, block size, and buffer count, and finally a fresh in-memory metadata
 facade. It returns the complete manager set only after the fallible storage managers succeed; initialization failures are
 wrapped with the failing stage and no partial set is returned. Every successful server manager set owns an independent
-metadata facade. The facade's catalog file initialization is a separate transaction-backed operation. Process-restart
-recovery, planner selection, and transaction commit remain separate behaviors.
+metadata facade. The facade's catalog file initialization is a separate transaction-backed operation. The caller can
+invoke `Managers.Recover` after reopening the durable database; this creates and commits a dedicated recovery
+transaction. `NewManagers` does not recover implicitly. Planner selection and ordinary transaction lifecycle remain
+separate behaviors.
 
 `Managers.NewTransaction` uses one ID allocator and lock table shared by the manager set, while each returned transaction
 keeps its own buffer ownership. Creation appends a START record to the shared log and supplies the log iterator needed
-for transaction rollback. A failed START append returns no transaction. Process-restart recovery, catalog initialization,
-planner selection, transaction lifecycle, and client adapters remain separate behaviors.
+for transaction rollback. A failed START append returns no transaction. Restart recovery through `Managers.Recover`, catalog
+initialization, planner selection, ordinary transaction completion, and client adapters remain separate behaviors.
 
 The embedded and network drivers share a client contract in Java, but Go should introduce an adapter only when a concrete
 caller needs it. The RMI proxy classes are transport-specific and should not be reproduced as a Go class hierarchy or
@@ -74,12 +83,17 @@ actual scope requires SQL driver compatibility.
 | `TestManagersNewTransactionReportsMissingInternalState` | Missing shared lock state is rejected before log access |
 | `TestManagersNewTransactionReturnsNoTransactionWhenStartCannotFit` | A log that cannot store START returns contextual failure and no transaction |
 | `TestManagersNewTransactionUsesFileBackedStorage` | A committed transaction writes through the configured file and buffer managers |
+| `TestManagersRecoverDurablyUndoesFlushedUncommittedUpdate` | A reopened server manager set restores the prior value, flushes CHECKPOINT, and commits its recovery transaction |
+| `TestManagersRecoverRejectsNilAndIncompleteManagerSets` | Nil and incomplete manager sets fail before recovery work |
+| `TestManagersRecoverPreservesRestartHistoryError` | Corrupt durable history returns contextual restart-recovery failure |
+| `TestFinishRestartRecoveryReportsRecoveryAndCommitFailures` | Recovery failure prevents commit, while commit failure preserves the durable checkpoint LSN |
 
 The manager-composition tests first failed to compile because `NewManagers` did not exist. The transaction tests first
 failed because `Managers.NewTransaction` did not exist, and the metadata test first failed because `Managers.Metadata`
-did not exist. The catalog test first failed because `Managers.InitializeCatalogs` was undefined. These tests use
-temporary database directories and keep catalog initialization separate from process-restart recovery, planner setup,
-transaction completion, and JDBC client operations.
+did not exist. The catalog test first failed because `Managers.InitializeCatalogs` was undefined. Restart recovery tests
+first failed because `Managers.Recover` and its recovery-transaction lifecycle helper were undefined. These tests use
+temporary database directories and keep catalog initialization, explicit process-restart recovery, planner setup,
+ordinary transaction completion, and JDBC client operations as separate behaviors.
 
 ## Intentional differences
 

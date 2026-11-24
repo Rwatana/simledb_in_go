@@ -40,6 +40,13 @@ Issue #1117 adds the server-side record-transaction adapter used for catalog ini
 operation and each adapter method are 100.0% covered; the full-module profile still reports 100.0% for every
 executable package and function.
 
+Issue #1119 adds the explicit `Managers.Recover` restart operation. The durable restart scenario covers undo of a
+flushed uncommitted update, CHECKPOINT ordering, and completion of the recovery transaction; failure tests cover
+manager validation, corrupt history, and recovery/commit lifecycle errors. The uncached command
+`GOCACHE=/tmp/simpledb-go-cache go test ./... -count=1 -coverprofile=/tmp/simpledb-coverage-1119-final.out`
+reported 100.0% statement coverage for every executable package. `go tool cover -func` reported every executable
+function and the module total at 100.0%, with no zero-count statements.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
