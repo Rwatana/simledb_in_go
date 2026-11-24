@@ -26,7 +26,7 @@
 | 8 | Query Processing | 実装中 | [query scanと関係演算子の解説・実装記録](docs/chapters/08-query-processing.md) |
 | 9 | Parsing | 実装完了（PR stack上） | [SQL tokenizationとupdate-command dispatchの解説・実装記録](docs/chapters/09-parsing.md) |
 | 10 | Planning | 実装中 | [query plan contract、TablePlan/SelectPlan/ProductPlan/ProjectPlanのscan・schema・estimateの解説・実装記録](docs/chapters/10-planning.md) |
-| 11 | JDBC Interfaces | 実装中 | [server managers、catalog initialization、transaction start、SQL planningとJava source map](docs/chapters/11-jdbc-interfaces.md) |
+| 11 | JDBC Interfaces | 実装中 | [server managers、embedded connection transaction、SQL planningとJava source map](docs/chapters/11-jdbc-interfaces.md) |
 | 12 | Indexing | 実装中 | [index traversal contractと索引実装の解説・実装記録](docs/chapters/12-indexing.md) |
 | 13 | Materialization and Sorting | 未着手 | — |
 | 14 | Effective Buffer Utilization | 未着手 | — |
@@ -78,7 +78,7 @@
 
 ## 次の一歩
 
-Chapter 11 JDBC Interfacesでは、`internal/server.NewManagers`でfile・log・buffer managerを明示設定から組み立て、独立したmetadata managerとbasic query/update plannerを加えた共有管理セットからSTART記録付きtransactionを生成します。呼び出し側が所有するtransactionを使ったcatalog初期化、明示呼び出しによるprocess-restart recovery、SQL SELECTの解析とplanning、SQL update commandのplanner dispatchを追加しました。Query plannerはbasicとcost-awareを選べます。update planner戦略、transaction lifecycle、embedded JDBC client、network clientは別の振る舞いとして後続に分けます。
+Chapter 11 JDBC Interfacesでは、`internal/server.NewManagers`でfile・log・buffer managerを明示設定から組み立て、独立したmetadata managerとbasic query/update plannerを加えた共有管理セットからSTART記録付きtransactionを生成します。呼び出し側が所有するtransactionを使ったcatalog初期化、明示呼び出しによるprocess-restart recovery、SQL SELECTの解析とplanning、SQL update commandのplanner dispatch、Query plannerのbasic/cost-aware選択を追加しました。Embedded connectionはtransactionの開始とcommit/rollbackをGo標準driver contractで公開します。SQL statementとrows、connector設定、network clientは別の振る舞いとして後続に分けます。
 
 Chapter 12 Indexingでは、値/RIDベースの索引走査契約、100個の静的hash bucketへのJava互換キー割当、静的hash indexの探索コスト見積もり、hashとB-treeの初期化・走査・挿入・削除、索引scan/plan、B-tree page・分割・root growthを実装しています。葉とdirectory pageを同時にpinせず、1 frameでも探索できるようにしています。
 
