@@ -62,6 +62,18 @@ func TestPreparedStatementQueryReturnsProjectedRowsToDatabaseSQL(t *testing.T) {
 	if want := []string{"name", "id"}; !reflect.DeepEqual(columns, want) {
 		t.Fatalf("rows Columns() = %v, want %v", columns, want)
 	}
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		t.Fatalf("rows ColumnTypes() error = %v", err)
+	}
+	if len(columnTypes) != 2 {
+		t.Fatalf("rows ColumnTypes() returned %d types, want 2", len(columnTypes))
+	}
+	for index, want := range []string{"VARCHAR", "INTEGER"} {
+		if got := columnTypes[index].DatabaseTypeName(); got != want {
+			t.Errorf("column %q database type = %q, want %q", columns[index], got, want)
+		}
+	}
 	if !rows.Next() {
 		t.Fatalf("rows Next() = false, error = %v, want one matching row", rows.Err())
 	}

@@ -125,10 +125,12 @@ behavior after rejecting nil or canceled contexts and unsupported parameters. `S
 the active caller-owned transaction and returns its projected fields through `driver.Rows`. Integer columns become
 `int64` driver values, strings remain strings, exhaustion returns `io.EOF`, and closing rows closes the underlying scan.
 `Stmt.QueryContext` rejects nil or canceled contexts before creating the plan, then uses the same caller-owned
-transaction and row path. Parameter binding and optional result type metadata remain independent behaviors. The
+transaction and row path. `driver.RowsColumnTypeDatabaseTypeName` reports `VARCHAR` and `INTEGER` from the projected
+schema in column order, so `database/sql.Rows.ColumnTypes()` exposes those database-specific names without advancing
+the scan. Scan types, lengths, precision, and nullability remain independent optional metadata behaviors. The
 [statement lifecycle and query diagram](../diagrams/ch11-embedded-statement.svg) shows how a prepared statement opens
-a scan and returns rows; its [editable Draw.io source](../diagrams/ch11-embedded-statement.drawio) is kept beside the
-SVG.
+a scan and returns rows plus database type names; its [editable Draw.io source](../diagrams/ch11-embedded-statement.drawio)
+is kept beside the SVG.
 The [update execution diagram](../diagrams/ch11-embedded-update-execution.svg) shows transaction ownership during a
 statement call; its [editable Draw.io source](../diagrams/ch11-embedded-update-execution.drawio) is maintained too.
 
@@ -181,6 +183,7 @@ needs them.
 | `TestStatementQueryContextImplementsDriverContractAndRejectsInvalidInputs` | Context-aware query rejects nil/closed statements, nil/canceled contexts, and arguments |
 | `TestNewStatementRowsValidatesScanAndSchema` | Result rows reject missing scans and schemas |
 | `TestStatementRowsReturnsTypedValuesAndClosesUnderlyingScan` | Rows expose defensive column names, map supported values, report EOF, and close once |
+| `TestStatementRowsReportsDatabaseTypeNames` | Driver rows and `database/sql.Rows.ColumnTypes()` report projected integer and varchar database type names |
 | `TestStatementRowsReportsInvalidStateAndScanFailures` | Closed rows, wrong destinations, scan/read errors, unsupported types, and close failures are returned |
 | `TestDatabaseSQLExecutesUpdatesInsideExplicitTransaction` | CREATE TABLE and INSERT execute through `sql.Tx`, report affected rows, commit, and roll back independently |
 | `TestConnectionTracksOneActiveTransactionForStatementExecution` | A connection rejects nested transactions and becomes reusable after explicit completion |

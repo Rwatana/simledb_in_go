@@ -61,6 +61,46 @@ func TestStatementRowsReturnsTypedValuesAndClosesUnderlyingScan(t *testing.T) {
 	}
 }
 
+func TestStatementRowsReportsDatabaseTypeNames(t *testing.T) {
+	var schema record.Schema
+	schema.AddVarcharField("name", 20)
+	schema.AddIntegerField("id")
+	rows := &statementRows{schema: &schema, columns: schema.Fields()}
+	var driverRows driver.Rows = rows
+	metadata, ok := driverRows.(driver.RowsColumnTypeDatabaseTypeName)
+	if !ok {
+		t.Fatal("statement rows do not implement driver.RowsColumnTypeDatabaseTypeName")
+	}
+	for index, want := range []string{"VARCHAR", "INTEGER"} {
+		if got := metadata.ColumnTypeDatabaseTypeName(index); got != want {
+			t.Errorf("ColumnTypeDatabaseTypeName(%d) = %q, want %q", index, got, want)
+		}
+	}
+	for _, index := range []int{-1, 2} {
+		if got := metadata.ColumnTypeDatabaseTypeName(index); got != "" {
+			t.Errorf("ColumnTypeDatabaseTypeName(%d) = %q, want empty", index, got)
+		}
+	}
+	if got := (*statementRows)(nil).ColumnTypeDatabaseTypeName(0); got != "" {
+		t.Errorf("nil ColumnTypeDatabaseTypeName(0) = %q, want empty", got)
+	}
+	if got := (&statementRows{columns: []string{"name"}}).ColumnTypeDatabaseTypeName(0); got != "" {
+		t.Errorf("missing-schema ColumnTypeDatabaseTypeName(0) = %q, want empty", got)
+	}
+
+	missingField := &statementRows{schema: &record.Schema{}, columns: []string{"missing"}}
+	if got := missingField.ColumnTypeDatabaseTypeName(0); got != "" {
+		t.Errorf("missing-field ColumnTypeDatabaseTypeName(0) = %q, want empty", got)
+	}
+
+	var unsupportedSchema record.Schema
+	unsupportedSchema.AddField("unknown", record.FieldType(99), 0)
+	unsupported := &statementRows{schema: &unsupportedSchema, columns: unsupportedSchema.Fields()}
+	if got := unsupported.ColumnTypeDatabaseTypeName(0); got != "" {
+		t.Errorf("unsupported ColumnTypeDatabaseTypeName(0) = %q, want empty", got)
+	}
+}
+
 func TestStatementRowsReportsInvalidStateAndScanFailures(t *testing.T) {
 	destination := []driver.Value{nil}
 	if err := (*statementRows)(nil).Next(destination); err == nil || !strings.Contains(err.Error(), "rows") {
