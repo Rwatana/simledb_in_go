@@ -61,7 +61,9 @@ and connection ownership; its [editable Draw.io source](../diagrams/ch11-network
 on a `RemoteSession`. The client and underlying transport remain caller-owned; a failed RPC returns no session. The
 [network RPC client-session diagram](../diagrams/ch11-network-rpc-client-session.svg) shows the request, server-side
 START boundary, returned ID, and ownership; its [editable Draw.io source](../diagrams/ch11-network-rpc-client-session.drawio)
-is kept beside the SVG.
+is kept beside the SVG. `RemoteSession.Commit` sends `SimpleDB.Commit` on that client and replaces its retained ID with
+the server's successor ID only after a successful response; a failed call preserves the previous ID and does not close
+the client.
 
 `network.ServeConnection` registers a small gob-based `net/rpc` service for one accepted connection. A successful
 `SimpleDB.Connect` creates one transaction through the shared manager set, retains it on that connection's service, and
@@ -240,6 +242,8 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestConnectRPCSessionRetainsTransactionIDAndLeavesClientOpen` | The client constructor stores the returned transaction ID and leaves the caller-owned RPC client usable |
 | `TestConnectRPCSessionRejectsNilClient` | Nil clients return no session and a nil session reports transaction ID zero |
 | `TestConnectRPCSessionWrapsRemoteConnectErrorWithoutReturningSession` | A failed server-side Connect is contextual and returns no client session |
+| `TestRemoteSessionCommitRetainsSuccessorTransactionID` | Commit replaces the retained ID with the successor transaction ID and keeps the caller's RPC client usable |
+| `TestRemoteSessionCommitRejectsInvalidStateAndPreservesIDOnRPCFailure` | Nil session/client and RPC errors are contextual, and a failed Commit retains the last known ID |
 | `TestDriverServiceConnectRejectsInvalidReceiverAndReply` | Nil service/reply and incomplete managers fail, clearing any partial transaction ID |
 | `TestRegisterDriverServiceRejectsInvalidInputsAndDuplicateRegistration` | RPC service registration validates dependencies and wraps duplicate-name failures |
 | `TestDriverServiceCommitCommitsAndStartsNextTransactionOverRPC` | RPC Commit persists the current outcome, returns a new transaction ID, and retains exactly one successor |
@@ -379,6 +383,10 @@ The response uses concrete gob-friendly structs rather than interface-valued cel
 The network RPC client-session test-first run initially failed because `RemoteSession`, `ConnectRPCSession`, and
 `TransactionID` were undefined. Tests verify the transaction ID returned by the `SimpleDB.Connect` RPC, nil-client
 validation, contextual server errors with no session, and continued use of the caller-owned RPC client.
+
+The network RPC client-commit test-first run initially failed because `RemoteSession.Commit` was undefined. Tests verify
+the successor transaction ID after successful RPC completion, nil session/client validation, preservation of the last
+known ID after a remote error, and continued use of the caller-owned RPC client.
 
 ## Intentional differences
 
