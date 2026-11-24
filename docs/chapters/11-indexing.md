@@ -851,6 +851,21 @@ The focused tests first failed because `Page.NextLeafSlot` was undefined. Tests 
 integer mismatches and exhaustion, varchar equality, empty pages, malformed field layouts, invalid page/transaction
 state, negative and overflowing input slots, negative counts, wrapped count/key reads, and unchanged pin ownership.
 
+## Feature 61: Select a B-tree leaf overflow block
+
+Java `BTreeLeaf.tryOverflow` follows a leaf's flag only when the search key equals the first key in that leaf and the
+flag is nonnegative. Go's `Page.FindOverflowBlock` makes that decision without changing page ownership: it reads the
+first `dataval`, then the flag, and returns a block in the same index file for a matching key, including block zero. A
+different first key or a negative flag reports no target; read errors preserve their causes. The operation checks the
+page, transaction, key field, layout, and typed search key. Opening the returned block, advancing within it, and
+maintaining B-tree index cursor state remain separate behaviors; the equality-and-flag decision does not need a diagram.
+
+### Test-first record
+
+The focused tests first failed because `Page.FindOverflowBlock` was undefined. Tests cover matching integer/varchar keys,
+overflow block zero, a mismatching first key, a negative flag, invalid/typed-nil state, mismatched or unset search keys,
+malformed layouts, wrapped first-key and flag reads, flag-read ordering after a mismatch, and unchanged pin ownership.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

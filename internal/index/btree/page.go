@@ -382,6 +382,63 @@ func (page *Page) NextLeafSlot(searchKey query.Constant, currentSlot int) (int, 
 	return nextSlot, value.Equal(searchKey), nil
 }
 
+// FindOverflowBlock returns the leaf overflow block when its first key matches searchKey.
+func (page *Page) FindOverflowBlock(searchKey query.Constant) (storage.BlockID, bool, error) {
+	if page == nil {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s: page is nil", searchKey)
+	}
+	if page.block.FileName() == "" {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s: page is closed", searchKey)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s in block %v: transaction is nil", searchKey, page.block)
+	}
+	if page.layout == nil {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s in block %v: layout is nil", searchKey, page.block)
+	}
+	schema := page.layout.Schema()
+	if schema == nil {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s in block %v: layout schema is nil", searchKey, page.block)
+	}
+	dataval, ok := schema.Field("dataval")
+	if !ok {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s in block %v: layout has no dataval field", searchKey, page.block)
+	}
+	if dataval.Type != record.IntegerField && dataval.Type != record.VarcharField {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s in block %v: unsupported dataval type %d", searchKey, page.block, dataval.Type)
+	}
+	fieldOffset, ok := page.layout.Offset("dataval")
+	if !ok {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s in block %v: layout has no dataval offset", searchKey, page.block)
+	}
+	slotSize := page.layout.SlotSize()
+	if slotSize <= 0 || fieldOffset < 0 || fieldOffset >= slotSize {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s in block %v: invalid dataval offset %d for slot size %d", searchKey, page.block, fieldOffset, slotSize)
+	}
+	switch dataval.Type {
+	case record.IntegerField:
+		if _, ok := searchKey.AsInt(); !ok {
+			return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block in block %v: integer dataval cannot be compared with %s", page.block, searchKey)
+		}
+	case record.VarcharField:
+		if _, ok := searchKey.AsString(); !ok {
+			return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block in block %v: varchar dataval cannot be compared with %s", page.block, searchKey)
+		}
+	}
+	firstKey, err := page.GetDataVal(0)
+	if err != nil {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s in block %v: read first key: %w", searchKey, page.block, err)
+	}
+	flag, err := page.GetFlag()
+	if err != nil {
+		return storage.BlockID{}, false, fmt.Errorf("find B-tree overflow block for %s in block %v: read overflow flag: %w", searchKey, page.block, err)
+	}
+	if !firstKey.Equal(searchKey) || flag < 0 {
+		return storage.BlockID{}, false, nil
+	}
+	return storage.NewBlockID(page.block.FileName(), int(flag)), true, nil
+}
+
 // GetDataVal reads the dataval field from the specified B-tree page slot.
 func (page *Page) GetDataVal(slot int) (query.Constant, error) {
 	if page == nil {
