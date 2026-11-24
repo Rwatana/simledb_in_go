@@ -241,6 +241,22 @@ func (page *Page) GetNumRecs() (int32, error) {
 	return count, nil
 }
 
+func (page *Page) setNumRecs(count int32) error {
+	if page == nil {
+		return fmt.Errorf("write B-tree page record count: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("write B-tree page record count: page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("write B-tree page record count in block %v: transaction is nil", page.block)
+	}
+	if err := page.transaction.SetInt(page.block, 4, count, true); err != nil {
+		return fmt.Errorf("write B-tree page record count in block %v: %w", page.block, err)
+	}
+	return nil
+}
+
 func pageSlotFieldPosition(slot, slotSize, fieldOffset int) (int, error) {
 	return pageSlotFieldPositionForCount(int64(slot), slotSize, fieldOffset)
 }

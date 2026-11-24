@@ -576,6 +576,18 @@ header read return contextual errors while preserving the storage error cause.
 The focused tests first failed because `Page.GetNumRecs` was undefined. Tests verify positive, zero, and negative
 counts at header offset four, no layout or pin-state changes, nil and typed-nil state, and wrapped read failures.
 
+## Feature 44: Write a B-tree page record count
+
+Java's private `BTPage.setNumRecs` writes the record-count header at byte offset four and requests transaction
+logging. Go's package-private `Page.setNumRecs` preserves that signed value and write behavior, without requiring
+layout metadata or changing the pin state. Nil/closed page state, a nil transaction, and storage write failures return
+contextual errors that preserve the original cause.
+
+### Test-first record
+
+The focused tests first failed because `Page.setNumRecs` was undefined. Tests verify signed count writes at offset four
+with logging enabled, no reads/layout/pin changes, nil and typed-nil state, and wrapped write failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
