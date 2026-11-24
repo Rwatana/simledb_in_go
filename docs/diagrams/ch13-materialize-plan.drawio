@@ -1,0 +1,52 @@
+<mxfile host="app.diagrams.net" modified="2026-11-25T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ch13-materialize-plan" name="Materialize plan">
+    <mxGraphModel dx="1000" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="source-plan" value="Source plan&#xa;schema + estimates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="210" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="source-scan" value="query.Scan&#xa;next row / get values" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="220" width="210" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="materialize" value="MaterializePlan.Open&#xa;copy each row in schema order" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="340" y="140" width="240" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="temporary" value="TempTable&#xa;query.UpdateScan&#xa;append rows and field values" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="650" y="150" width="210" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="cleanup" value="Close source scan&#xa;rewind destination scan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="340" y="340" width="240" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="result" value="query.Scan returned&#xa;before first row&#xa;caller closes it" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="650" y="345" width="210" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="estimate" value="BlocksAccessed&#xa;ceil(records / records per block)&#xa;excludes one-time copy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="455" width="270" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="plan-to-open" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="source-plan" target="materialize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="scan-to-copy" value="rows" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="source-scan" target="materialize">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="copy-to-temp" value="insert + set values" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="materialize" target="temporary">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="temp-to-cleanup" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="temporary" target="cleanup">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="source-to-cleanup" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="source-scan" target="cleanup">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rewind-result" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="cleanup" target="result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="plan-estimate" style="endArrow=block;html=1;dashed=1;" edge="1" parent="1" source="source-plan" target="estimate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
