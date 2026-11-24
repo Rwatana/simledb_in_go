@@ -41,9 +41,6 @@ func TestNewConnectionValidatesManagersAndImplementsDriverConnection(t *testing.
 	if statement.NumInput() != -1 {
 		t.Errorf("NumInput() = %d, want -1 until parameter parsing exists", statement.NumInput())
 	}
-	if result, err := statement.Exec(nil); result != nil || !errors.Is(err, driver.ErrSkip) {
-		t.Errorf("Exec() = (%v, %v), want unsupported execution and driver.ErrSkip", result, err)
-	}
 	if rows, err := statement.Query(nil); rows != nil || !errors.Is(err, driver.ErrSkip) {
 		t.Errorf("Query() = (%v, %v), want unsupported query and driver.ErrSkip", rows, err)
 	}

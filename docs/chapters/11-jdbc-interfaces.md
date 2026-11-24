@@ -99,8 +99,8 @@ adapter is described below; SQL execution and result adapters remain separate.
 `embedded.Connection` is the first concrete client adapter. It implements `driver.Conn`, starts a transaction from the
 manager set in `Begin`, and returns a `driver.Tx` adapter for explicit commit or rollback. Closing the connection prevents
 new begins but leaves already returned transactions caller-owned. The connection creates a lightweight statement handle
-without parsing or executing its SQL; `NumInput` reports an unknown parameter count and statement Exec/Query remain
-unsupported until their execution paths are implemented. The [embedded transaction lifecycle
+without parsing its SQL; `NumInput` reports an unknown parameter count, and statement execution uses the active
+transaction when called. The [embedded transaction lifecycle
 diagram](../diagrams/ch11-embedded-transaction-lifecycle.svg) shows the connection ownership boundaries and its
 [editable Draw.io source](../diagrams/ch11-embedded-transaction-lifecycle.drawio) is maintained beside the SVG.
 
@@ -113,10 +113,13 @@ both standard-library entry points; its [editable Draw.io source](../diagrams/ch
 beside the SVG.
 
 `Connection.Prepare` retains the SQL string and connection in a `driver.Stmt` handle. `Close` is idempotent, and
-`NumInput` remains `-1` until parameter parsing is implemented. The required legacy `Stmt.Exec` and `Stmt.Query`
-methods return `driver.ErrSkip`; parsing, update execution, SELECT rows, and result metadata remain independent
-behaviors. The [statement lifecycle diagram](../diagrams/ch11-embedded-statement.svg) shows the supported preparation
-boundary and its [editable Draw.io source](../diagrams/ch11-embedded-statement.drawio) is kept beside the SVG.
+`NumInput` remains `-1` until parameter parsing is implemented. `Stmt.Exec` routes zero-argument update SQL through
+`Managers.ExecuteUpdate` using the active connection transaction and returns the planner's affected-row count; the
+transaction remains open for explicit completion. `Stmt.Query` still returns `driver.ErrSkip`. Parameter binding,
+database-level autocommit, SELECT rows, and result metadata remain independent behaviors. The [statement lifecycle diagram](../diagrams/ch11-embedded-statement.svg)
+shows preparation; its [editable Draw.io source](../diagrams/ch11-embedded-statement.drawio) is kept beside the SVG.
+The [update execution diagram](../diagrams/ch11-embedded-update-execution.svg) shows transaction ownership during a
+statement call; its [editable Draw.io source](../diagrams/ch11-embedded-update-execution.drawio) is maintained too.
 
 The embedded and network drivers share a client contract in Java, but Go should introduce an adapter only when a concrete
 caller needs it. The RMI proxy classes are transport-specific and should not be reproduced as a Go class hierarchy or
@@ -159,6 +162,9 @@ needs them.
 | `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
 | `TestStatementRejectsNilAndClosedOperations` | Nil and closed statements return contextual lifecycle errors |
+| `TestDatabaseSQLExecutesUpdatesInsideExplicitTransaction` | CREATE TABLE and INSERT execute through `sql.Tx`, report affected rows, commit, and roll back independently |
+| `TestConnectionTracksOneActiveTransactionForStatementExecution` | A connection rejects nested transactions and becomes reusable after explicit completion |
+| `TestStatementExecRejectsInvalidStateAndWrapsUpdateErrors` | Exec rejects nil, closed, unbound, argument-bearing, malformed, and planner-failing calls |
 | `TestManagersComposeBasicUpdatePlannerWithTheirMetadata` | A manager set's update planner registers a table through shared metadata and a caller-owned transaction |
 | `TestManagersCreateQueryPlanParsesAndPlansSelect` | SELECT text is parsed and planned through the manager set without taking ownership of its transaction |
 | `TestManagersCreateQueryPlanReportsInvalidInputsAndFailures` | Incomplete managers, nil transactions, parse errors, and plan errors are returned with context |
@@ -180,10 +186,11 @@ connection transaction lifecycle, ordinary transaction completion, and JDBC clie
 The embedded-connection tests first failed because `Connection`, `NewConnection`, and its transaction adapter were
 undefined. Connector tests first failed because `Connector`, `NewConnector`, and the driver adapter were undefined.
 Statement tests first failed because the connection returned no statement handle and the `statement` adapter was
-undefined.
+undefined. Statement-execution tests first failed because the connection did not expose an active transaction to the
+prepared statement.
 These tests use temporary database directories and keep catalog initialization, explicit process-restart recovery,
-planner composition and strategy selection, embedded connection lifecycle, connector creation, SQL execution, and JDBC
-client operations as separate behaviors.
+planner composition and strategy selection, embedded connection lifecycle, connector creation, statement preparation,
+transaction-bound SQL updates, query rows, and JDBC client operations as separate behaviors.
 
 ## Intentional differences
 

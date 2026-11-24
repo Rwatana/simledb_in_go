@@ -11,8 +11,9 @@ import (
 
 // Connection owns access to one server manager set for an embedded SQL client.
 type Connection struct {
-	managers *server.Managers
-	closed   bool
+	managers          *server.Managers
+	activeTransaction *transaction.Transaction
+	closed            bool
 }
 
 var _ driver.Conn = (*Connection)(nil)
@@ -56,15 +57,20 @@ func (connection *Connection) Begin() (driver.Tx, error) {
 	if connection.managers == nil {
 		return nil, fmt.Errorf("begin embedded transaction: manager set is nil")
 	}
+	if connection.activeTransaction != nil {
+		return nil, fmt.Errorf("begin embedded transaction: another transaction is active")
+	}
 	created, err := connection.managers.NewTransaction()
 	if err != nil {
 		return nil, fmt.Errorf("begin embedded transaction: %w", err)
 	}
-	return &transactionAdapter{transaction: created}, nil
+	connection.activeTransaction = created
+	return &transactionAdapter{transaction: created, connection: connection}, nil
 }
 
 type transactionAdapter struct {
 	transaction *transaction.Transaction
+	connection  *Connection
 }
 
 var _ driver.Tx = (*transactionAdapter)(nil)
@@ -73,6 +79,7 @@ func (adapter *transactionAdapter) Commit() error {
 	if adapter == nil || adapter.transaction == nil {
 		return fmt.Errorf("commit embedded transaction: transaction is nil")
 	}
+	defer func() { adapter.connection.activeTransaction = nil }()
 	if _, err := adapter.transaction.Commit(); err != nil {
 		return fmt.Errorf("commit embedded transaction: %w", err)
 	}
@@ -83,6 +90,7 @@ func (adapter *transactionAdapter) Rollback() error {
 	if adapter == nil || adapter.transaction == nil {
 		return fmt.Errorf("rollback embedded transaction: transaction is nil")
 	}
+	defer func() { adapter.connection.activeTransaction = nil }()
 	if _, err := adapter.transaction.Rollback(); err != nil {
 		return fmt.Errorf("rollback embedded transaction: %w", err)
 	}
