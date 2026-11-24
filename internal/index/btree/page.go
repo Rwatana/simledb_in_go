@@ -1434,6 +1434,56 @@ func (page *Page) InitializeDirectoryRoot(minimumKey query.Constant) error {
 	return nil
 }
 
+// InitializeLeafPage formats an allocated B-tree leaf page as an empty overflow-chain head.
+func (page *Page) InitializeLeafPage() error {
+	if page == nil {
+		return fmt.Errorf("initialize B-tree leaf page: page is nil")
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("initialize B-tree leaf page: page is closed")
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("initialize B-tree leaf page in block %v: transaction is nil", page.block)
+	}
+	if page.layout == nil {
+		return fmt.Errorf("initialize B-tree leaf page in block %v: layout is nil", page.block)
+	}
+	if page.block.Number() < 0 {
+		return fmt.Errorf("initialize B-tree leaf page in block %v: block number is negative", page.block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return fmt.Errorf("initialize B-tree leaf page in block %v: invalid layout: %w", page.block, err)
+	}
+	if len(fields) != 3 {
+		return fmt.Errorf("initialize B-tree leaf page in block %v: layout must contain dataval, block, and id fields", page.block)
+	}
+	datavalFound, blockFound, idFound := false, false, false
+	for _, field := range fields {
+		switch field.name {
+		case "dataval":
+			datavalFound = true
+		case "block":
+			blockFound = true
+			if field.typeOf != record.IntegerField {
+				return fmt.Errorf("initialize B-tree leaf page in block %v: block field is not an integer", page.block)
+			}
+		case "id":
+			idFound = true
+			if field.typeOf != record.IntegerField {
+				return fmt.Errorf("initialize B-tree leaf page in block %v: id field is not an integer", page.block)
+			}
+		}
+	}
+	if !datavalFound || !blockFound || !idFound {
+		return fmt.Errorf("initialize B-tree leaf page in block %v: layout requires dataval, block, and id fields", page.block)
+	}
+	if err := page.Format(page.block, -1); err != nil {
+		return fmt.Errorf("initialize B-tree leaf page in block %v: format page: %w", page.block, err)
+	}
+	return nil
+}
+
 // AppendNew appends and formats a block in the current page's file.
 func (page *Page) AppendNew(flag int32) (storage.BlockID, error) {
 	if page == nil {
