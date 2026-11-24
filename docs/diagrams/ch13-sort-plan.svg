@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560" viewBox="0 0 1120 560" role="img" aria-labelledby="title desc">
+  <title id="title">Sort plan runs and merge passes</title>
+  <desc id="desc">SortPlan copies source rows into ascending temporary runs, starting a new run when adjacent sort keys descend. It repeatedly merges adjacent run pairs and carries an odd final run forward until at most two runs remain, then returns a final SortScan.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#52677d"/>
+    </marker>
+    <style>
+      text { font: 16px sans-serif; fill: #172b4d; text-anchor: middle; }
+      .small { font-size: 13px; }
+      .input { fill: #dae8fc; stroke: #6c8ebf; }
+      .split { fill: #fff2cc; stroke: #d6b656; }
+      .runs { fill: #d5e8d4; stroke: #82b366; }
+      .merge { fill: #e1d5e7; stroke: #9673a6; }
+      .note { fill: #f5f5f5; stroke: #666; }
+      .box { stroke-width: 2; rx: 10; }
+      .edge { fill: none; stroke: #52677d; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <path class="edge" d="M205 243 H270"/>
+  <path class="edge" d="M485 215 H525 V108 H575"/>
+  <path class="edge" d="M685 153 V278"/>
+  <path class="edge" d="M570 330 H525 V184 H575"/>
+  <path class="edge" d="M790 108 H825 V193 H865"/>
+  <path class="edge" d="M962 239 V330"/>
+  <rect class="box input" x="35" y="205" width="170" height="76"/>
+  <text x="120" y="236">Source Plan</text>
+  <text class="small" x="120" y="260">query.Scan</text>
+  <rect class="box split" x="275" y="185" width="210" height="118"/>
+  <text x="380" y="219">Split into runs</text>
+  <text class="small" x="380" y="246">copy rows in order</text>
+  <text class="small" x="380" y="270">new run on key descent</text>
+  <rect class="box runs" x="580" y="65" width="210" height="88"/>
+  <text x="685" y="101">Sorted temporary runs</text>
+  <text class="small" x="685" y="128">each run is ascending</text>
+  <rect class="box merge" x="570" y="285" width="230" height="92"/>
+  <text x="685" y="322">Pairwise merge pass</text>
+  <text class="small" x="685" y="349">SortScan + destination run</text>
+  <rect class="box split" x="870" y="150" width="185" height="88"/>
+  <text x="962" y="184">Final SortScan</text>
+  <text class="small" x="962" y="211">one or two runs</text>
+  <rect class="box input" x="870" y="335" width="185" height="86"/>
+  <text x="962" y="369">Sorted query.Scan</text>
+  <text class="small" x="962" y="396">caller closes scan</text>
+  <rect class="box note" x="35" y="440" width="450" height="72"/>
+  <text class="small" x="260" y="468">Plan estimates delegate to source</text>
+  <text class="small" x="260" y="492">BlocksAccessed uses MaterializePlan; sort cost excluded</text>
+  <text class="small" x="340" y="137">source closes after splitting</text>
+  <text class="small" x="755" y="213">more than two runs</text>
+  <text class="small" x="495" y="252">next pass; carry an odd run forward</text>
+  <text class="small" x="840" y="144">one or two remain</text>
+  <text class="small" x="1007" y="289">return</text>
+</svg>

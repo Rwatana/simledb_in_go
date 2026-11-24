@@ -1,0 +1,52 @@
+<mxfile host="app.diagrams.net" modified="2026-11-25T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ch13-sort-plan" name="Sort plan runs and merge passes">
+    <mxGraphModel dx="1120" dy="650" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1120" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="source" value="Source Plan&#xa;query.Scan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="35" y="205" width="170" height="76" as="geometry" />
+        </mxCell>
+        <mxCell id="split" value="Split into runs&#xa;copy rows in order&#xa;start run on key descent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="275" y="185" width="210" height="118" as="geometry" />
+        </mxCell>
+        <mxCell id="runs" value="Sorted temporary runs&#xa;each run is ascending" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="580" y="65" width="210" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="merge" value="Pairwise merge pass&#xa;SortScan + destination run" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="570" y="285" width="230" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="final" value="Final SortScan&#xa;one or two runs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="870" y="150" width="185" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="output" value="Sorted query.Scan&#xa;caller closes scan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="870" y="335" width="185" height="86" as="geometry" />
+        </mxCell>
+        <mxCell id="metadata" value="Plan estimates delegate to source&#xa;BlocksAccessed uses MaterializePlan and excludes sort cost" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="35" y="440" width="450" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="source-close" value="source scan closes after splitting" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" parent="1">
+          <mxGeometry x="210" y="125" width="260" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-source-split" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#52677d;endArrow=block;endFill=1;" edge="1" parent="1" source="source" target="split">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-split-runs" value="create ascending runs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#52677d;endArrow=block;endFill=1;" edge="1" parent="1" source="split" target="runs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-runs-merge" value="more than two runs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#52677d;endArrow=block;endFill=1;" edge="1" parent="1" source="runs" target="merge">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-merge-runs" value="next pass; carry odd run forward" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#52677d;endArrow=block;endFill=1;" edge="1" parent="1" source="merge" target="runs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-runs-final" value="one or two runs remain" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#52677d;endArrow=block;endFill=1;" edge="1" parent="1" source="runs" target="final">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-final-output" value="return" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#52677d;endArrow=block;endFill=1;" edge="1" parent="1" source="final" target="output">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
