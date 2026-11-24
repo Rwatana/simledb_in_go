@@ -128,6 +128,21 @@ func (join *IndexJoinPlan) RecordsOutput() int {
 	return int(int32(join.left.RecordsOutput()) * int32(join.indexInfo.RecordsOutput()))
 }
 
+// DistinctValues estimates field cardinality from the left plan when it declares the field, otherwise from the right.
+func (join *IndexJoinPlan) DistinctValues(fieldName string) int {
+	if join == nil || join.left == nil {
+		return 0
+	}
+	leftSchema := join.left.Schema()
+	if leftSchema != nil && leftSchema.HasField(fieldName) {
+		return join.left.DistinctValues(fieldName)
+	}
+	if join.right == nil {
+		return 0
+	}
+	return join.right.DistinctValues(fieldName)
+}
+
 func isNilIndexJoinPlanScan(scan query.Scan) bool {
 	if scan == nil {
 		return true
@@ -148,3 +163,5 @@ func closeIndexJoinPlanScan(side string, scan query.Scan) error {
 	}
 	return nil
 }
+
+var _ Plan = (*IndexJoinPlan)(nil)
