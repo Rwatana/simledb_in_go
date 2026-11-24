@@ -628,6 +628,19 @@ The focused tests first failed because `Page.SetDataVal` was undefined. Tests co
 at their layout-derived positions, invalid and typed-nil state, missing/unsupported/malformed field metadata, unset
 and mismatched constants, negative/overflowing slots, int32 offset overflow, and wrapped errors from both write types.
 
+## Feature 48: Write a B-tree directory child number
+
+Java's `BTPage.setInt` writes a directory child number to the integer `block` field for one slot with logging enabled.
+Go's `Page.SetChildNum` derives the slot position from the eight-byte page header and layout, preserves the signed
+32-bit value, checks metadata and the transaction's signed 32-bit write-offset range, and wraps storage failures. It
+does not read page data or change the page pin.
+
+### Test-first record
+
+The focused tests first failed because `Page.SetChildNum` was undefined. Tests verify negative, zero, and positive
+values at the layout-derived offset with logging enabled, no reads/pin changes, nil and typed-nil state, missing or
+noninteger fields, malformed offsets, negative/overflowing slots, int32 offset overflow, and wrapped write failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
