@@ -7,6 +7,10 @@ embedded driver, which creates the engine in the application process, with a net
 server. The existing [client-boundary diagram](../diagrams/ch02-client-boundary.svg) shows these two paths; its
 [editable Draw.io source](../diagrams/ch02-client-boundary.drawio) is shared with the Chapter 2 concept note.
 
+The first Go behavior composes the file, log, and buffer managers from explicit database settings. The [manager
+assembly diagram](../diagrams/ch11-server-manager-assembly.svg) shows their initialization order and the failure boundary;
+the [editable Draw.io source](../diagrams/ch11-server-manager-assembly.drawio) is maintained beside it.
+
 ## Java source map
 
 | Java source | Responsibility |
@@ -22,10 +26,12 @@ server. The existing [client-boundary diagram](../diagrams/ch02-client-boundary.
 ## Go design and current status
 
 The Go repository has lower-level file, log, buffer, transaction, metadata, query, and planning packages, but does not yet
-have equivalent JDBC or server packages. The Java three-argument `SimpleDB` constructor is a useful first composition
-boundary: it creates the file manager, then the log manager, then the buffer manager using the supplied directory,
-block size, and buffer count. The one-argument constructor adds recovery, metadata initialization, planner selection, and
-transaction commit; those effects should remain separately testable rather than being hidden in one ported constructor.
+have a JDBC adapter. `internal/server.NewManagers` now implements the Java three-argument `SimpleDB` constructor's first
+composition behavior: it creates the file manager, then the log manager for `simpledb.log`, then the buffer manager using
+the supplied directory, block size, and buffer count. It returns the complete manager set only after all three succeed;
+initialization failures are wrapped with the failing stage and no partial set is returned. The one-argument constructor
+adds recovery, metadata initialization, planner selection, and transaction commit; those effects remain separate
+behaviors.
 
 The embedded and network drivers share a client contract in Java, but Go should introduce an adapter only when a concrete
 caller needs it. The RMI proxy classes are transport-specific and should not be reproduced as a Go class hierarchy or
@@ -34,9 +40,15 @@ actual scope requires SQL driver compatibility.
 
 ## Test map
 
-This document-only chapter map adds no Go behavior. The first implementation behavior should test manager construction
-order, configured values, and cleanup/error propagation through a temporary database directory. Recovery, metadata and
-planner bootstrap, transaction creation, and JDBC client operations remain independent follow-up behaviors.
+| Test | Observable behavior |
+| --- | --- |
+| `TestNewManagersUsesConfiguredFileLogAndBufferManagers` | Explicit block size and buffer count reach the constructed managers, and the log gets its initial block |
+| `TestNewManagersReturnsNoManagersWhenFileManagerFails` | Directory creation failure is wrapped and exposes no partial manager set |
+| `TestNewManagersReturnsNoManagersWhenLogManagerFails` | An unusable log block size is reported after file-manager creation with no partial manager set |
+| `TestNewManagersReturnsNoManagersWhenBufferManagerFails` | Invalid buffer capacity is reported after log initialization with no partial manager set |
+
+The tests first failed to compile because `NewManagers` did not exist. They use temporary database directories and keep
+manager composition separate from recovery, metadata and planner bootstrap, transaction creation, and JDBC client operations.
 
 ## Intentional differences
 

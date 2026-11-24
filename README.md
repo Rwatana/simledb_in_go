@@ -26,7 +26,7 @@
 | 8 | Query Processing | 実装中 | [query scanと関係演算子の解説・実装記録](docs/chapters/08-query-processing.md) |
 | 9 | Parsing | 実装完了（PR stack上） | [SQL tokenizationとupdate-command dispatchの解説・実装記録](docs/chapters/09-parsing.md) |
 | 10 | Planning | 実装中 | [query plan contract、TablePlan/SelectPlan/ProductPlan/ProjectPlanのscan・schema・estimateの解説・実装記録](docs/chapters/10-planning.md) |
-| 11 | JDBC Interfaces | 学習資料作成済み・実装未着手 | [Java source mapとGo移植方針](docs/chapters/11-jdbc-interfaces.md) |
+| 11 | JDBC Interfaces | 実装中 | [server manager compositionとJava source map](docs/chapters/11-jdbc-interfaces.md) |
 | 12 | Indexing | 実装中 | [index traversal contractと索引実装の解説・実装記録](docs/chapters/12-indexing.md) |
 | 13 | Materialization and Sorting | 未着手 | — |
 | 14 | Effective Buffer Utilization | 未着手 | — |
@@ -78,7 +78,7 @@
 
 ## 次の一歩
 
-Chapter 11 JDBC Interfacesの概要とJava source mapを追加しました。GoではまだJDBC/server境界を実装していません。まずJava `SimpleDB`の3引数constructorが行うfile・log・buffer managerの組み立てを、既存のGo infrastructureから独立した振る舞いとして移します。metadata、planner、embedded client、network clientは別の振る舞いとして後続に分けます。
+Chapter 11 JDBC Interfacesの概要とJava source mapを追加し、`internal/server.NewManagers`でfile・log・buffer managerを明示設定から順に組み立てます。metadata、planner、transaction、embedded JDBC client、network clientは別の振る舞いとして後続に分けます。
 
 Chapter 12 Indexingでは、値/RIDベースの索引走査契約、100個の静的hash bucketへのJava互換キー割当、静的hash indexの探索コスト見積もり、hashとB-treeの初期化・走査・挿入・削除、索引scan/plan、B-tree page・分割・root growthを実装しています。葉とdirectory pageを同時にpinせず、1 frameでも探索できるようにしています。
 
