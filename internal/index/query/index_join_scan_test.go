@@ -436,6 +436,47 @@ func TestIndexJoinScanGetStringWrapsSelectedScanErrors(t *testing.T) {
 	}
 }
 
+func TestIndexJoinScanHasFieldChecksRightBeforeLeft(t *testing.T) {
+	right := newIndexJoinIntegerRecordScan(t, &positioningTransaction{}, "id")
+	left := &indexJoinLeftScan{fieldNames: map[string]bool{"id": true, "student_id": true}}
+	scan := &IndexJoinScan{lhs: left, rhs: right}
+	if !scan.HasField("id") {
+		t.Fatal("HasField(\"id\") = false, want true from right table")
+	}
+	if len(left.hasFieldCalls) != 0 {
+		t.Fatalf("left HasField calls = %v, want none when right declares the field", left.hasFieldCalls)
+	}
+	if !scan.HasField("student_id") {
+		t.Fatal("HasField(\"student_id\") = false, want true from left scan")
+	}
+	if len(left.hasFieldCalls) != 1 || left.hasFieldCalls[0] != "student_id" {
+		t.Fatalf("left HasField calls = %v, want [student_id]", left.hasFieldCalls)
+	}
+	if scan.HasField("missing") {
+		t.Fatal("HasField(\"missing\") = true, want false")
+	}
+}
+
+func TestIndexJoinScanHasFieldReturnsFalseForInvalidState(t *testing.T) {
+	left := &indexJoinLeftScan{fieldNames: map[string]bool{"student_id": true}}
+	tests := []struct {
+		name string
+		scan *IndexJoinScan
+	}{
+		{name: "nil receiver"},
+		{name: "missing left scan", scan: &IndexJoinScan{rhs: newPositioningTableScan(t)}},
+		{name: "missing right scan", scan: &IndexJoinScan{lhs: left}},
+		{name: "missing right table scan", scan: &IndexJoinScan{lhs: left, rhs: &query.RecordScan{}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.scan.HasField("student_id") {
+				t.Fatal("HasField() = true for invalid scan state, want false")
+			}
+		})
+	}
+}
+
 type indexJoinPositioningIndex struct {
 	keys        []query.Constant
 	positionErr error
@@ -478,6 +519,7 @@ type indexJoinLeftScan struct {
 	getIntErr        error
 	getStringFields  []string
 	getStringErr     error
+	hasFieldCalls    []string
 	closeCalls       int
 }
 
@@ -529,6 +571,7 @@ func (scan *indexJoinLeftScan) GetString(fieldName string) (string, error) {
 	return scan.stringValues[fieldName], nil
 }
 func (scan *indexJoinLeftScan) HasField(fieldName string) bool {
+	scan.hasFieldCalls = append(scan.hasFieldCalls, fieldName)
 	if scan.fieldNames == nil {
 		return true
 	}

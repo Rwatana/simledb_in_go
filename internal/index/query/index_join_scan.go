@@ -186,3 +186,11 @@ func (scan *IndexJoinScan) GetString(fieldName string) (string, error) {
 	}
 	return value, nil
 }
+
+// HasField reports whether either side of the join declares fieldName.
+func (scan *IndexJoinScan) HasField(fieldName string) bool {
+	if scan == nil || scan.lhs == nil || scan.rhs == nil || scan.rhs.TableScan == nil {
+		return false
+	}
+	return scan.rhs.HasField(fieldName) || scan.lhs.HasField(fieldName)
+}
