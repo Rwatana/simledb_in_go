@@ -55,6 +55,13 @@ invoke `Managers.Recover` after reopening the durable database; this creates and
 transaction. `NewManagers` does not recover implicitly. Planner selection and ordinary transaction lifecycle remain
 separate behaviors.
 
+Each successful `Managers` set also exposes a `plan.QueryPlanner`, currently composed as a
+`plan.BasicQueryPlanner` backed by the same metadata facade. Callers pass the active transaction to
+`CreatePlan`, so the planner can resolve the table schema and statistics through that transaction without owning
+transaction lifecycle. The [query planner composition diagram](../diagrams/ch11-query-planner-composition.svg)
+shows this dependency and the returned query plan; its [editable Draw.io source](../diagrams/ch11-query-planner-composition.drawio)
+is maintained beside it. Update planner composition and selectable planning strategies are separate behaviors.
+
 `Managers.NewTransaction` uses one ID allocator and lock table shared by the manager set, while each returned transaction
 keeps its own buffer ownership. Creation appends a START record to the shared log and supplies the log iterator needed
 for transaction rollback. A failed START append returns no transaction. Restart recovery through `Managers.Recover`, catalog
@@ -87,12 +94,14 @@ actual scope requires SQL driver compatibility.
 | `TestManagersRecoverRejectsNilAndIncompleteManagerSets` | Nil and incomplete manager sets fail before recovery work |
 | `TestManagersRecoverPreservesRestartHistoryError` | Corrupt durable history returns contextual restart-recovery failure |
 | `TestFinishRestartRecoveryReportsRecoveryAndCommitFailures` | Recovery failure prevents commit, while commit failure preserves the durable checkpoint LSN |
+| `TestManagersComposeBasicQueryPlannerWithTheirMetadata` | A manager set's SELECT planner resolves an initialized table through that set's metadata and caller-owned transaction |
 
 The manager-composition tests first failed to compile because `NewManagers` did not exist. The transaction tests first
 failed because `Managers.NewTransaction` did not exist, and the metadata test first failed because `Managers.Metadata`
 did not exist. The catalog test first failed because `Managers.InitializeCatalogs` was undefined. Restart recovery tests
-first failed because `Managers.Recover` and its recovery-transaction lifecycle helper were undefined. These tests use
-temporary database directories and keep catalog initialization, explicit process-restart recovery, planner setup,
+first failed because `Managers.Recover` and its recovery-transaction lifecycle helper were undefined. The query-planner
+test first failed because `Managers.QueryPlanner` was undefined. These tests use temporary database directories and
+keep catalog initialization, explicit process-restart recovery, SELECT planner composition, update planner composition,
 ordinary transaction completion, and JDBC client operations as separate behaviors.
 
 ## Intentional differences

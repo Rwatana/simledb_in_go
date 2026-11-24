@@ -47,6 +47,12 @@ manager validation, corrupt history, and recovery/commit lifecycle errors. The u
 reported 100.0% statement coverage for every executable package. `go tool cover -func` reported every executable
 function and the module total at 100.0%, with no zero-count statements.
 
+Issue #1121 adds the `Managers.QueryPlanner` composition. Its integration test creates catalog metadata, registers a
+table, and asks the composed basic planner for a SELECT projection through a caller-owned transaction. The uncached
+command `GOCACHE=/tmp/simpledb-go-cache go test ./... -count=1 -coverprofile=/tmp/simpledb-coverage-1121-final.out`
+reports 100.0% statement coverage for every executable package; `go tool cover -func` reports every executable
+function and module total at 100.0%, with no zero-count statements.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the

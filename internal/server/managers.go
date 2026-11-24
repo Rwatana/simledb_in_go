@@ -9,6 +9,7 @@ import (
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
 	"github.com/Rwatana/simledb_in_go/internal/metadata"
+	"github.com/Rwatana/simledb_in_go/internal/plan"
 	"github.com/Rwatana/simledb_in_go/internal/record"
 	"github.com/Rwatana/simledb_in_go/internal/recovery"
 	"github.com/Rwatana/simledb_in_go/internal/storage"
@@ -17,7 +18,7 @@ import (
 
 const logFileName = "simpledb.log"
 
-// Managers contains the file, log, buffer, and metadata managers for one database runtime.
+// Managers contains the file, log, buffer, metadata, and SELECT planning components for one database runtime.
 type Managers struct {
 	// Files reads and writes fixed-size database blocks.
 	Files *storagefile.Manager
@@ -27,11 +28,13 @@ type Managers struct {
 	Buffers *buffer.Manager
 	// Metadata coordinates the in-memory table, view, statistics, and index metadata managers.
 	Metadata *metadata.MetadataManager
-	ids      *transaction.IDAllocator
-	locks    *concurrency.LockTable
+	// QueryPlanner creates SELECT plans using this manager set's metadata facade.
+	QueryPlanner plan.QueryPlanner
+	ids          *transaction.IDAllocator
+	locks        *concurrency.LockTable
 }
 
-// NewManagers creates the file, log, buffer, and metadata managers using the supplied settings.
+// NewManagers creates the file, log, buffer, metadata, and basic SELECT planning components using the supplied settings.
 func NewManagers(directory string, blockSize, bufferCount int) (*Managers, error) {
 	files, err := storagefile.NewManager(directory, blockSize)
 	if err != nil {
@@ -48,14 +51,16 @@ func NewManagers(directory string, blockSize, bufferCount int) (*Managers, error
 		return nil, fmt.Errorf("initialize server buffer manager: %w", err)
 	}
 
-	return &Managers{
+	managers := &Managers{
 		Files:    files,
 		Logs:     logs,
 		Buffers:  buffers,
 		Metadata: metadata.NewMetadataManager(),
 		ids:      &transaction.IDAllocator{},
 		locks:    &concurrency.LockTable{},
-	}, nil
+	}
+	managers.QueryPlanner = plan.NewBasicQueryPlanner(managers.Metadata)
+	return managers, nil
 }
 
 // NewTransaction creates a transaction using this manager set's shared storage and identity state.
