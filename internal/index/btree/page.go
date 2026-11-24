@@ -439,6 +439,42 @@ func (page *Page) FindOverflowBlock(searchKey query.Constant) (storage.BlockID, 
 	return storage.NewBlockID(page.block.FileName(), int(flag)), true, nil
 }
 
+// OpenOverflowPage releases the current leaf page before pinning its selected overflow page.
+func (page *Page) OpenOverflowPage(overflowBlock storage.BlockID) (*Page, error) {
+	if page == nil {
+		return nil, fmt.Errorf("open B-tree overflow page for block %v: current page is nil", overflowBlock)
+	}
+	if page.block.FileName() == "" {
+		return nil, fmt.Errorf("open B-tree overflow page for block %v: current page is closed", overflowBlock)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return nil, fmt.Errorf("open B-tree overflow page for block %v: current transaction is nil", overflowBlock)
+	}
+	if page.layout == nil {
+		return nil, fmt.Errorf("open B-tree overflow page for block %v: leaf layout is nil", overflowBlock)
+	}
+	if page.layout.Schema() == nil {
+		return nil, fmt.Errorf("open B-tree overflow page for block %v: leaf layout schema is nil", overflowBlock)
+	}
+	if overflowBlock.FileName() == "" {
+		return nil, fmt.Errorf("open B-tree overflow page: target file name is empty")
+	}
+	if overflowBlock.FileName() != page.block.FileName() {
+		return nil, fmt.Errorf("open B-tree overflow page for block %v: target file differs from current leaf file %q", overflowBlock, page.block.FileName())
+	}
+	if overflowBlock.Number() < 0 {
+		return nil, fmt.Errorf("open B-tree overflow page for file %q: target block number %d is negative", overflowBlock.FileName(), overflowBlock.Number())
+	}
+	if err := page.Close(); err != nil {
+		return nil, fmt.Errorf("open B-tree overflow page for block %v: close current leaf page: %w", overflowBlock, err)
+	}
+	overflow, err := NewPage(page.transaction, overflowBlock, page.layout)
+	if err != nil {
+		return nil, fmt.Errorf("open B-tree overflow page for block %v: %w", overflowBlock, err)
+	}
+	return overflow, nil
+}
+
 // GetDataVal reads the dataval field from the specified B-tree page slot.
 func (page *Page) GetDataVal(slot int) (query.Constant, error) {
 	if page == nil {
