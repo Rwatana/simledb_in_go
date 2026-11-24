@@ -125,6 +125,50 @@ func TestPageReadsLengthPrefixedStrings(t *testing.T) {
 	}
 }
 
+func TestPageStoresLengthPrefixedStrings(t *testing.T) {
+	t.Parallel()
+
+	page := newPage(t, 64)
+	want := []string{"", "zero\x00one", "東京🙂"}
+	for index, value := range want {
+		offset := index * 16
+		if err := page.SetString(offset, value); err != nil {
+			t.Fatalf("SetString(%d, %q) error = %v", offset, value, err)
+		}
+		got, err := page.GetString(offset)
+		if err != nil {
+			t.Fatalf("GetString(%d) error = %v", offset, err)
+		}
+		if got != value {
+			t.Errorf("GetString(%d) = %q, want %q", offset, got, value)
+		}
+		encoded, err := page.GetBytes(offset)
+		if err != nil {
+			t.Fatalf("GetBytes(%d) error = %v", offset, err)
+		}
+		if !bytes.Equal(encoded, []byte(value)) {
+			t.Errorf("GetBytes(%d) = %v, want %v", offset, encoded, []byte(value))
+		}
+	}
+}
+
+func TestPageSetStringPreservesPageOnFailure(t *testing.T) {
+	t.Parallel()
+
+	page := newPage(t, 12)
+	if err := page.SetString(0, "old"); err != nil {
+		t.Fatalf("SetString(0, %q) error = %v", "old", err)
+	}
+	before := page.Snapshot()
+	err := page.SetString(4, "too long")
+	if err == nil || !strings.Contains(err.Error(), "set bytes at offset 4") {
+		t.Fatalf("SetString(4, %q) error = %v, want contextual capacity error", "too long", err)
+	}
+	if after := page.Snapshot(); !bytes.Equal(after, before) {
+		t.Errorf("failed SetString() changed page bytes: after = %v, before = %v", after, before)
+	}
+}
+
 func TestPageGetStringReportsLengthPrefixAndPayloadErrors(t *testing.T) {
 	t.Parallel()
 

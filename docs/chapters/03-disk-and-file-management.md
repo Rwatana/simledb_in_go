@@ -161,8 +161,8 @@ interfaceも追加していない。値の生成、比較、表示に外部依�
 
 編集可能な図は[Draw.io版](../diagrams/ch03-page-encoding.drawio)、ブラウザで表示できる図は
 [SVG版](../diagrams/ch03-page-encoding.svg)を参照する。図は固定長Pageの中で4-byte整数と
-length-prefixedなbyte列がどのoffsetを占めるか、および`GetString`が同じpayloadをUTF-8文字列として
-読むことを示す。
+length-prefixedなbyte列がどのoffsetを占めるか、およびstring APIが同じpayload encodingを共有する
+ことを示す。
 
 ### 問い
 
@@ -171,13 +171,14 @@ disk blockへ書き出す前の値を、固定長memory領域のどこに、何b
 ### 概念
 
 `Page`は固定capacityのbyte列を持ち、値の先頭位置をoffsetで指定する。整数は必ず4 bytes、
-任意のbinary payloadは4-byteのlength prefixとpayload本体として格納する。`GetString`はこの同じ
-encodingを読み、payload bytesをUTF-8文字列として返す。string専用の別形式やprefixは追加しない。
+任意のbinary payloadは4-byteのlength prefixとpayload本体として格納する。`SetString`はUTF-8 byte列を
+この形式で保存し、`GetString`は同じpayloadをUTF-8文字列として返す。string専用の別形式やprefixは
+追加しない。
 
 ```text
 integer = 4-byte signed value
 bytes   = 4-byte payload length + payload
-string  = same bytes encoding, interpreted as UTF-8
+string  = same bytes encoding, using UTF-8 bytes
 ```
 
 複数の値を同じPageへ置く場合、呼び出し側が前の値のencoded lengthを使って次のoffsetを決める。
@@ -191,7 +192,7 @@ string  = same bytes encoding, interpreted as UTF-8
 | `Capacity()` | 利用可能な総byte数を返す |
 | `SetInt` / `GetInt` | offset指定で4-byte整数を書き読みする |
 | `SetBytes` / `GetBytes` | offset指定でlength-prefixed bytesを書き読みする |
-| `GetString` | `GetBytes`と同じpayloadをUTF-8文字列として読む |
+| `SetString` / `GetString` | 同じ形式でUTF-8 stringを書き読みする |
 | `Snapshot()` | file I/Oへ渡せる全Page内容のcopyを返す |
 
 `GetBytes`と`Snapshot`は内部sliceを直接返さずcopyを返す。呼び出し側が返却値を変更しても、
@@ -209,8 +210,8 @@ if err != nil {
 }
 
 _ = page.SetInt(0, 42)
-_ = page.SetBytes(8, []byte("hello"))
-_ = page.GetString(8) // reads the same length-prefixed payload as text
+_ = page.SetString(8, "hello")
+_ = page.GetString(8) // reads the same length-prefixed payload
 ```
 
 すべてのread/writeで`offset + encoded length`がcapacity内かを確認する。範囲外accessや、
@@ -248,8 +249,14 @@ TestPageReadsLengthPrefixedStrings: storage.Page.GetString undefined
 ```
 
 Greenでは空文字列、embedded NUL、multibyte UTF-8 (`東京🙂`) の読取りと、truncated prefix、negative length、
-truncated payloadのcontext付きerrorを確認する。encoding自体は`GetBytes`と共有するため、`SetString`は別の
-observable behaviorとして後続Issueで扱う。
+truncated payloadのcontext付きerrorを確認する。encoding自体は`GetBytes`と共有する。
+
+### Issue #1195: length-prefixed string writes
+
+`SetString`のround-tripとcapacity failure testを実装より先に置いた。focused buildは`Page.SetString`未定義で
+失敗した。最小実装はstringをUTF-8 bytesへ変換して既存の`SetBytes`へ渡すため、prefix、境界検査、失敗時に
+Pageを変更しない保証を再利用する。空文字列、embedded NUL、multibyte UTF-8 (`東京🙂`) を同じpage形式で
+書き、`GetString`と`GetBytes`の両方で内容を確認する。
 
 ### Test cases
 
@@ -260,6 +267,8 @@ observable behaviorとして後続Issueで扱う。
 | `TestPageStoresLengthPrefixedBytes` | 空やNULを含むpayloadをlength prefix付きで保存する |
 | `TestPageReadsLengthPrefixedStrings` | 既存payloadを空・NUL・multibyte UTF-8文字列として読み、Pageを変更しない |
 | `TestPageGetStringReportsLengthPrefixAndPayloadErrors` | prefix/payloadの境界errorにstring offsetのcontextを付ける |
+| `TestPageStoresLengthPrefixedStrings` | 空・NUL・multibyte UTF-8を同じbytes形式で書き、string/bytes APIでround-tripする |
+| `TestPageSetStringPreservesPageOnFailure` | payloadがcapacityを超える書込みはcontext付きerrorとなり既存内容を維持する |
 | `TestPageGetBytesRejectsTruncatedLengthPrefix` | prefix全体がPageに収まらない場合にoffset付きerrorを返す |
 | `TestPageGetBytesRejectsNegativeLength` | 負のlength prefixをpayload allocation前に拒否する |
 | `TestValidateByteSequenceLengthRejectsUnencodableLength` | int32 length prefixへ格納できないpayload長を拒否する |
@@ -286,7 +295,7 @@ observable behaviorとして後続Issueで扱う。
 | `getInt` / `putInt` | `GetInt` / `SetInt` | `int32`とbig-endianで4-byte contractを明示する |
 | `getBytes` / `setBytes` | `GetBytes` / `SetBytes` | 同じlength prefix形式を使い、copyを返す |
 | `getString` | `GetString` | 既存length-prefixed payloadをUTF-8文字列として読み、別encodingを作らない |
-| `setString` | 未実装 | string書込みは独立した後続behaviorで追加する |
+| `setString` | `SetString` | UTF-8 bytesを`SetBytes`へ渡し、既存のlength prefixとatomicな境界検査を共有する |
 | `contents()` | `Snapshot()` | package外のfile I/Oへmutable sliceを公開しない |
 | `BufferOverflowException`等 | `error` | 境界失敗を呼び出し側が明示的に扱えるようにする |
 
@@ -301,7 +310,7 @@ Java版のAPI名は参考にするが、`ByteBuffer`のmutable positionやexcept
 
 ## 意図的に含めなかったもの
 
-- `SetString`によるstring専用書込み（別のobservable behaviorとして後続Issueで扱う）
+- invalid UTF-8を別文字集合へ正規化する処理
 - `BlockID`との関連付け
 - filesystemへのread/write/append
 - block sizeの設定管理

@@ -86,6 +86,11 @@ func (p *Page) SetBytes(offset int, value []byte) error {
 	return p.setBytesWithLength(offset, value, int64(len(value)))
 }
 
+// SetString stores a UTF-8 string at offset using the length-prefixed byte encoding.
+func (p *Page) SetString(offset int, value string) error {
+	return p.SetBytes(offset, []byte(value))
+}
+
 func (p *Page) setBytesWithLength(offset int, value []byte, length int64) error {
 	if err := validateByteSequenceLength(offset, length); err != nil {
 		return err
