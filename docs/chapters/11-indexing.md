@@ -11,6 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
+| `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java` | Retain one B-tree block and layout while the transaction has it pinned |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
 | `internal/metadata.IndexInfo` | `simpledb/metadata/IndexInfo.java` | Open the configured static hash index using the retained transaction and index-record layout |
@@ -455,6 +456,22 @@ or an unavailable fallback plan without panicking. `IndexJoinPlan` now satisfies
 The focused tests first failed because `IndexJoinPlan.DistinctValues` was undefined. Tests verify left/right routing,
 duplicate-name precedence, unknown-field fallback, missing schemas/plans, nil receiver, and interface conformance.
 
+## Feature 36: Pin a B-tree page when opened
+
+Java `BTPage` retains the transaction, block identifier, and layout, then pins the block in its constructor. Go's
+`btree.NewPage` follows that ownership boundary, validates the block and layout before I/O, and retains the dependencies
+only after pin succeeds. `PageTransaction` extends the record-page operations with the matching unpin capability needed
+by the page lifecycle; closing the page remains a separate behavior. The [B-tree page pin diagram](../diagrams/ch11-btree-page-pin.svg)
+shows the transaction pin and the retained block/layout; its editable source is
+[`ch11-btree-page-pin.drawio`](../diagrams/ch11-btree-page-pin.drawio).
+
+### Test-first record
+
+The focused tests first failed because `NewPage` and `PageTransaction` were undefined. Tests verify a single pin of the
+requested block, retained state, nil and typed-nil transaction rejection, missing layout/schema, invalid block
+identifiers, and a pin failure whose original cause remains inspectable. The constructor performs no page reads or
+writes.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
@@ -470,3 +487,4 @@ duplicate-name precedence, unknown-field fallback, missing schemas/plans, nil re
 - `IndexSelectScan.HasField` reports false for invalid scan state and otherwise delegates to the table schema.
 - `IndexSelectScan.Close` attempts both retained resources in Java order and joins all Go close errors.
 - `IndexJoinScan.Close` attempts all retained resources in Java order and joins Go close errors while preserving each cause.
+- `btree.NewPage` rejects invalid transaction, layout, and block inputs before pinning and returns pin failures as Go errors with their original causes.
