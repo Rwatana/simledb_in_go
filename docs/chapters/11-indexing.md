@@ -354,6 +354,16 @@ the left scan. Failures are contextual and retain their wrapped causes.
 The focused tests first failed because `IndexJoinScan.GetInt` was undefined. Tests verify right-first and left-fallback
 routing, returned values, nil receiver and dependency validation, and wrapped read errors from both selected scans.
 
+## Feature 27: Read typed fields from index join scans
+
+`IndexJoinScan.GetVal` returns the right table's schema-typed query constant when it declares the field and otherwise
+delegates to the left scan. Errors identify the selected side and retain their causes.
+
+### Test-first record
+
+The focused test run first failed because `IndexJoinScan.GetVal` was undefined. Tests verify right-side integer and
+string constants, left-side fallback, invalid receiver/dependencies, and wrapped errors from both selected scans.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
