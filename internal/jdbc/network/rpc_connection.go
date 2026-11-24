@@ -144,6 +144,9 @@ func serveConnection(conn net.Conn, managers *server.Managers, rpcServer rpcConn
 		return fmt.Errorf("serve network RPC connection: %w", err)
 	}
 	rpcServer.ServeConn(conn)
+	if err := service.disconnect(); err != nil {
+		return fmt.Errorf("disconnect network RPC session: %w", err)
+	}
 	return nil
 }
 
@@ -437,5 +440,26 @@ func (s *DriverService) Close(_ CloseRequest, reply *CloseResponse) error {
 	}
 	s.transaction = nil
 	s.closed = true
+	return nil
+}
+
+func (s *DriverService) disconnect() error {
+	if s == nil {
+		return fmt.Errorf("disconnect network RPC session: service is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil
+	}
+	s.closed = true
+	if s.transaction == nil {
+		return nil
+	}
+	active := s.transaction
+	s.transaction = nil
+	if _, err := active.Rollback(); err != nil {
+		return fmt.Errorf("rollback active network RPC transaction after disconnect: %w", err)
+	}
 	return nil
 }
