@@ -17,7 +17,7 @@ type MultibufferProductTransaction interface {
 }
 
 // MultibufferProductScan retains the inputs and current right-hand chunk for a multi-buffer product.
-// It currently owns only the right chunk acquired during initialization; the left scan remains caller-owned.
+// It owns right-hand chunks as it advances; the left scan remains caller-owned.
 type MultibufferProductScan struct {
 	transaction    MultibufferProductTransaction
 	left           query.Scan
@@ -28,6 +28,10 @@ type MultibufferProductScan struct {
 	chunkSize      int
 	nextBlock      int
 	product        *query.ProductScan
+	pendingChunk   bool
+	chunkInitErr   error
+	closed         bool
+	exhausted      bool
 	newProductScan func(query.Scan, query.Scan) (*query.ProductScan, error)
 }
 
@@ -85,13 +89,15 @@ func NewMultibufferProductScan(transaction MultibufferProductTransaction, left q
 			return nil, fmt.Errorf("initialize multibuffer product scan for %q: pin first chunk: %w", fileName, err)
 		}
 		scan.right = &ChunkValueScan{ChunkScan: chunk, schema: schema}
-		return scan, fmt.Errorf("initialize multibuffer product scan for %q: retain partially pinned first chunk: %w", fileName, err)
+		scan.chunkInitErr = fmt.Errorf("initialize multibuffer product scan for %q: retain partially pinned first chunk: %w", fileName, err)
+		return scan, scan.chunkInitErr
 	}
 	scan.right = &ChunkValueScan{ChunkScan: chunk, schema: schema}
 	if err := left.BeforeFirst(); err != nil {
 		initializationErr := fmt.Errorf("initialize multibuffer product scan for %q: reset left scan before first product row: %w", fileName, err)
 		if closeErr := scan.Close(); closeErr != nil {
-			return scan, errors.Join(initializationErr, fmt.Errorf("initialize multibuffer product scan for %q: release first chunk after left reset failure: %w", fileName, closeErr))
+			scan.chunkInitErr = errors.Join(initializationErr, fmt.Errorf("initialize multibuffer product scan for %q: release first chunk after left reset failure: %w", fileName, closeErr))
+			return scan, scan.chunkInitErr
 		}
 		return nil, initializationErr
 	}
@@ -104,8 +110,14 @@ func (scan *MultibufferProductScan) BeforeFirst() error {
 	if scan == nil || scan.transaction == nil || scan.left == nil {
 		return fmt.Errorf("rewind multibuffer product scan: scan is not initialized")
 	}
+	if scan.closed {
+		return fmt.Errorf("rewind multibuffer product scan for %q: current chunk is unavailable because the scan is closed", scan.fileName)
+	}
 	if scan.fileSize == 0 {
 		return nil
+	}
+	if scan.chunkInitErr != nil {
+		return scan.chunkInitErr
 	}
 	if scan.right == nil {
 		return fmt.Errorf("rewind multibuffer product scan for %q: current chunk is unavailable", scan.fileName)
@@ -116,28 +128,95 @@ func (scan *MultibufferProductScan) BeforeFirst() error {
 	if err := scan.product.BeforeFirst(); err != nil {
 		return fmt.Errorf("rewind multibuffer product scan for %q: %w", scan.fileName, err)
 	}
+	scan.pendingChunk = false
+	scan.exhausted = false
 	return nil
 }
 
-// Next advances to the next left-major pair within the currently pinned right-hand chunk.
+// Next advances to the next left-major pair, replacing the right-hand chunk when needed.
 func (scan *MultibufferProductScan) Next() (bool, error) {
 	if scan == nil || scan.transaction == nil || scan.left == nil {
 		return false, fmt.Errorf("advance multibuffer product scan: scan is not initialized")
 	}
+	if scan.closed {
+		return false, fmt.Errorf("advance multibuffer product scan for %q: current chunk is unavailable because the scan is closed", scan.fileName)
+	}
 	if scan.fileSize == 0 {
 		return false, nil
 	}
-	if scan.right == nil {
-		return false, fmt.Errorf("advance multibuffer product scan for %q: current chunk is unavailable", scan.fileName)
+	if scan.chunkInitErr != nil {
+		return false, scan.chunkInitErr
 	}
-	if err := scan.ensureProduct(); err != nil {
-		return false, err
+	if scan.exhausted {
+		return false, nil
 	}
-	hasRow, err := scan.product.Next()
+	for {
+		if scan.pendingChunk {
+			if err := scan.useNextChunk(); err != nil {
+				return false, err
+			}
+			scan.pendingChunk = false
+		}
+		if scan.right == nil {
+			return false, fmt.Errorf("advance multibuffer product scan for %q: current chunk is unavailable", scan.fileName)
+		}
+		if err := scan.ensureProduct(); err != nil {
+			return false, err
+		}
+		hasRow, err := scan.product.Next()
+		if err != nil {
+			return false, fmt.Errorf("advance multibuffer product scan for %q: %w", scan.fileName, err)
+		}
+		if hasRow {
+			return true, nil
+		}
+		if scan.nextBlock >= scan.fileSize {
+			scan.exhausted = true
+			return false, nil
+		}
+		scan.pendingChunk = true
+	}
+}
+
+func (scan *MultibufferProductScan) useNextChunk() error {
+	if scan.nextBlock >= scan.fileSize {
+		return nil
+	}
+	if scan.right != nil {
+		if err := scan.right.Close(); err != nil {
+			return fmt.Errorf("advance multibuffer product scan for %q: release current chunk: %w", scan.fileName, err)
+		}
+		scan.right = nil
+		scan.product = nil
+	}
+	remaining := scan.fileSize - scan.nextBlock
+	span := scan.chunkSize
+	if remaining < span {
+		span = remaining
+	}
+	endBlock := scan.nextBlock + span - 1
+	chunk, err := multibuffer.NewChunkScan(scan.transaction, scan.fileName, scan.layout, scan.nextBlock, endBlock)
 	if err != nil {
-		return false, fmt.Errorf("advance multibuffer product scan for %q: %w", scan.fileName, err)
+		wrappedErr := fmt.Errorf("advance multibuffer product scan for %q: pin chunk %d..%d: %w", scan.fileName, scan.nextBlock, endBlock, err)
+		if chunk != nil {
+			scan.right = &ChunkValueScan{ChunkScan: chunk, schema: scan.layout.Schema()}
+			scan.chunkInitErr = wrappedErr
+			return wrappedErr
+		}
+		return wrappedErr
 	}
-	return hasRow, nil
+	scan.right = &ChunkValueScan{ChunkScan: chunk, schema: scan.layout.Schema()}
+	if err := scan.left.BeforeFirst(); err != nil {
+		leftErr := fmt.Errorf("advance multibuffer product scan for %q: rewind left scan for chunk %d..%d: %w", scan.fileName, scan.nextBlock, endBlock, err)
+		if closeErr := scan.right.Close(); closeErr != nil {
+			scan.chunkInitErr = errors.Join(leftErr, fmt.Errorf("advance multibuffer product scan for %q: release chunk after left rewind failure: %w", scan.fileName, closeErr))
+			return scan.chunkInitErr
+		}
+		scan.right = nil
+		return leftErr
+	}
+	scan.nextBlock = endBlock + 1
+	return nil
 }
 
 func (scan *MultibufferProductScan) ensureProduct() error {
@@ -158,16 +237,20 @@ func (scan *MultibufferProductScan) ensureProduct() error {
 	return nil
 }
 
-// Close releases the right-hand chunk retained during initialization.
+// Close releases the currently retained right-hand chunk.
 // Failed page releases remain available for a later Close retry. The caller retains ownership of the left scan.
 func (scan *MultibufferProductScan) Close() error {
-	if scan == nil || scan.right == nil {
+	if scan == nil || scan.closed {
 		return nil
 	}
-	if err := scan.right.Close(); err != nil {
-		return err
+	if scan.right != nil {
+		if err := scan.right.Close(); err != nil {
+			return err
+		}
 	}
 	scan.right = nil
 	scan.product = nil
+	scan.chunkInitErr = nil
+	scan.closed = true
 	return nil
 }

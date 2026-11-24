@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="680" viewBox="0 0 1100 680" role="img" aria-labelledby="title desc">
+  <title id="title">Multibuffer product chunk rollover</title>
+  <desc id="desc">After left-major rows in one right chunk are exhausted, release its pages, bound and pin the next range, rewind the left input, and continue. Failed transitions remain retryable without advancing the saved range.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#506070" />
+    </marker>
+    <style>
+      text { font: 16px sans-serif; fill: #18212b; }
+      .box { stroke-width: 2; rx: 12; }
+      .arrow { fill: none; stroke: #506070; stroke-width: 2; marker-end: url(#arrow); }
+      .retry { fill: none; stroke: #b85450; stroke-width: 2; stroke-dasharray: 7 5; marker-end: url(#arrow); }
+      .hint { font-size: 14px; fill: #586675; }
+    </style>
+  </defs>
+  <rect width="1100" height="680" fill="#ffffff" />
+  <text x="50" y="42" font-size="24" font-weight="700">Move to the next bounded right-hand chunk</text>
+  <rect class="box" x="60" y="95" width="210" height="86" fill="#d5e8d4" stroke="#82b366" />
+  <text x="165" y="128" text-anchor="middle" font-weight="700">Current chunk</text>
+  <text x="165" y="154" text-anchor="middle">blocks [start, end]</text>
+  <rect class="box" x="360" y="95" width="250" height="86" fill="#dae8fc" stroke="#6c8ebf" />
+  <text x="485" y="128" text-anchor="middle" font-weight="700">Emit left-major pairs</text>
+  <text x="485" y="154" text-anchor="middle">until this chunk is exhausted</text>
+  <rect class="box" x="700" y="95" width="230" height="86" fill="#fff2cc" stroke="#d6b656" />
+  <text x="815" y="128" text-anchor="middle" font-weight="700">Release current pages</text>
+  <text x="815" y="154" text-anchor="middle">before pinning another range</text>
+  <rect class="box" x="700" y="285" width="300" height="100" fill="#e1d5e7" stroke="#9673a6" />
+  <text x="850" y="322" text-anchor="middle" font-weight="700">Bound the next range</text>
+  <text x="850" y="350" text-anchor="middle">end = min(start + chunkSize - 1, fileSize - 1)</text>
+  <rect class="box" x="360" y="285" width="250" height="100" fill="#f8cecc" stroke="#b85450" />
+  <text x="485" y="322" text-anchor="middle" font-weight="700">Pin range and rewind LHS</text>
+  <text x="485" y="350" text-anchor="middle">left scan stays caller-owned</text>
+  <rect class="box" x="60" y="285" width="230" height="100" fill="#d5e8d4" stroke="#82b366" />
+  <text x="175" y="322" text-anchor="middle" font-weight="700">Continue traversal</text>
+  <text x="175" y="350" text-anchor="middle">advance nextBlock only on success</text>
+  <rect class="box" x="360" y="505" width="250" height="90" fill="#f5f5f5" stroke="#666666" />
+  <text x="485" y="540" text-anchor="middle" font-weight="700">Retryable failure</text>
+  <text x="485" y="568" text-anchor="middle">retain boundary and failed pages</text>
+  <rect class="box" x="700" y="505" width="230" height="90" fill="#f5f5f5" stroke="#666666" />
+  <text x="815" y="540" text-anchor="middle" font-weight="700">At file end</text>
+  <text x="815" y="568" text-anchor="middle">keep final chunk until Close</text>
+  <path class="arrow" d="M270 138 H350" />
+  <path class="arrow" d="M610 138 H690" />
+  <path class="arrow" d="M815 181 V275" />
+  <path class="arrow" d="M700 335 H620" />
+  <path class="arrow" d="M360 335 H300" />
+  <path class="retry" d="M485 386 V495" />
+  <text class="hint" x="500" y="452">pin or left rewind error</text>
+  <path class="retry" d="M1000 335 C1050 335 1050 550 940 550" />
+  <text class="hint" x="1008" y="430" transform="rotate(90 1008 430)">no next block range</text>
+</svg>
