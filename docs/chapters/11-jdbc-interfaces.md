@@ -43,7 +43,7 @@ for use; a recovery or final commit error is returned with restart context.
 | `simpledb/jdbc/embedded/EmbeddedDriver.java`, `EmbeddedConnection.java` | Interpret an embedded URL and bind a connection to an in-process database and transaction |
 | `simpledb/jdbc/embedded/EmbeddedStatement.java`, `EmbeddedResultSet.java`, `EmbeddedMetaData.java` | Execute through the planner, expose a scan as a result cursor, and describe its columns |
 | `simpledb/jdbc/network/NetworkDriver.java`, `NetworkConnection.java`, `NetworkStatement.java`, `NetworkResultSet.java`, `NetworkMetaData.java` | Adapt a network client to the same JDBC-facing contract |
-| `simpledb/jdbc/network/Remote*` | Implement the server-side remote objects used by the Java RMI transport |
+| `simpledb/jdbc/network/Remote*` | Implement the server-side remote objects used by Java RMI, including per-connection transactions and their commit/rollback cycle |
 
 The Java network driver strips `jdbc:simpledb://` from its data-source name and contacts the RMI registry on the
 host's default port 1099. The Go `network.ParseNetworkURL` behavior keeps this URL interpretation explicit: it returns
@@ -61,8 +61,10 @@ and connection ownership; its [editable Draw.io source](../diagrams/ch11-network
 `SimpleDB.Connect` creates one transaction through the shared manager set, retains it on that connection's service, and
 returns its transaction ID. The [network RPC session diagram](../diagrams/ch11-network-rpc-session.svg) shows the connect
 request, START-log boundary, and per-connection transaction; its [editable Draw.io source](../diagrams/ch11-network-rpc-session.drawio)
-is maintained beside the SVG. This is a Go-native server boundary and does not implement Java RMI framing. Remote
-commit/rollback/close and SQL operations remain separate behaviors.
+is maintained beside the SVG. This is a Go-native server boundary and does not implement Java RMI framing. `DriverService.Commit` commits the retained transaction and starts its successor on the same connection, matching the
+Java server connection cycle without exposing RMI. Its [network commit diagram](../diagrams/ch11-network-rpc-commit.svg)
+shows the durable COMMIT marker followed by the next START record; its [editable Draw.io source](../diagrams/ch11-network-rpc-commit.drawio)
+is maintained beside the SVG. Rollback, connection close, and SQL operations remain separate behaviors.
 
 ## Go design and current status
 
@@ -216,6 +218,10 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestServeConnectionRejectsNilAndIncompleteInputs` | Nil connections/managers and incomplete transaction manager sets are rejected |
 | `TestDriverServiceConnectRejectsInvalidReceiverAndReply` | Nil service/reply and incomplete managers fail, clearing any partial transaction ID |
 | `TestRegisterDriverServiceRejectsInvalidInputsAndDuplicateRegistration` | RPC service registration validates dependencies and wraps duplicate-name failures |
+| `TestDriverServiceCommitCommitsAndStartsNextTransactionOverRPC` | RPC Commit persists the current outcome, returns a new transaction ID, and retains exactly one successor |
+| `TestDriverServiceCommitRejectsInvalidStateAndReply` | Nil state, manager set, reply, and active transaction are rejected |
+| `TestDriverServiceCommitKeepsTransactionWhenCommitFails` | A failed commit returns no new ID and does not replace the active transaction |
+| `TestDriverServiceCommitLeavesNoStaleTransactionWhenNextStartFails` | Successful commit followed by successor-start failure leaves no completed transaction attached and permits reconnect |
 | `TestConnectorConnectValidatesReceiverContextAndCancellation` | Nil state and canceled contexts return errors before creating a connection |
 | `TestConnectorDriverOpenAndDatabaseSQLUseConfiguredManagers` | Driver.Open and `sql.OpenDB` use the bound manager set and support transaction completion |
 | `TestConnectorDriverRejectsInvalidState` | Nil driver and connector states fail with contextual errors |
@@ -302,6 +308,12 @@ START record and the returned transaction ID, check manager and registration err
 replace the connection transaction. The service retains transaction ownership for later remote methods; finalization and
 SQL execution remain independent.
 
+
+The network RPC-commit test-first run initially failed because `CommitRequest`, `CommitResponse`, and `DriverService.Commit`
+were undefined. Tests verify the COMMIT and successor START records through RPC, invalid service state, completed-transaction
+errors, and the case where the commit succeeds but the next START cannot be created. In that last case the completed
+transaction is not retained and Connect can be retried; rollback and connection close remain independent.
+
 ## Intentional differences
 
 - Do not reproduce the Java `java.sql` adapter hierarchy mechanically.
@@ -310,4 +322,4 @@ SQL execution remain independent.
 - Keep the upstream Java distribution and book PDF outside Git.
 - Parse the Java-compatible embedded URL prefix, but keep path resolution, database initialization, and manager settings explicit in Go.
 - Parse the Java-compatible network URL into a host, but keep dialing and remote-session lifecycle separate from parsing; the current Go network parser preserves the default registry port convention.
-- Open a TCP socket to the parsed network host with caller context, then serve a Go `net/rpc` Connect request that creates one connection-bound transaction; defer transaction finalization and remote SQL operations to separate behaviors.
+- Open a TCP socket to the parsed network host with caller context, then serve Go `net/rpc` Connect and Commit requests, with Commit persisting the current transaction and opening its successor; defer rollback, connection close, and remote SQL operations to separate behaviors.

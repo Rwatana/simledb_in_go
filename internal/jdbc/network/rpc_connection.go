@@ -19,6 +19,14 @@ type ConnectResponse struct {
 	TransactionID int64
 }
 
+// CommitRequest is the empty request for committing a remote database session.
+type CommitRequest struct{}
+
+// CommitResponse contains the transaction identifier created after commit.
+type CommitResponse struct {
+	TransactionID int64
+}
+
 // DriverService serves requests over one RPC connection and retains its transaction.
 type DriverService struct {
 	managers    *server.Managers
@@ -93,6 +101,38 @@ func (s *DriverService) Connect(_ ConnectRequest, reply *ConnectResponse) error 
 	created, err := s.managers.NewTransaction()
 	if err != nil {
 		return fmt.Errorf("connect network RPC session: %w", err)
+	}
+	s.transaction = created
+	reply.TransactionID = int64(created.ID())
+	return nil
+}
+
+// Commit commits the active transaction and starts its successor for this RPC connection.
+func (s *DriverService) Commit(_ CommitRequest, reply *CommitResponse) error {
+	if reply != nil {
+		*reply = CommitResponse{}
+	}
+	if s == nil {
+		return fmt.Errorf("commit network RPC session: service is nil")
+	}
+	if reply == nil {
+		return fmt.Errorf("commit network RPC session: reply is nil")
+	}
+	if s.managers == nil {
+		return fmt.Errorf("commit network RPC session: manager set is nil")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.transaction == nil {
+		return fmt.Errorf("commit network RPC session: active transaction is nil")
+	}
+	if _, err := s.transaction.Commit(); err != nil {
+		return fmt.Errorf("commit network RPC transaction: %w", err)
+	}
+	s.transaction = nil
+	created, err := s.managers.NewTransaction()
+	if err != nil {
+		return fmt.Errorf("start network RPC transaction after commit: %w", err)
 	}
 	s.transaction = created
 	reply.TransactionID = int64(created.ID())
