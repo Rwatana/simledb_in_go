@@ -60,3 +60,54 @@ func (scan *IndexJoinScan) BeforeFirst() error {
 	scan.hasLeftRow = true
 	return nil
 }
+
+// Next advances to the next record matching a left-side join value.
+func (scan *IndexJoinScan) Next() (bool, error) {
+	if scan == nil {
+		return false, fmt.Errorf("advance nil index join scan")
+	}
+	if scan.lhs == nil {
+		return false, fmt.Errorf("advance index join scan: left scan is nil")
+	}
+	if scan.index == nil {
+		return false, fmt.Errorf("advance index join scan: index is nil")
+	}
+	if scan.rhs == nil || scan.rhs.TableScan == nil {
+		return false, fmt.Errorf("advance index join scan: right table scan is nil")
+	}
+	if !scan.hasLeftRow {
+		return false, nil
+	}
+	for {
+		found, err := scan.index.Next()
+		if err != nil {
+			return false, fmt.Errorf("advance index join scan index: %w", err)
+		}
+		if found {
+			rid, err := scan.index.GetDataRID()
+			if err != nil {
+				return false, fmt.Errorf("read index join scan RID: %w", err)
+			}
+			if err := scan.rhs.MoveToRID(rid); err != nil {
+				return false, fmt.Errorf("move index join scan right table to RID %v: %w", rid, err)
+			}
+			return true, nil
+		}
+		found, err = scan.lhs.Next()
+		if err != nil {
+			return false, fmt.Errorf("advance index join scan left scan: %w", err)
+		}
+		if !found {
+			scan.hasLeftRow = false
+			return false, nil
+		}
+		joinValue, err := scan.lhs.GetVal(scan.joinField)
+		if err != nil {
+			return false, fmt.Errorf("read index join scan join field %q: %w", scan.joinField, err)
+		}
+		if err := scan.index.BeforeFirst(joinValue); err != nil {
+			scan.hasLeftRow = false
+			return false, fmt.Errorf("position index join scan index for left row: %w", err)
+		}
+	}
+}

@@ -331,6 +331,19 @@ The focused tests first failed because `IndexJoinScan` and `NewIndexJoinScan` we
 key positioning, empty left input, repeat positioning, invalid dependencies, and wrapped left-reset, left-advance,
 join-value, and index-positioning errors.
 
+## Feature 25: Advance index-join scans through matching records
+
+`IndexJoinScan.Next` returns each matching index RID after moving the right table scan to it. When the current key has
+no more index entries, it advances the left scan, reads the next join value, repositions the index, and continues; left
+exhaustion returns false and marks the scan exhausted. Index iteration, RID reads, right-side moves, left advancement,
+join-value reads, and index repositioning preserve their wrapped causes on failure.
+
+### Test-first record
+
+The focused test first failed because `IndexJoinScan.Next` was undefined. Tests verify multiple matching RIDs across
+different left keys, final exhaustion, empty input, invalid scan state, and errors from index iteration/RID retrieval,
+right-side movement, left advancement/value retrieval, and index repositioning.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
