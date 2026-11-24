@@ -80,3 +80,33 @@ func (leaf *Leaf) GetDataRID() (record.RID, error) {
 	}
 	return rid, nil
 }
+
+// Delete removes the first current-search-key leaf entry with the specified data RID.
+func (leaf *Leaf) Delete(dataRID record.RID) error {
+	if leaf == nil {
+		return fmt.Errorf("delete B-tree leaf entry %s: leaf is nil", dataRID)
+	}
+	if leaf.contents == nil {
+		return fmt.Errorf("delete B-tree leaf entry %s for %s: page is nil", dataRID, leaf.searchKey)
+	}
+	for {
+		found, err := leaf.Next()
+		if err != nil {
+			return fmt.Errorf("delete B-tree leaf entry %s for %s: advance cursor: %w", dataRID, leaf.searchKey, err)
+		}
+		if !found {
+			return nil
+		}
+		currentRID, err := leaf.GetDataRID()
+		if err != nil {
+			return fmt.Errorf("delete B-tree leaf entry %s for %s: read current data RID: %w", dataRID, leaf.searchKey, err)
+		}
+		if !currentRID.Equal(dataRID) {
+			continue
+		}
+		if err := leaf.contents.Delete(leaf.currentSlot); err != nil {
+			return fmt.Errorf("delete B-tree leaf entry %s for %s in block %v at slot %d: %w", dataRID, leaf.searchKey, leaf.contents.block, leaf.currentSlot, err)
+		}
+		return nil
+	}
+}
