@@ -506,6 +506,69 @@ func (page *Page) InsertDir(slot int, value query.Constant, childBlock int32) er
 	return nil
 }
 
+// InsertLeaf opens a leaf slot, shifts later entries, and stores its key and record identifier.
+func (page *Page) InsertLeaf(slot int, value query.Constant, rid record.RID) error {
+	if page == nil {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d: page is nil", slot)
+	}
+	if page.block.FileName() == "" {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d: page is closed", slot)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: transaction is nil", slot, page.block)
+	}
+	if page.layout == nil {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: layout is nil", slot, page.block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: invalid layout: %w", slot, page.block, err)
+	}
+	hasBlock, hasID := false, false
+	for _, field := range fields {
+		switch field.name {
+		case "block":
+			hasBlock = true
+			if field.typeOf != record.IntegerField {
+				return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: block field is not an integer", slot, page.block)
+			}
+		case "id":
+			hasID = true
+			if field.typeOf != record.IntegerField {
+				return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: id field is not an integer", slot, page.block)
+			}
+		}
+	}
+	if !hasBlock {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: layout has no block field", slot, page.block)
+	}
+	if !hasID {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: layout has no id field", slot, page.block)
+	}
+	values := [...]int{rid.BlockNumber(), rid.Slot()}
+	fieldNames := [...]string{"block", "id"}
+	for i, field := range fieldNames {
+		if int64(values[i]) < math.MinInt32 || int64(values[i]) > math.MaxInt32 {
+			return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: RID %s value %d exceeds int32 range", slot, page.block, field, values[i])
+		}
+	}
+
+	count, err := page.insertSlot(slot, value)
+	if err != nil {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: open slot: %w", slot, page.block, err)
+	}
+	if err := page.setNumRecs(count + 1); err != nil {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: write record count: %w", slot, page.block, err)
+	}
+	if err := page.SetDataVal(slot, value); err != nil {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: write dataval: %w", slot, page.block, err)
+	}
+	if err := page.SetDataRID(slot, rid); err != nil {
+		return fmt.Errorf("insert B-tree leaf entry at slot %d in block %v: write data RID: %w", slot, page.block, err)
+	}
+	return nil
+}
+
 func (page *Page) insertSlot(slot int, value query.Constant) (int32, error) {
 	if page == nil {
 		return 0, fmt.Errorf("page is nil")

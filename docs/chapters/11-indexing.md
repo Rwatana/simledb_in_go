@@ -675,6 +675,23 @@ record shifting in reverse order, append at the end, logged field writes, unchan
 and layout metadata, mismatched value types, negative counts/slots, count and offset overflow, and wrapped count/read/
 copy/count-write/new-key/new-child failures.
 
+## Feature 51: Insert a B-tree leaf entry
+
+Java `BTPage.insertLeaf` opens the selected slot, shifts complete later records to the right, increments the count,
+then writes `dataval`, `block`, and `id`. Go's `Page.InsertLeaf` shares the checked slot-opening operation with
+`Page.InsertDir`, validates both integer RID fields and both signed 32-bit RID values before shifting, and delegates the
+key and RID writes to the existing typed page methods in Java order. Each write requests transaction logging; a caller
+can roll back earlier writes if a later storage operation fails. Capacity checks and leaf splitting remain separate
+operations. The [leaf insertion diagram](../diagrams/ch11-btree-insert-leaf.svg) shows the record shift and distinct
+key/RID fields; its editable source is [`ch11-btree-insert-leaf.drawio`](../diagrams/ch11-btree-insert-leaf.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.InsertLeaf` was undefined. Tests verify a middle insertion across a
+varchar key and both RID fields, append to an empty page, exact logged write order, invalid page/layout/RID metadata,
+RID range validation before mutation, unchanged pin state, and wrapped count, shift, count-write, key-write, and either
+RID-write failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
