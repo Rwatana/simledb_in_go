@@ -8,13 +8,14 @@ import (
 	"github.com/Rwatana/simledb_in_go/internal/concurrency"
 	storagefile "github.com/Rwatana/simledb_in_go/internal/infrastructure/file"
 	logmanager "github.com/Rwatana/simledb_in_go/internal/log"
+	"github.com/Rwatana/simledb_in_go/internal/metadata"
 	"github.com/Rwatana/simledb_in_go/internal/recovery"
 	"github.com/Rwatana/simledb_in_go/internal/transaction"
 )
 
 const logFileName = "simpledb.log"
 
-// Managers contains the file, log, and buffer managers for one database runtime.
+// Managers contains the file, log, buffer, and metadata managers for one database runtime.
 type Managers struct {
 	// Files reads and writes fixed-size database blocks.
 	Files *storagefile.Manager
@@ -22,11 +23,13 @@ type Managers struct {
 	Logs *logmanager.Manager
 	// Buffers owns the configured pool of memory frames.
 	Buffers *buffer.Manager
-	ids     *transaction.IDAllocator
-	locks   *concurrency.LockTable
+	// Metadata coordinates the in-memory table, view, statistics, and index metadata managers.
+	Metadata *metadata.MetadataManager
+	ids      *transaction.IDAllocator
+	locks    *concurrency.LockTable
 }
 
-// NewManagers creates the file, log, and buffer managers using the supplied settings.
+// NewManagers creates the file, log, buffer, and metadata managers using the supplied settings.
 func NewManagers(directory string, blockSize, bufferCount int) (*Managers, error) {
 	files, err := storagefile.NewManager(directory, blockSize)
 	if err != nil {
@@ -44,11 +47,12 @@ func NewManagers(directory string, blockSize, bufferCount int) (*Managers, error
 	}
 
 	return &Managers{
-		Files:   files,
-		Logs:    logs,
-		Buffers: buffers,
-		ids:     &transaction.IDAllocator{},
-		locks:   &concurrency.LockTable{},
+		Files:    files,
+		Logs:     logs,
+		Buffers:  buffers,
+		Metadata: metadata.NewMetadataManager(),
+		ids:      &transaction.IDAllocator{},
+		locks:    &concurrency.LockTable{},
 	}, nil
 }
 

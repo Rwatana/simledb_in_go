@@ -7,9 +7,11 @@ embedded driver, which creates the engine in the application process, with a net
 server. The existing [client-boundary diagram](../diagrams/ch02-client-boundary.svg) shows these two paths; its
 [editable Draw.io source](../diagrams/ch02-client-boundary.drawio) is shared with the Chapter 2 concept note.
 
-The first Go behavior composes the file, log, and buffer managers from explicit database settings. The [manager
-assembly diagram](../diagrams/ch11-server-manager-assembly.svg) shows their initialization order and the failure boundary;
-the [editable Draw.io source](../diagrams/ch11-server-manager-assembly.drawio) is maintained beside it.
+The first Go behavior composes the file, log, and buffer managers from explicit database settings. The next adds an
+independent, in-memory metadata facade to each successful manager set. The [manager assembly
+diagram](../diagrams/ch11-server-manager-assembly.svg) shows this composition and the low-level manager failure boundary;
+the [editable Draw.io source](../diagrams/ch11-server-manager-assembly.drawio) is maintained beside it. Creating the
+metadata facade does not create catalog files; catalog initialization remains a separate transaction-backed behavior.
 
 The next behavior opens transactions from that shared manager set. The [transaction creation diagram](../diagrams/ch11-server-transaction-creation.svg)
 shows the per-server ID and lock state, shared storage dependencies, START logging, and the no-transaction error path;
@@ -30,12 +32,12 @@ its [editable Draw.io source](../diagrams/ch11-server-transaction-creation.drawi
 ## Go design and current status
 
 The Go repository has lower-level file, log, buffer, transaction, metadata, query, and planning packages, but does not yet
-have a JDBC adapter. `internal/server.NewManagers` now implements the Java three-argument `SimpleDB` constructor's first
-composition behavior: it creates the file manager, then the log manager for `simpledb.log`, then the buffer manager using
-the supplied directory, block size, and buffer count. It returns the complete manager set only after all three succeed;
-initialization failures are wrapped with the failing stage and no partial set is returned. The one-argument constructor
-adds recovery, metadata initialization, planner selection, and transaction commit; those effects remain separate
-behaviors.
+have a JDBC adapter. `internal/server.NewManagers` now creates the file manager, then the log manager for `simpledb.log`,
+then the buffer manager using the supplied directory, block size, and buffer count, and finally a fresh in-memory metadata
+facade. It returns the complete manager set only after the fallible storage managers succeed; initialization failures are
+wrapped with the failing stage and no partial set is returned. Every successful server manager set owns an independent
+metadata facade. The facade's catalog file initialization is a separate transaction-backed operation. Process-restart
+recovery, planner selection, and transaction commit remain separate behaviors.
 
 `Managers.NewTransaction` uses one ID allocator and lock table shared by the manager set, while each returned transaction
 keeps its own buffer ownership. Creation appends a START record to the shared log and supplies the log iterator needed
@@ -52,6 +54,7 @@ actual scope requires SQL driver compatibility.
 | Test | Observable behavior |
 | --- | --- |
 | `TestNewManagersUsesConfiguredFileLogAndBufferManagers` | Explicit block size and buffer count reach the constructed managers, and the log gets its initial block |
+| `TestNewManagersCreatesIndependentMetadataManagers` | Each successful manager set receives a distinct, non-nil metadata facade |
 | `TestNewManagersReturnsNoManagersWhenFileManagerFails` | Directory creation failure is wrapped and exposes no partial manager set |
 | `TestNewManagersReturnsNoManagersWhenLogManagerFails` | An unusable log block size is reported after file-manager creation with no partial manager set |
 | `TestNewManagersReturnsNoManagersWhenBufferManagerFails` | Invalid buffer capacity is reported after log initialization with no partial manager set |
@@ -63,8 +66,9 @@ actual scope requires SQL driver compatibility.
 | `TestManagersNewTransactionUsesFileBackedStorage` | A committed transaction writes through the configured file and buffer managers |
 
 The manager-composition tests first failed to compile because `NewManagers` did not exist. The transaction tests first
-failed because `Managers.NewTransaction` did not exist. They use temporary database directories and keep each behavior
-separate from process-restart recovery, metadata and planner bootstrap, and JDBC client operations.
+failed because `Managers.NewTransaction` did not exist, and the metadata test first failed because `Managers.Metadata`
+did not exist. They use temporary database directories and keep each behavior separate from process-restart recovery,
+catalog initialization, planner setup, and JDBC client operations.
 
 ## Intentional differences
 
