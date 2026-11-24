@@ -708,6 +708,23 @@ varchar and integer fields, ascending copy order, last-slot deletion without cop
 typed-nil page state, negative counts and out-of-range slots, malformed layouts, int and int32 offset overflow, and
 wrapped count-read, field-copy, and count-write errors.
 
+## Feature 53: Format a B-tree page
+
+Java `BTPage.format` writes the page flag and empty record count, then initializes each complete slot that fits after
+the eight-byte header. Go's `Page.Format` validates the target block and retained schema/layout, reads the transaction
+block size, and writes integer fields as zero and varchar fields as empty strings in schema order. Every initialization
+write disables transaction logging, matching Java's caller-managed page setup; the method does not change pin state.
+Offsets are checked against the transaction's signed 32-bit write API before the first write, and storage errors retain
+their causes. Since partial format writes are unlogged, the caller must not publish the target block if formatting
+fails. The [page format diagram](../diagrams/ch11-btree-page-format.svg) shows the header, full slots, and unused tail;
+its editable source is [`ch11-btree-page-format.drawio`](../diagrams/ch11-btree-page-format.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.Format` was undefined. Tests verify signed flags, zero count, integer and
+varchar defaults, schema write order, complete-slot boundaries, disabled logging, caller-owned pin state, invalid page,
+target and layout metadata, block-size and offset errors, and wrapped failures for header and default-value writes.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

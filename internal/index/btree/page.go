@@ -622,6 +622,76 @@ func (page *Page) Delete(slot int) error {
 	return nil
 }
 
+// Format initializes block with a flag, an empty record count, and default values for each complete slot.
+func (page *Page) Format(block storage.BlockID, flag int32) error {
+	if page == nil {
+		return fmt.Errorf("format B-tree page block %v: page is nil", block)
+	}
+	if isNilPageTransaction(page.transaction) {
+		return fmt.Errorf("format B-tree page block %v: transaction is nil", block)
+	}
+	if page.layout == nil {
+		return fmt.Errorf("format B-tree page block %v: layout is nil", block)
+	}
+	if block.FileName() == "" {
+		return fmt.Errorf("format B-tree page block %v: target file name is empty", block)
+	}
+	if block.Number() < 0 {
+		return fmt.Errorf("format B-tree page block %v: target block number is negative", block)
+	}
+	fields, err := btreeRecordFields(page.layout)
+	if err != nil {
+		return fmt.Errorf("format B-tree page block %v: invalid layout: %w", block, err)
+	}
+	if len(fields) == 0 {
+		return fmt.Errorf("format B-tree page block %v: layout schema has no fields", block)
+	}
+	blockSize, err := page.transaction.BlockSize()
+	if err != nil {
+		return fmt.Errorf("format B-tree page block %v: read block size: %w", block, err)
+	}
+	const headerSize = 8
+	if blockSize < headerSize {
+		return fmt.Errorf("format B-tree page block %v: block size %d is smaller than header size %d", block, blockSize, headerSize)
+	}
+	slotSize := page.layout.SlotSize()
+	slotCount := (blockSize - headerSize) / slotSize
+	if slotCount > 0 {
+		lastSlot := slotCount - 1
+		lastBase := headerSize + lastSlot*slotSize
+		for _, field := range fields {
+			position := lastBase + field.offset
+			if position > math.MaxInt32 {
+				return fmt.Errorf("format B-tree page block %v: field %q offset %d exceeds int32 range", block, field.name, position)
+			}
+		}
+	}
+
+	if err := page.transaction.SetInt(block, 0, flag, false); err != nil {
+		return fmt.Errorf("format B-tree page block %v: write flag: %w", block, err)
+	}
+	if err := page.transaction.SetInt(block, 4, 0, false); err != nil {
+		return fmt.Errorf("format B-tree page block %v: write record count: %w", block, err)
+	}
+	for slot := 0; slot < slotCount; slot++ {
+		base := headerSize + slot*slotSize
+		for _, field := range fields {
+			position := base + field.offset
+			switch field.typeOf {
+			case record.IntegerField:
+				if err := page.transaction.SetInt(block, int32(position), 0, false); err != nil {
+					return fmt.Errorf("format B-tree page block %v: initialize field %q in slot %d at offset %d: %w", block, field.name, slot, position, err)
+				}
+			case record.VarcharField:
+				if err := page.transaction.SetString(block, int32(position), "", false); err != nil {
+					return fmt.Errorf("format B-tree page block %v: initialize field %q in slot %d at offset %d: %w", block, field.name, slot, position, err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (page *Page) insertSlot(slot int, value query.Constant) (int32, error) {
 	if page == nil {
 		return 0, fmt.Errorf("page is nil")
