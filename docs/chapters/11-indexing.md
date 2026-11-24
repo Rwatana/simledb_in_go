@@ -11,7 +11,7 @@ implementation can preserve the same interface.
 | --- | --- | --- |
 | `internal/index.Index` | `simpledb/index/Index.java` | Position by a search key, traverse matching entries, return data RIDs, mutate value/RID entries, and close resources |
 | `internal/index/hash.HashIndex` | `simpledb/index/hash/HashIndex.java` | Retain the transaction, index name, record layout, and current traversal state for a static hash index |
-| `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java` | Retain one B-tree block and layout while the transaction has it pinned |
+| `internal/index/btree.Page` | `simpledb/index/btree/BTPage.java` | Retain and pin a B-tree block, then position before a sorted search key |
 | `internal/index/query.IndexSelectScan` | `simpledb/index/query/IndexSelectScan.java` | Adapt index matches to a query record scan and expose the selected record's fields |
 | `internal/index/query.IndexJoinScan` | `simpledb/index/query/IndexJoinScan.java` | Position a right-side index lookup from the current left join value |
 | `internal/metadata.IndexInfo` | `simpledb/metadata/IndexInfo.java` | Open the configured static hash index using the retained transaction and index-record layout |
@@ -471,6 +471,23 @@ The focused tests first failed because `NewPage` and `PageTransaction` were unde
 requested block, retained state, nil and typed-nil transaction rejection, missing layout/schema, invalid block
 identifiers, and a pin failure whose original cause remains inspectable. The constructor performs no page reads or
 writes.
+
+## Feature 37: Position before a B-tree search key
+
+Java `BTPage.findSlotBefore` scans sorted `dataval` entries and returns the slot immediately before the first value
+that is greater than or equal to the requested key. Go's `Page.FindSlotBefore` reads the page record count at byte
+offset 4, calculates each field position from the eight-byte page header and record layout, and supports integer and
+varchar keys; varchar ordering follows Java's UTF-16 code units. Duplicate keys return the position before the first duplicate; empty pages and keys preceding the first
+entry return `-1`. Invalid types, malformed offsets, negative record counts, and storage read failures are returned as
+contextual errors without changing the pinned page. The [B-tree slot search diagram](../diagrams/ch11-btree-slot-search.svg)
+shows the lower-bound position and duplicate behavior; its editable source is
+[`ch11-btree-slot-search.drawio`](../diagrams/ch11-btree-slot-search.drawio).
+
+### Test-first record
+
+The focused tests first failed because `Page.FindSlotBefore` was undefined. Tests cover integer and varchar ordering,
+empty pages, keys below/at/between/above values, duplicates, invalid and typed-nil state, absent or malformed
+`dataval` metadata, unset or mismatched keys, negative counts, offset overflow, and wrapped header/value read failures.
 
 ## Intentional differences from Java
 
