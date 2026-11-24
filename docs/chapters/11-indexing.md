@@ -344,6 +344,16 @@ The focused test first failed because `IndexJoinScan.Next` was undefined. Tests 
 different left keys, final exhaustion, empty input, invalid scan state, and errors from index iteration/RID retrieval,
 right-side movement, left advancement/value retrieval, and index repositioning.
 
+## Feature 26: Read integer fields from index join scans
+
+`IndexJoinScan.GetInt` reads from the right table when its schema contains the requested field; otherwise it delegates to
+the left scan. Failures are contextual and retain their wrapped causes.
+
+### Test-first record
+
+The focused tests first failed because `IndexJoinScan.GetInt` was undefined. Tests verify right-first and left-fallback
+routing, returned values, nil receiver and dependency validation, and wrapped read errors from both selected scans.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.

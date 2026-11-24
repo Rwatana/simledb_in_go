@@ -111,3 +111,28 @@ func (scan *IndexJoinScan) Next() (bool, error) {
 		}
 	}
 }
+
+// GetInt reads an integer field from the right scan when present, otherwise from the left scan.
+func (scan *IndexJoinScan) GetInt(fieldName string) (int32, error) {
+	if scan == nil {
+		return 0, fmt.Errorf("read integer field %q through nil index join scan", fieldName)
+	}
+	if scan.lhs == nil {
+		return 0, fmt.Errorf("read integer field %q through index join scan: left scan is nil", fieldName)
+	}
+	if scan.rhs == nil || scan.rhs.TableScan == nil {
+		return 0, fmt.Errorf("read integer field %q through index join scan: right table scan is nil", fieldName)
+	}
+	if scan.rhs.HasField(fieldName) {
+		value, err := scan.rhs.GetInt(fieldName)
+		if err != nil {
+			return 0, fmt.Errorf("read integer field %q through index join scan right table: %w", fieldName, err)
+		}
+		return value, nil
+	}
+	value, err := scan.lhs.GetInt(fieldName)
+	if err != nil {
+		return 0, fmt.Errorf("read integer field %q through index join scan left scan: %w", fieldName, err)
+	}
+	return value, nil
+}
