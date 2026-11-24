@@ -115,6 +115,10 @@ its successor; failures return no transaction ID. Tests inspect the ordered STAR
 failure plus the post-commit replacement-start failure. The separate coverage workflow enforces 100.0% in every
 executable package and function.
 
+Issue #1171 adds `DriverService.Rollback`, which durably rolls back the connection transaction and starts its successor.
+Tests inspect the ROLLBACK/START record sequence and cover invalid state, rollback failure, and a failed successor START
+that leaves the completed transaction detached. The independent coverage workflow keeps all executable code at 100.0%.
+
 ## Historical coverage checkpoints
 
 The figures and audit notes below are historical snapshots. They describe the state at the named checkpoint, not the
