@@ -966,6 +966,20 @@ The focused tests first failed because `Leaf.Insert` was undefined. Tests verify
 position, RID fields, nil directory result, capacity rejection, wrapped errors, invalid cursor state, and unchanged page
 ownership on success and failure.
 
+## Feature 69: Close a B-tree leaf cursor
+
+Java `BTreeLeaf.close` releases the page pin retained by the cursor. Go's `Leaf.Close` delegates to `Page.Close`, clears
+the cursor's page reference only after a successful unpin, and returns a contextual error that preserves an unpin
+failure. A failed close retains the page so the caller can retry; repeated close after success is a no-op, while later
+cursor operations report that no page is open. The existing [B-tree page lifecycle diagram](../diagrams/ch11-btree-page-pin.svg)
+already shows the page pin/unpin boundary and is reused here instead of drawing that same transition again.
+
+### Test-first record
+
+The focused tests first failed because `Leaf.Close` was undefined. They verify one unpin on success, idempotent repeated
+close, closed-cursor errors from the other public operations, preservation of the page after a wrapped unpin failure,
+successful retry, and nil-receiver validation.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
