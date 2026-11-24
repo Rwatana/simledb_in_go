@@ -28,7 +28,7 @@
 | 10 | Planning | 実装中 | [query plan contract、TablePlan/SelectPlan/ProductPlan/ProjectPlanのscan・schema・estimateの解説・実装記録](docs/chapters/10-planning.md) |
 | 11 | JDBC Interfaces | 実装中 | [server managers、embedded database/sql connector、SQL planningとJava source map](docs/chapters/11-jdbc-interfaces.md) |
 | 12 | Indexing | 実装中 | [index traversal contractと索引実装の解説・実装記録](docs/chapters/12-indexing.md) |
-| 13 | Materialization and Sorting | 実装中 | [一時テーブル記述子・scan・MaterializePlan・ソート比較器の解説・実装記録](docs/chapters/13-materialization-and-sorting.md) |
+| 13 | Materialization and Sorting | 実装中 | [一時テーブル記述子・MaterializePlan・比較器・SortScanの解説・実装記録](docs/chapters/13-materialization-and-sorting.md) |
 | 14 | Effective Buffer Utilization | 未着手 | — |
 | 15 | Query Optimization | 未着手 | — |
 
