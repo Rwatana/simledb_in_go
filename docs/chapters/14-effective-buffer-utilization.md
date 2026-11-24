@@ -9,7 +9,9 @@ operations.
 | Go area | Java reference | Responsibility |
 | --- | --- | --- |
 | `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
-| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
+| `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` (`beforeFirst`, `next`, `getInt`, `getString`, `hasField`) | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
+| `internal/plan.ChunkValueScan` | `simpledb/multibuffer/ChunkScan.java` (`getVal`) | Adapt typed chunk field reads to query constants without making `multibuffer` depend on `query` |
+
 
 ## Feature 1: Choose a safe buffer root
 
@@ -100,26 +102,6 @@ independent behaviors.
 The focused tests cover every executable statement and function. The module coverage workflow continues to require
 100.0% statement coverage for every executable package, function, and module total.
 
-## Feature 8: Report declared field membership
-
-`ChunkScan.HasField` consults the scan layout's schema and does not depend on cursor position or page lifecycle. A nil
-receiver, zero-value scan, or layout without a schema reports false. The method does not pin pages or read record data.
-
-### Test-first record
-
-Focused compilation first failed because `ChunkScan.HasField` was undefined. Tests cover integer and varchar fields,
-missing and empty names, nil and zero-value scans, closed scans, and the absence of transaction reads or new pins.
-
-### Design decision
-
-The chunk scan delegates membership to `record.Schema` because field existence is schema metadata rather than a current
-record value. Query-value conversion and query-plan integration remain separate behaviors.
-
-### Validation
-
-The focused package suite covers every executable statement and function. The module coverage workflow continues to
-require 100.0% statement coverage for every executable package, function, and module total.
-
 ## Feature 4: Advance within the active chunk block
 
 `ChunkScan.BeforeFirst` positions the cursor before slot -1 in the first pinned page. `ChunkScan.Next` uses the active
@@ -144,6 +126,7 @@ the next block is not selected implicitly in this feature.
 
 The focused tests cover every executable statement and function. The module coverage workflow continues to require
 100.0% statement coverage for every executable package, function, and module total.
+
 ## Feature 5: Advance across chunk blocks
 
 When `ChunkScan.Next` reaches the end of its active page, it advances to each remaining pinned page, resets the slot
@@ -209,6 +192,49 @@ pages, unchanged cursor and pins, missing field names, wrapped transaction read 
 
 The accessor delegates offset calculation and field lookup to `RecordPage.GetString`; it adds block context while
 preserving the storage error. Query-value conversion and field-membership checks remain separate behaviors.
+
+### Validation
+
+The focused tests cover every executable statement and function. The module coverage workflow continues to require
+100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 8: Report declared field membership
+
+`ChunkScan.HasField` consults the scan layout's schema and does not depend on cursor position or page lifecycle. A nil
+receiver, zero-value scan, or layout without a schema reports false. The method does not pin pages or read record data.
+
+### Test-first record
+
+Focused compilation first failed because `ChunkScan.HasField` was undefined. Tests cover integer and varchar fields,
+missing and empty names, nil and zero-value scans, closed scans, and the absence of transaction reads or new pins.
+
+### Design decision
+
+The chunk scan delegates membership to `record.Schema` because field existence is schema metadata rather than a current
+record value. Query-value conversion and query-plan integration remain separate behaviors.
+
+### Validation
+
+The focused package suite covers every executable statement and function. The module coverage workflow continues to
+require 100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 9: Read query values from a chunk record
+
+`plan.ChunkValueScan` embeds a `multibuffer.ChunkScan` and converts the current record field to the matching
+`query.Constant`. Integer and varchar fields use the chunk scan's typed getters, so cursor validation, active-page
+selection, storage error context, and pin ownership remain centralized in the lower-level scan.
+
+### Test-first record
+
+Focused compilation first failed because `ChunkValueScan` and `NewChunkValueScan` were undefined. Tests cover integer
+and string constants on the first and later pages, repeated reads without advancing, missing fields, wrapped storage
+errors, unsupported schema types, and unavailable adapter/cursor states that must not read field data.
+
+### Design decision
+
+The adapter lives in `plan`, which can depend on both `multibuffer` and `query`; `multibuffer` remains independent of
+the query constant type. The wrapper embeds the existing chunk scan to preserve traversal, field access, metadata, and
+close behavior instead of duplicating cursor or resource ownership.
 
 ### Validation
 
