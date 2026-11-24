@@ -406,6 +406,20 @@ The focused tests first failed because `IndexJoinPlan` was undefined. Tests veri
 order and definitions, that the combined schema is independent of later child schema changes, missing child schemas,
 and nil receiver behavior.
 
+## Feature 32: Open index join plans
+
+Java `IndexJoinPlan.open` opens the left input, casts the right input to a table scan, opens the index, and constructs an
+`IndexJoinScan`. Go's `IndexJoinPlan.Open` requires the right child to provide an initialized `query.RecordScan`, rejects
+missing or typed-nil scans safely, and returns contextual errors while preserving their causes. If opening or scan
+initialization fails, it attempts to close every already-opened scan and index and joins cleanup errors with the primary
+failure.
+
+### Test-first record
+
+The focused tests first failed because `IndexJoinPlan.Open` was undefined. Tests verify the initialized scan type and
+resource release, nil plan dependencies and child scans, typed-nil scans, incompatible right scan types, partial child
+open failures, left positioning/advancement/join-value errors, index positioning errors, and cleanup failures.
+
 ## Intentional differences from Java
 
 - Fallible operations return Go `error` values instead of relying on unchecked Java calls or exceptions.
