@@ -26,11 +26,14 @@ func newIndexJoinIntegerRecordScan(t *testing.T, transaction record.TableScanTra
 
 type indexJoinIntegerTransaction struct {
 	*positioningTransaction
-	value        int32
-	getIntErr    error
-	getIntCalls  int
-	getIntBlock  storage.BlockID
-	getIntOffset int
+	value          int32
+	stringValue    string
+	getIntErr      error
+	getStringErr   error
+	getIntCalls    int
+	getStringCalls int
+	getIntBlock    storage.BlockID
+	getIntOffset   int
 }
 
 func (transaction *indexJoinIntegerTransaction) GetInt(block storage.BlockID, offset int) (int32, error) {
@@ -41,6 +44,14 @@ func (transaction *indexJoinIntegerTransaction) GetInt(block storage.BlockID, of
 		return 0, transaction.getIntErr
 	}
 	return transaction.value, nil
+}
+
+func (transaction *indexJoinIntegerTransaction) GetString(storage.BlockID, int) (string, error) {
+	transaction.getStringCalls++
+	if transaction.getStringErr != nil {
+		return "", transaction.getStringErr
+	}
+	return transaction.stringValue, nil
 }
 
 func TestNewIndexJoinScanPositionsIndexFromFirstLeftRow(t *testing.T) {
@@ -245,6 +256,97 @@ func TestIndexJoinScanGetIntWrapsSelectedScanErrors(t *testing.T) {
 	leftIndexJoinScan := &IndexJoinScan{lhs: leftScan, rhs: newPositioningTableScan(t)}
 	if _, err := leftIndexJoinScan.GetInt("student_id"); !errors.Is(err, leftErr) || !strings.Contains(err.Error(), "left scan") {
 		t.Fatalf("left GetInt() error = %v, want wrapped cause %v", err, leftErr)
+	}
+}
+
+func TestIndexJoinScanGetValReadsRightTableFieldsAndPreservesType(t *testing.T) {
+	transaction := &indexJoinIntegerTransaction{
+		positioningTransaction: &positioningTransaction{},
+		value:                  73,
+		stringValue:            "Ada",
+	}
+	schema := &record.Schema{}
+	schema.AddIntegerField("id")
+	schema.AddVarcharField("name", 12)
+	right, err := query.NewRecordScan(transaction, "students", record.NewLayout(schema))
+	if err != nil {
+		t.Fatalf("NewRecordScan() error = %v", err)
+	}
+	if err := right.MoveToRID(record.NewRID(0, 2)); err != nil {
+		t.Fatalf("right MoveToRID() error = %v", err)
+	}
+	left := &indexJoinLeftScan{fieldNames: map[string]bool{"id": true, "name": true}}
+	scan := &IndexJoinScan{lhs: left, rhs: right}
+
+	gotInt, err := scan.GetVal("id")
+	if err != nil || !gotInt.Equal(query.NewIntConstant(73)) {
+		t.Fatalf("GetVal(\"id\") = (%v, %v), want integer constant 73", gotInt, err)
+	}
+	gotString, err := scan.GetVal("name")
+	if err != nil || !gotString.Equal(query.NewStringConstant("Ada")) {
+		t.Fatalf("GetVal(\"name\") = (%v, %v), want string constant Ada", gotString, err)
+	}
+	if len(left.getValFields) != 0 {
+		t.Fatalf("left GetVal calls = %v, want none when right declares both fields", left.getValFields)
+	}
+}
+
+func TestIndexJoinScanGetValReadsLeftWhenRightDoesNotDeclareField(t *testing.T) {
+	leftValue := query.NewStringConstant("A-1")
+	left := &indexJoinLeftScan{
+		rows:       []map[string]query.Constant{{"student_id": leftValue}},
+		fieldNames: map[string]bool{"student_id": true},
+	}
+	scan := &IndexJoinScan{lhs: left, rhs: newPositioningTableScan(t)}
+
+	got, err := scan.GetVal("student_id")
+	if err != nil || !got.Equal(leftValue) {
+		t.Fatalf("GetVal(\"student_id\") = (%v, %v), want left value %v", got, err, leftValue)
+	}
+	if len(left.getValFields) != 1 || left.getValFields[0] != "student_id" {
+		t.Fatalf("left GetVal calls = %v, want [student_id]", left.getValFields)
+	}
+}
+
+func TestIndexJoinScanGetValValidatesReceiverAndDependencies(t *testing.T) {
+	right := newPositioningTableScan(t)
+	left := &indexJoinLeftScan{}
+	tests := []struct {
+		name string
+		scan *IndexJoinScan
+		want string
+	}{
+		{name: "nil receiver", want: "nil index join scan"},
+		{name: "left scan", scan: &IndexJoinScan{rhs: right}, want: "left scan is nil"},
+		{name: "right scan", scan: &IndexJoinScan{lhs: left}, want: "right table scan is nil"},
+		{name: "right table scan", scan: &IndexJoinScan{lhs: left, rhs: &query.RecordScan{}}, want: "right table scan is nil"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := test.scan.GetVal("student_id")
+			if got != (query.Constant{}) || err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("GetVal() = (%v, %v), want error containing %q", got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestIndexJoinScanGetValWrapsSelectedScanErrors(t *testing.T) {
+	rightErr := errors.New("right query value failed")
+	rightTransaction := &indexJoinIntegerTransaction{positioningTransaction: &positioningTransaction{}, getIntErr: rightErr}
+	right := newIndexJoinIntegerRecordScan(t, rightTransaction, "id")
+	if err := right.MoveToRID(record.NewRID(0, 2)); err != nil {
+		t.Fatalf("right MoveToRID() error = %v", err)
+	}
+	left := &indexJoinLeftScan{fieldNames: map[string]bool{"id": true}}
+	if _, err := (&IndexJoinScan{lhs: left, rhs: right}).GetVal("id"); !errors.Is(err, rightErr) || !strings.Contains(err.Error(), "right table") {
+		t.Fatalf("right GetVal() error = %v, want wrapped cause %v", err, rightErr)
+	}
+
+	leftErr := errors.New("left query value failed")
+	left = &indexJoinLeftScan{fieldNames: map[string]bool{"student_id": true}, getValErr: leftErr}
+	if _, err := (&IndexJoinScan{lhs: left, rhs: newPositioningTableScan(t)}).GetVal("student_id"); !errors.Is(err, leftErr) || !strings.Contains(err.Error(), "left scan") {
+		t.Fatalf("left GetVal() error = %v, want wrapped cause %v", err, leftErr)
 	}
 }
 
