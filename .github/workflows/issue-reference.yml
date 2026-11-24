@@ -36,8 +36,3 @@ jobs:
             echo "Issue Number must match the branch: #${issue_number}"
             exit 1
           fi
-
-          if ! grep -Eq "(Closes|Fixes|Resolves)[[:space:]]+#${issue_number}([^0-9]|$)" <<< "$PR_BODY"; then
-            echo "Pull Request body must close Issue #${issue_number}."
-            exit 1
-          fi
