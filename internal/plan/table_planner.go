@@ -9,6 +9,9 @@ import (
 	"github.com/Rwatana/simledb_in_go/internal/record"
 )
 
+// ProductPlanFactory builds a product plan from its left and right inputs.
+type ProductPlanFactory func(left Plan, right Plan) Plan
+
 // TablePlannerMetadata provides the metadata needed to prepare one table for heuristic planning.
 type TablePlannerMetadata interface {
 	// Layout resolves the physical record layout for a table.
@@ -94,6 +97,19 @@ func (planner *TablePlanner) MakeSelectPlan() Plan {
 		return candidate
 	}
 	return NewSelectPlan(candidate, selectPredicate)
+}
+
+// MakeProductPlan filters this table's base scan, then passes it with current to factory.
+// It returns nil when planner, current, the base table plan, or factory is unavailable.
+func (planner *TablePlanner) MakeProductPlan(current Plan, factory ProductPlanFactory) Plan {
+	if planner == nil || isNilTablePlannerDependency(current) || planner.tablePlan == nil || factory == nil {
+		return nil
+	}
+	var tableInput Plan = planner.tablePlan
+	if selectPredicate, ok := planner.predicate.SelectSubPredicate(planner.schema); ok {
+		tableInput = NewSelectPlan(tableInput, selectPredicate)
+	}
+	return factory(current, tableInput)
 }
 
 // MakeJoinPlan builds an index join when a table index matches the join predicate, or a product join otherwise.

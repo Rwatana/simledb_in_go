@@ -28,6 +28,13 @@ func NewMultibufferProductPlan(transaction MultibufferProductPlanTransaction, le
 	return &MultibufferProductPlan{transaction: transaction, left: left, right: right}
 }
 
+// NewMultibufferProductPlanFactory binds a transaction to a table planner's product-plan factory.
+func NewMultibufferProductPlanFactory(transaction MultibufferProductPlanTransaction) plan.ProductPlanFactory {
+	return func(left, right plan.Plan) plan.Plan {
+		return NewMultibufferProductPlan(transaction, left, right)
+	}
+}
+
 // Schema returns the output schema by combining the left fields before the right fields.
 func (p *MultibufferProductPlan) Schema() *record.Schema {
 	if p == nil || p.left == nil || p.right == nil {

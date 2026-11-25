@@ -66,3 +66,27 @@ func TestMultibufferProductPlanSchemaReturnsNilForUnavailableChildren(t *testing
 		t.Errorf("nil right schema Schema() = %v, want nil", got)
 	}
 }
+
+func TestNewMultibufferProductPlanFactoryBindsTransactionAndInputs(t *testing.T) {
+	leftSchema := &record.Schema{}
+	leftSchema.AddIntegerField("department_id")
+	rightSchema := &record.Schema{}
+	rightSchema.AddIntegerField("student_department_id")
+	left := &materializePlan{schema: leftSchema}
+	right := &materializePlan{schema: rightSchema}
+	transaction := newMaterializePlanTransaction()
+
+	factory := NewMultibufferProductPlanFactory(transaction)
+	factoryResult := factory(left, right)
+	product, ok := factoryResult.(*MultibufferProductPlan)
+	if !ok {
+		t.Fatalf("factory result type = %T, want *MultibufferProductPlan", factoryResult)
+	}
+	if product.transaction != transaction || product.left != left || product.right != right {
+		t.Errorf("factory product = (%p, %p, %p), want (%p, %p, %p)",
+			product.transaction, product.left, product.right, transaction, left, right)
+	}
+	if left.openCalls != 0 || right.openCalls != 0 || transaction.calls != 0 {
+		t.Errorf("factory opened plans or accessed transaction: opens=%d/%d calls=%d", left.openCalls, right.openCalls, transaction.calls)
+	}
+}
