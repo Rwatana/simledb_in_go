@@ -946,3 +946,107 @@ func TestChooseLowestJoinPlanRejectsUnavailableCandidates(t *testing.T) {
 		})
 	}
 }
+
+func TestChooseLowestProductPlanSelectsMinimumAndRemovesWinner(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(1, 10))
+	planners := []*TablePlanner{
+		newSelectCandidate("first", 1, query.Predicate{}, transaction),
+		newSelectCandidate("best", 2, query.Predicate{}, transaction),
+		newSelectCandidate("last", 3, query.Predicate{}, transaction),
+	}
+	original := append([]*TablePlanner(nil), planners...)
+	records := map[string]int{"first": 20, "best": 5, "last": 9}
+	calls := make(map[string]int)
+	factory := func(left, right Plan) Plan {
+		if left != current {
+			t.Errorf("product factory left plan = %p, want current plan %p", left, current)
+		}
+		table, ok := right.(*TablePlan)
+		if !ok {
+			t.Errorf("product factory right plan type = %T, want *TablePlan", right)
+			return nil
+		}
+		calls[table.tableName]++
+		return &productPlanProbe{records: records[table.tableName]}
+	}
+
+	gotPlan, remaining, err := chooseLowestProductPlan(planners, current, factory)
+	if err != nil {
+		t.Fatalf("chooseLowestProductPlan() error = %v", err)
+	}
+	selected, ok := gotPlan.(*productPlanProbe)
+	if !ok || selected.records != records["best"] {
+		t.Errorf("selected plan = %T (%v), want product estimate %d", gotPlan, gotPlan, records["best"])
+	}
+	if len(remaining) != 2 || remaining[0] != planners[0] || remaining[1] != planners[2] {
+		t.Errorf("remaining planners = %v, want first and last in source order", remaining)
+	}
+	for index, planner := range original {
+		if planners[index] != planner {
+			t.Errorf("input planner %d changed from %p to %p", index, planner, planners[index])
+		}
+	}
+	for _, planner := range planners {
+		if calls[planner.tableName] != 1 {
+			t.Errorf("factory calls for %q = %d, want exactly one", planner.tableName, calls[planner.tableName])
+		}
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("product choice accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+	}
+}
+
+func TestChooseLowestProductPlanKeepsFirstCandidateOnTies(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(1, 10))
+	planners := []*TablePlanner{
+		newSelectCandidate("first", 4, query.Predicate{}, transaction),
+		newSelectCandidate("second", 4, query.Predicate{}, transaction),
+	}
+	factory := func(_, _ Plan) Plan {
+		return &productPlanProbe{records: 8}
+	}
+
+	gotPlan, remaining, err := chooseLowestProductPlan(planners, current, factory)
+	if err != nil {
+		t.Fatalf("chooseLowestProductPlan() error = %v", err)
+	}
+	if gotPlan == nil {
+		t.Fatal("chooseLowestProductPlan() plan = nil, want a product plan")
+	}
+	if len(remaining) != 1 || remaining[0] != planners[1] {
+		t.Errorf("remaining planners = %v, want only second", remaining)
+	}
+}
+
+func TestChooseLowestProductPlanRejectsUnavailableCandidates(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(1, 10))
+	factory := func(left, right Plan) Plan { return NewProductPlan(left, right) }
+	var typedNil Plan = (*TablePlan)(nil)
+	var typedNilCurrent Plan = (*TablePlan)(nil)
+	for _, test := range []struct {
+		name     string
+		planners []*TablePlanner
+		current  Plan
+		factory  ProductPlanFactory
+		wantText string
+	}{
+		{name: "empty planners", current: current, factory: factory, wantText: "no table planners"},
+		{name: "nil current", planners: []*TablePlanner{newSelectCandidate("student", 1, query.Predicate{}, transaction)}, factory: factory, wantText: "current plan is nil"},
+		{name: "typed nil current", planners: []*TablePlanner{newSelectCandidate("student", 1, query.Predicate{}, transaction)}, current: typedNilCurrent, factory: factory, wantText: "current plan is nil"},
+		{name: "nil factory", planners: []*TablePlanner{newSelectCandidate("student", 1, query.Predicate{}, transaction)}, current: current, wantText: "product factory is nil"},
+		{name: "nil planner", planners: []*TablePlanner{nil}, current: current, factory: factory, wantText: "table planner at index 0 is nil"},
+		{name: "nil table plan", planners: []*TablePlanner{{tableName: "student"}}, current: current, factory: factory, wantText: `table plan for "student" is nil`},
+		{name: "nil factory result", planners: []*TablePlanner{newSelectCandidate("student", 1, query.Predicate{}, transaction)}, current: current, factory: func(Plan, Plan) Plan { return nil }, wantText: `product plan for "student" is nil`},
+		{name: "typed nil factory result", planners: []*TablePlanner{newSelectCandidate("student", 1, query.Predicate{}, transaction)}, current: current, factory: func(Plan, Plan) Plan { return typedNil }, wantText: `product plan for "student" is nil`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, remaining, err := chooseLowestProductPlan(test.planners, test.current, test.factory)
+			if plan != nil || remaining != nil || err == nil || !strings.Contains(err.Error(), test.wantText) {
+				t.Errorf("chooseLowestProductPlan() = (%v, %v, %v), want no plan, no remainder, and error containing %q", plan, remaining, err, test.wantText)
+			}
+		})
+	}
+}

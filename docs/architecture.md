@@ -94,7 +94,9 @@ The Chapter 15 `chooseLowestSelectPlan` helper starts a join order with the leas
 retains source order for ties, and returns the other table planners without mutating the caller's slice.
 `chooseLowestJoinPlan` then evaluates each remaining applicable join once, chooses the smallest output estimate, and
 removes only that planner while preserving source order. When no join applies it leaves every planner available for the
-separate product-fallback step; projection orchestration remains separate.
+separate product-fallback step. `chooseLowestProductPlan` builds each product through the supplied factory, chooses the
+lowest output estimate, and removes only the winner. This lets heuristic planning use either the basic or multibuffer
+product implementation without changing package dependencies; projection orchestration remains separate.
 
 ## テスト方針
 
