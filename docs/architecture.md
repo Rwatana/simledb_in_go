@@ -48,6 +48,11 @@ Chapter 2で確認した`Connection`や`ResultSet`の責務も、その名前の
 作る根拠にはしない。接続方式、cursor、metadataのうち、実際の利用側が必要とする操作だけを
 その利用側のpackageに定義する。
 
+`server.Managers.SetQueryPlannerStrategy` can select the Chapter 15 heuristic planner alongside the basic and
+cost-aware choices. The server adapter binds a `materialize.MultibufferProductPlanFactory` only when the caller's
+transaction implements the required multibuffer surface; `plan` remains independent of `materialize`, and the
+transaction stays caller-owned.
+
 Chapter 14's `multibuffer.ChunkScan` stays independent of query value types. The Chapter 14
 `plan.ChunkValueScan` adapter composes that lower-level cursor with `query.Constant` conversion at the planner
 edge; the optimization cursor remains reusable without importing its consumer's value model. The
