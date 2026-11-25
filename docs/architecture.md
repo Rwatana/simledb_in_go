@@ -58,6 +58,8 @@ the next bounded range releases the old right chunk first, then pins the next ra
 scan. Partial pin cleanup failures retain a retryable close handle on the plan scan.
 `MultibufferProductScan.GetVal` forwards current-row field reads to the active `query.ProductScan`, preserving the
 query constant model and adding product/field context without moving either input cursor or changing chunk pins.
+`MultibufferProductScan.HasField` instead consults the caller-owned left scan and retained right-layout schema,
+keeping field-membership metadata independent of product-row state and lazy product construction.
 
 ## テスト方針
 

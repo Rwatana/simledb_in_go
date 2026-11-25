@@ -200,6 +200,15 @@ func (scan *MultibufferProductScan) GetVal(fieldName string) (query.Constant, er
 	return value, nil
 }
 
+// HasField reports whether either input schema declares fieldName.
+func (scan *MultibufferProductScan) HasField(fieldName string) bool {
+	if scan == nil || scan.transaction == nil || scan.left == nil || scan.layout == nil {
+		return false
+	}
+	schema := scan.layout.Schema()
+	return schema != nil && (scan.left.HasField(fieldName) || schema.HasField(fieldName))
+}
+
 func (scan *MultibufferProductScan) useNextChunk() error {
 	if scan.nextBlock >= scan.fileSize {
 		return nil

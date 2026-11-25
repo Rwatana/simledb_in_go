@@ -363,3 +363,27 @@ Field-specific convenience accessors and query-plan construction remain separate
 
 The focused `internal/plan` tests cover every executable statement and function. The independent coverage workflow
 requires 100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 14: Report fields available from a multibuffer product
+
+`MultibufferProductScan.HasField` reports whether the caller-owned left scan or the right record-layout schema
+declares a field. It is schema metadata, so it works before traversal, after rewind or exhaustion, for an empty right
+relation, and after close. Nil, zero-value, and schema-less scans report false. The check does not create the lazy
+`query.ProductScan`, read a row, move either input, or change right-chunk pins.
+
+### Test-first record
+
+Focused compilation first failed because `MultibufferProductScan.HasField` was undefined. Tests cover left/right
+field unions, absent names, empty relations, nil/zero/schema-less scans, and calls before, during, and after traversal
+and close while checking row-read and page-pin state.
+
+### Design decision
+
+Field membership depends on the two input schemas, not on the current product row or active chunk. The plan scan
+checks the left scan and the retained right layout directly, avoiding creation of the lazy row-pairing operator and
+keeping metadata queries independent of cursor and resource lifecycle.
+
+### Validation
+
+The focused `internal/plan` tests cover every executable statement and function. The independent coverage workflow
+requires 100.0% statement coverage for every executable package, function, and module total.

@@ -1021,6 +1021,91 @@ func TestMultibufferProductScanReadsValuesFromCurrentProductRow(t *testing.T) {
 	}
 }
 
+func TestMultibufferProductScanReportsFieldMembershipWithoutReadingRows(t *testing.T) {
+	layout := chunkValueLayout(false)
+	idOffset, _ := layout.Offset("id")
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize: 128,
+			intValues: map[int]map[int]int32{0: {0: 1, idOffset: 100}},
+		},
+		fileSize:  1,
+		available: 4,
+	}
+	left := &multibufferProductLeftRows{values: []int32{10}, position: -1}
+	scan, err := NewMultibufferProductScan(transaction, left, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	initialPins := append([]storage.BlockID(nil), transaction.pins...)
+	if !scan.HasField("left") || !scan.HasField("id") || !scan.HasField("name") || scan.HasField("missing") {
+		t.Fatal("HasField() did not report the union of left and right schema fields")
+	}
+	if scan.product != nil || left.nextCalls != 0 || left.beforeFirstCalls != 1 || len(transaction.intReads) != 0 || len(transaction.stringReads) != 0 {
+		t.Fatalf("HasField() accessed rows: product=%v left next=%d rewind=%d int reads=%v string reads=%v", scan.product, left.nextCalls, left.beforeFirstCalls, transaction.intReads, transaction.stringReads)
+	}
+	if !reflect.DeepEqual(transaction.pins, initialPins) || len(transaction.unpins) != 0 {
+		t.Fatalf("HasField() changed pins: pins=%v unpins=%v", transaction.pins, transaction.unpins)
+	}
+	if ok, err := scan.Next(); err != nil || !ok {
+		t.Fatalf("Next() = (%v, %v), want a product row", ok, err)
+	}
+	if !scan.HasField("left") || !scan.HasField("id") {
+		t.Fatal("HasField() lost schema membership on a current row")
+	}
+	if ok, err := scan.Next(); err != nil || ok {
+		t.Fatalf("Next() after one product row = (%v, %v), want exhaustion", ok, err)
+	}
+	if !scan.HasField("left") || !scan.HasField("id") {
+		t.Fatal("HasField() changed after exhaustion")
+	}
+	if err := scan.BeforeFirst(); err != nil {
+		t.Fatalf("BeforeFirst() after exhaustion: %v", err)
+	}
+	if !scan.HasField("left") || !scan.HasField("id") {
+		t.Fatal("HasField() changed after rewind")
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close(): %v", err)
+	}
+	closedPins := append([]storage.BlockID(nil), transaction.unpins...)
+	if !scan.HasField("left") || !scan.HasField("id") || scan.HasField("missing") {
+		t.Fatal("HasField() should remain schema-based after Close")
+	}
+	if !reflect.DeepEqual(transaction.unpins, closedPins) || left.nextCalls != 2 {
+		t.Fatalf("HasField() changed closed scan state: unpins=%v left next=%d", transaction.unpins, left.nextCalls)
+	}
+}
+
+func TestMultibufferProductScanReportsRightFieldsForEmptyRelation(t *testing.T) {
+	transaction := &multibufferProductTransaction{fileSize: 0}
+	scan, err := NewMultibufferProductScan(transaction, &multibufferProductLeftProbe{}, "empty", chunkValueLayout(false))
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if !scan.HasField("id") || !scan.HasField("name") || scan.HasField("missing") {
+		t.Fatal("HasField() did not use declared schema fields for an empty right relation")
+	}
+	if len(transaction.pins) != 0 || len(transaction.unpins) != 0 || transaction.availableCalls != 0 {
+		t.Fatalf("HasField() touched empty relation resources: pins=%v unpins=%v buffer checks=%d", transaction.pins, transaction.unpins, transaction.availableCalls)
+	}
+}
+
+func TestMultibufferProductScanHasFieldAcceptsNilZeroAndSchemaLessScans(t *testing.T) {
+	var nilScan *MultibufferProductScan
+	if nilScan.HasField("id") {
+		t.Fatal("nil HasField() = true, want false")
+	}
+	if (&MultibufferProductScan{}).HasField("id") {
+		t.Fatal("zero-value HasField() = true, want false")
+	}
+	left := &multibufferProductLeftRows{values: []int32{10}, position: -1}
+	scan := &MultibufferProductScan{transaction: &multibufferProductTransaction{}, left: left}
+	if scan.HasField("left") {
+		t.Fatal("HasField() on a schema-less partial scan = true, want false")
+	}
+}
+
 func TestMultibufferProductScanGetValRejectsNilAndZeroValue(t *testing.T) {
 	var nilScan *MultibufferProductScan
 	if _, err := nilScan.GetVal("left"); err == nil || !strings.Contains(err.Error(), "not initialized") {
