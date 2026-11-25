@@ -163,3 +163,14 @@ input/destination open, read, write, and close failures; and joined cleanup erro
 Java's `SortPlan` uses a mutable list of temporary tables and unchecked scan operations. Go retains the source plan and
 uses explicit scan interfaces and wrapped errors. Sorted runs are merged pairwise in repeated passes; an unpaired final
 run advances unchanged to the next pass. The final `SortScan` owns the remaining run scans, and callers close it.
+
+## Completion audit
+
+The six numbered feature records cover the descriptor and scan boundary, lexicographic record comparison,
+materialization, sorted-run merging, and sort-plan run generation through their focused tests. The existing diagrams
+cover those behaviors without introducing a new concept: each SVG links to an editable Draw.io source. The remaining
+storage difference is explicit: the current transaction API cannot delete temporary files, so successful and failed
+sort operations release scans but do not claim file deletion.
+
+Chapter 13 is complete on the ordered PR stack; the README status does not imply that this stacked work has already
+been merged.
