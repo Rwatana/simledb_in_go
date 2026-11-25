@@ -76,6 +76,21 @@ func NewTablePlanner(tableName string, predicate query.Predicate, transaction re
 	}, nil
 }
 
+// MakeSelectPlan uses a matching table index for an equality with a constant, when available.
+// It returns the table plan when no indexed equality applies. Residual predicate filtering is
+// added separately by the query-planning workflow.
+func (planner *TablePlanner) MakeSelectPlan() Plan {
+	for fieldName, indexInfo := range planner.indexes {
+		if indexInfo == nil {
+			continue
+		}
+		if searchKey, ok := planner.predicate.EquatesWithConstant(fieldName); ok {
+			return NewIndexSelectPlan(planner.tablePlan, indexInfo, searchKey)
+		}
+	}
+	return planner.tablePlan
+}
+
 func isNilTablePlannerDependency(dependency any) bool {
 	if dependency == nil {
 		return true

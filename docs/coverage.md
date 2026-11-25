@@ -1129,3 +1129,7 @@ ties, and no scan opens; full-module CI remains at 100.0%.
 At Issue #1255, `plan.NewTablePlanner` initializes the per-table state used by Chapter 15's heuristic planner. Focused
 tests cover ordered metadata resolution, retained state, unavailable dependencies, wrapped metadata errors, and the
 absence of storage access; full-module CI remains at 100.0%.
+
+At Issue #1257, `TablePlanner.MakeSelectPlan` selects an indexed lookup for a matching field-to-constant equality and
+otherwise falls back to the retained table plan. Focused tests cover both equality operand orders, unmatched indexes,
+field-to-field comparisons, nil index metadata, and no storage access; full-module CI remains at 100.0%.

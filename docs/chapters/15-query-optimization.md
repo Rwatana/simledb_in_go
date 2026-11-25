@@ -10,6 +10,7 @@ query-planner behaviors remain separate features.
 | --- | --- | --- |
 | `internal/plan.NewOptimizedProductPlan` | `simpledb/plan/OptimizedProductPlan.java` (constructor) | Compare both two-input product orientations and select the cheaper block-access order |
 | `internal/plan.NewTablePlanner` | `simpledb/opt/TablePlanner.java` (constructor) | Resolve and retain a table's plan, schema, predicate, transaction, and indexes for later heuristic planning |
+| `internal/plan.TablePlanner.MakeSelectPlan` | `simpledb/opt/TablePlanner.java` (`makeSelectPlan`, `makeIndexSelect`) | Use a matching field index for a constant equality, or return the table plan |
 
 ## Feature 1: Choose the cheaper product plan order
 
@@ -59,3 +60,26 @@ absence of storage access.
 Focused planner tests cover every statement in the constructor and its dependency check. Full-module coverage, race,
 vet, documentation, formatting, and the independent workflow-audit results are recorded in the recovery checkpoint
 and stacked PR.
+
+## Feature 3: Use an index for a table equality selection
+
+`TablePlanner.MakeSelectPlan` checks the table's registered indexes for a field that the query predicate equates with
+a constant. A match produces an `IndexSelectPlan` over the retained `TablePlan`, carrying the matching index and
+search key. If no registered index has such an equality, the method returns the table plan. This plan choice does not
+open scans or access storage. Applying the remaining table-local predicate terms is a separate behavior.
+
+### Test-first record
+
+Focused compilation first failed because `MakeSelectPlan` was undefined. Tests cover matching indexes, a constant on
+either side of the equality, unmatched and field-to-field predicates, nil index metadata, and no storage access.
+
+### Design decision
+
+The method returns the existing `Plan` contract, using `IndexSelectPlan` only for an indexed equality and the retained
+`TablePlan` as its fallback. It leaves residual filtering and query-level join/product choices to later planner
+features.
+
+### Validation
+
+Focused planner tests cover every statement in the method. Full-module coverage, race, vet, documentation, formatting,
+and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.
