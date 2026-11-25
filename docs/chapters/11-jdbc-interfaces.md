@@ -204,8 +204,9 @@ schema in column order, so `database/sql.Rows.ColumnTypes()` exposes those datab
 the scan. `driver.RowsColumnTypeScanType` reports `string` for varchar values and `int64` for integer values, matching
 the driver's row values. `driver.RowsColumnTypeLength` reports the declared varchar character limit and returns no
 variable-length bound for integer columns. `driver.RowsColumnTypeNullable` reports that supported scalar fields are
-known non-nullable because the current record/query value model cannot represent NULL. Precision/scale remain
-independent optional metadata behaviors.
+known non-nullable because the current record/query value model cannot represent NULL. The current schema also has no
+DECIMAL or NUMERIC field type, so the optional `driver.RowsColumnTypePrecisionScale` contract is intentionally not
+implemented; Go defines that metadata for decimal types, which this database cannot represent.
 The [statement lifecycle and query diagram](../diagrams/ch11-embedded-statement.svg) shows positional scalar binding,
 scan creation, and rows plus database type names, Go scan types, varchar lengths, and nullability; its [editable Draw.io
 source](../diagrams/ch11-embedded-statement.drawio) is kept beside the SVG.
@@ -472,6 +473,7 @@ closing the returned client ends the owned transport, while session creation rem
 - Do not reproduce the Java `java.sql` adapter hierarchy mechanically.
 - Do not introduce RMI merely to match Java's network classes; define a Go transport only when a server/client use case is implemented.
 - `QueryColumn.DisplaySize` preserves the Java remote metadata display-width rule for the supported integer and varchar schema types.
+- The record model supports INTEGER and VARCHAR but no DECIMAL or NUMERIC values; the optional Go precision/scale metadata contract is therefore not exposed.
 - Preserve explicit Go errors for initialization and lifecycle failures rather than relying on JDBC `SQLException` conventions.
 - Keep the upstream Java distribution and book PDF outside Git.
 - Parse the Java-compatible embedded URL prefix, but keep path resolution, database initialization, and manager settings explicit in Go.

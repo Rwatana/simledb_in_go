@@ -1180,3 +1180,8 @@ supports multibuffer operations and leaves the heuristic planner's ordinary-prod
 Tests cover strategy replacement, invalid-selection preservation, transaction-specific factory selection, and connected
 and disconnected SELECT planning. The final full-module coverage profile reports 100.0% for each executable package and function, with no uncovered
 statement regions.
+
+Issue #1276 closes the Chapter 11 implementation record after auditing the manager, embedded-driver, and network-driver
+source maps and tests. The README marks the chapter complete on the ordered PR stack. The chapter note records that
+precision/scale is intentionally unavailable because the current type model has no decimal columns; this is not an
+unimplemented result-metadata behavior. This documentation-only closeout leaves the full-module 100.0% coverage gate unchanged.
