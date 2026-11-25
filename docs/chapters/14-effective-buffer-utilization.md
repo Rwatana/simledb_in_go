@@ -338,3 +338,28 @@ matching scan resource ownership and avoiding needless release/re-pin on repeate
 
 The focused plan tests cover every executable statement and function. The independent module coverage workflow requires
 100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 13: Read query values from the current product row
+
+`MultibufferProductScan.GetVal` delegates field lookup to the active `query.ProductScan`, so fields from both the
+caller-owned left scan and the current right-hand chunk are exposed as `query.Constant` values. It is available only
+after `Next` returns a row and becomes unavailable after rewind, failed or exhausted advancement, or close. Repeated
+reads leave the product cursor and chunk pins unchanged. Errors preserve the underlying query cause while adding
+field and right-table context.
+
+### Test-first record
+
+Focused tests first failed to compile because `MultibufferProductScan.GetVal` was undefined. Tests cover left and
+right integer and string fields, repeat reads, unchanged pins and left cursor position, missing fields with wrapped
+context, reads before the first row and after exhaustion, rewind, and close, plus nil and zero-value scans.
+
+### Design decision
+
+The product scan delegates to its existing `query.ProductScan` instead of reconstructing field ownership or
+conversion. Explicit current-row state prevents stale values from being exposed after the scan moves away from a row.
+Field-specific convenience accessors and query-plan construction remain separate behaviors.
+
+### Validation
+
+The focused `internal/plan` tests cover every executable statement and function. The independent coverage workflow
+requires 100.0% statement coverage for every executable package, function, and module total.

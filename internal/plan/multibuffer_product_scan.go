@@ -32,6 +32,7 @@ type MultibufferProductScan struct {
 	chunkInitErr   error
 	closed         bool
 	exhausted      bool
+	currentRow     bool
 	newProductScan func(query.Scan, query.Scan) (*query.ProductScan, error)
 }
 
@@ -110,6 +111,7 @@ func (scan *MultibufferProductScan) BeforeFirst() error {
 	if scan == nil || scan.transaction == nil || scan.left == nil {
 		return fmt.Errorf("rewind multibuffer product scan: scan is not initialized")
 	}
+	scan.currentRow = false
 	if scan.closed {
 		return fmt.Errorf("rewind multibuffer product scan for %q: current chunk is unavailable because the scan is closed", scan.fileName)
 	}
@@ -138,6 +140,7 @@ func (scan *MultibufferProductScan) Next() (bool, error) {
 	if scan == nil || scan.transaction == nil || scan.left == nil {
 		return false, fmt.Errorf("advance multibuffer product scan: scan is not initialized")
 	}
+	scan.currentRow = false
 	if scan.closed {
 		return false, fmt.Errorf("advance multibuffer product scan for %q: current chunk is unavailable because the scan is closed", scan.fileName)
 	}
@@ -168,6 +171,7 @@ func (scan *MultibufferProductScan) Next() (bool, error) {
 			return false, fmt.Errorf("advance multibuffer product scan for %q: %w", scan.fileName, err)
 		}
 		if hasRow {
+			scan.currentRow = true
 			return true, nil
 		}
 		if scan.nextBlock >= scan.fileSize {
@@ -176,6 +180,24 @@ func (scan *MultibufferProductScan) Next() (bool, error) {
 		}
 		scan.pendingChunk = true
 	}
+}
+
+// GetVal returns a field value from the current left-major product row.
+func (scan *MultibufferProductScan) GetVal(fieldName string) (query.Constant, error) {
+	if scan == nil || scan.transaction == nil || scan.left == nil {
+		return query.Constant{}, fmt.Errorf("read value field %q from multibuffer product scan: scan is not initialized", fieldName)
+	}
+	if scan.closed {
+		return query.Constant{}, fmt.Errorf("read value field %q from multibuffer product scan for %q: scan is closed", fieldName, scan.fileName)
+	}
+	if !scan.currentRow || scan.product == nil {
+		return query.Constant{}, fmt.Errorf("read value field %q from multibuffer product scan for %q: current product row is unavailable", fieldName, scan.fileName)
+	}
+	value, err := scan.product.GetVal(fieldName)
+	if err != nil {
+		return query.Constant{}, fmt.Errorf("read value field %q from multibuffer product scan for %q: %w", fieldName, scan.fileName, err)
+	}
+	return value, nil
 }
 
 func (scan *MultibufferProductScan) useNextChunk() error {
@@ -243,6 +265,7 @@ func (scan *MultibufferProductScan) Close() error {
 	if scan == nil || scan.closed {
 		return nil
 	}
+	scan.currentRow = false
 	if scan.right != nil {
 		if err := scan.right.Close(); err != nil {
 			return err

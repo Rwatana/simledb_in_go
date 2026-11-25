@@ -56,6 +56,8 @@ transaction operations needed to size and pin a right-hand chunk, while keeping 
 `multibuffer`. Within that pinned range, the plan delegates left-major pair traversal to `query.ProductScan`; moving to
 the next bounded range releases the old right chunk first, then pins the next range and rewinds the caller-owned left
 scan. Partial pin cleanup failures retain a retryable close handle on the plan scan.
+`MultibufferProductScan.GetVal` forwards current-row field reads to the active `query.ProductScan`, preserving the
+query constant model and adding product/field context without moving either input cursor or changing chunk pins.
 
 ## テスト方針
 
