@@ -81,6 +81,9 @@ materialization work, consistent with the existing materialize and sort plan est
 `materialize.MultibufferProductPlan.DistinctValues` follows `plan.ProductPlan` by routing a field estimate to the child
 whose schema contains it, preferring the left child for duplicate names and keeping the estimate free of scan or
 transaction I/O.
+Chapter 15's `plan.TablePlanner` constructor resolves a physical table's layout, statistics, and index metadata
+through a narrow planner-owned interface, then retains those values with its predicate and transaction. It does not
+open scans or pull view expansion into the per-table planner.
 
 ## テスト方針
 

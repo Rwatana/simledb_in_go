@@ -1125,3 +1125,7 @@ and the absence of scan or storage access; full-module CI remains at 100.0%.
 At Issue #1251, `plan.NewOptimizedProductPlan` compares the block-access costs of both product orientations and chooses
 the lower-cost order, reversing on ties as the Java implementation does. Focused tests cover either cheaper orientation,
 ties, and no scan opens; full-module CI remains at 100.0%.
+
+At Issue #1255, `plan.NewTablePlanner` initializes the per-table state used by Chapter 15's heuristic planner. Focused
+tests cover ordered metadata resolution, retained state, unavailable dependencies, wrapped metadata errors, and the
+absence of storage access; full-module CI remains at 100.0%.
