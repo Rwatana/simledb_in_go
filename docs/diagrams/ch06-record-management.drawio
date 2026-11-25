@@ -1,0 +1,25 @@
+<mxfile host="app.diagrams.net" modified="2026-11-25T06:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="ch06-record-management" name="Record Management Data Flow">
+    <mxGraphModel page="1" pageWidth="1320" pageHeight="720">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Chapter 6: Schema to Table Scan" style="text;html=1;align=center;fontSize=26;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="280" y="35" width="760" height="55" as="geometry"/></mxCell>
+        <mxCell id="schema" value="Schema&#xa;&#xa;ordered fields&#xa;types and lengths" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="170" width="240" height="140" as="geometry"/></mxCell>
+        <mxCell id="layout" value="Layout&#xa;&#xa;field offsets&#xa;fixed slot size" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="360" y="170" width="240" height="140" as="geometry"/></mxCell>
+        <mxCell id="recordpage" value="RecordPage&#xa;&#xa;one pinned block&#xa;slot flags and fields" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="660" y="170" width="240" height="140" as="geometry"/></mxCell>
+        <mxCell id="scan" value="TableScan&#xa;&#xa;block + slot cursor&#xa;table-wide traversal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="960" y="170" width="260" height="140" as="geometry"/></mxCell>
+        <mxCell id="block" value="Fixed-size file block&#xa;&#xa;Page bytes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="130" y="450" width="250" height="110" as="geometry"/></mxCell>
+        <mxCell id="tx" value="Transaction + Buffer&#xa;&#xa;field reads/writes&#xa;pin, unpin, locks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="520" y="450" width="300" height="130" as="geometry"/></mxCell>
+        <mxCell id="rid" value="RID&#xa;&#xa;(block number, slot)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="960" y="450" width="240" height="110" as="geometry"/></mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="schema" target="layout"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="layout" target="recordpage"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="recordpage" target="scan"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="block" target="recordpage"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="tx" target="recordpage"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="tx" target="scan"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;strokeWidth=3;" edge="1" parent="1" source="scan" target="rid"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="720" viewBox="0 0 1320 720" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 6: Schema to Table Scan</title>
+  <desc id="desc">Ordered schema fields determine record offsets and slot size. RecordPage reads fixed block bytes through a transaction, and TableScan traverses records by block and slot while exposing RIDs.</desc>
+  <style>
+    .title{font-family:Helvetica,Arial,sans-serif;font-size:30px;font-weight:700;fill:#1f2937}
+    .head{font-family:Helvetica,Arial,sans-serif;font-size:21px;font-weight:700;fill:#1f2937}
+    .body{font-family:Helvetica,Arial,sans-serif;font-size:17px;fill:#1f2937}
+    .edge{font-family:Helvetica,Arial,sans-serif;font-size:15px;fill:#334155}
+    .line{fill:none;stroke:#475569;stroke-width:3}
+  </style>
+  <rect width="1320" height="720" fill="#fff"/>
+  <text class="title" x="660" y="75" text-anchor="middle">Chapter 6: Schema to Table Scan</text>
+
+  <g stroke-width="2">
+    <rect x="60" y="170" width="240" height="140" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+    <rect x="360" y="170" width="240" height="140" rx="12" fill="#dae8fc" stroke="#6c8ebf"/>
+    <rect x="660" y="170" width="240" height="140" rx="12" fill="#d5e8d4" stroke="#82b366"/>
+    <rect x="960" y="170" width="260" height="140" rx="12" fill="#fff2cc" stroke="#d6b656"/>
+    <rect x="130" y="450" width="250" height="110" rx="12" fill="#f8cecc" stroke="#b85450"/>
+    <rect x="520" y="450" width="300" height="130" rx="12" fill="#d5e8d4" stroke="#82b366"/>
+    <rect x="960" y="450" width="240" height="110" rx="12" fill="#e1d5e7" stroke="#9673a6"/>
+  </g>
+
+  <g text-anchor="middle">
+    <text class="head" x="180" y="210">Schema</text>
+    <text class="body" x="180" y="250">ordered fields</text>
+    <text class="body" x="180" y="277">types and lengths</text>
+    <text class="head" x="480" y="210">Layout</text>
+    <text class="body" x="480" y="250">field offsets</text>
+    <text class="body" x="480" y="277">fixed slot size</text>
+    <text class="head" x="780" y="210">RecordPage</text>
+    <text class="body" x="780" y="250">one pinned block</text>
+    <text class="body" x="780" y="277">slot flags and fields</text>
+    <text class="head" x="1090" y="210">TableScan</text>
+    <text class="body" x="1090" y="250">block + slot cursor</text>
+    <text class="body" x="1090" y="277">table-wide traversal</text>
+    <text class="head" x="255" y="490">Fixed-size file block</text>
+    <text class="body" x="255" y="525">Page bytes</text>
+    <text class="head" x="670" y="492">Transaction + Buffer</text>
+    <text class="body" x="670" y="530">field reads/writes</text>
+    <text class="body" x="670" y="557">pin, unpin, locks</text>
+    <text class="head" x="1080" y="490">RID</text>
+    <text class="body" x="1080" y="525">(block number, slot)</text>
+  </g>
+
+  <g fill="#475569">
+    <rect x="300" y="238" width="60" height="4"/><polygon points="360,240 348,233 348,247"/>
+    <rect x="600" y="238" width="60" height="4"/><polygon points="660,240 648,233 648,247"/>
+    <rect x="900" y="238" width="60" height="4"/><polygon points="960,240 948,233 948,247"/>
+    <polygon points="379,483 381,487 651,312 649,308"/><polygon points="650,310 636,313 644,325"/>
+    <rect x="668" y="340" width="4" height="110"/><rect x="670" y="338" width="170" height="4"/><rect x="838" y="310" width="4" height="30"/><polygon points="840,310 833,322 847,322"/>
+    <rect x="820" y="513" width="100" height="4"/><rect x="918" y="340" width="4" height="175"/><rect x="920" y="338" width="170" height="4"/><rect x="1088" y="310" width="4" height="30"/><polygon points="1090,310 1083,322 1097,322"/>
+    <rect x="1088" y="310" width="4" height="140"/><polygon points="1090,450 1083,438 1097,438"/>
+  </g>
+
+</svg>

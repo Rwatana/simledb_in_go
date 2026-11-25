@@ -3,6 +3,11 @@
 This chapter builds typed schemas, physical layouts, record pages, and table scans in the book's dependency order.
 Each observable behavior remains a separate Issue, branch, commit, and stacked Pull Request.
 
+The editable [Draw.io data-flow diagram](../diagrams/ch06-record-management.drawio) and rendered
+[SVG preview](../diagrams/ch06-record-management.svg) show how ordered schema fields become fixed slot offsets, how a
+`RecordPage` uses those offsets within one block, and how `TableScan` traverses block/slot positions through transaction
+and buffer ownership.
+
 ## Java source map
 
 | Go area | Java reference | Responsibility |
@@ -856,3 +861,13 @@ The regression tests first failed because formatting errors returned without att
 
 This amends the empty-table constructor branch of Java `TableScan.TableScan`; it prevents a leaked buffer pin on the Go
 error path without changing successful initialization.
+
+## Completion audit
+
+The 48 numbered feature records cover ordered schema metadata, physical offsets and slot sizing, fixed-page record
+operations, stable RIDs, and the table-scan cursor and mutation lifecycle. Each feature retains its test-first evidence
+and maps the Go boundary to the corresponding Java `Schema`, `Layout`, `RecordPage`, `RID`, or `TableScan` behavior.
+The diagram highlights their dependency and ownership flow; no second diagram is needed for this chapter audit.
+
+Chapter 6 is complete on the ordered PR stack. The README status does not mean these stacked changes have already been
+merged.

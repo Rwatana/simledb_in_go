@@ -21,7 +21,7 @@
 | 3 | Disk and File Management | 実装完了（PR stack上） | [BlockID、Page、FileManagerの解説・実装記録](docs/chapters/03-disk-and-file-management.md)（`Page.SetString` / `GetString`は既存のlength-prefixed bytes形式を共有） |
 | 4 | Memory and Log Management | 実装完了（PR stack上） | [LogManagerとBufferManagerの解説・実装記録](docs/chapters/04-log-management.md) |
 | 5 | Transaction Management | 実装完了（PR stack上） | [Transactionの解説・実装記録](docs/chapters/05-transaction-management.md) |
-| 6 | Record Management | 基礎実装済み | [Schema、Layout、RecordPage、TableScanの解説・実装記録](docs/chapters/06-record-management.md) |
+| 6 | Record Management | 実装完了（PR stack上） | [Schema、Layout、RecordPage、TableScanの解説・実装記録](docs/chapters/06-record-management.md) / [編集用Draw.io](docs/diagrams/ch06-record-management.drawio) / [表示用SVG](docs/diagrams/ch06-record-management.svg) |
 | 7 | Metadata Management | 実装完了（PR stack上） | [Catalog metadataの解説・実装記録](docs/chapters/07-metadata-management.md) |
 | 8 | Query Processing | 実装完了（PR stack上） | [query scanと関係演算子の解説・実装記録](docs/chapters/08-query-processing.md) |
 | 9 | Parsing | 実装完了（PR stack上） | [SQL tokenizationとupdate-command dispatchの解説・実装記録](docs/chapters/09-parsing.md) |
