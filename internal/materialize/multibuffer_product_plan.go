@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Rwatana/simledb_in_go/internal/multibuffer"
 	"github.com/Rwatana/simledb_in_go/internal/plan"
 	"github.com/Rwatana/simledb_in_go/internal/query"
 	"github.com/Rwatana/simledb_in_go/internal/record"
@@ -49,6 +50,23 @@ func (p *MultibufferProductPlan) RecordsOutput() int {
 		return 0
 	}
 	return int(int32(p.left.RecordsOutput()) * int32(p.right.RecordsOutput()))
+}
+
+// BlocksAccessed estimates reading the product result, excluding right-plan materialization.
+func (p *MultibufferProductPlan) BlocksAccessed() int {
+	if p == nil || isNilSortPlanDependency(p.transaction) || isNilSortPlanDependency(p.left) || isNilSortPlanDependency(p.right) {
+		return 0
+	}
+	rightBlocks := NewMaterializePlan(p.transaction, p.right).BlocksAccessed()
+	if rightBlocks <= 0 {
+		return 0
+	}
+	chunkSize := multibuffer.BestFactor(p.transaction.AvailableBuffers(), rightBlocks)
+	chunks := rightBlocks / chunkSize
+	if rightBlocks%chunkSize != 0 {
+		chunks++
+	}
+	return int(int32(rightBlocks) + int32(p.left.BlocksAccessed())*int32(chunks))
 }
 
 // Open materializes the right plan and returns a multi-buffer product scan over it.

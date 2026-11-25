@@ -72,6 +72,9 @@ The returned owner wrapper closes the opened left scan alongside the product sca
 either plan or touching transaction state; it returns a new schema so child metadata stays unchanged.
 `materialize.MultibufferProductPlan.RecordsOutput` separately multiplies the child row estimates with Java-compatible
 signed 32-bit arithmetic and does not inspect schemas or open scans.
+`materialize.MultibufferProductPlan.BlocksAccessed` estimates the materialized right relation's read plus one left scan
+per right-side chunk, using the execution scan's `BestFactor` rule and excluding the right input's one-time
+materialization work, consistent with the existing materialize and sort plan estimates.
 
 ## テスト方針
 
