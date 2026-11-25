@@ -1133,3 +1133,7 @@ absence of storage access; full-module CI remains at 100.0%.
 At Issue #1257, `TablePlanner.MakeSelectPlan` selects an indexed lookup for a matching field-to-constant equality and
 otherwise falls back to the retained table plan. Focused tests cover both equality operand orders, unmatched indexes,
 field-to-field comparisons, nil index metadata, and no storage access; full-module CI remains at 100.0%.
+
+At Issue #1258, `TablePlanner.MakeSelectPlan` wraps its table or index candidate with the predicate terms that apply
+to the table schema, leaving cross-table terms for join planning. Focused tests cover both candidate types, local-term
+selection, no applicable terms, and no storage access; full-module CI remains at 100.0%.
