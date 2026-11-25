@@ -14,11 +14,12 @@
 
 IssueとPull Requestのtitleは`[Prefix] Summary`形式にする。許可するprefixの原本は
 `hack/prefix.yml`とし、CIでも同じファイルを参照する。
+IssueとPRのtitleには末尾のピリオドを要求しない。
 
 | Prefix | 対象 | 例 |
 | --- | --- | --- |
+| `[Backend]` | データベースの実装、テスト、refactor | `[Backend] Implement BlockID` |
 | `[Docs]` | 章まとめ、ソースリーディング、Draw.io、文書 | `[Docs] Summarize Chapter 1` |
-| `[Go]` | Goの実装、テスト、refactor | `[Go] Implement BlockID` |
 | `[CI/CD]` | GitHub Actions、template、開発自動化 | `[CI/CD] Validate Pull Request policy` |
 
 1つの変更が複数に関係する場合は、主目的のprefixを1つだけ選ぶ。
@@ -64,6 +65,14 @@ git push --force-with-lease
 
 履歴を書き換えるのは作業branchだけに限定し、共有branchのmainでは行わない。
 
+## Commit subject format
+
+各commitのsubjectは `[Scope] Summary.` の形式にする。`Scope`は
+[`hack/prefix.yml`](hack/prefix.yml)に列挙した値だけを使い、`[Backend]`、`[CI/CD]`、
+`[Docs]`を許可する。`[Go]`や未登録の値は許可しない。summaryの末尾にはピリオドを付ける。
+CIはPRに含まれるcommit subjectだけを検査し、commit bodyやmain上の過去の履歴は遡って検査しない。
+prefix、末尾ピリオド、PR title prefixはそれぞれ独立したworkflowで確認する。PR titleには末尾ピリオドを要求しない。
+
 ## Pull Requestの大きさ
 
 1つのPRで「学習資料」「値オブジェクト」「page encoding」「file I/O」のように
@@ -101,7 +110,9 @@ git push --force-with-lease
 
 Pull Requestでは次を自動検証する。
 
-- IssueとPR titleのprefixが`hack/prefix.yml`に存在する
+- Issue title prefixを`issue-policy.yml`で確認する
+- PR title prefixを独立したworkflowで確認する（末尾ピリオドは不要）
+- Commit subject prefixが`hack/prefix.yml`に存在し、subjectがピリオドで終わる
 - branch名が規約どおりである
 - branch、PR本文のIssue Number、`Closes`の番号が一致する
 - PRのcommit数が1である

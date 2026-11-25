@@ -1,0 +1,31 @@
+name: Commit subject period
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  commit-period:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Pull Request commits
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Test commit subject period rule
+        run: bash scripts/test_commit_subject_period.sh
+
+      - name: Require a final period on every commit subject
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: scripts/check_commit_period.sh "$BASE_SHA" "$HEAD_SHA"
