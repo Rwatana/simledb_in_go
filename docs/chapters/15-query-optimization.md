@@ -11,6 +11,7 @@ query-planner behaviors remain separate features.
 | `internal/plan.NewOptimizedProductPlan` | `simpledb/plan/OptimizedProductPlan.java` (constructor) | Compare both two-input product orientations and select the cheaper block-access order |
 | `internal/plan.NewTablePlanner` | `simpledb/opt/TablePlanner.java` (constructor) | Resolve and retain a table's plan, schema, predicate, transaction, and indexes for later heuristic planning |
 | `internal/plan.TablePlanner.MakeSelectPlan` | `simpledb/opt/TablePlanner.java` (`makeSelectPlan`, `makeIndexSelect`) | Use a matching field index for a constant equality, or return the table plan |
+| `internal/plan.TablePlanner.MakeSelectPlan` | `simpledb/opt/TablePlanner.java` (`addSelectPred`) | Apply the query terms that can be evaluated against one table schema |
 
 ## Feature 1: Choose the cheaper product plan order
 
@@ -83,3 +84,27 @@ features.
 
 Focused planner tests cover every statement in the method. Full-module coverage, race, vet, documentation, formatting,
 and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.
+
+## Feature 4: Apply table-local selection predicates
+
+After choosing its table or index-selection candidate, `TablePlanner.MakeSelectPlan` wraps that candidate in a
+`SelectPlan` when the query predicate contains terms applicable to the table schema. The selection contains every
+table-local term, including an indexed equality, matching the Java planner's `addSelectPred` behavior. Terms that need
+fields from another table remain outside this plan for join planning. With no applicable terms, the candidate is returned
+unchanged. Plan construction performs no scan or storage I/O.
+
+### Test-first record
+
+Focused compilation first failed because a table-local predicate was not applied. Tests cover filtering the index
+candidate, retaining all local terms while excluding a cross-table term, filtering the table-scan fallback, returning an
+unfiltered candidate when no terms apply, and avoiding storage access.
+
+### Design decision
+
+The implementation reuses `Predicate.SelectSubPredicate` and the existing `SelectPlan`; it does not duplicate predicate
+partitioning or add another scan wrapper type. Index lookup selection remains covered by the preceding feature.
+
+### Validation
+
+Focused planner tests cover every statement in the selection method. Full-module coverage, race, vet, documentation,
+formatting, and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.

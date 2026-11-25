@@ -147,9 +147,16 @@ func TestTablePlannerMakeSelectPlanUsesMatchingIndex(t *testing.T) {
 		t.Fatalf("NewTablePlanner() error = %v", err)
 	}
 
-	got, ok := planner.MakeSelectPlan().(*IndexSelectPlan)
+	selection, ok := planner.MakeSelectPlan().(*SelectPlan)
 	if !ok {
-		t.Fatalf("MakeSelectPlan() type = %T, want *IndexSelectPlan", planner.MakeSelectPlan())
+		t.Fatalf("MakeSelectPlan() type = %T, want *SelectPlan", planner.MakeSelectPlan())
+	}
+	if got, want := selection.predicate.String(), predicate.String(); got != want {
+		t.Errorf("selection predicate = %q, want %q", got, want)
+	}
+	got, ok := selection.child.(*IndexSelectPlan)
+	if !ok {
+		t.Fatalf("selection child type = %T, want *IndexSelectPlan", selection.child)
 	}
 	if got.child != planner.tablePlan || got.indexInfo != index {
 		t.Errorf("indexed selection state = (child %p, index %p), want (%p, %p)", got.child, got.indexInfo, planner.tablePlan, index)
@@ -176,9 +183,13 @@ func TestTablePlannerMakeSelectPlanRecognizesReversedConstantEquality(t *testing
 		t.Fatalf("NewTablePlanner() error = %v", err)
 	}
 
-	got, ok := planner.MakeSelectPlan().(*IndexSelectPlan)
+	selection, ok := planner.MakeSelectPlan().(*SelectPlan)
 	if !ok {
-		t.Fatalf("MakeSelectPlan() type = %T, want *IndexSelectPlan", planner.MakeSelectPlan())
+		t.Fatalf("MakeSelectPlan() type = %T, want *SelectPlan", planner.MakeSelectPlan())
+	}
+	got, ok := selection.child.(*IndexSelectPlan)
+	if !ok {
+		t.Fatalf("selection child type = %T, want *IndexSelectPlan", selection.child)
 	}
 	if got.indexInfo != index {
 		t.Errorf("indexed selection index = %p, want %p", got.indexInfo, index)
@@ -190,14 +201,15 @@ func TestTablePlannerMakeSelectPlanRecognizesReversedConstantEquality(t *testing
 
 func TestTablePlannerMakeSelectPlanFallsBackWithoutMatchingIndex(t *testing.T) {
 	for _, test := range []struct {
-		name      string
-		predicate query.Predicate
-		indexes   map[string]*metadata.IndexInfo
+		name       string
+		predicate  query.Predicate
+		indexes    map[string]*metadata.IndexInfo
+		wantSelect bool
 	}{
-		{name: "no indexes", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(7))))},
-		{name: "different indexed field", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(7)))), indexes: map[string]*metadata.IndexInfo{"name": {}}},
+		{name: "no indexes", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(7)))), wantSelect: true},
+		{name: "different indexed field", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(7)))), indexes: map[string]*metadata.IndexInfo{"name": {}}, wantSelect: true},
 		{name: "field equality", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewFieldExpression("other"))), indexes: map[string]*metadata.IndexInfo{"id": {}}},
-		{name: "nil index metadata", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(7)))), indexes: map[string]*metadata.IndexInfo{"id": nil}},
+		{name: "nil index metadata", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(7)))), indexes: map[string]*metadata.IndexInfo{"id": nil}, wantSelect: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			transaction := &tablePlanTransaction{}
@@ -210,13 +222,61 @@ func TestTablePlannerMakeSelectPlanFallsBackWithoutMatchingIndex(t *testing.T) {
 				t.Fatalf("NewTablePlanner() error = %v", err)
 			}
 
-			if got := planner.MakeSelectPlan(); got != planner.tablePlan {
+			got := planner.MakeSelectPlan()
+			if test.wantSelect {
+				selection, ok := got.(*SelectPlan)
+				if !ok {
+					t.Fatalf("MakeSelectPlan() = %T, want *SelectPlan", got)
+				}
+				if selection.child != planner.tablePlan || selection.predicate.String() != test.predicate.String() {
+					t.Errorf("selection = (child %p, predicate %q), want (%p, %q)", selection.child, selection.predicate.String(), planner.tablePlan, test.predicate.String())
+				}
+			} else if got != planner.tablePlan {
 				t.Errorf("MakeSelectPlan() = %T, want retained table plan %p", got, planner.tablePlan)
 			}
 			if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
 				t.Errorf("selection planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
 			}
 		})
+	}
+}
+
+func TestTablePlannerMakeSelectPlanAppliesOnlyTableLocalPredicate(t *testing.T) {
+	schema := newPlannerTestSchema("id")
+	schema.AddVarcharField("name", 24)
+	index := &metadata.IndexInfo{}
+	transaction := &tablePlanTransaction{}
+	indexedTerm := query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(7)))
+	localTerm := query.NewTerm(query.NewFieldExpression("name"), query.NewConstantExpression(query.NewStringConstant("Ada")))
+	crossTableTerm := query.NewTerm(query.NewFieldExpression("id"), query.NewFieldExpression("department_id"))
+	predicate := query.NewPredicateWithTerm(indexedTerm).
+		ConjoinWith(query.NewPredicateWithTerm(localTerm)).
+		ConjoinWith(query.NewPredicateWithTerm(crossTableTerm))
+	planner, err := NewTablePlanner("student", predicate, transaction, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(schema),
+		statistics: metadata.NewStatInfo(3, 12),
+		indexes:    map[string]*metadata.IndexInfo{"id": index},
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+
+	selection, ok := planner.MakeSelectPlan().(*SelectPlan)
+	if !ok {
+		t.Fatalf("MakeSelectPlan() type = %T, want *SelectPlan", planner.MakeSelectPlan())
+	}
+	indexSelection, ok := selection.child.(*IndexSelectPlan)
+	if !ok {
+		t.Fatalf("table-local selection child type = %T, want *IndexSelectPlan", selection.child)
+	}
+	if indexSelection.indexInfo != index || indexSelection.child != planner.tablePlan {
+		t.Errorf("indexed base plan = (%p, %p), want (%p, %p)", indexSelection.indexInfo, indexSelection.child, index, planner.tablePlan)
+	}
+	if got, want := selection.predicate.String(), indexedTerm.String()+" and "+localTerm.String(); got != want {
+		t.Errorf("table-local predicate = %q, want %q", got, want)
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("selection planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
 	}
 }
 
