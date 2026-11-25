@@ -485,3 +485,15 @@ empty name, and wrapped metadata errors are handled.
 - `BasicUpdatePlanner.ExecuteCreateTable` delegates schema creation to metadata and returns zero affected rows because DDL does not change table records.
 - `BasicUpdatePlanner.ExecuteCreateView` delegates the rendered SELECT definition to metadata and returns zero affected rows because DDL does not change table records.
 - `BasicUpdatePlanner.ExecuteCreateIndex` delegates all parsed identifiers to metadata and returns zero affected rows because DDL does not change table records.
+
+## Completion audit
+
+The 32 numbered feature records map the plan contract, table/select/product/project plans and their estimates, basic
+and cost-based query-planner composition, and the update-planner DML/DDL commands to their focused tests. View
+expansion, query-level heuristic ordering, and multibuffer product construction are documented separately in their
+dependent chapters; the Chapter 10 planners keep metadata and transaction access explicit.
+
+The plan-contract diagram already links the plan tree, estimates, schema, and opened scan to its editable Draw.io
+source. The documented Go boundaries retain explicit error results, cleanup of partial scans, cycle detection, and
+Java-compatible signed 32-bit estimate arithmetic. Chapter 10 is complete on the ordered PR stack; the README status
+does not imply that the stack has already been merged.
