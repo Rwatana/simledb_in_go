@@ -75,6 +75,9 @@ signed 32-bit arithmetic and does not inspect schemas or open scans.
 `materialize.MultibufferProductPlan.BlocksAccessed` estimates the materialized right relation's read plus one left scan
 per right-side chunk, using the execution scan's `BestFactor` rule and excluding the right input's one-time
 materialization work, consistent with the existing materialize and sort plan estimates.
+`materialize.MultibufferProductPlan.DistinctValues` follows `plan.ProductPlan` by routing a field estimate to the child
+whose schema contains it, preferring the left child for duplicate names and keeping the estimate free of scan or
+transaction I/O.
 
 ## テスト方針
 
