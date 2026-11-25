@@ -1119,3 +1119,7 @@ absence of scan or storage I/O. The full-module CI coverage check remains at 100
 At Issue #1249, `materialize.MultibufferProductPlan.DistinctValues` routes each field estimate to the child schema that
 owns it, with left-first handling for duplicate names. Focused tests cover unknown fields, missing metadata, typed nils,
 and the absence of scan or storage access; full-module CI remains at 100.0%.
+
+At Issue #1251, `plan.NewOptimizedProductPlan` compares the block-access costs of both product orientations and chooses
+the lower-cost order, reversing on ties as the Java implementation does. Focused tests cover either cheaper orientation,
+ties, and no scan opens; full-module CI remains at 100.0%.

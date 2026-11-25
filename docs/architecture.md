@@ -68,6 +68,9 @@ left-before-right field selection in the query operator.
 right input into a temporary table, then opens `plan.MultibufferProductScan` over that descriptor. This type stays in
 `materialize` because placing it in `plan` would reverse the existing dependency (`materialize` already uses `plan`).
 The returned owner wrapper closes the opened left scan alongside the product scan's right-chunk pins.
+Chapter 15's `plan.NewOptimizedProductPlan` compares both `ProductPlan` orientations and returns the one with the lower
+block-access estimate, choosing reversed input order on ties to match the Java constructor. Go returns the selected
+`ProductPlan` directly instead of adding a wrapper that only forwards the existing plan contract.
 `materialize.MultibufferProductPlan.Schema` combines the left and right child schemas in field order without opening
 either plan or touching transaction state; it returns a new schema so child metadata stays unchanged.
 `materialize.MultibufferProductPlan.RecordsOutput` separately multiplies the child row estimates with Java-compatible
