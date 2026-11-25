@@ -9,7 +9,7 @@ Documentation, Go coverage, Go test, Go vet, Issue closing reference, Issue poli
 title. Issue policy runs on issue events; the other checks validate pull requests. There is no current
 `pull-request-policy.yml` workflow.
 
-## Latest audit checkpoint: 2026-11-24
+## Latest audit checkpoint: 2026-11-25
 
 The uncached full-module command `go test ./... -count=1 -coverprofile=coverage.out` reports 100.0% statement
 coverage in every executable package. `go tool cover -func=coverage.out` reports 100.0% for every executable function
@@ -1095,3 +1095,10 @@ At the Issue #1239 product-row string-access checkpoint, `MultibufferProductScan
 `query.ProductScan`, supports left and right varchar fields, and preserves the cause for a right-page read failure.
 Tests cover repeated reads without cursor or pin changes, missing fields, and unavailable scan states. Focused
 validation is recorded in the PR; final full-module coverage must remain 100.0%.
+
+At the Issue #1241 product-plan-open checkpoint, `materialize.MultibufferProductPlan.Open` materializes the right
+plan, opens a left-major multi-buffer product scan, and returns a wrapper that owns the opened left scan as well as
+retryable right-chunk pins. Tests cover typed rows, field forwarding, rewinds, input and copy failures, cleanup error
+causes, nil dependencies, and retrying pin release. The uncached full suite reports 100.0% statement coverage in all
+20 executable packages and every executable function; interface-only `internal/index` has no statements. The full race
+suite, vet, docs, gofmt, `git diff --check`, and ten-workflow one-job audit pass.

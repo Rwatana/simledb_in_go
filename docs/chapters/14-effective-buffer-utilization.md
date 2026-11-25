@@ -12,6 +12,7 @@ operations.
 | `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` (`beforeFirst`, `next`, `getInt`, `getString`, `hasField`) | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
 | `internal/plan.ChunkValueScan` | `simpledb/multibuffer/ChunkScan.java` (`getVal`) | Adapt typed chunk field reads to query constants without making `multibuffer` depend on `query` |
 | `internal/plan.MultibufferProductScan` | `simpledb/multibuffer/MultibufferProductScan.java` (constructor, `beforeFirst`, `next`, `useNextChunk`) | Read right-table size and buffer budget, choose bounded ranges, pin and replace chunks, reset the left scan, and enumerate left-major pairs |
+| `internal/materialize.MultibufferProductPlan` | `simpledb/multibuffer/MultibufferProductPlan.java` (`open`, `copyRecordsFrom`) | Materialize the right plan into a temporary table, then open an owned left-major multi-buffer product scan |
 
 
 ## Feature 1: Choose a safe buffer root
@@ -433,3 +434,35 @@ storage semantics remain authoritative. Integer access and planner construction 
 
 The focused `internal/plan` tests cover every executable statement and function. The independent coverage workflow
 requires 100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 17: Open a materialized multibuffer product plan
+
+`materialize.MultibufferProductPlan.Open` opens the left plan, copies right-plan rows and typed values to a temporary
+table, and initializes `plan.MultibufferProductScan` over the temporary relation. The returned scan emits the existing
+left-major product order and owns the left scan opened by the plan. `Close` releases both the active right chunk and
+the owned left scan; failed chunk releases retain the product scan so callers can retry cleanup. Open failures preserve
+their source cause and phase context while closing scans already acquired.
+
+The [multibuffer product-plan open diagram](../diagrams/ch14-multibuffer-product-plan-open.svg) shows how both query
+plans converge on a scan: the right rows pass through a temporary table and bounded chunk scan, while the left scan is
+retained by the returned owner wrapper. The editable source is
+[`ch14-multibuffer-product-plan-open.drawio`](../diagrams/ch14-multibuffer-product-plan-open.drawio).
+
+### Test-first record
+
+Focused compilation first failed because `MultibufferProductPlan` and its constructor were undefined. Tests cover
+left-major rows from both inputs, rewind and typed field forwarding, right-side materialization, nil and partial
+inputs, copy/read/write failures, cleanup errors, returned-scan ownership, and retrying a failed chunk release.
+
+### Design decision
+
+The plan lives in `materialize` so it can create and populate a `TempTable` while depending on the lower-level plan
+contract and `plan.MultibufferProductScan`. Keeping this composition outside `plan` avoids making that package import
+`materialize`, which already imports `plan` for `MaterializePlan`. Plan schema composition and estimate methods remain
+separate behaviors.
+
+### Validation
+
+The focused `internal/materialize` suite and uncached full `go test ./... -count=1 -coverprofile=...` report
+100.0% statement coverage, including every executable package and function; the interface-only `internal/index`
+package has no statements. The race suite, vet, documentation validator, and independent workflow audit also pass.
