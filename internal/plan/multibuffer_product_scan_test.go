@@ -944,6 +944,93 @@ func TestMultibufferProductScanReleasesFinalChunkOnCloseAndRejectsReuse(t *testi
 	}
 }
 
+func TestMultibufferProductScanReadsValuesFromCurrentProductRow(t *testing.T) {
+	layout := chunkValueLayout(false)
+	idOffset, _ := layout.Offset("id")
+	nameOffset, _ := layout.Offset("name")
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize:    128,
+			intValues:    map[int]map[int]int32{0: {0: 1, idOffset: 100}},
+			stringValues: map[int]map[int]string{0: {nameOffset: "Ada"}},
+		},
+		fileSize:  1,
+		available: 4,
+	}
+	left := &multibufferProductLeftRows{values: []int32{10}, position: -1}
+	scan, err := NewMultibufferProductScan(transaction, left, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if _, err := scan.GetVal("left"); err == nil || !strings.Contains(err.Error(), "current product row") {
+		t.Fatalf("GetVal() before Next = %v, want no-current-row error", err)
+	}
+	if scan.product != nil || left.nextCalls != 0 || len(transaction.intReads) != 0 || len(transaction.stringReads) != 0 {
+		t.Fatalf("GetVal() before Next touched scan inputs: product=%v left reads=%d int reads=%v string reads=%v", scan.product, left.nextCalls, transaction.intReads, transaction.stringReads)
+	}
+	if ok, err := scan.Next(); err != nil || !ok {
+		t.Fatalf("Next() = (%v, %v), want a current product row", ok, err)
+	}
+	pins := append([]storage.BlockID(nil), transaction.pins...)
+	leftReads := left.nextCalls
+	checks := []struct {
+		field string
+		want  query.Constant
+	}{
+		{"left", query.NewIntConstant(10)},
+		{"id", query.NewIntConstant(100)},
+		{"name", query.NewStringConstant("Ada")},
+	}
+	for _, check := range checks {
+		for attempt := 0; attempt < 2; attempt++ {
+			got, err := scan.GetVal(check.field)
+			if err != nil || !got.Equal(check.want) {
+				t.Fatalf("GetVal(%q) attempt %d = (%v, %v), want %v", check.field, attempt, got, err, check.want)
+			}
+		}
+	}
+	if left.nextCalls != leftReads || !reflect.DeepEqual(transaction.pins, pins) {
+		t.Fatalf("GetVal moved the product or changed pins: left reads %d -> %d pins %v -> %v", leftReads, left.nextCalls, pins, transaction.pins)
+	}
+	if _, err := scan.GetVal("missing"); err == nil || !strings.Contains(err.Error(), "missing") || !strings.Contains(err.Error(), "multibuffer product scan") {
+		t.Fatalf("GetVal(missing) error = %v, want field and product-scan context", err)
+	}
+	if left.nextCalls != leftReads || !reflect.DeepEqual(transaction.pins, pins) {
+		t.Fatalf("failed field lookup moved the product or changed pins: left reads=%d pins=%v", left.nextCalls, transaction.pins)
+	}
+	if ok, err := scan.Next(); err != nil || ok {
+		t.Fatalf("Next() after one pair = (%v, %v), want exhaustion", ok, err)
+	}
+	if _, err := scan.GetVal("left"); err == nil || !strings.Contains(err.Error(), "current product row") {
+		t.Fatalf("GetVal() after exhaustion = %v, want no-current-row error", err)
+	}
+	if err := scan.BeforeFirst(); err != nil {
+		t.Fatalf("BeforeFirst() = %v", err)
+	}
+	if _, err := scan.GetVal("left"); err == nil || !strings.Contains(err.Error(), "current product row") {
+		t.Fatalf("GetVal() after BeforeFirst = %v, want no-current-row error", err)
+	}
+	if ok, err := scan.Next(); err != nil || !ok {
+		t.Fatalf("Next() after rewind = (%v, %v), want row", ok, err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() = %v", err)
+	}
+	if _, err := scan.GetVal("left"); err == nil || !strings.Contains(err.Error(), "closed") {
+		t.Fatalf("GetVal() after Close = %v, want closed-scan error", err)
+	}
+}
+
+func TestMultibufferProductScanGetValRejectsNilAndZeroValue(t *testing.T) {
+	var nilScan *MultibufferProductScan
+	if _, err := nilScan.GetVal("left"); err == nil || !strings.Contains(err.Error(), "not initialized") {
+		t.Fatalf("nil GetVal() error = %v, want initialization error", err)
+	}
+	if _, err := (&MultibufferProductScan{}).GetVal("left"); err == nil || !strings.Contains(err.Error(), "not initialized") {
+		t.Fatalf("zero-value GetVal() error = %v, want initialization error", err)
+	}
+}
+
 func multibufferProductPair(t *testing.T, scan *MultibufferProductScan) [2]int32 {
 	t.Helper()
 	left, err := scan.product.GetVal("left")

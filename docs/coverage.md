@@ -1074,3 +1074,9 @@ At the Issue #1228 multibuffer-product initialization checkpoint, `plan.NewMulti
 At the Issue #1230 in-chunk product traversal checkpoint, `MultibufferProductScan.BeforeFirst` and `Next` delegate left-major pairing to `query.ProductScan` without repinning the active chunk. Tests cover multiple right records per left row, reset and stable exhaustion, empty input, left/right scan failures, product-construction failures, and unchanged pins. The focused plan package suite reports 100.0% statement coverage; final uncached full-module coverage and repository checks are recorded in the stacked PR.
 
 At the Issue #1232 multibuffer-product rollover checkpoint, `MultibufferProductScan.Next` releases each exhausted right chunk before pinning the next bounded block range and rewinding the left scan. Tests cover left-major results across chunks, empty earlier chunks, a short final chunk, stable exhaustion, failed-release ordering and retry, later-range pin failure and retry, partial pin cleanup, left-rewind failure and retry, and final-chunk cleanup. The uncached full suite reports 100.0% statement coverage in all 20 executable packages, every executable function, and the module total; interface-only `internal/index` has no statements. The race suite, vet, docs validator, gofmt, diff check, XML parsing of 124 Draw.io and 123 SVG assets, and audit of ten separate one-job workflows pass.
+
+At the Issue #1233 current-product-value checkpoint, `MultibufferProductScan.GetVal` delegates to its current
+`query.ProductScan`, returning left or right fields as `query.Constant` without moving either input or changing page
+pins. Tests cover repeated reads, unavailable-row states, wrapped missing-field errors, and nil/zero-value scans.
+The focused `internal/plan` tests report 100.0% statement coverage; final full-module coverage and repository checks
+are recorded in the stacked PR. The ten CI items remain separate one-job workflow files.
