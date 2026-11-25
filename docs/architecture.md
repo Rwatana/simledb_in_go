@@ -60,6 +60,8 @@ scan. Partial pin cleanup failures retain a retryable close handle on the plan s
 query constant model and adding product/field context without moving either input cursor or changing chunk pins.
 `MultibufferProductScan.HasField` instead consults the caller-owned left scan and retained right-layout schema,
 keeping field-membership metadata independent of product-row state and lazy product construction.
+`MultibufferProductScan.GetInt` delegates typed integer access to the active `query.ProductScan` and adds field/table
+context while retaining the query error cause; it rejects missing current-row state before reading either input.
 
 ## テスト方針
 

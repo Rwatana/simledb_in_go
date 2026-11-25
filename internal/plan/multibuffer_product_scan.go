@@ -209,6 +209,24 @@ func (scan *MultibufferProductScan) HasField(fieldName string) bool {
 	return schema != nil && (scan.left.HasField(fieldName) || schema.HasField(fieldName))
 }
 
+// GetInt reads an integer field from the current left-major product row.
+func (scan *MultibufferProductScan) GetInt(fieldName string) (int32, error) {
+	if scan == nil || scan.transaction == nil || scan.left == nil {
+		return 0, fmt.Errorf("read integer field %q from multibuffer product scan: scan is not initialized", fieldName)
+	}
+	if scan.closed {
+		return 0, fmt.Errorf("read integer field %q from multibuffer product scan for %q: scan is closed", fieldName, scan.fileName)
+	}
+	if !scan.currentRow || scan.product == nil {
+		return 0, fmt.Errorf("read integer field %q from multibuffer product scan for %q: current product row is unavailable", fieldName, scan.fileName)
+	}
+	value, err := scan.product.GetInt(fieldName)
+	if err != nil {
+		return 0, fmt.Errorf("read integer field %q from multibuffer product scan for %q: %w", fieldName, scan.fileName, err)
+	}
+	return value, nil
+}
+
 func (scan *MultibufferProductScan) useNextChunk() error {
 	if scan.nextBlock >= scan.fileSize {
 		return nil
