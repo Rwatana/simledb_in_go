@@ -96,15 +96,30 @@ func (planner *TablePlanner) MakeSelectPlan() Plan {
 	return NewSelectPlan(candidate, selectPredicate)
 }
 
-// MakeJoinPlan builds a product join when the predicate relates this table to current.
+// MakeJoinPlan builds an index join when a table index matches the join predicate, or a product join otherwise.
 // It returns nil when no query term joins the two schemas.
 func (planner *TablePlanner) MakeJoinPlan(current Plan) Plan {
 	if current == nil {
 		return nil
 	}
-	joinPredicate, ok := planner.predicate.JoinSubPredicate(current.Schema(), planner.schema)
+	currentSchema := current.Schema()
+	joinPredicate, ok := planner.predicate.JoinSubPredicate(currentSchema, planner.schema)
 	if !ok {
 		return nil
+	}
+	for fieldName, indexInfo := range planner.indexes {
+		if indexInfo == nil {
+			continue
+		}
+		joinField, ok := planner.predicate.EquatesWithField(fieldName)
+		if !ok || !currentSchema.HasField(joinField) {
+			continue
+		}
+		var candidate Plan = NewIndexJoinPlan(current, planner.tablePlan, indexInfo, joinField)
+		if selectPredicate, ok := planner.predicate.SelectSubPredicate(planner.schema); ok {
+			candidate = NewSelectPlan(candidate, selectPredicate)
+		}
+		return NewSelectPlan(candidate, joinPredicate)
 	}
 	product := NewProductPlan(current, planner.MakeSelectPlan())
 	return NewSelectPlan(product, joinPredicate)

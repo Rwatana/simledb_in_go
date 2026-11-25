@@ -1,8 +1,8 @@
 # Chapter 15: Query Optimization
 
 Chapter 15 is still in progress. The current features record the product-order choice for `OptimizedProductPlan` and
-the metadata state needed by the book's per-table heuristic planner. Its later selection, join, product, and full
-query-planner behaviors remain separate features.
+the metadata state needed by the book's per-table heuristic planner. Its later index-join choice, product-planner
+integration, and full query-planner behaviors remain separate features.
 
 ## Java source map
 
@@ -13,6 +13,7 @@ query-planner behaviors remain separate features.
 | `internal/plan.TablePlanner.MakeSelectPlan` | `simpledb/opt/TablePlanner.java` (`makeSelectPlan`, `makeIndexSelect`) | Use a matching field index for a constant equality, or return the table plan |
 | `internal/plan.TablePlanner.MakeSelectPlan` | `simpledb/opt/TablePlanner.java` (`addSelectPred`) | Apply the query terms that can be evaluated against one table schema |
 | `internal/plan.TablePlanner.MakeJoinPlan` | `simpledb/opt/TablePlanner.java` (`makeJoinPlan`, `makeProductJoin`) | Build a product join filtered by terms that relate the current and table schemas |
+| `internal/plan.TablePlanner.MakeJoinPlan` | `simpledb/opt/TablePlanner.java` (`makeJoinPlan`, `makeIndexJoin`) | Prefer an indexed table-side join when a matching cross-schema equality is available |
 
 ## Feature 1: Choose the cheaper product plan order
 
@@ -111,12 +112,13 @@ Focused planner tests cover every statement in the selection method. Full-module
 formatting, and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.
 
 
-## Feature 5: Build a product join for a cross-schema predicate
+## Feature 5: Build the product-join fallback for a cross-schema predicate
 
 `TablePlanner.MakeJoinPlan(current)` extracts terms that apply to the union of the current and table schemas but not to
-one schema alone. When such a join predicate exists, it creates a `ProductPlan` with `current` on the left and this
-table's locally selected plan on the right, then wraps the product in a `SelectPlan` for the join terms. If no join
-term exists, it returns nil so the caller can consider another source or a Cartesian product. Plan construction does
+one schema alone. When such a join predicate exists and no matching table index is available, it creates a `ProductPlan`
+with `current` on the left and this table's locally selected plan on the right, then wraps the product in a `SelectPlan`
+for the join terms. If no join term exists, it returns nil so the caller can consider another source or a Cartesian product.
+Plan construction does
 not open scans or access storage.
 
 ### Test-first record
@@ -127,11 +129,36 @@ case, a nil current plan, and no storage access.
 
 ### Design decision
 
-The planner uses the existing `ProductPlan` and `SelectPlan` contracts. Keeping the per-table planner in `plan` avoids a
-reverse dependency on `materialize`; index-join selection and multibuffer product integration remain separate planner
-behaviors.
+The planner uses the existing `ProductPlan` and `SelectPlan` contracts for the product fallback. Keeping the per-table
+planner in `plan` avoids a reverse dependency on `materialize`; selecting a matching index join and multibuffer product
+integration remain separate planner behaviors.
 
 ### Validation
 
 Focused planner tests cover every statement in the method. Full-module coverage, race, vet, documentation, formatting,
 and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.
+
+
+## Feature 6: Prefer a matching index join
+
+`TablePlanner.MakeJoinPlan(current)` now checks table indexes for a field-to-field equality whose opposite field belongs to
+`current.Schema()`. A match creates an `IndexJoinPlan` with the current plan on the left and the table plan on the right,
+then applies any table-local predicate and the cross-schema join predicate. The index join takes precedence over the
+product fallback. If no index matches, the existing product path remains unchanged. Planning does not open scans or
+access transaction storage.
+
+### Test-first record
+
+Focused tests first failed because the matching index still produced a `ProductPlan`. Tests cover either equality operand
+order, index-join precedence, table-local selection, the no-local-selection path, unmatched and nil index entries,
+missing opposite fields, product fallback, and no storage access.
+
+### Design decision
+
+The planner reuses `IndexJoinPlan`, the registered `IndexInfo`, and the existing `SelectPlan`. It leaves the older product
+fallback and multibuffer integration as separate plan choices; it does not open either child scan during plan building.
+
+### Validation
+
+Focused planner tests cover every branch in the index-versus-product choice. Full-module coverage, race, vet,
+documentation, formatting, and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.
