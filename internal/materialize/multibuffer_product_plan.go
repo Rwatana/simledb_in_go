@@ -69,6 +69,25 @@ func (p *MultibufferProductPlan) BlocksAccessed() int {
 	return int(int32(rightBlocks) + int32(p.left.BlocksAccessed())*int32(chunks))
 }
 
+// DistinctValues returns the estimate from the child whose schema contains fieldName.
+func (p *MultibufferProductPlan) DistinctValues(fieldName string) int {
+	if p == nil || isNilSortPlanDependency(p.transaction) || isNilSortPlanDependency(p.left) || isNilSortPlanDependency(p.right) {
+		return 0
+	}
+	leftSchema := p.left.Schema()
+	rightSchema := p.right.Schema()
+	if leftSchema == nil || rightSchema == nil {
+		return 0
+	}
+	if leftSchema.HasField(fieldName) {
+		return p.left.DistinctValues(fieldName)
+	}
+	if rightSchema.HasField(fieldName) {
+		return p.right.DistinctValues(fieldName)
+	}
+	return 0
+}
+
 // Open materializes the right plan and returns a multi-buffer product scan over it.
 // The returned scan owns the left input scan opened by this method.
 func (p *MultibufferProductPlan) Open() (query.Scan, error) {

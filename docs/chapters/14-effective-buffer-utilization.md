@@ -12,7 +12,7 @@ operations.
 | `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` (`beforeFirst`, `next`, `getInt`, `getString`, `hasField`) | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
 | `internal/plan.ChunkValueScan` | `simpledb/multibuffer/ChunkScan.java` (`getVal`) | Adapt typed chunk field reads to query constants without making `multibuffer` depend on `query` |
 | `internal/plan.MultibufferProductScan` | `simpledb/multibuffer/MultibufferProductScan.java` (constructor, `beforeFirst`, `next`, `useNextChunk`) | Read right-table size and buffer budget, choose bounded ranges, pin and replace chunks, reset the left scan, and enumerate left-major pairs |
-| `internal/materialize.MultibufferProductPlan` | `simpledb/multibuffer/MultibufferProductPlan.java` (`schema`, `recordsOutput`, `blocksAccessed`, `open`, `copyRecordsFrom`) | Combine child schemas in left/right order, estimate product rows and chunked scan cost, materialize the right plan into a temporary table, then open an owned left-major multi-buffer product scan |
+| `internal/materialize.MultibufferProductPlan` | `simpledb/multibuffer/MultibufferProductPlan.java` (`schema`, `recordsOutput`, `blocksAccessed`, `distinctValues`, `open`, `copyRecordsFrom`) | Combine child schemas in left/right order, estimate product rows, chunked scan cost, and distinct values, materialize the right plan into a temporary table, then open an owned left-major multi-buffer product scan |
 
 
 ## Feature 1: Choose a safe buffer root
@@ -533,6 +533,30 @@ The cost model uses the same `BestFactor` rule as the product scan so estimated 
 the right plan for row count and schema through `MaterializePlan.BlocksAccessed`; it does not include right-plan
 materialization work, matching `MaterializePlan` and `SortPlan`'s established estimate boundary. Distinct-value
 estimation remains a separate behavior.
+
+### Validation
+
+Focused tests cover every statement in the new method. The full-module coverage, race, vet, documentation, formatting,
+and one-check-per-workflow audit results are recorded in the recovery checkpoint and stacked PR.
+
+## Feature 21: Estimate multibuffer product distinct values
+
+`materialize.MultibufferProductPlan.DistinctValues` delegates a field estimate to the child plan whose schema contains
+the field, following `plan.ProductPlan`. If both children expose the same field name, the left estimate wins, matching
+the product scan's left-first field lookup. An unavailable dependency, missing child schema, or unknown field returns
+zero. The estimate reads only plan metadata and does not open scans or access transaction/storage state.
+
+### Test-first record
+
+Focused compilation first failed because `MultibufferProductPlan.DistinctValues` was undefined. Tests cover left and
+right field routing, duplicate-name precedence, unknown fields, nil and typed-nil dependencies, missing schemas, and
+the absence of scan or storage calls.
+
+### Design decision
+
+The implementation matches `plan.ProductPlan.DistinctValues` so query optimization receives the same field estimates
+for nested-loop and multibuffer products. It remains separate from row-count and block-access estimates; field lookup
+reads both child schemas before routing to one child's estimate. No diagram was needed for this metadata delegation.
 
 ### Validation
 

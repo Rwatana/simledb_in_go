@@ -1115,3 +1115,7 @@ full-module CI coverage check continues to require 100.0% statement coverage.
 At Issue #1247, `materialize.MultibufferProductPlan.BlocksAccessed` estimates right-side materialized reads plus left
 scan passes per right chunk. Focused tests cover whole/final chunks, signed 32-bit arithmetic, unavailable inputs, and
 absence of scan or storage I/O. The full-module CI coverage check remains at 100.0%.
+
+At Issue #1249, `materialize.MultibufferProductPlan.DistinctValues` routes each field estimate to the child schema that
+owns it, with left-first handling for duplicate names. Focused tests cover unknown fields, missing metadata, typed nils,
+and the absence of scan or storage access; full-module CI remains at 100.0%.
