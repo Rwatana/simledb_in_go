@@ -96,6 +96,20 @@ func (planner *TablePlanner) MakeSelectPlan() Plan {
 	return NewSelectPlan(candidate, selectPredicate)
 }
 
+// MakeJoinPlan builds a product join when the predicate relates this table to current.
+// It returns nil when no query term joins the two schemas.
+func (planner *TablePlanner) MakeJoinPlan(current Plan) Plan {
+	if current == nil {
+		return nil
+	}
+	joinPredicate, ok := planner.predicate.JoinSubPredicate(current.Schema(), planner.schema)
+	if !ok {
+		return nil
+	}
+	product := NewProductPlan(current, planner.MakeSelectPlan())
+	return NewSelectPlan(product, joinPredicate)
+}
+
 func isNilTablePlannerDependency(dependency any) bool {
 	if dependency == nil {
 		return true

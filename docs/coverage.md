@@ -1137,3 +1137,8 @@ field-to-field comparisons, nil index metadata, and no storage access; full-modu
 At Issue #1258, `TablePlanner.MakeSelectPlan` wraps its table or index candidate with the predicate terms that apply
 to the table schema, leaving cross-table terms for join planning. Focused tests cover both candidate types, local-term
 selection, no applicable terms, and no storage access; full-module CI remains at 100.0%.
+
+
+At Issue #1260, `TablePlanner.MakeJoinPlan` builds a product plus join-selection plan only when a predicate term
+relates fields across the current and table schemas. Focused tests cover schema order, local and join predicate
+partitioning, nil/no-join fallbacks, and no storage access; full-module CI remains at 100.0%.
