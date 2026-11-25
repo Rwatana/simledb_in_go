@@ -1085,3 +1085,8 @@ At the Issue #1235 product-field-membership checkpoint, `MultibufferProductScan.
 left scan and right layout schemas independently of cursor/product lifecycle. Tests cover empty relations, nil,
 zero-value, and schema-less states, and prove metadata checks do not read rows or change pins. Focused validation is
 recorded in the PR; final full-module coverage must remain 100.0%.
+
+At the Issue #1237 product-row integer-access checkpoint, `MultibufferProductScan.GetInt` delegates to the current
+`query.ProductScan`, supports left and right integer fields, and preserves the cause for a right-page read failure.
+Tests cover repeated reads without cursor or pin changes, missing fields, and unavailable scan states. Focused
+validation is recorded in the PR; final full-module coverage must remain 100.0%.

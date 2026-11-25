@@ -89,7 +89,12 @@ func (scan *multibufferProductLeftRows) Next() (bool, error) {
 	return scan.position < len(scan.values), nil
 }
 
-func (scan *multibufferProductLeftRows) GetInt(string) (int32, error) { return 0, nil }
+func (scan *multibufferProductLeftRows) GetInt(fieldName string) (int32, error) {
+	if fieldName != "left" || scan.position < 0 || scan.position >= len(scan.values) {
+		return 0, errors.New("left integer is unavailable")
+	}
+	return scan.values[scan.position], nil
+}
 
 func (scan *multibufferProductLeftRows) GetString(string) (string, error) { return "", nil }
 
@@ -1103,6 +1108,98 @@ func TestMultibufferProductScanHasFieldAcceptsNilZeroAndSchemaLessScans(t *testi
 	scan := &MultibufferProductScan{transaction: &multibufferProductTransaction{}, left: left}
 	if scan.HasField("left") {
 		t.Fatal("HasField() on a schema-less partial scan = true, want false")
+	}
+}
+
+func TestMultibufferProductScanReadsIntegerFieldsFromCurrentProductRow(t *testing.T) {
+	layout := chunkValueLayout(false)
+	idOffset, _ := layout.Offset("id")
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize: 128,
+			intValues: map[int]map[int]int32{0: {0: 1, idOffset: 100}},
+		},
+		fileSize:  1,
+		available: 4,
+	}
+	left := &multibufferProductLeftRows{values: []int32{10}, position: -1}
+	scan, err := NewMultibufferProductScan(transaction, left, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if _, err := scan.GetInt("left"); err == nil || !strings.Contains(err.Error(), "current product row") {
+		t.Fatalf("GetInt() before Next = %v, want unavailable-row error", err)
+	}
+	if scan.product != nil || left.nextCalls != 0 || len(transaction.intReads) != 0 {
+		t.Fatalf("GetInt() before Next touched inputs: product=%v left next=%d int reads=%v", scan.product, left.nextCalls, transaction.intReads)
+	}
+	if ok, err := scan.Next(); err != nil || !ok {
+		t.Fatalf("Next() = (%v, %v), want a current product row", ok, err)
+	}
+	pins := append([]storage.BlockID(nil), transaction.pins...)
+	leftReads := left.nextCalls
+	for _, check := range []struct {
+		field string
+		want  int32
+	}{{"left", 10}, {"id", 100}, {"left", 10}, {"id", 100}} {
+		got, err := scan.GetInt(check.field)
+		if err != nil || got != check.want {
+			t.Fatalf("GetInt(%q) = (%d, %v), want %d", check.field, got, err, check.want)
+		}
+	}
+	if left.nextCalls != leftReads || !reflect.DeepEqual(transaction.pins, pins) {
+		t.Fatalf("GetInt advanced the product or changed pins: left reads %d -> %d pins %v -> %v", leftReads, left.nextCalls, pins, transaction.pins)
+	}
+	if _, err := scan.GetInt("missing"); err == nil || !strings.Contains(err.Error(), "missing") || !strings.Contains(err.Error(), "multibuffer product scan") {
+		t.Fatalf("GetInt(missing) error = %v, want field and product context", err)
+	}
+	readErr := errors.New("integer storage read failed")
+	transaction.chunkValueTransaction.intErrors = map[int]map[int]error{0: {idOffset: readErr}}
+	if _, err := scan.GetInt("id"); !errors.Is(err, readErr) || !strings.Contains(err.Error(), "student.tbl") {
+		t.Fatalf("GetInt(id) storage error = %v, want wrapped cause and table context", err)
+	}
+	if left.nextCalls != leftReads || !reflect.DeepEqual(transaction.pins, pins) {
+		t.Fatalf("GetInt error changed cursor or pins: left reads=%d pins=%v", left.nextCalls, transaction.pins)
+	}
+	if ok, err := scan.Next(); err != nil || ok {
+		t.Fatalf("Next() after one pair = (%v, %v), want exhaustion", ok, err)
+	}
+	readsAtExhaustion := len(transaction.intReads)
+	if _, err := scan.GetInt("left"); err == nil || !strings.Contains(err.Error(), "current product row") {
+		t.Fatalf("GetInt() after exhaustion = %v, want unavailable-row error", err)
+	}
+	if len(transaction.intReads) != readsAtExhaustion {
+		t.Fatalf("GetInt() after exhaustion read values: %v -> %v", readsAtExhaustion, transaction.intReads)
+	}
+	if err := scan.BeforeFirst(); err != nil {
+		t.Fatalf("BeforeFirst() after exhaustion: %v", err)
+	}
+	readsBeforeRewoundRead := len(transaction.intReads)
+	if _, err := scan.GetInt("id"); err == nil || !strings.Contains(err.Error(), "current product row") {
+		t.Fatalf("GetInt() after rewind = %v, want unavailable-row error", err)
+	}
+	if len(transaction.intReads) != readsBeforeRewoundRead {
+		t.Fatalf("GetInt() after rewind read values: %v -> %v", readsBeforeRewoundRead, transaction.intReads)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close(): %v", err)
+	}
+	readsBeforeClosedRead := len(transaction.intReads)
+	if _, err := scan.GetInt("id"); err == nil || !strings.Contains(err.Error(), "closed") {
+		t.Fatalf("GetInt() after Close = %v, want closed-scan error", err)
+	}
+	if len(transaction.intReads) != readsBeforeClosedRead {
+		t.Fatalf("GetInt() after Close read values: %v -> %v", readsBeforeClosedRead, transaction.intReads)
+	}
+}
+
+func TestMultibufferProductScanGetIntRejectsNilAndZeroValue(t *testing.T) {
+	var nilScan *MultibufferProductScan
+	if _, err := nilScan.GetInt("id"); err == nil || !strings.Contains(err.Error(), "not initialized") {
+		t.Fatalf("nil GetInt() error = %v, want not-initialized error", err)
+	}
+	if _, err := (&MultibufferProductScan{}).GetInt("id"); err == nil || !strings.Contains(err.Error(), "not initialized") {
+		t.Fatalf("zero-value GetInt() error = %v, want not-initialized error", err)
 	}
 }
 

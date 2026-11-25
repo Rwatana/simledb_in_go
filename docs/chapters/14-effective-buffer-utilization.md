@@ -387,3 +387,26 @@ keeping metadata queries independent of cursor and resource lifecycle.
 
 The focused `internal/plan` tests cover every executable statement and function. The independent coverage workflow
 requires 100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 15: Read an integer field from the current product row
+
+`MultibufferProductScan.GetInt` delegates integer field selection to the active `query.ProductScan`, supporting fields
+from both the caller-owned left scan and the current right-hand chunk. It requires a current product row; before-first,
+rewound, exhausted, closed, nil, and zero-value scans return errors before value reads. Repeated reads preserve both
+input cursors and page pins, and storage/query failures retain their causes with field and right-table context.
+
+### Test-first record
+
+Focused compilation first failed because `MultibufferProductScan.GetInt` was undefined. Tests cover repeated left and
+right integer reads, missing fields, wrapped right-page read errors, unavailable row states, nil and zero-value scans,
+and stable cursors and pins.
+
+### Design decision
+
+The accessor delegates to `query.ProductScan.GetInt` so its existing left-before-right field selection and storage
+semantics remain authoritative. String access and planner construction remain separate behaviors.
+
+### Validation
+
+The focused `internal/plan` tests cover every executable statement and function. The independent coverage workflow
+requires 100.0% statement coverage for every executable package, function, and module total.
