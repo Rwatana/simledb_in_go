@@ -147,11 +147,19 @@ type materializeRecordPosition struct {
 
 type materializePlanTransaction struct {
 	blockSize        int
+	availableBuffers int
 	blockSizeErr     error
 	sizeErr          error
+	sizeErrAt        int
+	sizeCalls        int
 	appendErr        error
 	pinErr           error
+	pinErrAt         int
+	pinCalls         int
 	unpinErr         error
+	unpinErrAt       int
+	unpinErrUntil    int
+	unpinCalls       int
 	getIntErr        error
 	getStringErr     error
 	setIntErr        error
@@ -172,17 +180,24 @@ type materializePlanTransaction struct {
 
 func newMaterializePlanTransaction() *materializePlanTransaction {
 	return &materializePlanTransaction{
-		blockSize: 256,
-		fileSizes: make(map[string]int),
-		integers:  make(map[materializeRecordPosition]int32),
-		strings:   make(map[materializeRecordPosition]string),
+		blockSize:        256,
+		availableBuffers: 8,
+		fileSizes:        make(map[string]int),
+		integers:         make(map[materializeRecordPosition]int32),
+		strings:          make(map[materializeRecordPosition]string),
 	}
 }
+
+func (tx *materializePlanTransaction) AvailableBuffers() int { return tx.availableBuffers }
 
 func (tx *materializePlanTransaction) Pin(storage.BlockID) error {
 	tx.calls++
 	tx.pins++
-	return tx.pinErr
+	tx.pinCalls++
+	if tx.pinErrAt == 0 || tx.pinErrAt == tx.pinCalls {
+		return tx.pinErr
+	}
+	return nil
 }
 
 func (tx *materializePlanTransaction) BlockSize() (int, error) {
@@ -240,7 +255,11 @@ func (tx *materializePlanTransaction) SetString(block storage.BlockID, offset in
 
 func (tx *materializePlanTransaction) Size(fileName string) (int, error) {
 	tx.calls++
-	return tx.fileSizes[fileName], tx.sizeErr
+	tx.sizeCalls++
+	if tx.sizeErrAt == 0 || tx.sizeErrAt == tx.sizeCalls {
+		return tx.fileSizes[fileName], tx.sizeErr
+	}
+	return tx.fileSizes[fileName], nil
 }
 
 func (tx *materializePlanTransaction) Append(fileName string) (storage.BlockID, error) {
@@ -259,7 +278,11 @@ func (tx *materializePlanTransaction) Append(fileName string) (storage.BlockID, 
 func (tx *materializePlanTransaction) Unpin(storage.BlockID) error {
 	tx.calls++
 	tx.unpins++
-	return tx.unpinErr
+	tx.unpinCalls++
+	if tx.unpinErrAt == 0 || (tx.unpinErrAt <= tx.unpinCalls && (tx.unpinErrUntil == 0 || tx.unpinCalls <= tx.unpinErrUntil)) {
+		return tx.unpinErr
+	}
+	return nil
 }
 
 func TestNewMaterializePlanCopiesRowsIntoTemporaryQueryScan(t *testing.T) {

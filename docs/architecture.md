@@ -64,6 +64,10 @@ keeping field-membership metadata independent of product-row state and lazy prod
 context while retaining the query error cause; it rejects missing current-row state before reading either input.
 `MultibufferProductScan.GetString` follows the same boundary for varchar values, keeping storage access and
 left-before-right field selection in the query operator.
+`materialize.MultibufferProductPlan.Open` composes the established plan and materialization packages: it copies the
+right input into a temporary table, then opens `plan.MultibufferProductScan` over that descriptor. This type stays in
+`materialize` because placing it in `plan` would reverse the existing dependency (`materialize` already uses `plan`).
+The returned owner wrapper closes the opened left scan alongside the product scan's right-chunk pins.
 
 ## テスト方針
 
