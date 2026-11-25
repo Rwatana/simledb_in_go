@@ -3,8 +3,10 @@
 ## Current gate
 
 The current full-module statement coverage is **100.0%**. The independent `Go coverage` workflow runs the full suite
-with a coverage profile, reports the module total in the GitHub Actions job summary, and fails unless that total is
-100.0%. The repository keeps each check in its own workflow file and status check: Branch name, Commit count,
+with a coverage profile, rejects every executable region whose execution count is zero, reports the module total in the
+GitHub Actions job summary, and requires the total to be 100.0%. The per-region check is exact; the formatted total is
+rounded to one decimal place and is not sufficient on its own to prove that no statement is uncovered. The repository
+keeps each check in its own workflow file and status check: Branch name, Commit count,
 Documentation, Go coverage, Go test, Go vet, Issue closing reference, Issue policy, Issue reference, and Pull request
 title. Issue policy runs on issue events; the other checks validate pull requests. There is no current
 `pull-request-policy.yml` workflow.
