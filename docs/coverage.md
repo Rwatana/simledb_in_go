@@ -1158,3 +1158,7 @@ at 100.0%.
 At Issue #1266, `chooseLowestSelectPlan` selects the source with the smallest row estimate after table-local filtering,
 keeps source order for ties, and returns a new slice without the selected planner. Focused tests cover filtered estimates,
 ties, invalid candidates, input preservation, and no storage access; full-module CI remains at 100.0%.
+
+At Issue #1268, `chooseLowestJoinPlan` selects the lowest-output applicable join candidate, keeps the first source for
+ties, and removes only the winner from a new ordered slice. Focused tests cover ignored non-joins, the no-join remainder,
+invalid planners and base plans, input preservation, and no storage access; full-module CI remains at 100.0%.
