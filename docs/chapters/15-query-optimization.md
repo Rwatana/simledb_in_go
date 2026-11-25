@@ -12,6 +12,7 @@ query-planner behaviors remain separate features.
 | `internal/plan.NewTablePlanner` | `simpledb/opt/TablePlanner.java` (constructor) | Resolve and retain a table's plan, schema, predicate, transaction, and indexes for later heuristic planning |
 | `internal/plan.TablePlanner.MakeSelectPlan` | `simpledb/opt/TablePlanner.java` (`makeSelectPlan`, `makeIndexSelect`) | Use a matching field index for a constant equality, or return the table plan |
 | `internal/plan.TablePlanner.MakeSelectPlan` | `simpledb/opt/TablePlanner.java` (`addSelectPred`) | Apply the query terms that can be evaluated against one table schema |
+| `internal/plan.TablePlanner.MakeJoinPlan` | `simpledb/opt/TablePlanner.java` (`makeJoinPlan`, `makeProductJoin`) | Build a product join filtered by terms that relate the current and table schemas |
 
 ## Feature 1: Choose the cheaper product plan order
 
@@ -108,3 +109,29 @@ partitioning or add another scan wrapper type. Index lookup selection remains co
 
 Focused planner tests cover every statement in the selection method. Full-module coverage, race, vet, documentation,
 formatting, and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.
+
+
+## Feature 5: Build a product join for a cross-schema predicate
+
+`TablePlanner.MakeJoinPlan(current)` extracts terms that apply to the union of the current and table schemas but not to
+one schema alone. When such a join predicate exists, it creates a `ProductPlan` with `current` on the left and this
+table's locally selected plan on the right, then wraps the product in a `SelectPlan` for the join terms. If no join
+term exists, it returns nil so the caller can consider another source or a Cartesian product. Plan construction does
+not open scans or access storage.
+
+### Test-first record
+
+Focused compilation first failed because `MakeJoinPlan` was undefined. Tests cover the product and selection node order,
+the left-to-right output schema, table-local selection on the right input, cross-schema term extraction, the no-join
+case, a nil current plan, and no storage access.
+
+### Design decision
+
+The planner uses the existing `ProductPlan` and `SelectPlan` contracts. Keeping the per-table planner in `plan` avoids a
+reverse dependency on `materialize`; index-join selection and multibuffer product integration remain separate planner
+behaviors.
+
+### Validation
+
+Focused planner tests cover every statement in the method. Full-module coverage, race, vet, documentation, formatting,
+and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.

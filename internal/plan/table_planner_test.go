@@ -314,3 +314,84 @@ func (probe *tablePlannerMetadataProbe) IndexInfo(tableName string, transaction 
 	probe.transactions = append(probe.transactions, transaction)
 	return probe.indexes, probe.indexesErr
 }
+
+func TestTablePlannerMakeJoinPlanBuildsProductForCrossSchemaPredicate(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	currentSchema := newPlannerTestSchema("department_id")
+	current := NewTablePlan(transaction, "department", record.NewLayout(currentSchema), metadata.NewStatInfo(2, 6))
+	tableSchema := newPlannerTestSchema("student_department_id")
+	tableSchema.AddVarcharField("student_name", 24)
+	joinTerm := query.NewTerm(query.NewFieldExpression("student_department_id"), query.NewFieldExpression("department_id"))
+	localTerm := query.NewTerm(query.NewFieldExpression("student_name"), query.NewConstantExpression(query.NewStringConstant("Ada")))
+	predicate := query.NewPredicateWithTerm(joinTerm).ConjoinWith(query.NewPredicateWithTerm(localTerm))
+	planner, err := NewTablePlanner("student", predicate, transaction, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(tableSchema),
+		statistics: metadata.NewStatInfo(3, 12),
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+
+	joinPlan, ok := planner.MakeJoinPlan(current).(*SelectPlan)
+	if !ok {
+		t.Fatalf("MakeJoinPlan() type = %T, want *SelectPlan", planner.MakeJoinPlan(current))
+	}
+	product, ok := joinPlan.child.(*ProductPlan)
+	if !ok {
+		t.Fatalf("join selection child type = %T, want *ProductPlan", joinPlan.child)
+	}
+	if product.left != current {
+		t.Errorf("product left = %p, want current plan %p", product.left, current)
+	}
+	tableSelection, ok := product.right.(*SelectPlan)
+	if !ok {
+		t.Fatalf("product right type = %T, want table-local *SelectPlan", product.right)
+	}
+	if tableSelection.child != planner.tablePlan || tableSelection.predicate.String() != localTerm.String() {
+		t.Errorf("table-side selection = (child %p, predicate %q), want (%p, %q)", tableSelection.child, tableSelection.predicate.String(), planner.tablePlan, localTerm.String())
+	}
+	if got, want := joinPlan.predicate.String(), joinTerm.String(); got != want {
+		t.Errorf("join predicate = %q, want %q", got, want)
+	}
+	if got, want := strings.Join(joinPlan.Schema().Fields(), ","), "department_id,student_department_id,student_name"; got != want {
+		t.Errorf("join output fields = %q, want %q", got, want)
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("join planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+	}
+}
+
+func TestTablePlannerMakeJoinPlanReturnsNilWithoutCrossSchemaPredicate(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(2, 6))
+	predicate := query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("student_name"),
+		query.NewConstantExpression(query.NewStringConstant("Ada")),
+	))
+	planner, err := NewTablePlanner("student", predicate, transaction, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(newPlannerTestSchema("student_name")),
+		statistics: metadata.NewStatInfo(3, 12),
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+	if got := planner.MakeJoinPlan(current); got != nil {
+		t.Errorf("MakeJoinPlan() = %T, want nil without a cross-schema predicate", got)
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("join planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+	}
+}
+
+func TestTablePlannerMakeJoinPlanReturnsNilForNilCurrentPlan(t *testing.T) {
+	planner, err := NewTablePlanner("student", query.Predicate{}, &tablePlanTransaction{}, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(newPlannerTestSchema("student_id")),
+		statistics: metadata.NewStatInfo(1, 2),
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+	if got := planner.MakeJoinPlan(nil); got != nil {
+		t.Errorf("MakeJoinPlan(nil) = %T, want nil", got)
+	}
+}
