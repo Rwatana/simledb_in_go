@@ -562,3 +562,14 @@ reads both child schemas before routing to one child's estimate. No diagram was 
 
 Focused tests cover every statement in the new method. The full-module coverage, race, vet, documentation, formatting,
 and one-check-per-workflow audit results are recorded in the recovery checkpoint and stacked PR.
+
+## Completion audit
+
+The 21 numbered feature records cover the buffer-budget helpers, bounded chunk pin/release and cursor traversal,
+typed chunk values, multibuffer product initialization and row iteration, and the materialized product plan with its
+schema and cost estimates. The chapter's Go/Java boundary keeps query-value adaptation in `plan`, temporary-table
+composition in `materialize`, and page ownership in `multibuffer` so dependencies remain one-way.
+
+The existing buffer estimator, chunk scan, product scan, and product-plan diagrams link to their editable Draw.io
+sources and cover the allocation and ownership transitions. Chapter 14 is complete on the ordered PR stack; the README
+status does not imply that this stacked work has already been merged.

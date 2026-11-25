@@ -29,7 +29,7 @@
 | 11 | JDBC Interfaces | 実装完了（PR stack上） | [server managers、embedded database/sql connector、SQL planningとJava source map](docs/chapters/11-jdbc-interfaces.md) |
 | 12 | Indexing | 実装完了（PR stack上） | [index traversal contractと索引実装の解説・実装記録](docs/chapters/12-indexing.md) |
 | 13 | Materialization and Sorting | 実装完了（PR stack上） | [一時テーブル記述子・MaterializePlan・比較器・SortScan・SortPlanの解説・実装記録](docs/chapters/13-materialization-and-sorting.md) |
-| 14 | Effective Buffer Utilization | 実装中 | [`multibuffer.BestRoot` / `BestFactor` / chunk-page traversal, query values, multichunk product scans, and materialized product-plan opening](docs/chapters/14-effective-buffer-utilization.md) |
+| 14 | Effective Buffer Utilization | 実装完了（PR stack上） | [`multibuffer.BestRoot` / `BestFactor` / chunk-page traversal, query values, multichunk product scans, and materialized product-plan opening](docs/chapters/14-effective-buffer-utilization.md) |
 | 15 | Query Optimization | 実装完了（PR stack上） | [cost-based and heuristic query planningの解説・実装記録](docs/chapters/15-query-optimization.md) |
 
 第1章は概念導入、第2章はJDBCによるクライアント境界の説明であり、書籍もSimpleDBの
