@@ -1,8 +1,8 @@
 # Chapter 15: Query Optimization
 
-Chapter 15 is still in progress. The current features record the product-order choice for `OptimizedProductPlan` and
-the metadata state needed by the book's per-table heuristic planner. Its later index-join choice, product-planner
-integration, and full query-planner behaviors remain separate features.
+Chapter 15 is still in progress. The current features record the product-order choice for `OptimizedProductPlan`, the
+metadata and per-table plans used by the heuristic planner, and its initial and next-join candidate choices. Query-level
+product fallback and projection remain separate features.
 
 ## Java source map
 
@@ -16,6 +16,7 @@ integration, and full query-planner behaviors remain separate features.
 | `internal/plan.TablePlanner.MakeJoinPlan` | `simpledb/opt/TablePlanner.java` (`makeJoinPlan`, `makeIndexJoin`) | Prefer an indexed table-side join when a matching cross-schema equality is available |
 | `internal/plan.TablePlanner.MakeProductPlan` | `simpledb/opt/TablePlanner.java` (`makeProductPlan`) | Filter the base table plan and pass it with the current plan to the multibuffer product factory |
 | `internal/plan.chooseLowestSelectPlan` | `simpledb/opt/HeuristicQueryPlanner.java` (`getLowestSelectPlan`) | Choose the lowest-output table-local selection as the initial join-order plan |
+| `internal/plan.chooseLowestJoinPlan` | `simpledb/opt/HeuristicQueryPlanner.java` (`getLowestJoinPlan`) | Choose the lowest-output applicable join and preserve the remaining source order |
 
 ## Feature 1: Choose the cheaper product plan order
 
@@ -219,3 +220,31 @@ repeat metadata lookup or create scans.
 
 Focused tests cover each branch of initial-plan selection. Full-module 100% coverage, race, vet, documentation,
 formatting, and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.
+
+## Feature 9: Choose the lowest-output applicable join plan
+
+`chooseLowestJoinPlan` evaluates each remaining `TablePlanner.MakeJoinPlan(current)` once and selects the applicable plan
+with the lowest `RecordsOutput` estimate. Equal estimates keep the earliest source. The selected planner is removed
+from a new remainder slice, and all other planners retain their order without changing the caller's slice. If no join
+predicate applies, the helper returns no plan and a copy of the complete candidate list for the later product-fallback
+step. An empty candidate list, nil or typed-nil current plan, nil planner, or planner without its base `TablePlan` returns
+a contextual error. A planner whose join predicate does not apply is skipped. Candidate selection does not open scans or
+access storage.
+
+### Test-first record
+
+Focused compilation first failed because `chooseLowestJoinPlan` was undefined. Focused tests cover minimum output choice
+among applicable joins, ignoring unrelated tables, removing only the winner, source-order tie breaking, preserving all
+candidates when no join applies, rejecting unavailable planners and base plans, leaving the input slice unchanged, and
+avoiding storage access.
+
+### Design decision
+
+The helper is the next single decision in the heuristic join-order loop and takes already-resolved table planners. The
+caller remains responsible for invoking it repeatedly, choosing the product fallback when it returns no join, and
+building the final projection.
+
+### Validation
+
+Full-module statement coverage, race, vet, documentation, formatting, and independent workflow-audit results are
+recorded in the recovery checkpoint and stacked PR.

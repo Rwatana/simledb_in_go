@@ -807,7 +807,11 @@ func TestChooseLowestSelectPlanRejectsUnavailableCandidates(t *testing.T) {
 }
 
 func newSelectCandidate(tableName string, records int, predicate query.Predicate, transaction record.TableScanTransaction) *TablePlanner {
-	schema := newPlannerTestSchema("id")
+	return newSelectCandidateWithField(tableName, "id", records, predicate, transaction)
+}
+
+func newSelectCandidateWithField(tableName, fieldName string, records int, predicate query.Predicate, transaction record.TableScanTransaction) *TablePlanner {
+	schema := newPlannerTestSchema(fieldName)
 	return &TablePlanner{
 		tableName:   tableName,
 		predicate:   predicate,
@@ -815,5 +819,130 @@ func newSelectCandidate(tableName string, records int, predicate query.Predicate
 		tablePlan:   NewTablePlan(transaction, tableName, record.NewLayout(schema), metadata.NewStatInfo(1, records)),
 		schema:      schema,
 		indexes:     make(map[string]*metadata.IndexInfo),
+	}
+}
+
+func TestChooseLowestJoinPlanSelectsMinimumApplicableAndRemovesWinner(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(1, 10))
+	joinPredicate := func(tableField string) query.Predicate {
+		return query.NewPredicateWithTerm(query.NewTerm(
+			query.NewFieldExpression(tableField),
+			query.NewFieldExpression("department_id"),
+		))
+	}
+	planners := []*TablePlanner{
+		newSelectCandidate("unrelated", 1, query.Predicate{}, transaction),
+		newSelectCandidateWithField("first_join", "first_department_id", 100, joinPredicate("first_department_id"), transaction),
+		newSelectCandidateWithField("best_join", "best_department_id", 4, joinPredicate("best_department_id"), transaction),
+	}
+	original := append([]*TablePlanner(nil), planners...)
+
+	gotPlan, remaining, err := chooseLowestJoinPlan(planners, current)
+	if err != nil {
+		t.Fatalf("chooseLowestJoinPlan() error = %v", err)
+	}
+	selection, ok := gotPlan.(*SelectPlan)
+	if !ok {
+		t.Fatalf("selected join plan type = %T, want *SelectPlan", gotPlan)
+	}
+	product, ok := selection.child.(*ProductPlan)
+	if !ok {
+		t.Fatalf("selected join input type = %T, want product fallback", selection.child)
+	}
+	selectedTable, ok := product.right.(*TablePlan)
+	if !ok || selectedTable.tableName != "best_join" || product.left != current {
+		t.Errorf("selected product = (%T, %T), want current on left and best_join on right", product.left, product.right)
+	}
+	if len(remaining) != 2 || remaining[0] != planners[0] || remaining[1] != planners[1] {
+		t.Errorf("remaining planners = %v, want unrelated and first_join in source order", remaining)
+	}
+	for index, planner := range original {
+		if planners[index] != planner {
+			t.Errorf("input planner %d changed from %p to %p", index, planner, planners[index])
+		}
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("join choice accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+	}
+}
+
+func TestChooseLowestJoinPlanKeepsFirstCandidateOnTies(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(1, 10))
+	joinPredicate := query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("student_department_id"),
+		query.NewFieldExpression("department_id"),
+	))
+	planners := []*TablePlanner{
+		newSelectCandidateWithField("first", "student_department_id", 4, joinPredicate, transaction),
+		newSelectCandidateWithField("second", "student_department_id", 4, joinPredicate, transaction),
+	}
+
+	gotPlan, remaining, err := chooseLowestJoinPlan(planners, current)
+	if err != nil {
+		t.Fatalf("chooseLowestJoinPlan() error = %v", err)
+	}
+	selection, ok := gotPlan.(*SelectPlan)
+	if !ok {
+		t.Fatalf("selected join plan type = %T, want *SelectPlan", gotPlan)
+	}
+	product, ok := selection.child.(*ProductPlan)
+	if !ok {
+		t.Fatalf("selected join input type = %T, want product fallback", selection.child)
+	}
+	selectedTable, ok := product.right.(*TablePlan)
+	if !ok {
+		t.Fatalf("selected join right plan type = %T, want *TablePlan", product.right)
+	}
+	if got := selectedTable.tableName; got != "first" {
+		t.Errorf("selected table = %q, want first source on an equal estimate", got)
+	}
+	if len(remaining) != 1 || remaining[0] != planners[1] {
+		t.Errorf("remaining planners = %v, want only second", remaining)
+	}
+}
+
+func TestChooseLowestJoinPlanPreservesCandidatesWhenNoJoinApplies(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(1, 10))
+	planners := []*TablePlanner{
+		newSelectCandidate("unrelated_first", 1, query.Predicate{}, transaction),
+		newSelectCandidate("unrelated_second", 2, query.Predicate{}, transaction),
+	}
+
+	gotPlan, remaining, err := chooseLowestJoinPlan(planners, current)
+	if err != nil {
+		t.Fatalf("chooseLowestJoinPlan() error = %v", err)
+	}
+	if gotPlan != nil {
+		t.Errorf("selected join plan = %T, want nil when no join predicate applies", gotPlan)
+	}
+	if len(remaining) != len(planners) || remaining[0] != planners[0] || remaining[1] != planners[1] {
+		t.Errorf("remaining planners = %v, want all candidates in source order", remaining)
+	}
+}
+
+func TestChooseLowestJoinPlanRejectsUnavailableCandidates(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(1, 10))
+	for _, test := range []struct {
+		name     string
+		planners []*TablePlanner
+		current  Plan
+		wantText string
+	}{
+		{name: "empty candidates", current: current, wantText: "no table planners"},
+		{name: "nil current", planners: []*TablePlanner{newSelectCandidate("student", 1, query.Predicate{}, transaction)}, wantText: "current plan is nil"},
+		{name: "typed nil current", planners: []*TablePlanner{newSelectCandidate("student", 1, query.Predicate{}, transaction)}, current: (*TablePlan)(nil), wantText: "current plan is nil"},
+		{name: "nil planner", planners: []*TablePlanner{nil}, current: current, wantText: "table planner at index 0 is nil"},
+		{name: "nil table plan", planners: []*TablePlanner{{tableName: "student"}}, current: current, wantText: `table plan for "student" is nil`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, remaining, err := chooseLowestJoinPlan(test.planners, test.current)
+			if plan != nil || remaining != nil || err == nil || !strings.Contains(err.Error(), test.wantText) {
+				t.Errorf("chooseLowestJoinPlan() = (%v, %v, %v), want no plan, no remainder, and error containing %q", plan, remaining, err, test.wantText)
+			}
+		})
 	}
 }
