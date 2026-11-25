@@ -11,7 +11,7 @@ operations.
 | `internal/multibuffer.BestRoot`, `BestFactor` | `simpledb/multibuffer/BufferNeeds.java` (`bestRoot`, `bestFactor`) | Choose a ceiling root or quotient of a relation's block count within the usable buffer budget |
 | `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` (`beforeFirst`, `next`, `getInt`, `getString`, `hasField`) | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
 | `internal/plan.ChunkValueScan` | `simpledb/multibuffer/ChunkScan.java` (`getVal`) | Adapt typed chunk field reads to query constants without making `multibuffer` depend on `query` |
-| `internal/plan.MultibufferProductScan` | `simpledb/multibuffer/MultibufferProductScan.java` (constructor, `beforeFirst`, `next`, `useNextChunk`) | Read right-table size and buffer budget, choose a bounded chunk, pin the first range, reset the left scan, and enumerate pairs within the active chunk |
+| `internal/plan.MultibufferProductScan` | `simpledb/multibuffer/MultibufferProductScan.java` (constructor, `beforeFirst`, `next`, `useNextChunk`) | Read right-table size and buffer budget, choose bounded ranges, pin and replace chunks, reset the left scan, and enumerate left-major pairs |
 
 
 ## Feature 1: Choose a safe buffer root
@@ -248,9 +248,9 @@ The focused tests cover every executable statement and function. The module cove
 right relation's block count from `<table>.tbl`, obtains the available-buffer count only when the relation is
 nonempty, and calls `multibuffer.BestFactor` to choose the first bounded block range. It pins that range through
 `multibuffer.NewChunkScan`, adapts the chunk to query values, and rewinds the left scan before returning. An empty right
-relation is initialized without pins or a left rewind. The scan owns only its acquired right chunk at this stage; the
-left scan remains caller-owned, and `Close` can retry failed page releases. Product-row traversal and later chunk
-rollover remain separate behaviors.
+relation is initialized without pins or a left rewind. The scan owns its active right chunk and retains ownership of the
+left scan with its caller. `Close` can retry failed page releases. Product-row traversal and later chunk rollover are
+recorded as separate behaviors below.
 
 The [product-scan initialization diagram](../diagrams/ch14-multibuffer-product-init.svg) shows the sizing, buffer
 selection, first-range pinning, and left rewind performed before row traversal. Its editable source is
@@ -267,7 +267,7 @@ close behavior.
 
 The plan package owns this orchestration because it depends on both the storage-oriented multibuffer scan and the
 query-facing scan contract. `multibuffer` remains independent of `query`. The first chunk is represented by
-`ChunkValueScan`, but product-row advancement and subsequent chunk replacement are intentionally not implemented here.
+`ChunkValueScan`; row advancement and subsequent chunk replacement are implemented by later features.
 
 ### Validation
 
@@ -280,7 +280,7 @@ The focused tests cover every executable statement and function. The module cove
 selected during initialization. The product scan is left-major: every right record in the current chunk is paired with
 one left record before the left input advances. `BeforeFirst` rewinds both inputs, and repeated exhaustion does not
 read pages again. An empty right relation returns no rows without touching the left scan. The active chunk remains
-pinned throughout this traversal; replacing it with the next chunk is a separate behavior.
+pinned throughout its rows. Replacing it with the next chunk is handled by Feature 12.
 
 The [in-chunk product traversal diagram](../diagrams/ch14-multibuffer-product-traversal.svg) shows the left-major
 pair order and the right-scan rewind for each left row. Its editable source is
@@ -295,10 +295,46 @@ read and rewind errors, product construction errors, invalid/closed scan states,
 ### Design decision
 
 The plan scan composes the existing `query.ProductScan` rather than duplicating its pairing state. The product is
-created lazily so the constructor remains limited to acquiring and positioning the first chunk. Field forwarding and
-later chunk rollover remain separate.
+created lazily so the constructor remains limited to acquiring and positioning the first chunk. Field forwarding
+remains separate.
 
 ### Validation
 
 The focused plan tests cover every executable statement and function. The module coverage workflow continues to
 require 100.0% statement coverage for every executable package, function, and module total.
+
+## Feature 12: Move a multibuffer product scan to later chunks
+
+After the current product reaches the end of its right chunk, `MultibufferProductScan.Next` releases that range before
+pinning the next one. It bounds every inclusive range by both `chunkSize` and the right relation's block count, resets
+the left scan for each range, and continues the same left-major pairing order. Empty chunks are skipped; the last range
+may contain fewer than `chunkSize` blocks. The final active chunk remains pinned until `Close`, and repeated exhaustion
+does not read or pin pages again.
+
+The scan does not advance its saved next-block boundary until a later range is fully pinned and the left scan rewinds.
+Failed old-range releases are retried before any new pin; a clean pin or rewind failure can be retried at the same range.
+If partial acquisition cleanup fails, the scan retains the remaining page handles and joined causes until `Close`
+releases them. Closing the product releases the current right chunk but leaves the left scan caller-owned.
+
+The [chunk rollover diagram](../diagrams/ch14-multibuffer-product-rollover.svg) shows the release, bounded next-range
+acquisition, and left rewind order. Its editable source is
+[`ch14-multibuffer-product-rollover.drawio`](../diagrams/ch14-multibuffer-product-rollover.drawio).
+
+### Test-first record
+
+The new tests first failed because `Next` stopped after the initially pinned chunk. Tests cover left-major output over
+multiple chunks, a bounded final chunk, empty earlier chunks, stable exhaustion, unchanged pins while current rows
+remain, failed-release retry ordering, later pin failure and retry, partial-pin cleanup, left-rewind failure and retry,
+and final-chunk release on close.
+
+### Design decision
+
+Each chunk transition is a retryable resource boundary. The `nextBlock` cursor advances only after all pages are pinned
+and the left scan has rewound successfully. A partially pinned range is not traversable: it is retained only so the
+caller can retry cleanup with `Close`. The last chunk stays open after row exhaustion until the caller closes the scan,
+matching scan resource ownership and avoiding needless release/re-pin on repeated `Next` calls.
+
+### Validation
+
+The focused plan tests cover every executable statement and function. The independent module coverage workflow requires
+100.0% statement coverage for every executable package, function, and module total.

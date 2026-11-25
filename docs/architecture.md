@@ -54,7 +54,8 @@ edge; the optimization cursor remains reusable without importing its consumer's 
 `plan.MultibufferProductScan` initialization also belongs at this edge: it combines a left `query.Scan` with the
 transaction operations needed to size and pin a right-hand chunk, while keeping chunk resource management in
 `multibuffer`. Within that pinned range, the plan delegates left-major pair traversal to `query.ProductScan`; moving to
-the next block range remains a separate multibuffer behavior.
+the next bounded range releases the old right chunk first, then pins the next range and rewinds the caller-owned left
+scan. Partial pin cleanup failures retain a retryable close handle on the plan scan.
 
 ## テスト方針
 

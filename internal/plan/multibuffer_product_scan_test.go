@@ -51,16 +51,24 @@ func (*multibufferProductLeftProbe) HasField(string) bool { return false }
 func (*multibufferProductLeftProbe) Close() error         { return nil }
 
 type multibufferProductLeftRows struct {
-	values           []int32
-	position         int
-	beforeFirstCalls int
-	nextCalls        int
-	beforeFirstErr   error
-	nextErrors       []error
+	values            []int32
+	position          int
+	beforeFirstCalls  int
+	nextCalls         int
+	beforeFirstErr    error
+	beforeFirstErrors []error
+	nextErrors        []error
 }
 
 func (scan *multibufferProductLeftRows) BeforeFirst() error {
 	scan.beforeFirstCalls++
+	if len(scan.beforeFirstErrors) != 0 {
+		err := scan.beforeFirstErrors[0]
+		scan.beforeFirstErrors = scan.beforeFirstErrors[1:]
+		if err != nil {
+			return err
+		}
+	}
 	if scan.beforeFirstErr != nil {
 		return scan.beforeFirstErr
 	}
@@ -502,6 +510,19 @@ func TestMultibufferProductScanPreservesProductFactoryAndInputErrors(t *testing.
 		}
 	})
 
+	t.Run("missing current chunk is reported", func(t *testing.T) {
+		scan, _, _ := newScan(t)
+		retained := scan.right
+		scan.right = nil
+		if ok, err := scan.Next(); ok || err == nil || !strings.Contains(err.Error(), "current chunk is unavailable") {
+			t.Fatalf("Next() without a current chunk = (%v, %v), want unavailable chunk error", ok, err)
+		}
+		scan.right = retained
+		if err := scan.Close(); err != nil {
+			t.Fatalf("Close() retained test chunk: %v", err)
+		}
+	})
+
 	t.Run("left next error", func(t *testing.T) {
 		scan, _, left := newScan(t)
 		leftErr := errors.New("left next failed")
@@ -565,6 +586,380 @@ func TestMultibufferProductScanPreservesProductFactoryAndInputErrors(t *testing.
 			t.Fatal("zero BeforeFirst() error = nil, want validation error")
 		}
 	})
+}
+
+func TestMultibufferProductScanMovesAcrossBoundedChunksInLeftMajorOrder(t *testing.T) {
+	layout := chunkValueLayout(false)
+	idOffset, _ := layout.Offset("id")
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize: 128,
+			intValues: map[int]map[int]int32{
+				0: {0: 1, idOffset: 100},
+				1: {0: 1, idOffset: 101},
+				2: {0: 1, idOffset: 102},
+				3: {0: 1, idOffset: 103},
+				4: {0: 1, idOffset: 104},
+			},
+		},
+		fileSize:  5,
+		available: 4,
+	}
+	left := &multibufferProductLeftRows{values: []int32{10, 20}, position: -1}
+	scan, err := NewMultibufferProductScan(transaction, left, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if scan.chunkSize != 2 {
+		t.Fatalf("chunk size = %d, want 2", scan.chunkSize)
+	}
+	wantPairs := [][2]int32{
+		{10, 100}, {10, 101}, {20, 100}, {20, 101},
+		{10, 102}, {10, 103}, {20, 102}, {20, 103},
+		{10, 104}, {20, 104},
+	}
+	for i, want := range wantPairs {
+		ok, err := scan.Next()
+		if err != nil || !ok {
+			t.Fatalf("Next() pair %d = (%v, %v), want a row", i, ok, err)
+		}
+		pair := multibufferProductPair(t, scan)
+		if pair != want {
+			t.Fatalf("pair %d = %v, want %v", i, pair, want)
+		}
+		if i == 3 {
+			if got, want := transaction.pins, multibufferProductBlocks(0, 1); !reflect.DeepEqual(got, want) {
+				t.Fatalf("current-chunk rows changed pins: got %v, want %v", got, want)
+			}
+			if len(transaction.unpins) != 0 {
+				t.Fatalf("current chunk was released before exhaustion: %v", transaction.unpins)
+			}
+		}
+	}
+	wantPins := multibufferProductBlocks(0, 4)
+	if !reflect.DeepEqual(transaction.pins, wantPins) {
+		t.Fatalf("pins = %v, want block order and bounded final chunk %v", transaction.pins, wantPins)
+	}
+	wantUnpins := append(multibufferProductBlocks(0, 1), multibufferProductBlocks(2, 3)...)
+	if !reflect.DeepEqual(transaction.unpins, wantUnpins) {
+		t.Fatalf("intermediate chunk releases = %v, want %v", transaction.unpins, wantUnpins)
+	}
+	if ok, err := scan.Next(); err != nil || ok {
+		t.Fatalf("Next() after final row = (%v, %v), want exhaustion", ok, err)
+	}
+	readsAtEnd := len(transaction.intReads)
+	if ok, err := scan.Next(); err != nil || ok {
+		t.Fatalf("repeated Next() after final chunk = (%v, %v), want stable exhaustion", ok, err)
+	}
+	if len(transaction.intReads) != readsAtEnd || !reflect.DeepEqual(transaction.pins, wantPins) || !reflect.DeepEqual(transaction.unpins, wantUnpins) {
+		t.Fatalf("stable exhaustion changed reads or pins: reads=%v pins=%v unpins=%v", transaction.intReads, transaction.pins, transaction.unpins)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() final chunk: %v", err)
+	}
+}
+
+func TestMultibufferProductScanSkipsEmptyEarlierChunks(t *testing.T) {
+	layout := chunkValueLayout(false)
+	idOffset, _ := layout.Offset("id")
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize: 128,
+			intValues: map[int]map[int]int32{4: {0: 1, idOffset: 104}},
+		},
+		fileSize:  5,
+		available: 4,
+	}
+	left := &multibufferProductLeftRows{values: []int32{20}, position: -1}
+	scan, err := NewMultibufferProductScan(transaction, left, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	ok, err := scan.Next()
+	if err != nil || !ok {
+		t.Fatalf("Next() after empty earlier chunks = (%v, %v), want final-chunk row", ok, err)
+	}
+	if got, want := multibufferProductPair(t, scan), [2]int32{20, 104}; got != want {
+		t.Fatalf("final-chunk pair = %v, want %v", got, want)
+	}
+	if got, want := transaction.pins, multibufferProductBlocks(0, 4); !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins across empty chunks = %v, want %v", got, want)
+	}
+	if got, want := transaction.unpins, multibufferProductBlocks(0, 3); !reflect.DeepEqual(got, want) {
+		t.Fatalf("releases before final chunk = %v, want %v", got, want)
+	}
+	if left.beforeFirstCalls != 3 {
+		t.Fatalf("left rewind calls = %d, want initial plus both chunk transitions", left.beforeFirstCalls)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() final chunk: %v", err)
+	}
+}
+
+func TestMultibufferProductScanRetriesLaterChunkPinFailure(t *testing.T) {
+	pinErr := errors.New("next chunk pin failed")
+	layout := chunkValueLayout(false)
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize: 128,
+			pinErrors: map[int]error{2: pinErr},
+		},
+		fileSize:  4,
+		available: 4,
+	}
+	scan, err := NewMultibufferProductScan(transaction, &multibufferProductLeftRows{position: -1}, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if ok, err := scan.Next(); ok || !errors.Is(err, pinErr) {
+		t.Fatalf("Next() at first chunk boundary = (%v, %v), want wrapped next-chunk pin error", ok, err)
+	}
+	if got, want := transaction.pins, multibufferProductBlocks(0, 2); !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins after failed transition = %v, want no block beyond failed block 2", got)
+	}
+	if scan.nextBlock != 2 {
+		t.Fatalf("next block after failed pin = %d, want retryable block 2", scan.nextBlock)
+	}
+	if err := scan.BeforeFirst(); err == nil || !strings.Contains(err.Error(), "current chunk is unavailable") {
+		t.Fatalf("BeforeFirst() while a later chunk is unavailable = %v, want unavailable chunk error", err)
+	}
+	delete(transaction.pinErrors, 2)
+	if ok, err := scan.Next(); err != nil || ok {
+		t.Fatalf("Next() after pin retry with empty left input = (%v, %v), want exhaustion", ok, err)
+	}
+	wantPins := append(multibufferProductBlocks(0, 2), multibufferProductBlocks(2, 3)...)
+	if !reflect.DeepEqual(transaction.pins, wantPins) {
+		t.Fatalf("pins after retry = %v, want failed block 2 retried before block 3: %v", transaction.pins, wantPins)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() after retry: %v", err)
+	}
+}
+
+func TestMultibufferProductScanRetriesOldChunkReleaseBeforePinningNext(t *testing.T) {
+	releaseErr := errors.New("old chunk release failed")
+	layout := chunkValueLayout(false)
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize:   128,
+			unpinErrors: map[int][]error{0: {releaseErr}},
+		},
+		fileSize:  4,
+		available: 4,
+	}
+	scan, err := NewMultibufferProductScan(transaction, &multibufferProductLeftRows{position: -1}, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if ok, err := scan.Next(); ok || !errors.Is(err, releaseErr) {
+		t.Fatalf("Next() at first chunk boundary = (%v, %v), want release error", ok, err)
+	}
+	if got, want := transaction.pins, multibufferProductBlocks(0, 1); !reflect.DeepEqual(got, want) {
+		t.Fatalf("failed release pinned the next chunk: got %v, want %v", got, want)
+	}
+	if ok, err := scan.Next(); err != nil || ok {
+		t.Fatalf("Next() after release retry and empty left input = (%v, %v), want exhaustion", ok, err)
+	}
+	if got, want := transaction.pins, multibufferProductBlocks(0, 3); !reflect.DeepEqual(got, want) {
+		t.Fatalf("pins after release retry = %v, want later chunk after old releases", got)
+	}
+	wantUnpinsBeforeClose := []storage.BlockID{
+		storage.NewBlockID("student.tbl", 0),
+		storage.NewBlockID("student.tbl", 1),
+		storage.NewBlockID("student.tbl", 0),
+	}
+	if !reflect.DeepEqual(transaction.unpins, wantUnpinsBeforeClose) {
+		t.Fatalf("unpin attempts before final Close = %v, want failed-page-only retry and retained final chunk %v", transaction.unpins, wantUnpinsBeforeClose)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() after release retry: %v", err)
+	}
+	wantUnpins := append(wantUnpinsBeforeClose, multibufferProductBlocks(2, 3)...)
+	if !reflect.DeepEqual(transaction.unpins, wantUnpins) {
+		t.Fatalf("unpins after final Close = %v, want %v", transaction.unpins, wantUnpins)
+	}
+}
+
+func TestMultibufferProductScanRetainsPartiallyPinnedLaterChunk(t *testing.T) {
+	pinErr := errors.New("later chunk pin failed")
+	releaseErr := errors.New("partial later chunk release failed")
+	layout := chunkValueLayout(false)
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize:   128,
+			pinErrors:   map[int]error{3: pinErr},
+			unpinErrors: map[int][]error{2: {releaseErr}},
+		},
+		fileSize:  4,
+		available: 4,
+	}
+	scan, err := NewMultibufferProductScan(transaction, &multibufferProductLeftRows{position: -1}, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if ok, err := scan.Next(); ok || !errors.Is(err, pinErr) || !errors.Is(err, releaseErr) {
+		t.Fatalf("Next() at partial chunk failure = (%v, %v), want both pin and cleanup causes", ok, err)
+	}
+	if scan.right == nil || scan.nextBlock != 2 {
+		t.Fatalf("partial chunk state = right %v, next block %d; want retained cleanup handle and unchanged next block", scan.right, scan.nextBlock)
+	}
+	if err := scan.BeforeFirst(); !errors.Is(err, pinErr) || !errors.Is(err, releaseErr) {
+		t.Fatalf("BeforeFirst() with partial later chunk = %v, want both causes", err)
+	}
+	pinsAtFailure := append([]storage.BlockID(nil), transaction.pins...)
+	if ok, err := scan.Next(); ok || !errors.Is(err, pinErr) || !errors.Is(err, releaseErr) {
+		t.Fatalf("Next() with retained partial chunk = (%v, %v), want original causes without retrying it", ok, err)
+	}
+	if !reflect.DeepEqual(transaction.pins, pinsAtFailure) {
+		t.Fatalf("Next() retried pins before cleanup: got %v, want %v", transaction.pins, pinsAtFailure)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() retry of partial later chunk: %v", err)
+	}
+	if got, want := transaction.unpins[len(transaction.unpins)-1], storage.NewBlockID("student.tbl", 2); got != want {
+		t.Fatalf("last cleanup retry = %v, want retained block %v", got, want)
+	}
+}
+
+func TestMultibufferProductScanDoesNotReplaceChunkPastFileEnd(t *testing.T) {
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{blockSize: 128},
+		fileSize:              1,
+		available:             4,
+	}
+	scan, err := NewMultibufferProductScan(transaction, &multibufferProductLeftRows{position: -1}, "student", chunkValueLayout(false))
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if err := scan.useNextChunk(); err != nil {
+		t.Fatalf("useNextChunk() after file end = %v, want nil", err)
+	}
+	if got, want := transaction.pins, multibufferProductBlocks(0, 0); !reflect.DeepEqual(got, want) {
+		t.Fatalf("pin attempts after file end = %v, want unchanged current chunk %v", transaction.pins, want)
+	}
+	if len(transaction.unpins) != 0 {
+		t.Fatalf("useNextChunk() released the final chunk: %v", transaction.unpins)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() final chunk: %v", err)
+	}
+}
+
+func TestMultibufferProductScanRetriesLaterChunkAfterLeftRewindFailure(t *testing.T) {
+	leftErr := errors.New("later left rewind failed")
+	layout := chunkValueLayout(false)
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{blockSize: 128},
+		fileSize:              4,
+		available:             4,
+	}
+	left := &multibufferProductLeftRows{position: -1, beforeFirstErrors: []error{nil, leftErr, nil}}
+	scan, err := NewMultibufferProductScan(transaction, left, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if ok, err := scan.Next(); ok || !errors.Is(err, leftErr) {
+		t.Fatalf("Next() at left reset failure = (%v, %v), want left rewind cause", ok, err)
+	}
+	wantAfterResetFailure := append(multibufferProductBlocks(0, 1), multibufferProductBlocks(2, 3)...)
+	if !reflect.DeepEqual(transaction.unpins, wantAfterResetFailure) {
+		t.Fatalf("failed left reset releases = %v, want current then failed new range %v", transaction.unpins, wantAfterResetFailure)
+	}
+	if scan.nextBlock != 2 || scan.right != nil {
+		t.Fatalf("failed rewind state = next block %d, right %v; want unchanged block and no new chunk", scan.nextBlock, scan.right)
+	}
+	if ok, err := scan.Next(); ok || err != nil {
+		t.Fatalf("Next() after rewind retry with empty left input = (%v, %v), want eventual exhaustion", ok, err)
+	}
+	wantPins := append(multibufferProductBlocks(0, 1), multibufferProductBlocks(2, 3)...)
+	wantPins = append(wantPins, multibufferProductBlocks(2, 3)...)
+	if !reflect.DeepEqual(transaction.pins, wantPins) {
+		t.Fatalf("pins after left rewind retry = %v, want %v", transaction.pins, wantPins)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() after left rewind retry: %v", err)
+	}
+}
+
+func TestMultibufferProductScanRetainsLaterChunkWhenRewindAndCleanupFail(t *testing.T) {
+	leftErr := errors.New("later left rewind failed")
+	releaseErr := errors.New("later chunk release failed")
+	layout := chunkValueLayout(false)
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize:   128,
+			unpinErrors: map[int][]error{2: {releaseErr}},
+		},
+		fileSize:  4,
+		available: 4,
+	}
+	left := &multibufferProductLeftRows{position: -1, beforeFirstErrors: []error{nil, leftErr}}
+	scan, err := NewMultibufferProductScan(transaction, left, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if ok, err := scan.Next(); ok || !errors.Is(err, leftErr) || !errors.Is(err, releaseErr) {
+		t.Fatalf("Next() at rewind cleanup failure = (%v, %v), want both causes", ok, err)
+	}
+	if scan.right == nil || scan.nextBlock != 2 {
+		t.Fatalf("retained later chunk state = right %v next block %d, want cleanup handle and unchanged range", scan.right, scan.nextBlock)
+	}
+	if ok, err := scan.Next(); ok || !errors.Is(err, leftErr) || !errors.Is(err, releaseErr) {
+		t.Fatalf("Next() with retained rewind failure = (%v, %v), want stored causes", ok, err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() retry after left rewind failure: %v", err)
+	}
+	if err := scan.BeforeFirst(); err == nil || !strings.Contains(err.Error(), "closed") {
+		t.Fatalf("BeforeFirst() after cleanup = %v, want closed scan error", err)
+	}
+}
+
+func TestMultibufferProductScanReleasesFinalChunkOnCloseAndRejectsReuse(t *testing.T) {
+	layout := chunkValueLayout(false)
+	idOffset, _ := layout.Offset("id")
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize: 128,
+			intValues: map[int]map[int]int32{0: {0: 1, idOffset: 100}},
+		},
+		fileSize:  1,
+		available: 4,
+	}
+	scan, err := NewMultibufferProductScan(transaction, &multibufferProductLeftRows{values: []int32{10}, position: -1}, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close() = %v", err)
+	}
+	if got, want := transaction.unpins, multibufferProductBlocks(0, 0); !reflect.DeepEqual(got, want) {
+		t.Fatalf("Close() final page releases = %v, want %v", got, want)
+	}
+	if ok, err := scan.Next(); ok || err == nil || !strings.Contains(err.Error(), "closed") {
+		t.Fatalf("Next() after Close() = (%v, %v), want closed scan error", ok, err)
+	}
+	if err := scan.BeforeFirst(); err == nil || !strings.Contains(err.Error(), "closed") {
+		t.Fatalf("BeforeFirst() after Close() = %v, want closed scan error", err)
+	}
+}
+
+func multibufferProductPair(t *testing.T, scan *MultibufferProductScan) [2]int32 {
+	t.Helper()
+	left, err := scan.product.GetVal("left")
+	if err != nil {
+		t.Fatalf("read product left value: %v", err)
+	}
+	right, err := scan.product.GetVal("id")
+	if err != nil {
+		t.Fatalf("read product right value: %v", err)
+	}
+	leftValue, leftIsInt := left.AsInt()
+	rightValue, rightIsInt := right.AsInt()
+	if !leftIsInt || !rightIsInt {
+		t.Fatalf("product values = (%v, %v), want integer values", left, right)
+	}
+	return [2]int32{leftValue, rightValue}
 }
 
 func multibufferProductBlocks(start, end int) []storage.BlockID {
