@@ -1,0 +1,30 @@
+name: Pull request title prefix
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  title-prefix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Pull Request commits
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Test Pull Request title prefix rule
+        run: bash scripts/test_pull_request_title_prefix.sh
+
+      - name: Require an allowed prefix on the Pull Request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: bash scripts/check_pull_request_title_prefix.sh "$PR_TITLE"

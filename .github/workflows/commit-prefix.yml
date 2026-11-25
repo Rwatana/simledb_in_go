@@ -1,0 +1,31 @@
+name: Commit subject prefix
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  commit-prefix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Pull Request commits
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Test commit subject prefix rule
+        run: bash scripts/test_commit_subject_prefix.sh
+
+      - name: Require a bracketed prefix on every commit subject
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: scripts/check_commit_prefix.sh "$BASE_SHA" "$HEAD_SHA"

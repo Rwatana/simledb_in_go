@@ -1,5 +1,5 @@
-# Allowed Issue and Pull Request title prefixes.
+# Allowed Issue, Pull Request, and commit subject prefixes.
 prefixes:
-  - Docs
-  - Go
+  - Backend
   - CI/CD
+  - Docs
