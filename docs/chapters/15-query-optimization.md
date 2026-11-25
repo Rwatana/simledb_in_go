@@ -1,8 +1,8 @@
 # Chapter 15: Query Optimization
 
 Chapter 15 is still in progress. The current features record the product-order choice for `OptimizedProductPlan`, the
-metadata and per-table plans used by the heuristic planner, and its initial and next-join candidate choices. Query-level
-product fallback and projection remain separate features.
+metadata and per-table plans used by the heuristic planner, and its initial, next-join, and disconnected-product
+candidate choices. Query-level projection remains a separate feature.
 
 ## Java source map
 
@@ -17,6 +17,7 @@ product fallback and projection remain separate features.
 | `internal/plan.TablePlanner.MakeProductPlan` | `simpledb/opt/TablePlanner.java` (`makeProductPlan`) | Filter the base table plan and pass it with the current plan to the multibuffer product factory |
 | `internal/plan.chooseLowestSelectPlan` | `simpledb/opt/HeuristicQueryPlanner.java` (`getLowestSelectPlan`) | Choose the lowest-output table-local selection as the initial join-order plan |
 | `internal/plan.chooseLowestJoinPlan` | `simpledb/opt/HeuristicQueryPlanner.java` (`getLowestJoinPlan`) | Choose the lowest-output applicable join and preserve the remaining source order |
+| `internal/plan.chooseLowestProductPlan` | `simpledb/opt/HeuristicQueryPlanner.java` (`getLowestProductPlan`) | Choose the lowest-output product fallback and preserve the remaining source order |
 
 ## Feature 1: Choose the cheaper product plan order
 
@@ -243,6 +244,32 @@ avoiding storage access.
 The helper is the next single decision in the heuristic join-order loop and takes already-resolved table planners. The
 caller remains responsible for invoking it repeatedly, choosing the product fallback when it returns no join, and
 building the final projection.
+
+### Validation
+
+Full-module statement coverage, race, vet, documentation, formatting, and independent workflow-audit results are
+recorded in the recovery checkpoint and stacked PR.
+
+## Feature 10: Choose the lowest-output product fallback plan
+
+`chooseLowestProductPlan` builds a product plan for every remaining table planner using the current plan and the supplied
+`ProductPlanFactory`, then selects the candidate with the lowest `RecordsOutput` estimate. Equal estimates keep the first
+source. The selected planner is removed from a new remainder slice while other planner order and the caller's slice stay
+unchanged. Empty candidate lists, nil or typed-nil current plans, a nil factory, nil planner entries, planners without a
+base `TablePlan`, and nil or typed-nil factory results return contextual errors. This helper does not open scans or
+access storage; query-level projection remains separate.
+
+### Test-first record
+
+Focused compilation first failed because `chooseLowestProductPlan` was undefined. Tests cover minimum product output,
+factory input order and exactly-once calls, stable tie breaking, winner removal, unavailable dependencies and factory
+results, input preservation, and no storage access.
+
+### Design decision
+
+The helper receives the same product factory boundary used by `TablePlanner.MakeProductPlan`, so query planning can choose
+among normal or multibuffer products without adding a `plan` to `materialize` dependency. It implements only the
+no-applicable-join fallback choice; repeated orchestration and projection remain separate.
 
 ### Validation
 
