@@ -523,6 +523,16 @@ appendとlengthもOS file sizeへ依存するため、read/writeと同じfilesys
 対応させて永続化する最小file layerが完成した。次はChapter 4で、このfile layerを利用する
 `LogManager`のrecord appendとblock rolloverを独立したIssueとして実装する。
 
+## Completion audit
+
+The four feature records cover the chapter's complete file layer: logical block identity, in-memory page encoding,
+fixed-size block reads/writes, and block append/length. Their Java source references, tests, and intentional scope
+boundaries are recorded above. The BlockID and Page diagrams already link to editable Draw.io sources; no additional
+diagram is needed.
+
+Chapter 3 is complete on the ordered PR stack; the README status does not imply that this stacked work has already
+been merged.
+
 ## 参照元
 
 - Edward Sciore, *Database Design and Implementation*, 2nd ed., Section 3.5 and Fig. 3.13
