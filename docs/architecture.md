@@ -90,7 +90,9 @@ candidate with terms applicable to that table schema; it does not open scans or 
 schema, applies table-local terms, and retains the cross-schema predicate above it. Without a matching index, it uses
 the `ProductPlan` fallback. `TablePlanner.MakeProductPlan` passes the locally filtered base table plan to a supplied
 factory; `materialize` provides the transaction-bound multibuffer product factory so `plan` does not import `materialize`.
-Query-level orchestration stays separate.
+The Chapter 15 `chooseLowestSelectPlan` helper starts a join order with the least-output table-local selection plan,
+retains source order for ties, and returns the other table planners without mutating the caller's slice. Later join,
+product, and projection orchestration steps remain separate.
 
 ## テスト方針
 

@@ -1154,3 +1154,7 @@ product factory once with current plan on the left and the table input on the ri
 factory constructs `MultibufferProductPlan` without a `plan` to `materialize` import. Focused tests cover local and empty
 predicates, factory argument order/count, missing inputs, adapter binding, and no storage access; full-module CI remains
 at 100.0%.
+
+At Issue #1266, `chooseLowestSelectPlan` selects the source with the smallest row estimate after table-local filtering,
+keeps source order for ties, and returns a new slice without the selected planner. Focused tests cover filtered estimates,
+ties, invalid candidates, input preservation, and no storage access; full-module CI remains at 100.0%.
