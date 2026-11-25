@@ -2398,6 +2398,18 @@ primitiveだけを提供する。
 Chapter 4のlog managerとbuffer managerの基本機能はここまでで揃う。次はChapter 5へ進み、transactionと
 concurrency controlの最小value/lock behaviorから、書籍順に1 observable behaviorずつ実装する。
 
+## Completion audit
+
+The 27 numbered feature records cover the log page boundary and record lifecycle, reverse traversal and iterator
+flush, buffer assignment and replacement under WAL, and the complete pool pin/unpin, waiting, timeout, and
+transaction-flush paths. Each behavior has its own test-first implementation record and remains independently
+reviewable in the ordered stack. The fixed-timeout gap noted in the waiting-buffer section is handled by Feature 26.
+
+The log initialization, append/rollover, reverse-iteration, buffer-assignment, WAL replacement, pinning, waiter, and
+transaction-flush diagrams link to editable Draw.io sources and SVG previews. The audit found no missing transition
+that requires another diagram. Chapter 4 is complete on the ordered PR stack; the README status does not mean these
+stacked changes have already been merged.
+
 ## 参照元
 
 - Edward Sciore, *Database Design and Implementation*, 2nd ed., Chapter 4
