@@ -1167,3 +1167,9 @@ At Issue #1270, `chooseLowestProductPlan` evaluates each candidate through the s
 the lowest output estimate, keeps the first source on ties, and removes only the selected planner. Focused tests cover
 factory inputs/call counts, invalid dependencies and results, input preservation, and no storage access; full-module CI
 remains at 100.0%.
+
+At Issue #1272, `HeuristicQueryPlanner.CreatePlan` composes table metadata resolution, minimum-output initial selection,
+repeated join choice, disconnected product fallback, and final projection. Tests cover connected and disconnected plans,
+custom/default product factories, contextual metadata and projection errors, invalid dependencies/results, and no storage
+access. The uncached full-suite coverage profile reports 100.0% for every executable package and function, with no
+zero-count executable statement regions; `internal/index` has no statements.

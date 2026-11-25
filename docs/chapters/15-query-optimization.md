@@ -1,8 +1,8 @@
 # Chapter 15: Query Optimization
 
-Chapter 15 is still in progress. The current features record the product-order choice for `OptimizedProductPlan`, the
-metadata and per-table plans used by the heuristic planner, and its initial, next-join, and disconnected-product
-candidate choices. Query-level projection remains a separate feature.
+Chapter 15 is implemented on the ordered Pull Request stack. The features record the product-order choice for
+`OptimizedProductPlan`, the metadata and per-table plans used by the heuristic planner, its initial, next-join, and
+disconnected-product candidate choices, and the end-to-end query planner that applies projection last.
 
 ## Java source map
 
@@ -18,6 +18,7 @@ candidate choices. Query-level projection remains a separate feature.
 | `internal/plan.chooseLowestSelectPlan` | `simpledb/opt/HeuristicQueryPlanner.java` (`getLowestSelectPlan`) | Choose the lowest-output table-local selection as the initial join-order plan |
 | `internal/plan.chooseLowestJoinPlan` | `simpledb/opt/HeuristicQueryPlanner.java` (`getLowestJoinPlan`) | Choose the lowest-output applicable join and preserve the remaining source order |
 | `internal/plan.chooseLowestProductPlan` | `simpledb/opt/HeuristicQueryPlanner.java` (`getLowestProductPlan`) | Choose the lowest-output product fallback and preserve the remaining source order |
+| `internal/plan.HeuristicQueryPlanner.CreatePlan` | `simpledb/opt/HeuristicQueryPlanner.java` (`createPlan`) | Initialize table planners, compose the lowest-output left-deep join/product plan, then project requested fields |
 
 ## Feature 1: Choose the cheaper product plan order
 
@@ -275,3 +276,32 @@ no-applicable-join fallback choice; repeated orchestration and projection remain
 
 Full-module statement coverage, race, vet, documentation, formatting, and independent workflow-audit results are
 recorded in the recovery checkpoint and stacked PR.
+
+## Feature 11: Create a complete heuristic query plan
+
+`HeuristicQueryPlanner.CreatePlan` resolves each query table in source order through the shared metadata provider,
+starts with the least-output table-local selection, then repeatedly adds the least-output applicable join. When no join
+is applicable it uses the configured product factory and adds the least-output product candidate. It wraps the final
+plan in `ProjectPlan` only after all sources have been incorporated. A nil factory defaults to ordinary
+`ProductPlan`; callers can supply the transaction-bound multibuffer factory. Metadata, invalid dependencies, product
+factory results, and projection errors are returned with planning context. The method only reads planning metadata and
+estimates; it does not open scans, perform storage reads, or own the caller's transaction.
+
+### Test-first record
+
+Focused compilation first failed because `NewHeuristicQueryPlanner` was undefined. Tests cover the connected join
+path, disconnected product fallback, source/order estimates, custom and default factories, projection order, metadata
+failures, invalid dependencies and factory results, and the absence of scan/storage access.
+
+### Design decision
+
+The query-level planner composes `TablePlanner` and the separately tested lowest-output helpers rather than duplicating
+selection and candidate ranking. Validated internal chooser paths avoid handling helper errors that cannot arise after
+the query's table planners have been initialized; the public-to-package helpers retain validation for their own callers.
+Projection remains the final node in the plan tree, and the supplied factory keeps the dependency direction from
+`plan` to `materialize` intact.
+
+### Validation
+
+Full-module coverage, race, vet, documentation, formatting, and independent workflow-audit results are recorded in the
+recovery checkpoint and stacked PR.

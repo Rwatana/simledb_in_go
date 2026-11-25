@@ -96,7 +96,8 @@ retains source order for ties, and returns the other table planners without muta
 removes only that planner while preserving source order. When no join applies it leaves every planner available for the
 separate product-fallback step. `chooseLowestProductPlan` builds each product through the supplied factory, chooses the
 lowest output estimate, and removes only the winner. This lets heuristic planning use either the basic or multibuffer
-product implementation without changing package dependencies; projection orchestration remains separate.
+product implementation without changing package dependencies. `HeuristicQueryPlanner.CreatePlan` composes these choices
+into a left-deep query plan and applies the requested projection after all source tables have been incorporated.
 
 ## テスト方針
 
