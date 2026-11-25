@@ -395,3 +395,215 @@ func TestTablePlannerMakeJoinPlanReturnsNilForNilCurrentPlan(t *testing.T) {
 		t.Errorf("MakeJoinPlan(nil) = %T, want nil", got)
 	}
 }
+
+func TestTablePlannerMakeJoinPlanPrefersMatchingIndexJoin(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		joinTerm query.Term
+	}{
+		{
+			name: "indexed table field on left",
+			joinTerm: query.NewTerm(
+				query.NewFieldExpression("student_department_id"),
+				query.NewFieldExpression("department_id"),
+			),
+		},
+		{
+			name: "indexed table field on right",
+			joinTerm: query.NewTerm(
+				query.NewFieldExpression("department_id"),
+				query.NewFieldExpression("student_department_id"),
+			),
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			transaction := &tablePlanTransaction{}
+			currentSchema := newPlannerTestSchema("department_id")
+			current := NewTablePlan(transaction, "department", record.NewLayout(currentSchema), metadata.NewStatInfo(2, 6))
+			tableSchema := newPlannerTestSchema("student_department_id")
+			tableSchema.AddVarcharField("student_name", 24)
+			indexInfo, err := metadata.NewIndexInfo(
+				"student_department_idx",
+				"student_department_id",
+				tableSchema,
+				transaction,
+				metadata.NewStatInfo(3, 12),
+			)
+			if err != nil {
+				t.Fatalf("NewIndexInfo() error = %v", err)
+			}
+			localTerm := query.NewTerm(
+				query.NewFieldExpression("student_name"),
+				query.NewConstantExpression(query.NewStringConstant("Ada")),
+			)
+			predicate := query.NewPredicateWithTerm(test.joinTerm).ConjoinWith(query.NewPredicateWithTerm(localTerm))
+			planner, err := NewTablePlanner("student", predicate, transaction, &tablePlannerMetadataProbe{
+				layout:     record.NewLayout(tableSchema),
+				statistics: metadata.NewStatInfo(3, 12),
+				indexes:    map[string]*metadata.IndexInfo{"student_department_id": indexInfo},
+			})
+			if err != nil {
+				t.Fatalf("NewTablePlanner() error = %v", err)
+			}
+
+			joinPlan, ok := planner.MakeJoinPlan(current).(*SelectPlan)
+			if !ok {
+				t.Fatalf("MakeJoinPlan() type = %T, want outer join-predicate *SelectPlan", planner.MakeJoinPlan(current))
+			}
+			if got, want := joinPlan.predicate.String(), test.joinTerm.String(); got != want {
+				t.Errorf("outer predicate = %q, want join predicate %q", got, want)
+			}
+			localSelection, ok := joinPlan.child.(*SelectPlan)
+			if !ok {
+				t.Fatalf("join selection child type = %T, want table-local *SelectPlan", joinPlan.child)
+			}
+			if got, want := localSelection.predicate.String(), localTerm.String(); got != want {
+				t.Errorf("table-local predicate = %q, want %q", got, want)
+			}
+			indexJoin, ok := localSelection.child.(*IndexJoinPlan)
+			if !ok {
+				t.Fatalf("table-local selection child type = %T, want *IndexJoinPlan", localSelection.child)
+			}
+			if indexJoin.left != current || indexJoin.right != planner.tablePlan || indexJoin.indexInfo != indexInfo || indexJoin.joinField != "department_id" {
+				t.Errorf("index join = (left %p, right %p, index %p, field %q), want (%p, %p, %p, department_id)",
+					indexJoin.left, indexJoin.right, indexJoin.indexInfo, indexJoin.joinField,
+					current, planner.tablePlan, indexInfo)
+			}
+			if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+				t.Errorf("index join planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+			}
+		})
+	}
+}
+
+func TestTablePlannerMakeJoinPlanFallsBackWhenIndexIsNotOnJoinedField(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(2, 6))
+	tableSchema := newPlannerTestSchema("student_department_id")
+	tableSchema.AddIntegerField("student_code")
+	indexInfo, err := metadata.NewIndexInfo(
+		"student_code_idx",
+		"student_code",
+		tableSchema,
+		transaction,
+		metadata.NewStatInfo(3, 12),
+	)
+	if err != nil {
+		t.Fatalf("NewIndexInfo() error = %v", err)
+	}
+	planner, err := NewTablePlanner("student", query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("student_department_id"),
+		query.NewFieldExpression("department_id"),
+	)), transaction, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(tableSchema),
+		statistics: metadata.NewStatInfo(3, 12),
+		indexes: map[string]*metadata.IndexInfo{
+			"student_code":          indexInfo,
+			"student_department_id": nil,
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+
+	joinPlan, ok := planner.MakeJoinPlan(current).(*SelectPlan)
+	if !ok {
+		t.Fatalf("MakeJoinPlan() type = %T, want *SelectPlan", planner.MakeJoinPlan(current))
+	}
+	product, ok := joinPlan.child.(*ProductPlan)
+	if !ok {
+		t.Fatalf("join selection child type = %T, want product fallback", joinPlan.child)
+	}
+	if product.left != current {
+		t.Errorf("product left = %p, want current plan %p", product.left, current)
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("product join planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+	}
+}
+
+func TestTablePlannerMakeJoinPlanUsesIndexJoinWithoutLocalSelection(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	currentSchema := newPlannerTestSchema("department_id")
+	current := NewTablePlan(transaction, "department", record.NewLayout(currentSchema), metadata.NewStatInfo(2, 6))
+	tableSchema := newPlannerTestSchema("student_department_id")
+	indexInfo, err := metadata.NewIndexInfo(
+		"student_department_idx",
+		"student_department_id",
+		tableSchema,
+		transaction,
+		metadata.NewStatInfo(3, 12),
+	)
+	if err != nil {
+		t.Fatalf("NewIndexInfo() error = %v", err)
+	}
+	joinTerm := query.NewTerm(query.NewFieldExpression("student_department_id"), query.NewFieldExpression("department_id"))
+	planner, err := NewTablePlanner("student", query.NewPredicateWithTerm(joinTerm), transaction, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(tableSchema),
+		statistics: metadata.NewStatInfo(3, 12),
+		indexes:    map[string]*metadata.IndexInfo{"student_department_id": indexInfo},
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+
+	joinPlan, ok := planner.MakeJoinPlan(current).(*SelectPlan)
+	if !ok {
+		t.Fatalf("MakeJoinPlan() type = %T, want *SelectPlan", planner.MakeJoinPlan(current))
+	}
+	indexJoin, ok := joinPlan.child.(*IndexJoinPlan)
+	if !ok {
+		t.Fatalf("join selection child type = %T, want *IndexJoinPlan without a local selection", joinPlan.child)
+	}
+	if indexJoin.left != current || indexJoin.right != planner.tablePlan || indexJoin.indexInfo != indexInfo || indexJoin.joinField != "department_id" {
+		t.Errorf("index join = (left %p, right %p, index %p, field %q), want (%p, %p, %p, department_id)",
+			indexJoin.left, indexJoin.right, indexJoin.indexInfo, indexJoin.joinField,
+			current, planner.tablePlan, indexInfo)
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("index join planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+	}
+}
+
+func TestTablePlannerMakeJoinPlanRequiresOppositeFieldInCurrentSchema(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(2, 6))
+	tableSchema := newPlannerTestSchema("student_department_id")
+	tableSchema.AddIntegerField("student_code")
+	indexInfo, err := metadata.NewIndexInfo(
+		"student_code_idx",
+		"student_code",
+		tableSchema,
+		transaction,
+		metadata.NewStatInfo(3, 12),
+	)
+	if err != nil {
+		t.Fatalf("NewIndexInfo() error = %v", err)
+	}
+	joinTerm := query.NewTerm(query.NewFieldExpression("student_department_id"), query.NewFieldExpression("department_id"))
+	unavailableOuterTerm := query.NewTerm(query.NewFieldExpression("student_code"), query.NewFieldExpression("outside_field"))
+	predicate := query.NewPredicateWithTerm(joinTerm).ConjoinWith(query.NewPredicateWithTerm(unavailableOuterTerm))
+	planner, err := NewTablePlanner("student", predicate, transaction, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(tableSchema),
+		statistics: metadata.NewStatInfo(3, 12),
+		indexes:    map[string]*metadata.IndexInfo{"student_code": indexInfo},
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+
+	joinPlan, ok := planner.MakeJoinPlan(current).(*SelectPlan)
+	if !ok {
+		t.Fatalf("MakeJoinPlan() type = %T, want *SelectPlan", planner.MakeJoinPlan(current))
+	}
+	product, ok := joinPlan.child.(*ProductPlan)
+	if !ok {
+		t.Fatalf("join selection child type = %T, want product fallback for an unavailable outer field", joinPlan.child)
+	}
+	if product.left != current {
+		t.Errorf("product left = %p, want current plan %p", product.left, current)
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("join planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+	}
+}

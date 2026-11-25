@@ -1139,6 +1139,11 @@ to the table schema, leaving cross-table terms for join planning. Focused tests 
 selection, no applicable terms, and no storage access; full-module CI remains at 100.0%.
 
 
-At Issue #1260, `TablePlanner.MakeJoinPlan` builds a product plus join-selection plan only when a predicate term
+At Issue #1260, `TablePlanner.MakeJoinPlan` builds a product plus join-selection fallback when a predicate term
 relates fields across the current and table schemas. Focused tests cover schema order, local and join predicate
 partitioning, nil/no-join fallbacks, and no storage access; full-module CI remains at 100.0%.
+
+At Issue #1262, `TablePlanner.MakeJoinPlan` prefers `IndexJoinPlan` when an indexed table field equals a field in the
+current schema, while preserving the product fallback otherwise. Focused tests cover both equality operand orders,
+local predicate placement, unmatched/nil indexes, unavailable outer fields, and no storage access; full-module CI
+remains at 100.0%.

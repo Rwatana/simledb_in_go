@@ -86,8 +86,9 @@ through a narrow planner-owned interface, then retains those values with its pre
 open scans or pull view expansion into the per-table planner.
 `TablePlanner.MakeSelectPlan` uses a registered index for a matching field-to-constant equality, then wraps the
 candidate with terms applicable to that table schema; it does not open scans or touch transaction state.
-`TablePlanner.MakeJoinPlan` combines the current plan and the locally selected table plan with a `ProductPlan`, then
-filters their cross-schema predicate with `SelectPlan`; index joins and multibuffer product integration stay separate.
+`TablePlanner.MakeJoinPlan` prefers an `IndexJoinPlan` when a table index matches a field equality with the current
+schema, applies table-local terms, and retains the cross-schema predicate above it. Without a matching index, it uses
+the `ProductPlan` fallback; query-level orchestration and multibuffer product integration stay separate.
 
 ## テスト方針
 
