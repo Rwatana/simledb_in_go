@@ -15,6 +15,7 @@ integration, and full query-planner behaviors remain separate features.
 | `internal/plan.TablePlanner.MakeJoinPlan` | `simpledb/opt/TablePlanner.java` (`makeJoinPlan`, `makeProductJoin`) | Build a product join filtered by terms that relate the current and table schemas |
 | `internal/plan.TablePlanner.MakeJoinPlan` | `simpledb/opt/TablePlanner.java` (`makeJoinPlan`, `makeIndexJoin`) | Prefer an indexed table-side join when a matching cross-schema equality is available |
 | `internal/plan.TablePlanner.MakeProductPlan` | `simpledb/opt/TablePlanner.java` (`makeProductPlan`) | Filter the base table plan and pass it with the current plan to the multibuffer product factory |
+| `internal/plan.chooseLowestSelectPlan` | `simpledb/opt/HeuristicQueryPlanner.java` (`getLowestSelectPlan`) | Choose the lowest-output table-local selection as the initial join-order plan |
 
 ## Feature 1: Choose the cheaper product plan order
 
@@ -192,3 +193,29 @@ on selecting its table input.
 
 Focused planner and materialize tests cover each statement in the factory path. Full-module coverage, race, vet,
 documentation, formatting, and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.
+
+
+## Feature 8: Choose the lowest-output initial table plan
+
+`chooseLowestSelectPlan` evaluates each table planner's local selection plan and chooses the one with the smallest
+`RecordsOutput` estimate to start the heuristic join order. Equal estimates retain the earlier table source. The selected
+planner is removed from a new remainder slice while the caller's ordered input stays unchanged. Empty candidate lists,
+nil planners, and planners without a base table plan return contextual errors. This is the first-source choice only;
+adding join candidates, product fallback, and projection remains separate.
+
+### Test-first record
+
+Focused compilation first failed because `chooseLowestSelectPlan` was undefined. Tests cover choosing a large table after
+a selective local predicate, removing only the selected candidate, retaining source order on ties, rejecting unavailable
+candidates, not mutating the input slice, and avoiding storage access.
+
+### Design decision
+
+The helper mirrors `HeuristicQueryPlanner.getLowestSelectPlan` and keeps the initial choice independently testable before
+the subsequent query-level join loop is introduced. It accepts already-resolved `TablePlanner` values, so it does not
+repeat metadata lookup or create scans.
+
+### Validation
+
+Focused tests cover each branch of initial-plan selection. Full-module 100% coverage, race, vet, documentation,
+formatting, and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.

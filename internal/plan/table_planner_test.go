@@ -726,3 +726,94 @@ func TestTablePlannerMakeProductPlanReturnsNilForUnavailableInputs(t *testing.T)
 		t.Errorf("product factory calls = %d, want 0 for unavailable inputs", factoryCalls)
 	}
 }
+
+func TestChooseLowestSelectPlanUsesFilteredOutputAndRemovesWinner(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	filtered := query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("id"),
+		query.NewConstantExpression(query.NewIntConstant(7)),
+	))
+	planners := []*TablePlanner{
+		newSelectCandidate("large_filtered", 100, filtered, transaction),
+		newSelectCandidate("small_unfiltered", 3, query.Predicate{}, transaction),
+		newSelectCandidate("largest_unfiltered", 40, query.Predicate{}, transaction),
+	}
+	original := append([]*TablePlanner(nil), planners...)
+
+	gotPlan, remaining, err := chooseLowestSelectPlan(planners)
+	if err != nil {
+		t.Fatalf("chooseLowestSelectPlan() error = %v", err)
+	}
+	selected, ok := gotPlan.(*SelectPlan)
+	if !ok {
+		t.Fatalf("selected plan type = %T, want filtered *SelectPlan", gotPlan)
+	}
+	selectedTable, ok := selected.child.(*TablePlan)
+	if !ok {
+		t.Fatalf("selected plan child type = %T, want *TablePlan", selected.child)
+	}
+	if selectedTable.tableName != "large_filtered" || selected.RecordsOutput() != 2 {
+		t.Errorf("selected plan = (%q, %d rows), want (large_filtered, 2 rows)", selectedTable.tableName, selected.RecordsOutput())
+	}
+	if len(remaining) != 2 || remaining[0] != planners[1] || remaining[1] != planners[2] {
+		t.Errorf("remaining planners = %v, want the unselected candidates in source order", remaining)
+	}
+	for index, planner := range original {
+		if planners[index] != planner {
+			t.Errorf("input planner %d changed from %p to %p", index, planner, planners[index])
+		}
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("selection choice accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+	}
+}
+
+func TestChooseLowestSelectPlanKeepsFirstCandidateOnTies(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	planners := []*TablePlanner{
+		newSelectCandidate("first", 5, query.Predicate{}, transaction),
+		newSelectCandidate("second", 5, query.Predicate{}, transaction),
+	}
+
+	gotPlan, remaining, err := chooseLowestSelectPlan(planners)
+	if err != nil {
+		t.Fatalf("chooseLowestSelectPlan() error = %v", err)
+	}
+	if got := gotPlan.(*TablePlan).tableName; got != "first" {
+		t.Errorf("selected table = %q, want first source on an equal estimate", got)
+	}
+	if len(remaining) != 1 || remaining[0] != planners[1] {
+		t.Errorf("remaining planners = %v, want only the second source", remaining)
+	}
+}
+
+func TestChooseLowestSelectPlanRejectsUnavailableCandidates(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		planners []*TablePlanner
+		wantText string
+	}{
+		{name: "empty", planners: nil, wantText: "no table planners"},
+		{name: "nil planner", planners: []*TablePlanner{nil}, wantText: "table planner at index 0 is nil"},
+		{name: "nil table plan", planners: []*TablePlanner{{tableName: "student"}}, wantText: `table plan for "student" is nil`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan, remaining, err := chooseLowestSelectPlan(test.planners)
+			if plan != nil || remaining != nil || err == nil || !strings.Contains(err.Error(), test.wantText) {
+				t.Errorf("chooseLowestSelectPlan() = (%v, %v, %v), want no plan, no remainder, and error containing %q", plan, remaining, err, test.wantText)
+			}
+		})
+	}
+}
+
+func newSelectCandidate(tableName string, records int, predicate query.Predicate, transaction record.TableScanTransaction) *TablePlanner {
+	schema := newPlannerTestSchema("id")
+	return &TablePlanner{
+		tableName:   tableName,
+		predicate:   predicate,
+		transaction: transaction,
+		tablePlan:   NewTablePlan(transaction, tableName, record.NewLayout(schema), metadata.NewStatInfo(1, records)),
+		schema:      schema,
+		indexes:     make(map[string]*metadata.IndexInfo),
+	}
+}
