@@ -43,6 +43,14 @@ func (p *MultibufferProductPlan) Schema() *record.Schema {
 	return schema
 }
 
+// RecordsOutput returns the estimated row count of the left-major product.
+func (p *MultibufferProductPlan) RecordsOutput() int {
+	if p == nil || p.left == nil || p.right == nil {
+		return 0
+	}
+	return int(int32(p.left.RecordsOutput()) * int32(p.right.RecordsOutput()))
+}
+
 // Open materializes the right plan and returns a multi-buffer product scan over it.
 // The returned scan owns the left input scan opened by this method.
 func (p *MultibufferProductPlan) Open() (query.Scan, error) {

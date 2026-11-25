@@ -27,6 +27,7 @@ type materializePlan struct {
 	closeErr        error
 	scan            *materializeSourceScan
 	openCalls       int
+	schemaCalls     int
 	distinctCalls   []string
 }
 
@@ -57,7 +58,10 @@ func (p *materializePlan) DistinctValues(fieldName string) int {
 	return p.distinct[fieldName]
 }
 
-func (p *materializePlan) Schema() *record.Schema { return p.schema }
+func (p *materializePlan) Schema() *record.Schema {
+	p.schemaCalls++
+	return p.schema
+}
 
 type materializeSourceScan struct {
 	schema         *record.Schema

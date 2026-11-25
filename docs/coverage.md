@@ -1107,3 +1107,7 @@ At the Issue #1243 plan-schema checkpoint, `materialize.MultibufferProductPlan.S
 fields in order while retaining types and varchar lengths. Tests cover nil metadata, schema non-mutation, and absence of
 scan or transaction side effects. The complete uncached suite must continue reporting 100.0% for every executable
 package, function, and module total.
+
+At the Issue #1245 product-row-estimate checkpoint, `materialize.MultibufferProductPlan.RecordsOutput` uses the same
+signed 32-bit multiplication as `plan.ProductPlan`. Focused tests cover overflow, nil plans, and no-I/O behavior; the
+full-module CI coverage check continues to require 100.0% statement coverage.

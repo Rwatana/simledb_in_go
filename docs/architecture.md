@@ -70,6 +70,8 @@ right input into a temporary table, then opens `plan.MultibufferProductScan` ove
 The returned owner wrapper closes the opened left scan alongside the product scan's right-chunk pins.
 `materialize.MultibufferProductPlan.Schema` combines the left and right child schemas in field order without opening
 either plan or touching transaction state; it returns a new schema so child metadata stays unchanged.
+`materialize.MultibufferProductPlan.RecordsOutput` separately multiplies the child row estimates with Java-compatible
+signed 32-bit arithmetic and does not inspect schemas or open scans.
 
 ## テスト方針
 
