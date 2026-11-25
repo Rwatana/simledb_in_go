@@ -18,7 +18,7 @@
 | --- | --- | --- | --- |
 | 1 | Database Systems | 学習資料作成済み | [章まとめ](docs/chapters/01-database-systems.md) / [概念図](docs/diagrams/ch01-database-system.drawio) |
 | 2 | JDBC | 学習資料作成済み | [章まとめ](docs/chapters/02-jdbc.md) / [編集用Draw.io](docs/diagrams/ch02-client-boundary.drawio) / [表示用SVG](docs/diagrams/ch02-client-boundary.svg) |
-| 3 | Disk and File Management | 基礎実装済み | [BlockID、Page、FileManagerの解説・実装記録](docs/chapters/03-disk-and-file-management.md)（`Page.SetString` / `GetString`は既存のlength-prefixed bytes形式を共有） |
+| 3 | Disk and File Management | 実装完了（PR stack上） | [BlockID、Page、FileManagerの解説・実装記録](docs/chapters/03-disk-and-file-management.md)（`Page.SetString` / `GetString`は既存のlength-prefixed bytes形式を共有） |
 | 4 | Memory and Log Management | 基礎実装済み | [LogManagerとBufferManagerの解説・実装記録](docs/chapters/04-log-management.md) |
 | 5 | Transaction Management | 基礎実装済み | [Transactionの解説・実装記録](docs/chapters/05-transaction-management.md) |
 | 6 | Record Management | 基礎実装済み | [Schema、Layout、RecordPage、TableScanの解説・実装記録](docs/chapters/06-record-management.md) |
