@@ -1080,3 +1080,8 @@ At the Issue #1233 current-product-value checkpoint, `MultibufferProductScan.Get
 pins. Tests cover repeated reads, unavailable-row states, wrapped missing-field errors, and nil/zero-value scans.
 The focused `internal/plan` tests report 100.0% statement coverage; final full-module coverage and repository checks
 are recorded in the stacked PR. The ten CI items remain separate one-job workflow files.
+
+At the Issue #1235 product-field-membership checkpoint, `MultibufferProductScan.HasField` reports the union of the
+left scan and right layout schemas independently of cursor/product lifecycle. Tests cover empty relations, nil,
+zero-value, and schema-less states, and prove metadata checks do not read rows or change pins. Focused validation is
+recorded in the PR; final full-module coverage must remain 100.0%.
