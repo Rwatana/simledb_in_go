@@ -12,7 +12,7 @@ operations.
 | `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` (`beforeFirst`, `next`, `getInt`, `getString`, `hasField`) | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
 | `internal/plan.ChunkValueScan` | `simpledb/multibuffer/ChunkScan.java` (`getVal`) | Adapt typed chunk field reads to query constants without making `multibuffer` depend on `query` |
 | `internal/plan.MultibufferProductScan` | `simpledb/multibuffer/MultibufferProductScan.java` (constructor, `beforeFirst`, `next`, `useNextChunk`) | Read right-table size and buffer budget, choose bounded ranges, pin and replace chunks, reset the left scan, and enumerate left-major pairs |
-| `internal/materialize.MultibufferProductPlan` | `simpledb/multibuffer/MultibufferProductPlan.java` (`schema`, `open`, `copyRecordsFrom`) | Combine child schemas in left/right order, materialize the right plan into a temporary table, then open an owned left-major multi-buffer product scan |
+| `internal/materialize.MultibufferProductPlan` | `simpledb/multibuffer/MultibufferProductPlan.java` (`schema`, `recordsOutput`, `open`, `copyRecordsFrom`) | Combine child schemas in left/right order, estimate product rows, materialize the right plan into a temporary table, then open an owned left-major multi-buffer product scan |
 
 
 ## Feature 1: Choose a safe buffer root
@@ -490,3 +490,25 @@ behaviors.
 
 The focused tests exercise every new executable statement and function. Full-module tests, race tests, vet,
 documentation validation, and the independent one-check-per-workflow audit are recorded with this Issue's PR.
+
+## Feature 19: Estimate multibuffer product output rows
+
+`materialize.MultibufferProductPlan.RecordsOutput` multiplies the row-count estimates of its left and right plans,
+using signed 32-bit multiplication to match the Java `int` arithmetic used by the book. A nil plan or child returns
+zero. The estimate does not open scans, inspect schemas, or read transaction state.
+
+### Test-first record
+
+Focused compilation first failed because `MultibufferProductPlan.RecordsOutput` was undefined. Tests cover a normal
+product estimate, signed 32-bit overflow behavior, nil receiver and children, and the absence of scan, schema, or
+transaction calls.
+
+### Design decision
+
+The implementation follows `plan.ProductPlan.RecordsOutput` and the book's 32-bit Java integer behavior. Block-access
+and distinct-value estimates remain separate behaviors.
+
+### Validation
+
+The focused tests cover every new executable statement and function. Full-module tests, race tests, vet, documentation
+validation, and the independent one-check-per-workflow audit are recorded with this Issue's PR.
