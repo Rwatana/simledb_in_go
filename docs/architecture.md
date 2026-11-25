@@ -68,6 +68,8 @@ left-before-right field selection in the query operator.
 right input into a temporary table, then opens `plan.MultibufferProductScan` over that descriptor. This type stays in
 `materialize` because placing it in `plan` would reverse the existing dependency (`materialize` already uses `plan`).
 The returned owner wrapper closes the opened left scan alongside the product scan's right-chunk pins.
+`materialize.MultibufferProductPlan.Schema` combines the left and right child schemas in field order without opening
+either plan or touching transaction state; it returns a new schema so child metadata stays unchanged.
 
 ## テスト方針
 

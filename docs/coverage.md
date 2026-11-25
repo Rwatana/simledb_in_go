@@ -1102,3 +1102,8 @@ retryable right-chunk pins. Tests cover typed rows, field forwarding, rewinds, i
 causes, nil dependencies, and retrying pin release. The uncached full suite reports 100.0% statement coverage in all
 20 executable packages and every executable function; interface-only `internal/index` has no statements. The full race
 suite, vet, docs, gofmt, `git diff --check`, and ten-workflow one-job audit pass.
+
+At the Issue #1243 plan-schema checkpoint, `materialize.MultibufferProductPlan.Schema` combines left and right child
+fields in order while retaining types and varchar lengths. Tests cover nil metadata, schema non-mutation, and absence of
+scan or transaction side effects. The complete uncached suite must continue reporting 100.0% for every executable
+package, function, and module total.
