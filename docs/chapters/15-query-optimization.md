@@ -14,6 +14,7 @@ integration, and full query-planner behaviors remain separate features.
 | `internal/plan.TablePlanner.MakeSelectPlan` | `simpledb/opt/TablePlanner.java` (`addSelectPred`) | Apply the query terms that can be evaluated against one table schema |
 | `internal/plan.TablePlanner.MakeJoinPlan` | `simpledb/opt/TablePlanner.java` (`makeJoinPlan`, `makeProductJoin`) | Build a product join filtered by terms that relate the current and table schemas |
 | `internal/plan.TablePlanner.MakeJoinPlan` | `simpledb/opt/TablePlanner.java` (`makeJoinPlan`, `makeIndexJoin`) | Prefer an indexed table-side join when a matching cross-schema equality is available |
+| `internal/plan.TablePlanner.MakeProductPlan` | `simpledb/opt/TablePlanner.java` (`makeProductPlan`) | Filter the base table plan and pass it with the current plan to the multibuffer product factory |
 
 ## Feature 1: Choose the cheaper product plan order
 
@@ -161,4 +162,33 @@ fallback and multibuffer integration as separate plan choices; it does not open 
 ### Validation
 
 Focused planner tests cover every branch in the index-versus-product choice. Full-module coverage, race, vet,
+documentation, formatting, and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.
+
+
+## Feature 7: Build a multibuffer table product plan
+
+`TablePlanner.MakeProductPlan(current, factory)` applies only the table-local predicate to the base `TablePlan`, then
+passes `current` as the left input and that filtered table plan as the right input to `factory`. The method returns the
+factory's plan and does not open scans or access transaction storage. It deliberately does not choose an index selection
+or add the cross-schema join predicate; those are separate planner paths.
+
+The `plan` package accepts a small `ProductPlanFactory` function to avoid importing `materialize`, which already depends
+on `plan`. `materialize.NewMultibufferProductPlanFactory` binds the transaction and creates the concrete
+`MultibufferProductPlan`, preserving the layered dependency direction without adding a wrapper hierarchy.
+
+### Test-first record
+
+Focused tests first failed to compile because `ProductPlanFactory`, `MakeProductPlan`, and the multibuffer factory were
+undefined. Tests cover local-filter placement, the base-table fallback when no local terms apply, exactly one factory
+call with left/right inputs in order, unavailable inputs, the transaction-bound materialize adapter, and no storage access.
+
+### Design decision
+
+The factory function is the minimum boundary needed to let a planner in `plan` request a concrete product from the higher
+`materialize` package. It keeps transaction ownership in the materialization layer and lets `TablePlanner` remain focused
+on selecting its table input.
+
+### Validation
+
+Focused planner and materialize tests cover each statement in the factory path. Full-module coverage, race, vet,
 documentation, formatting, and independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.

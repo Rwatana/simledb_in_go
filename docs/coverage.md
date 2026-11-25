@@ -1147,3 +1147,10 @@ At Issue #1262, `TablePlanner.MakeJoinPlan` prefers `IndexJoinPlan` when an inde
 current schema, while preserving the product fallback otherwise. Focused tests cover both equality operand orders,
 local predicate placement, unmatched/nil indexes, unavailable outer fields, and no storage access; full-module CI
 remains at 100.0%.
+
+
+At Issue #1264, `TablePlanner.MakeProductPlan` filters the base table plan with table-local terms and calls the supplied
+product factory once with current plan on the left and the table input on the right. The transaction-bound materialize
+factory constructs `MultibufferProductPlan` without a `plan` to `materialize` import. Focused tests cover local and empty
+predicates, factory argument order/count, missing inputs, adapter binding, and no storage access; full-module CI remains
+at 100.0%.

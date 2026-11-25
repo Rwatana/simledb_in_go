@@ -88,7 +88,9 @@ open scans or pull view expansion into the per-table planner.
 candidate with terms applicable to that table schema; it does not open scans or touch transaction state.
 `TablePlanner.MakeJoinPlan` prefers an `IndexJoinPlan` when a table index matches a field equality with the current
 schema, applies table-local terms, and retains the cross-schema predicate above it. Without a matching index, it uses
-the `ProductPlan` fallback; query-level orchestration and multibuffer product integration stay separate.
+the `ProductPlan` fallback. `TablePlanner.MakeProductPlan` passes the locally filtered base table plan to a supplied
+factory; `materialize` provides the transaction-bound multibuffer product factory so `plan` does not import `materialize`.
+Query-level orchestration stays separate.
 
 ## テスト方針
 

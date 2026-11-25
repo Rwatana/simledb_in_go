@@ -607,3 +607,122 @@ func TestTablePlannerMakeJoinPlanRequiresOppositeFieldInCurrentSchema(t *testing
 		t.Errorf("join planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
 	}
 }
+
+func TestTablePlannerMakeProductPlanFiltersTableBeforeFactory(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(2, 6))
+	tableSchema := newPlannerTestSchema("student_department_id")
+	tableSchema.AddVarcharField("student_name", 24)
+	localTerm := query.NewTerm(
+		query.NewFieldExpression("student_name"),
+		query.NewConstantExpression(query.NewStringConstant("Ada")),
+	)
+	joinTerm := query.NewTerm(query.NewFieldExpression("student_department_id"), query.NewFieldExpression("department_id"))
+	predicate := query.NewPredicateWithTerm(localTerm).ConjoinWith(query.NewPredicateWithTerm(joinTerm))
+	planner, err := NewTablePlanner("student", predicate, transaction, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(tableSchema),
+		statistics: metadata.NewStatInfo(3, 12),
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+
+	wantPlan := &productPlanProbe{}
+	var gotLeft, gotRight Plan
+	factoryCalls := 0
+	factory := ProductPlanFactory(func(left, right Plan) Plan {
+		factoryCalls++
+		gotLeft, gotRight = left, right
+		return wantPlan
+	})
+	if got := planner.MakeProductPlan(current, factory); got != wantPlan {
+		t.Fatalf("MakeProductPlan() = %T, want factory result %T", got, wantPlan)
+	}
+	if factoryCalls != 1 {
+		t.Fatalf("product factory calls = %d, want 1", factoryCalls)
+	}
+	if gotLeft != current {
+		t.Errorf("factory left plan = %p, want current plan %p", gotLeft, current)
+	}
+	tableSelection, ok := gotRight.(*SelectPlan)
+	if !ok {
+		t.Fatalf("factory right plan type = %T, want table-local *SelectPlan", gotRight)
+	}
+	if tableSelection.child != planner.tablePlan || tableSelection.predicate.String() != localTerm.String() {
+		t.Errorf("factory table selection = (child %p, predicate %q), want (%p, %q)",
+			tableSelection.child, tableSelection.predicate.String(), planner.tablePlan, localTerm.String())
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("product plan construction accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+	}
+}
+
+func TestTablePlannerMakeProductPlanPassesBaseTableWithoutLocalPredicate(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	tableSchema := newPlannerTestSchema("student_id")
+	planner, err := NewTablePlanner("student", query.Predicate{}, transaction, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(tableSchema),
+		statistics: metadata.NewStatInfo(3, 12),
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(2, 6))
+	wantPlan := &productPlanProbe{}
+	var gotLeft, gotRight Plan
+	factoryCalls := 0
+	factory := ProductPlanFactory(func(left, right Plan) Plan {
+		factoryCalls++
+		gotLeft, gotRight = left, right
+		return wantPlan
+	})
+
+	if got := planner.MakeProductPlan(current, factory); got != wantPlan {
+		t.Fatalf("MakeProductPlan() = %T, want factory result %T", got, wantPlan)
+	}
+	if factoryCalls != 1 || gotLeft != current || gotRight != planner.tablePlan {
+		t.Errorf("factory call = %d, inputs = (%p, %p), want one call with (%p, %p)",
+			factoryCalls, gotLeft, gotRight, current, planner.tablePlan)
+	}
+}
+
+func TestTablePlannerMakeProductPlanReturnsNilForUnavailableInputs(t *testing.T) {
+	transaction := &tablePlanTransaction{}
+	planner, err := NewTablePlanner("student", query.Predicate{}, transaction, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(newPlannerTestSchema("student_id")),
+		statistics: metadata.NewStatInfo(3, 12),
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+	current := NewTablePlan(transaction, "department", record.NewLayout(newPlannerTestSchema("department_id")), metadata.NewStatInfo(2, 6))
+	factoryCalls := 0
+	factory := ProductPlanFactory(func(Plan, Plan) Plan {
+		factoryCalls++
+		return &productPlanProbe{}
+	})
+	var typedNilPlanner *TablePlanner
+	var typedNilCurrent *TablePlan
+	cases := []struct {
+		name    string
+		planner *TablePlanner
+		current Plan
+		factory ProductPlanFactory
+	}{
+		{name: "nil planner", planner: nil, current: current, factory: factory},
+		{name: "typed nil planner", planner: typedNilPlanner, current: current, factory: factory},
+		{name: "nil current", planner: planner, current: nil, factory: factory},
+		{name: "typed nil current", planner: planner, current: typedNilCurrent, factory: factory},
+		{name: "nil factory", planner: planner, current: current, factory: nil},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.planner.MakeProductPlan(test.current, test.factory); got != nil {
+				t.Errorf("MakeProductPlan() = %T, want nil for %s", got, test.name)
+			}
+		})
+	}
+	if factoryCalls != 0 {
+		t.Errorf("product factory calls = %d, want 0 for unavailable inputs", factoryCalls)
+	}
+}
