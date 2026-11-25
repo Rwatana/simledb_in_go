@@ -28,6 +28,7 @@ type materializePlan struct {
 	scan            *materializeSourceScan
 	openCalls       int
 	schemaCalls     int
+	blocksCalls     int
 	distinctCalls   []string
 }
 
@@ -49,7 +50,10 @@ func (p *materializePlan) Open() (query.Scan, error) {
 	return p.scan, nil
 }
 
-func (p *materializePlan) BlocksAccessed() int { return p.blocks }
+func (p *materializePlan) BlocksAccessed() int {
+	p.blocksCalls++
+	return p.blocks
+}
 
 func (p *materializePlan) RecordsOutput() int { return p.records }
 
@@ -152,6 +156,7 @@ type materializeRecordPosition struct {
 type materializePlanTransaction struct {
 	blockSize        int
 	availableBuffers int
+	availableCalls   int
 	blockSizeErr     error
 	sizeErr          error
 	sizeErrAt        int
@@ -192,7 +197,10 @@ func newMaterializePlanTransaction() *materializePlanTransaction {
 	}
 }
 
-func (tx *materializePlanTransaction) AvailableBuffers() int { return tx.availableBuffers }
+func (tx *materializePlanTransaction) AvailableBuffers() int {
+	tx.availableCalls++
+	return tx.availableBuffers
+}
 
 func (tx *materializePlanTransaction) Pin(storage.BlockID) error {
 	tx.calls++

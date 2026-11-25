@@ -1111,3 +1111,7 @@ package, function, and module total.
 At the Issue #1245 product-row-estimate checkpoint, `materialize.MultibufferProductPlan.RecordsOutput` uses the same
 signed 32-bit multiplication as `plan.ProductPlan`. Focused tests cover overflow, nil plans, and no-I/O behavior; the
 full-module CI coverage check continues to require 100.0% statement coverage.
+
+At Issue #1247, `materialize.MultibufferProductPlan.BlocksAccessed` estimates right-side materialized reads plus left
+scan passes per right chunk. Focused tests cover whole/final chunks, signed 32-bit arithmetic, unavailable inputs, and
+absence of scan or storage I/O. The full-module CI coverage check remains at 100.0%.

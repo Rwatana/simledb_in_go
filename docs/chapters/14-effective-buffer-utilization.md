@@ -12,7 +12,7 @@ operations.
 | `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` (`beforeFirst`, `next`, `getInt`, `getString`, `hasField`) | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
 | `internal/plan.ChunkValueScan` | `simpledb/multibuffer/ChunkScan.java` (`getVal`) | Adapt typed chunk field reads to query constants without making `multibuffer` depend on `query` |
 | `internal/plan.MultibufferProductScan` | `simpledb/multibuffer/MultibufferProductScan.java` (constructor, `beforeFirst`, `next`, `useNextChunk`) | Read right-table size and buffer budget, choose bounded ranges, pin and replace chunks, reset the left scan, and enumerate left-major pairs |
-| `internal/materialize.MultibufferProductPlan` | `simpledb/multibuffer/MultibufferProductPlan.java` (`schema`, `recordsOutput`, `open`, `copyRecordsFrom`) | Combine child schemas in left/right order, estimate product rows, materialize the right plan into a temporary table, then open an owned left-major multi-buffer product scan |
+| `internal/materialize.MultibufferProductPlan` | `simpledb/multibuffer/MultibufferProductPlan.java` (`schema`, `recordsOutput`, `blocksAccessed`, `open`, `copyRecordsFrom`) | Combine child schemas in left/right order, estimate product rows and chunked scan cost, materialize the right plan into a temporary table, then open an owned left-major multi-buffer product scan |
 
 
 ## Feature 1: Choose a safe buffer root
@@ -512,3 +512,29 @@ and distinct-value estimates remain separate behaviors.
 
 The focused tests cover every new executable statement and function. Full-module tests, race tests, vet, documentation
 validation, and the independent one-check-per-workflow audit are recorded with this Issue's PR.
+
+## Feature 20: Estimate multibuffer product block access cost
+
+`materialize.MultibufferProductPlan.BlocksAccessed` estimates reading the materialized right input once, then scanning
+the left input once for each right-side chunk. It derives the right-side block count from the right plan's estimated
+rows and schema, chooses the bounded chunk size with `multibuffer.BestFactor`, and counts a final partial chunk. The
+estimate follows the local plan convention of excluding the one-time cost to produce a materialized relation. Missing
+dependencies, an empty right input, or unavailable block sizing yields zero.
+
+### Test-first record
+
+Focused compilation first failed because `MultibufferProductPlan.BlocksAccessed` was undefined. Tests cover whole and
+partial chunks, signed 32-bit Java-compatible cost arithmetic, unavailable metadata, and the absence of scan or storage
+I/O while estimating.
+
+### Design decision
+
+The cost model uses the same `BestFactor` rule as the product scan so estimated chunk count matches execution. It asks
+the right plan for row count and schema through `MaterializePlan.BlocksAccessed`; it does not include right-plan
+materialization work, matching `MaterializePlan` and `SortPlan`'s established estimate boundary. Distinct-value
+estimation remains a separate behavior.
+
+### Validation
+
+Focused tests cover every statement in the new method. The full-module coverage, race, vet, documentation, formatting,
+and one-check-per-workflow audit results are recorded in the recovery checkpoint and stacked PR.
