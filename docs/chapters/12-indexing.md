@@ -1367,3 +1367,16 @@ and close failures with cleanup retry. The method is 100.0% covered.
 - `btree.ensureLeafFile` appends and initializes the first leaf block only when the index leaf file is empty, then releases the temporary page pin.
 - `btree.ensureDirectoryFile` creates the block-zero minimum-key root only when the directory file is empty and chooses Java's integer or varchar sentinel from the key schema.
 - `btree.directoryLayoutFromLeaf` derives the directory `block` and `dataval` schema as a pure layout operation; file initialization and full index construction remain separate.
+
+## Completion audit
+
+The 89 numbered behavior records above complete the chapter's source map: the index contract, static hash key and cost
+rules, hash-index lifecycle, index-select and index-join adapters/plans, and B-tree page, cursor, overflow, split,
+directory propagation, root growth, index lifecycle, insertion, deletion, and cleanup behavior are all represented.
+The Java behavior is adapted to the repository's `query.Constant`, `record.RID`, transaction, and buffer contracts;
+the intentional error, cleanup, duplicate, and rollback differences above define the boundaries of that adaptation.
+
+The existing index-contract, B-tree page-format, leaf search, directory insertion, and root-growth diagrams already
+cover the chapter's storage transitions and link to editable Draw.io sources, so no additional diagram is needed.
+Chapter 12 is complete on the ordered PR stack; the README status refers to that landing order rather than implying
+that the stack has already been merged.
