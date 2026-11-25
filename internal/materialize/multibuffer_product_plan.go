@@ -27,6 +27,22 @@ func NewMultibufferProductPlan(transaction MultibufferProductPlanTransaction, le
 	return &MultibufferProductPlan{transaction: transaction, left: left, right: right}
 }
 
+// Schema returns the output schema by combining the left fields before the right fields.
+func (p *MultibufferProductPlan) Schema() *record.Schema {
+	if p == nil || p.left == nil || p.right == nil {
+		return nil
+	}
+	leftSchema := p.left.Schema()
+	rightSchema := p.right.Schema()
+	if leftSchema == nil || rightSchema == nil {
+		return nil
+	}
+	schema := &record.Schema{}
+	schema.AddAllFrom(leftSchema)
+	schema.AddAllFrom(rightSchema)
+	return schema
+}
+
 // Open materializes the right plan and returns a multi-buffer product scan over it.
 // The returned scan owns the left input scan opened by this method.
 func (p *MultibufferProductPlan) Open() (query.Scan, error) {

@@ -12,7 +12,7 @@ operations.
 | `internal/multibuffer.ChunkScan` | `simpledb/multibuffer/ChunkScan.java` (`beforeFirst`, `next`, `getInt`, `getString`, `hasField`) | Own a bounded block range, traverse it in block/slot order, read current fields, and report declared field membership |
 | `internal/plan.ChunkValueScan` | `simpledb/multibuffer/ChunkScan.java` (`getVal`) | Adapt typed chunk field reads to query constants without making `multibuffer` depend on `query` |
 | `internal/plan.MultibufferProductScan` | `simpledb/multibuffer/MultibufferProductScan.java` (constructor, `beforeFirst`, `next`, `useNextChunk`) | Read right-table size and buffer budget, choose bounded ranges, pin and replace chunks, reset the left scan, and enumerate left-major pairs |
-| `internal/materialize.MultibufferProductPlan` | `simpledb/multibuffer/MultibufferProductPlan.java` (`open`, `copyRecordsFrom`) | Materialize the right plan into a temporary table, then open an owned left-major multi-buffer product scan |
+| `internal/materialize.MultibufferProductPlan` | `simpledb/multibuffer/MultibufferProductPlan.java` (`schema`, `open`, `copyRecordsFrom`) | Combine child schemas in left/right order, materialize the right plan into a temporary table, then open an owned left-major multi-buffer product scan |
 
 
 ## Feature 1: Choose a safe buffer root
@@ -466,3 +466,27 @@ separate behaviors.
 The focused `internal/materialize` suite and uncached full `go test ./... -count=1 -coverprofile=...` report
 100.0% statement coverage, including every executable package and function; the interface-only `internal/index`
 package has no statements. The race suite, vet, documentation validator, and independent workflow audit also pass.
+
+## Feature 18: Combine multibuffer product schemas
+
+`materialize.MultibufferProductPlan.Schema` returns a new schema with the left plan's fields followed by the right
+plan's fields. Field types and varchar lengths are retained, and neither child schema is mutated. The accessor reads
+only child metadata: it does not open scans or touch transaction state. A nil plan, child, or child schema yields a
+nil result.
+
+### Test-first record
+
+Focused compilation first failed because `MultibufferProductPlan.Schema` was undefined. Tests cover field order,
+integer/varchar definitions and lengths, non-mutation of both inputs, absence of scan/transaction calls, and nil receiver,
+child-plan, and child-schema cases.
+
+### Design decision
+
+The plan composes schemas by using `record.Schema.AddAllFrom` in left-to-right order, matching product field lookup
+order while returning a distinct schema. Row-count, distinct-value, and block-access estimates remain separate
+behaviors.
+
+### Validation
+
+The focused tests exercise every new executable statement and function. Full-module tests, race tests, vet,
+documentation validation, and the independent one-check-per-workflow audit are recorded with this Issue's PR.
