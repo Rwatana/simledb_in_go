@@ -384,6 +384,10 @@ failed because the SETSTRING operation, encoder, and decoder did not exist.
 | `TestDecodeSetStringRecordRejectsInvalidEncoding` | Both lengths and exact boundary are strict |
 | `TestDecodeSetStringRecordRejectsTruncatedFilenameLength` | Filename length cannot claim bytes missing before the fixed fields |
 
+Java source map: `SetStringRecord` writes the same operation, transaction, filename, block, offset, and old-string
+fields through `Page` accessors. Go owns the byte encoding in `EncodeSetStringRecord` and validates both lengths and the
+exact final boundary before exposing fields.
+
 ## Feature 13: Append a SETSTRING record
 
 `AppendSetStringRecord` encodes before I/O, appends exactly once, and returns the LSN unchanged. Encoding failure prevents
@@ -399,6 +403,10 @@ Exact bytes/LSN, encoding cutoff, and contextual append failure were tested firs
 | `TestAppendSetStringRecordAppendsExactEncodingAndReturnsLSN` | One exact append and unchanged LSN |
 | `TestAppendSetStringRecordDoesNotAppendAfterEncodingFailure` | Invalid block width prevents I/O |
 | `TestAppendSetStringRecordReturnsAppendFailureWithContext` | Wrapped transaction/block context and no retry |
+
+Java `SetStringRecord.writeToLog` combines old-value construction and append. Go's `AppendSetStringRecord` receives an
+already captured value, reuses the independently tested codec, and depends only on the narrow `LogAppender`; reading the
+old page value remains Feature 16.
 
 ## Feature 14: Decode records by operation
 
@@ -418,6 +426,10 @@ initial build failed because `DecodeRecord` did not exist.
 | --- | --- |
 | `TestDecodeRecordDispatchesEveryOperation` | Each operation returns its concrete typed record |
 | `TestDecodeRecordRejectsShortAndUnknownOperation` | Prefix/operation errors and strict decoder errors remain explicit |
+
+Java `LogRecord.create` dispatches from the operation prefix into concrete recovery records. Go's `DecodeRecord` keeps
+that dispatch explicit, then delegates boundary validation to the selected typed decoder and exposes only the minimal
+`Record.Operation` contract.
 
 ## Feature 15: Log the previous integer before update
 
@@ -1731,7 +1743,9 @@ Both cases initially returned `ErrBufferNotPinned` because string reads had no l
 | --- | --- |
 | `TestTransactionRejectsGetStringAfterCompletion` | Completed transactions reject string reads before buffer lookup and lock acquisition |
 
-String and integer reads now share the same explicit completed-transaction boundary.
+Java `Transaction` relies on callers discarding a completed instance. Go makes that lifecycle convention an explicit
+`ErrTransactionCompleted` result before buffer lookup or shared-lock acquisition, while preserving `Unpin` for cleanup
+retry. String and integer reads share the same completed-transaction boundary.
 
 ## Feature 79: Reject integer writes after transaction completion
 
@@ -1750,7 +1764,9 @@ no new exclusive lock, and no additional recovery record. All four cases initial
 | --- | --- |
 | `TestTransactionRejectsSetIntAfterCompletion` | Completed transactions reject logged and no-log integer writes before side effects |
 
-This adds the write-side lifecycle boundary without changing active transaction write semantics.
+Java `Transaction` expects a committed or rolled-back instance to stop serving page operations. Go reports
+`ErrTransactionCompleted` before lock acquisition, logging, or mutation, without changing active-transaction write
+semantics.
 
 ## Feature 80: Reject string writes after transaction completion
 
@@ -1771,7 +1787,9 @@ no exclusive-lock acquisition, and no additional recovery append. All four cases
 | --- | --- |
 | `TestTransactionRejectsSetStringAfterCompletion` | Completed transactions reject logged and no-log string writes before side effects |
 
-All transaction page access now shares one terminal-state rule while cleanup release remains possible.
+This follows Java `Transaction`'s completed-instance convention with an explicit Go error before lock acquisition,
+SETSTRING logging, or mutation. All transaction page access shares one terminal-state rule while cleanup release remains
+possible.
 
 ## Feature 81: Invoke durable restart recovery from a transaction
 
@@ -1892,7 +1910,19 @@ This completes the Java `Transaction.availableBuffs` boundary while retaining th
 
 Continue in Chapter 6 with record layout and schema behaviors, preserving one observable behavior per stacked PR.
 
+## Completion audit
+
+The 85 numbered feature records cover recovery-log value formats and append boundaries, undo-only rollback and restart
+recovery, block-lock coordination, transaction-local buffer ownership, durable commit/rollback ordering, and the
+transaction-facing file and buffer metadata boundary. Each record retains its test-first evidence. The Java source maps
+now call out SETSTRING encoding/append/dispatch and the completed-transaction convention where Go makes it explicit.
+
+All 20 chapter diagram links resolve to six editable Draw.io assets and their SVG previews; those diagrams cover the
+record formats and dispatch, recovery traversal, lock transitions, transaction completion, and file growth. Chapter 5
+is complete on the ordered PR stack; this README status does not mean the stacked work has already been merged.
+
 ## Sources
 
 - Edward Sciore, *Database Design and Implementation*, 2nd ed., Chapter 5, Sect. 5.3.9.1
-- SimpleDB 3.4 Java source: `simpledb.tx.recovery.LogRecord`, `CheckpointRecord`
+- SimpleDB 3.4 Java source: `simpledb.tx.Transaction`, `simpledb.tx.recovery.LogRecord`, `CheckpointRecord`,
+  `StartRecord`, `CommitRecord`, `RollbackRecord`, `SetIntRecord`, and `SetStringRecord`
