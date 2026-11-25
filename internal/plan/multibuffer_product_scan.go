@@ -227,6 +227,24 @@ func (scan *MultibufferProductScan) GetInt(fieldName string) (int32, error) {
 	return value, nil
 }
 
+// GetString reads a string field from the current left-major product row.
+func (scan *MultibufferProductScan) GetString(fieldName string) (string, error) {
+	if scan == nil || scan.transaction == nil || scan.left == nil {
+		return "", fmt.Errorf("read string field %q from multibuffer product scan: scan is not initialized", fieldName)
+	}
+	if scan.closed {
+		return "", fmt.Errorf("read string field %q from multibuffer product scan for %q: scan is closed", fieldName, scan.fileName)
+	}
+	if !scan.currentRow || scan.product == nil {
+		return "", fmt.Errorf("read string field %q from multibuffer product scan for %q: current product row is unavailable", fieldName, scan.fileName)
+	}
+	value, err := scan.product.GetString(fieldName)
+	if err != nil {
+		return "", fmt.Errorf("read string field %q from multibuffer product scan for %q: %w", fieldName, scan.fileName, err)
+	}
+	return value, nil
+}
+
 func (scan *MultibufferProductScan) useNextChunk() error {
 	if scan.nextBlock >= scan.fileSize {
 		return nil

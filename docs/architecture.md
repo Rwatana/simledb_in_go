@@ -62,6 +62,8 @@ query constant model and adding product/field context without moving either inpu
 keeping field-membership metadata independent of product-row state and lazy product construction.
 `MultibufferProductScan.GetInt` delegates typed integer access to the active `query.ProductScan` and adds field/table
 context while retaining the query error cause; it rejects missing current-row state before reading either input.
+`MultibufferProductScan.GetString` follows the same boundary for varchar values, keeping storage access and
+left-before-right field selection in the query operator.
 
 ## テスト方針
 

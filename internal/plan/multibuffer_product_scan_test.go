@@ -1238,3 +1238,140 @@ func multibufferProductBlocks(start, end int) []storage.BlockID {
 	}
 	return blocks
 }
+
+type multibufferProductLeftStrings struct {
+	values           []string
+	position         int
+	beforeFirstCalls int
+	nextCalls        int
+}
+
+func (scan *multibufferProductLeftStrings) BeforeFirst() error {
+	scan.beforeFirstCalls++
+	scan.position = -1
+	return nil
+}
+
+func (scan *multibufferProductLeftStrings) Next() (bool, error) {
+	scan.nextCalls++
+	scan.position++
+	return scan.position < len(scan.values), nil
+}
+
+func (*multibufferProductLeftStrings) GetInt(string) (int32, error) {
+	return 0, errors.New("left integer is unavailable")
+}
+
+func (scan *multibufferProductLeftStrings) GetString(fieldName string) (string, error) {
+	if fieldName != "left_name" || scan.position < 0 || scan.position >= len(scan.values) {
+		return "", errors.New("left string is unavailable")
+	}
+	return scan.values[scan.position], nil
+}
+
+func (scan *multibufferProductLeftStrings) GetVal(fieldName string) (query.Constant, error) {
+	value, err := scan.GetString(fieldName)
+	if err != nil {
+		return query.Constant{}, err
+	}
+	return query.NewStringConstant(value), nil
+}
+
+func (*multibufferProductLeftStrings) HasField(fieldName string) bool {
+	return fieldName == "left_name"
+}
+
+func (*multibufferProductLeftStrings) Close() error { return nil }
+
+func TestMultibufferProductScanReadsStringFieldsFromCurrentProductRow(t *testing.T) {
+	layout := chunkValueLayout(false)
+	nameOffset, _ := layout.Offset("name")
+	transaction := &multibufferProductTransaction{
+		chunkValueTransaction: chunkValueTransaction{
+			blockSize:    128,
+			intValues:    map[int]map[int]int32{0: {0: 1}},
+			stringValues: map[int]map[int]string{0: {nameOffset: "right"}},
+		},
+		fileSize:  1,
+		available: 4,
+	}
+	left := &multibufferProductLeftStrings{values: []string{"left"}}
+	scan, err := NewMultibufferProductScan(transaction, left, "student", layout)
+	if err != nil {
+		t.Fatalf("NewMultibufferProductScan() error = %v", err)
+	}
+	if _, err := scan.GetString("left_name"); err == nil || !strings.Contains(err.Error(), "current product row") {
+		t.Fatalf("GetString() before Next = %v, want unavailable-row error", err)
+	}
+	if scan.product != nil || left.nextCalls != 0 || len(transaction.stringReads) != 0 {
+		t.Fatalf("GetString() before Next touched inputs: product=%v left next=%d string reads=%v", scan.product, left.nextCalls, transaction.stringReads)
+	}
+	if ok, err := scan.Next(); err != nil || !ok {
+		t.Fatalf("Next() = (%v, %v), want a current product row", ok, err)
+	}
+	pins := append([]storage.BlockID(nil), transaction.pins...)
+	leftReads := left.nextCalls
+	for _, check := range []struct {
+		field string
+		want  string
+	}{{"left_name", "left"}, {"name", "right"}, {"left_name", "left"}, {"name", "right"}} {
+		got, err := scan.GetString(check.field)
+		if err != nil || got != check.want {
+			t.Fatalf("GetString(%q) = (%q, %v), want %q", check.field, got, err, check.want)
+		}
+	}
+	if left.nextCalls != leftReads || !reflect.DeepEqual(transaction.pins, pins) {
+		t.Fatalf("GetString advanced the product or changed pins: left reads %d -> %d pins %v -> %v", leftReads, left.nextCalls, pins, transaction.pins)
+	}
+	if _, err := scan.GetString("missing"); err == nil || !strings.Contains(err.Error(), "missing") || !strings.Contains(err.Error(), "multibuffer product scan") {
+		t.Fatalf("GetString(missing) error = %v, want field and product context", err)
+	}
+	readErr := errors.New("string storage read failed")
+	transaction.chunkValueTransaction.stringErrors = map[int]map[int]error{0: {nameOffset: readErr}}
+	if _, err := scan.GetString("name"); !errors.Is(err, readErr) || !strings.Contains(err.Error(), "student.tbl") {
+		t.Fatalf("GetString(name) storage error = %v, want wrapped cause and table context", err)
+	}
+	if left.nextCalls != leftReads || !reflect.DeepEqual(transaction.pins, pins) {
+		t.Fatalf("GetString error changed cursor or pins: left reads=%d pins=%v", left.nextCalls, transaction.pins)
+	}
+	if ok, err := scan.Next(); err != nil || ok {
+		t.Fatalf("Next() after one pair = (%v, %v), want exhaustion", ok, err)
+	}
+	readsAtExhaustion := len(transaction.stringReads)
+	if _, err := scan.GetString("name"); err == nil || !strings.Contains(err.Error(), "current product row") {
+		t.Fatalf("GetString() after exhaustion = %v, want unavailable-row error", err)
+	}
+	if len(transaction.stringReads) != readsAtExhaustion {
+		t.Fatalf("GetString() after exhaustion read values: %v -> %v", readsAtExhaustion, transaction.stringReads)
+	}
+	if err := scan.BeforeFirst(); err != nil {
+		t.Fatalf("BeforeFirst() after exhaustion: %v", err)
+	}
+	readsBeforeRewoundRead := len(transaction.stringReads)
+	if _, err := scan.GetString("name"); err == nil || !strings.Contains(err.Error(), "current product row") {
+		t.Fatalf("GetString() after rewind = %v, want unavailable-row error", err)
+	}
+	if len(transaction.stringReads) != readsBeforeRewoundRead {
+		t.Fatalf("GetString() after rewind read values: %v -> %v", readsBeforeRewoundRead, transaction.stringReads)
+	}
+	if err := scan.Close(); err != nil {
+		t.Fatalf("Close(): %v", err)
+	}
+	readsBeforeClosedRead := len(transaction.stringReads)
+	if _, err := scan.GetString("name"); err == nil || !strings.Contains(err.Error(), "closed") {
+		t.Fatalf("GetString() after Close = %v, want closed-scan error", err)
+	}
+	if len(transaction.stringReads) != readsBeforeClosedRead {
+		t.Fatalf("GetString() after Close read values: %v -> %v", readsBeforeClosedRead, transaction.stringReads)
+	}
+}
+
+func TestMultibufferProductScanGetStringRejectsNilAndZeroValue(t *testing.T) {
+	var nilScan *MultibufferProductScan
+	if _, err := nilScan.GetString("name"); err == nil || !strings.Contains(err.Error(), "not initialized") {
+		t.Fatalf("nil GetString() error = %v, want not-initialized error", err)
+	}
+	if _, err := (&MultibufferProductScan{}).GetString("name"); err == nil || !strings.Contains(err.Error(), "not initialized") {
+		t.Fatalf("zero-value GetString() error = %v, want not-initialized error", err)
+	}
+}

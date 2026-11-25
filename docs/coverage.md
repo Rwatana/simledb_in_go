@@ -1090,3 +1090,8 @@ At the Issue #1237 product-row integer-access checkpoint, `MultibufferProductSca
 `query.ProductScan`, supports left and right integer fields, and preserves the cause for a right-page read failure.
 Tests cover repeated reads without cursor or pin changes, missing fields, and unavailable scan states. Focused
 validation is recorded in the PR; final full-module coverage must remain 100.0%.
+
+At the Issue #1239 product-row string-access checkpoint, `MultibufferProductScan.GetString` delegates to the current
+`query.ProductScan`, supports left and right varchar fields, and preserves the cause for a right-page read failure.
+Tests cover repeated reads without cursor or pin changes, missing fields, and unavailable scan states. Focused
+validation is recorded in the PR; final full-module coverage must remain 100.0%.
