@@ -23,7 +23,7 @@
 | 5 | Transaction Management | 基礎実装済み | [Transactionの解説・実装記録](docs/chapters/05-transaction-management.md) |
 | 6 | Record Management | 基礎実装済み | [Schema、Layout、RecordPage、TableScanの解説・実装記録](docs/chapters/06-record-management.md) |
 | 7 | Metadata Management | 実装完了（PR stack上） | [Catalog metadataの解説・実装記録](docs/chapters/07-metadata-management.md) |
-| 8 | Query Processing | 実装中 | [query scanと関係演算子の解説・実装記録](docs/chapters/08-query-processing.md) |
+| 8 | Query Processing | 実装完了（PR stack上） | [query scanと関係演算子の解説・実装記録](docs/chapters/08-query-processing.md) |
 | 9 | Parsing | 実装完了（PR stack上） | [SQL tokenizationとupdate-command dispatchの解説・実装記録](docs/chapters/09-parsing.md) |
 | 10 | Planning | 実装中 | [query plan contract、TablePlan/SelectPlan/ProductPlan/ProjectPlanのscan・schema・estimateの解説・実装記録](docs/chapters/10-planning.md) |
 | 11 | JDBC Interfaces | 実装完了（PR stack上） | [server managers、embedded database/sql connector、SQL planningとJava source map](docs/chapters/11-jdbc-interfaces.md) |

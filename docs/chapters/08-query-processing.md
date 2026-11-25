@@ -363,3 +363,16 @@ composition; the editable source is [`ch08-term-reduction-factor.drawio`](../dia
 
 The first focused test run failed because `Predicate.ReductionFactor` was undefined. Tests verify empty, single-term,
 and multiple-term estimates, a missing estimator, and Java-compatible 32-bit multiplication overflow.
+
+## Completion audit
+
+The 32 numbered feature records map Chapter 8's typed constants, expression and equality-term evaluation, predicate
+composition and subpredicate selection, scan/update contracts, record adapter, selection/product/projection scans,
+and equality-based selectivity estimation to their focused tests. Plan construction and plan-level output estimates
+remain in Chapter 10; indexed scans and joins remain in Chapter 12.
+
+The selection, product, project, and reduction-factor diagrams already explain the operator loops and estimate flow,
+and each displayed SVG links to its editable Draw.io source. The documented Go boundaries preserve explicit presence
+results, error propagation, one-way query-to-record dependencies, copied projection membership, and Java-compatible
+signed 32-bit estimate arithmetic. Chapter 8 is complete on the ordered PR stack; the README status does not imply
+that the stack has already been merged.
