@@ -374,17 +374,59 @@ Java版はread時にも`rws`でfileを開くためmissing fileが作られ得る
 
 ## 意図的に含めなかったもの
 
-- block appendとfile length
+- block append
 - temporary table cleanup
 - open file cacheとclose lifecycle
 - filesystemのmock interface
 - buffer pool、log、transaction、lock
 
+## Feature 4: FileManager length
+
+### 問い
+
+database fileのbyte sizeから、完全なlogical block数を安全に返すにはどうするか。
+
+### 概念
+
+file sizeがblock sizeの整数倍なら、その商がlogical block数になる。存在しないfileは、まだblockがない状態として0を返す。
+端数があるfileは破損状態としてerrorにし、切り捨てて正常に見せない。
+
+```text
+logical block count = file byte size ÷ block size
+file byte size % block size != 0 → corruption error
+```
+
+### 公開API
+
+| API | 責務 |
+| --- | --- |
+| `Length(fileName)` | complete logical blockの数を返す。missing fileは0 |
+
+### Test-firstの記録
+
+missing file、複数block、partial file、invalid path、stat failureの振る舞いを既存の`manager_test.go`へ追加した。
+`blocksForSize`は端数とplatform `int`上限を検証する。
+
+### Javaソースリーディング
+
+対象は`simpledb.file.FileMgr.length`である。Java版はfile byte sizeをblock sizeで割った整数を返す。
+Go版はsilentな切り捨てを避け、block sizeで割り切れないfileをerrorとして返す。
+
+### Clean Architecture上の判断
+
+file sizeとpathはfilesystemの責務なので、`Manager`内でstatし、結果は内側のlogical block数に変換する。
+stat操作のprivate seamでerror pathを決定的に検証し、公開filesystem interfaceは追加しない。
+
+### 意図的に含めなかったもの
+
+- zero-filled block append
+- block truncateとdelete
+- open file cache
+- buffer pool、log、transaction、recovery
+
 ## 次の機能
 
-次は`FileManager`のappend/lengthを独立したIssueとして扱う。file sizeをblock sizeで割って
-logical block数を取得し、末尾へzero-filled blockを追加して新しい`BlockID`を返す振る舞いを
-一時ディレクトリのintegration testで説明する。
+次はzero-filled block appendを実装し、file末尾へ新しいlogical blockを安全に追加する。
 
 ## 参照元
 

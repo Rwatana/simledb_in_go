@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Rwatana/simledb_in_go/internal/storage"
 )
@@ -157,6 +159,45 @@ func TestManagerRejectsInvalidBlockAccess(t *testing.T) {
 	}
 }
 
+func TestManagerLengthReportsCompleteBlocks(t *testing.T) {
+	t.Parallel()
+
+	const blockSize = 16
+	directory := filepath.Join(t.TempDir(), "database")
+	manager := newManager(t, directory, blockSize)
+	if got, err := manager.Length("missing.tbl"); err != nil || got != 0 {
+		t.Fatalf("Length() for missing file = (%d, %v), want (0, nil)", got, err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "student.tbl"), make([]byte, 3*blockSize), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if got, err := manager.Length("student.tbl"); err != nil || got != 3 {
+		t.Fatalf("Length() = (%d, %v), want (3, nil)", got, err)
+	}
+	if _, err := manager.Length("../escape.tbl"); err == nil {
+		t.Fatal("Length() path traversal error = nil, want an invalid file name error")
+	}
+}
+
+func TestManagerLengthRejectsInvalidSizesAndStatFailures(t *testing.T) {
+	boom := errors.New("injected stat failure")
+	manager := &Manager{directory: "/database", blockSize: 4, ops: testFileOperations{statErr: boom}}
+	if _, err := manager.Length("data"); !errors.Is(err, boom) {
+		t.Fatalf("Length() error = %v, want wrapped stat failure", err)
+	}
+	manager.ops = testFileOperations{statInfo: testFileInfo{size: 5}}
+	if _, err := manager.Length("data"); err == nil {
+		t.Fatal("Length() for partial block file error = nil, want corruption error")
+	}
+}
+
+func TestBlocksForSizeRejectsLimitOverflow(t *testing.T) {
+	manager := &Manager{blockSize: 1}
+	if _, err := manager.blocksForSizeWithLimit("data", 3, 2); err == nil {
+		t.Fatal("blocksForSizeWithLimit() error = nil, want platform-limit error")
+	}
+}
+
 func newManager(t *testing.T, directory string, blockSize int) *Manager {
 	t.Helper()
 
@@ -231,12 +272,15 @@ func TestManagerWriteWrapsOpenWriteAndSyncFailures(t *testing.T) {
 }
 
 type testFileOperations struct {
+	statInfo    os.FileInfo
+	statErr     error
 	openErr     error
 	openFileErr error
 	readHandle  fileHandle
 	writeHandle fileHandle
 }
 
+func (f testFileOperations) Stat(string) (os.FileInfo, error) { return f.statInfo, f.statErr }
 func (f testFileOperations) Open(string) (fileHandle, error) {
 	if f.openErr != nil {
 		return nil, f.openErr
@@ -267,6 +311,15 @@ func (f *fakeBlockFile) ReadAt(p []byte, _ int64) (int, error) {
 func (f *fakeBlockFile) WriteAt([]byte, int64) (int, error) { return f.writeCount, f.writeErr }
 func (f *fakeBlockFile) Sync() error                        { return f.syncErr }
 func (f *fakeBlockFile) Close() error                       { return nil }
+
+type testFileInfo struct{ size int64 }
+
+func (info testFileInfo) Name() string  { return "data" }
+func (info testFileInfo) Size() int64   { return info.size }
+func (testFileInfo) Mode() fs.FileMode  { return 0o600 }
+func (testFileInfo) ModTime() time.Time { return time.Time{} }
+func (testFileInfo) IsDir() bool        { return false }
+func (testFileInfo) Sys() any           { return nil }
 
 func TestNewManagerRejectsInvalidDirectory(t *testing.T) {
 	t.Parallel()
