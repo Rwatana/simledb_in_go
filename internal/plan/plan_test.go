@@ -2125,10 +2125,11 @@ func (probe selectPlanEstimateProbe) DistinctValues(fieldName string) int {
 func (selectPlanEstimateProbe) Schema() *record.Schema { return nil }
 
 type tablePlanTransaction struct {
-	size    int
-	sizeErr error
-	pins    []storage.BlockID
-	unpins  []storage.BlockID
+	size      int
+	sizeErr   error
+	sizeCalls int
+	pins      []storage.BlockID
+	unpins    []storage.BlockID
 }
 
 type basicUpdatePlannerMetadataProbe struct {
@@ -2263,7 +2264,10 @@ func (*tablePlanTransaction) GetString(storage.BlockID, int) (string, error)    
 func (*tablePlanTransaction) SetInt(storage.BlockID, int32, int32, bool) error     { return nil }
 func (*tablePlanTransaction) SetString(storage.BlockID, int32, string, bool) error { return nil }
 
-func (t *tablePlanTransaction) Size(string) (int, error) { return t.size, t.sizeErr }
+func (t *tablePlanTransaction) Size(string) (int, error) {
+	t.sizeCalls++
+	return t.size, t.sizeErr
+}
 
 func (*tablePlanTransaction) Append(fileName string) (storage.BlockID, error) {
 	return storage.NewBlockID(fileName, 0), nil

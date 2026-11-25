@@ -1,13 +1,15 @@
 # Chapter 15: Query Optimization
 
-This chapter records the product-order choice for the `OptimizedProductPlan` source. Its estimate inputs and selected
-plan are independently tested in the Chapter 15 feature below, which is represented in the ordered PR stack.
+Chapter 15 is still in progress. The current features record the product-order choice for `OptimizedProductPlan` and
+the metadata state needed by the book's per-table heuristic planner. Its later selection, join, product, and full
+query-planner behaviors remain separate features.
 
 ## Java source map
 
 | Go behavior | Java source | Responsibility |
 | --- | --- | --- |
 | `internal/plan.NewOptimizedProductPlan` | `simpledb/plan/OptimizedProductPlan.java` (constructor) | Compare both two-input product orientations and select the cheaper block-access order |
+| `internal/plan.NewTablePlanner` | `simpledb/opt/TablePlanner.java` (constructor) | Resolve and retain a table's plan, schema, predicate, transaction, and indexes for later heuristic planning |
 
 ## Feature 1: Choose the cheaper product plan order
 
@@ -31,3 +33,29 @@ interface into a wrapper. Query-planner integration is a separate behavior and r
 
 Focused tests cover every statement in the factory. Full-module coverage, race, vet, documentation, formatting, and
 independent workflow-audit results are recorded in the recovery checkpoint and stacked PR.
+
+## Feature 2: Initialize one table planner's metadata
+
+`plan.NewTablePlanner` resolves one physical table's layout, validates its schema, resolves statistics, then loads
+the table's index metadata. It retains a `TablePlan`, schema, predicate, transaction, and index map so later planner
+operations can make independent selection, join, and product choices. Each metadata request happens once and in this
+order. Missing metadata or transaction dependencies and missing layout/schema/statistics fail before a planner is
+returned; lookup failures preserve their causes with table and phase context. A missing index map is treated as an
+empty set of indexes.
+
+The Go `TablePlannerMetadata` interface exposes only `Layout`, `Statistics`, and `IndexInfo`, the operations this
+constructor needs. It deliberately does not require view resolution, scan creation, or query-level orchestration.
+This constructor does not open a table scan or inspect rows. Selection-plan choice and index use remain separate
+observable behaviors.
+
+### Test-first record
+
+Focused compilation first failed because `NewTablePlanner` was undefined. Tests verify dependency validation,
+metadata request order and arguments, state retention, empty index metadata, contextual wrapped failures, and the
+absence of storage access.
+
+### Validation
+
+Focused planner tests cover every statement in the constructor and its dependency check. Full-module coverage, race,
+vet, documentation, formatting, and the independent workflow-audit results are recorded in the recovery checkpoint
+and stacked PR.
