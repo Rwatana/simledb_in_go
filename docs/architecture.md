@@ -84,6 +84,8 @@ transaction I/O.
 Chapter 15's `plan.TablePlanner` constructor resolves a physical table's layout, statistics, and index metadata
 through a narrow planner-owned interface, then retains those values with its predicate and transaction. It does not
 open scans or pull view expansion into the per-table planner.
+`TablePlanner.MakeSelectPlan` uses a registered index for a matching field-to-constant equality, otherwise retaining
+the table scan plan; it does not open scans or apply residual selection terms.
 
 ## テスト方針
 

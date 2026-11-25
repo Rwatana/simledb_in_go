@@ -131,6 +131,95 @@ func TestNewTablePlannerPreservesMetadataFailures(t *testing.T) {
 	}
 }
 
+func TestTablePlannerMakeSelectPlanUsesMatchingIndex(t *testing.T) {
+	index := &metadata.IndexInfo{}
+	transaction := &tablePlanTransaction{}
+	predicate := query.NewPredicateWithTerm(query.NewTerm(
+		query.NewFieldExpression("id"),
+		query.NewConstantExpression(query.NewIntConstant(7)),
+	))
+	planner, err := NewTablePlanner("student", predicate, transaction, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(newPlannerTestSchema("id")),
+		statistics: metadata.NewStatInfo(3, 12),
+		indexes:    map[string]*metadata.IndexInfo{"id": index},
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+
+	got, ok := planner.MakeSelectPlan().(*IndexSelectPlan)
+	if !ok {
+		t.Fatalf("MakeSelectPlan() type = %T, want *IndexSelectPlan", planner.MakeSelectPlan())
+	}
+	if got.child != planner.tablePlan || got.indexInfo != index {
+		t.Errorf("indexed selection state = (child %p, index %p), want (%p, %p)", got.child, got.indexInfo, planner.tablePlan, index)
+	}
+	if value, ok := got.searchKey.AsInt(); !ok || value != 7 {
+		t.Errorf("indexed selection key = (%d, %t), want (7, true)", value, ok)
+	}
+	if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+		t.Errorf("selection planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+	}
+}
+
+func TestTablePlannerMakeSelectPlanRecognizesReversedConstantEquality(t *testing.T) {
+	index := &metadata.IndexInfo{}
+	planner, err := NewTablePlanner("student", query.NewPredicateWithTerm(query.NewTerm(
+		query.NewConstantExpression(query.NewStringConstant("Ada")),
+		query.NewFieldExpression("name"),
+	)), &tablePlanTransaction{}, &tablePlannerMetadataProbe{
+		layout:     record.NewLayout(newPlannerTestSchema("name")),
+		statistics: metadata.NewStatInfo(1, 1),
+		indexes:    map[string]*metadata.IndexInfo{"name": index},
+	})
+	if err != nil {
+		t.Fatalf("NewTablePlanner() error = %v", err)
+	}
+
+	got, ok := planner.MakeSelectPlan().(*IndexSelectPlan)
+	if !ok {
+		t.Fatalf("MakeSelectPlan() type = %T, want *IndexSelectPlan", planner.MakeSelectPlan())
+	}
+	if got.indexInfo != index {
+		t.Errorf("indexed selection index = %p, want %p", got.indexInfo, index)
+	}
+	if value, ok := got.searchKey.AsString(); !ok || value != "Ada" {
+		t.Errorf("indexed selection key = (%q, %t), want (Ada, true)", value, ok)
+	}
+}
+
+func TestTablePlannerMakeSelectPlanFallsBackWithoutMatchingIndex(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		predicate query.Predicate
+		indexes   map[string]*metadata.IndexInfo
+	}{
+		{name: "no indexes", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(7))))},
+		{name: "different indexed field", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(7)))), indexes: map[string]*metadata.IndexInfo{"name": {}}},
+		{name: "field equality", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewFieldExpression("other"))), indexes: map[string]*metadata.IndexInfo{"id": {}}},
+		{name: "nil index metadata", predicate: query.NewPredicateWithTerm(query.NewTerm(query.NewFieldExpression("id"), query.NewConstantExpression(query.NewIntConstant(7)))), indexes: map[string]*metadata.IndexInfo{"id": nil}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			transaction := &tablePlanTransaction{}
+			planner, err := NewTablePlanner("student", test.predicate, transaction, &tablePlannerMetadataProbe{
+				layout:     record.NewLayout(newPlannerTestSchema("id")),
+				statistics: metadata.NewStatInfo(3, 12),
+				indexes:    test.indexes,
+			})
+			if err != nil {
+				t.Fatalf("NewTablePlanner() error = %v", err)
+			}
+
+			if got := planner.MakeSelectPlan(); got != planner.tablePlan {
+				t.Errorf("MakeSelectPlan() = %T, want retained table plan %p", got, planner.tablePlan)
+			}
+			if transaction.sizeCalls != 0 || len(transaction.pins) != 0 {
+				t.Errorf("selection planning accessed storage: size calls = %d, pins = %v", transaction.sizeCalls, transaction.pins)
+			}
+		})
+	}
+}
+
 type tablePlannerMetadataProbe struct {
 	layout        *record.Layout
 	statistics    *metadata.StatInfo
