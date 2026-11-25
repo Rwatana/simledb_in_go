@@ -13,6 +13,9 @@ behavior remains a separate Issue, branch, commit, and stacked Pull Request.
 | `internal/metadata.NewViewCatalogSchema` | `simpledb/metadata/ViewMgr.java` constructor | Logical description of each `viewcat` record |
 | `internal/metadata.NewStatInfo` | `simpledb/metadata/StatInfo.java` constructor | Immutable observed block and record counts |
 | `internal/metadata.NewStatManager` | `simpledb/metadata/StatMgr.java` constructor | Statistics cache state and table metadata dependency |
+| `internal/metadata.TableManager`, `ViewManager`, `IndexManager`, `StatManager` | `TableMgr.java`, `ViewMgr.java`, `IndexMgr.java`, `StatMgr.java` | Catalog writes/lookups, view definitions, index metadata, and cached statistics |
+| `internal/metadata.MetadataManager` | `simpledb/metadata/MetadataMgr.java` | Shared catalog initialization and table/view/index/statistics facade |
+| `internal/metadata.IndexInfo.Open` | `simpledb/metadata/IndexInfo.java` | Open the configured static-hash index; B-tree implementation remains in Chapter 12 |
 
 ## Feature 1: Construct the table catalog layout
 
@@ -864,3 +867,15 @@ bucket so incorrect index-name, transaction, or record-layout wiring is observab
 | Test | Observable behavior |
 | --- | --- |
 | `TestIndexInfoOpenBuildsConfiguredStaticHashIndexWithoutOpeningBucket` | The method defers bucket I/O until positioning and returns an index configured with the metadata's name, transaction, and typed record layout |
+
+## Completion audit
+
+The 38 numbered feature records cover the chapter's catalog layouts, table and field rows, view registration and
+lookup, table statistics and refresh/cache policy, index catalog and estimates, concrete index metadata opening, and
+the shared metadata facade. The source map now identifies each manager and the cross-chapter `IndexInfo.Open`
+boundary. The two later follow-up sections record the coverage-only regression cases and the concrete hash-index
+opening behavior that depends on Chapter 12.
+
+No diagram is required for this closeout: the chapter describes metadata catalog contents and the existing record and
+index diagrams explain the physical and index boundaries. Chapter 7 is complete on the ordered PR stack; the README
+status does not imply that this stacked work has already been merged.
