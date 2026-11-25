@@ -129,7 +129,9 @@ Each successful `Managers` set also exposes a `plan.QueryPlanner`, currently com
 transaction lifecycle. The [query planner composition diagram](../diagrams/ch11-query-planner-composition.svg)
 shows this dependency and the returned query plan; its [editable Draw.io source](../diagrams/ch11-query-planner-composition.drawio)
 is maintained beside it. `Managers.SetQueryPlannerStrategy` can replace this default with a basic or cost-aware
-`plan.BetterQueryPlanner`; both choices receive the manager set's existing metadata facade. The
+`plan.BetterQueryPlanner`, or with the Chapter 15 heuristic planner; every choice receives the manager set's existing
+metadata facade. The heuristic adapter binds a multibuffer product factory when planning receives a full transaction,
+and falls back to ordinary products for a narrower record-transaction adapter. The
 [query-planner strategy diagram](../diagrams/ch11-query-planner-strategy.svg) shows that selection while keeping the
 metadata and transaction shared; its [editable Draw.io source](../diagrams/ch11-query-planner-strategy.drawio) is
 maintained beside the SVG. The zero-valued strategy preserves the basic default, and a rejected selection leaves the
@@ -240,8 +242,10 @@ operations currently implemented; its remaining optional interfaces stay out unt
 | `TestManagersRecoverPreservesRestartHistoryError` | Corrupt durable history returns contextual restart-recovery failure |
 | `TestFinishRestartRecoveryReportsRecoveryAndCommitFailures` | Recovery failure prevents commit, while commit failure preserves the durable checkpoint LSN |
 | `TestManagersComposeBasicQueryPlannerWithTheirMetadata` | A manager set's SELECT planner resolves an initialized table through that set's metadata and caller-owned transaction |
-| `TestManagersSetQueryPlannerStrategyUsesSharedMetadata` | Basic and cost-aware choices replace the default planner and both plan through shared metadata |
+| `TestManagersSetQueryPlannerStrategyUsesSharedMetadata` | Basic, cost-aware, and heuristic choices replace the default planner and plan through shared metadata |
 | `TestManagersSetQueryPlannerStrategyRejectsInvalidInputsWithoutReplacingPlanner` | Nil manager sets, missing metadata, and unknown strategies leave the current planner unchanged |
+| `TestHeuristicProductFactoryUsesTransactionBoundMultibufferProducts` | Full transactions bind multibuffer product plans; narrower adapters use the ordinary product fallback |
+| `TestManagersHeuristicStrategyPlansConnectedAndDisconnectedSources` | The manager-selected heuristic planner builds joined and disconnected SELECT plans with the requested projection |
 | `TestNewConnectionValidatesManagersAndImplementsDriverConnection` | A non-nil manager set creates a driver connection that retains SQL in a prepared statement handle |
 | `TestConnectionBeginsAndCompletesCallerControlledTransactions` | Begin creates a driver transaction that delegates commit and rollback, and the connection can begin again |
 | `TestConnectionCloseIsIdempotentAndLeavesReturnedTransactionCallerOwned` | Close prevents new operations without completing a transaction already returned to the caller |
@@ -354,7 +358,8 @@ test first failed because `Managers.QueryPlanner` was undefined. The update plan
 `Managers.UpdatePlanner` was undefined. The SQL SELECT dispatch test first failed because `Managers.CreateQueryPlan` was
 undefined. The SQL update dispatch tests first failed because `Managers.ExecuteUpdate` and its command dispatcher were
 undefined. The planner-strategy tests first failed because `QueryPlannerStrategy` and
-`Managers.SetQueryPlannerStrategy` were undefined. These tests use temporary database directories and keep catalog initialization, explicit process-restart
+`Managers.SetQueryPlannerStrategy` were undefined. The heuristic-strategy tests first failed because its strategy value,
+manager adapter, and transaction-bound product factory were undefined. These tests use temporary database directories and keep catalog initialization, explicit process-restart
 recovery, SELECT planner composition, update planner composition, SQL SELECT planning, SQL update dispatch, embedded
 connection transaction lifecycle, ordinary transaction completion, and JDBC client operations as separate behaviors.
 The embedded-connection tests first failed because `Connection`, `NewConnection`, and its transaction adapter were

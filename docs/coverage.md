@@ -1173,3 +1173,10 @@ repeated join choice, disconnected product fallback, and final projection. Tests
 custom/default product factories, contextual metadata and projection errors, invalid dependencies/results, and no storage
 access. The uncached full-suite coverage profile reports 100.0% for every executable package and function, with no
 zero-count executable statement regions; `internal/index` has no statements.
+
+At Issue #1274, `Managers.SetQueryPlannerStrategy` adds a heuristic option backed by the same metadata facade as the
+basic and cost-aware planners. The server adapter binds `MultibufferProductPlanFactory` when the caller-owned transaction
+supports multibuffer operations and leaves the heuristic planner's ordinary-product default for narrower adapters.
+Tests cover strategy replacement, invalid-selection preservation, transaction-specific factory selection, and connected
+and disconnected SELECT planning. The final full-module coverage profile reports 100.0% for each executable package and function, with no uncovered
+statement regions.
